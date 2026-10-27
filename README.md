@@ -17,3 +17,5 @@ A procedural low-poly green dragon built from primitives in Three.js, with an or
 | Pause | Esc | II |
 
 Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
+
+Created by Claude from a one-line prompt - see [PROMPT.md](PROMPT.md).
