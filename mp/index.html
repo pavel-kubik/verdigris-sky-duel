@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Verdigris Co-op</title>
+<meta name="description" content="Fly green dragons together against waves of crimson wyverns. Peer-to-peer co-op in the browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ink:#0d1411;--panel:rgba(12,19,16,.8);--line:rgba(233,225,204,.16);--bone:#ebe3cd;--mute:#a9ae9b;
+  --verd:#62c48a;--ember:#ff9447;--blood:#e5484f;
+  --f-display:"Grenze Gotisch",Georgia,serif;--f-ui:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--ink);color:var(--bone);font:15px/1.4 var(--f-ui);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#c,#hud{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{pointer-events:none}
+#vignette{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(229,72,79,.55) 100%)}
+button,input{font-family:var(--f-ui)}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--verd);outline-offset:2px}
+
+#hudTop{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:calc(14px + env(safe-area-inset-left,0px));right:calc(14px + env(safe-area-inset-right,0px));display:flex;align-items:flex-start;justify-content:space-between;gap:12px;pointer-events:none}
+.left{display:grid;gap:10px;width:min(230px,40vw)}
+.bars{display:grid;gap:7px}
+.bar{display:grid;gap:3px}
+.bar span{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.track{height:8px;background:rgba(233,225,204,.12);border-radius:2px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.fill{height:100%;width:100%;transform-origin:left;transition:transform .12s linear}
+#hpFill{background:linear-gradient(90deg,#3d9a63,var(--verd))}
+#stFill{background:linear-gradient(90deg,#d8562a,var(--ember))}
+#team{display:grid;gap:4px;font-size:12px}
+#team div{display:grid;grid-template-columns:10px 1fr 46px;gap:6px;align-items:center}
+#team i{width:10px;height:10px;border-radius:50%}
+#team b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#team em{font-style:normal;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+#team .down b{color:var(--blood);text-decoration:line-through}
+.tally{text-align:center;font-variant-numeric:tabular-nums;line-height:1.05}
+.tally b{display:block;font-family:var(--f-display);font-weight:700;font-size:30px}
+.tally small{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.right{display:flex;gap:8px;align-items:flex-start}
+#roomChip{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;border-radius:20px;padding:0 14px;font-size:13px;font-weight:600;letter-spacing:.06em}
+#roomChip span{color:var(--verd);font-weight:700;letter-spacing:.14em}
+#menuBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
+#banner{position:fixed;left:0;right:0;top:28%;text-align:center;font-family:var(--f-display);font-size:clamp(34px,7vw,64px);text-shadow:0 2px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s;padding-inline:16px}
+#banner small{display:block;font-family:var(--f-ui);font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--ember);margin-top:6px}
+#feed{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));top:calc(64px + env(safe-area-inset-top,0px));display:grid;gap:4px;justify-items:end;font-size:13px;pointer-events:none}
+#feed div{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:2px 8px;transition:opacity .5s}
+#legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(560px,60vw);font-size:12px;color:var(--mute);pointer-events:none}
+kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin-right:4px;background:rgba(12,19,16,.5)}
+
+#stick{position:fixed;left:calc(22px + env(safe-area-inset-left,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));width:128px;height:128px;border-radius:50%;border:1px solid var(--line);background:rgba(12,19,16,.35);touch-action:none}
+#nub{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(98,196,138,.35);border:1px solid var(--verd)}
+#btns{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,64px);gap:12px}
+#btns button{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);background:rgba(12,19,16,.55);color:var(--bone);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;touch-action:none}
+#btns button.on{background:rgba(255,148,71,.35);border-color:var(--ember)}
+#bBreath{border-color:var(--ember)!important;color:var(--ember)!important}
+
+.panel{position:fixed;background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:6px;padding:22px;display:grid;gap:14px}
+#lobby{left:calc(20px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);width:340px;max-height:calc(100% - 40px);overflow:auto;-webkit-user-select:text;user-select:text}
+.center{left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));text-align:center}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--verd);font-weight:700}
+h1,h2{font-family:var(--f-display);font-weight:700;line-height:.9;margin:0;text-wrap:balance}
+h1{font-size:60px}
+h2{font-size:42px}
+p{margin:0;color:var(--mute);line-height:1.45}
+label{display:grid;gap:4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600}
+input{background:rgba(233,225,204,.06);border:1px solid var(--line);border-radius:4px;color:var(--bone);padding:10px 12px;font-size:16px;letter-spacing:normal;text-transform:none;font-weight:500;width:100%}
+#codeIn{text-transform:uppercase;letter-spacing:.2em;font-weight:700}
+.cta{background:var(--verd);color:#08130d;border:0;border-radius:4px;padding:12px 16px;font-size:16px;font-weight:700;letter-spacing:.04em}
+.cta:hover{filter:brightness(1.08)}
+.cta:disabled{opacity:.5;cursor:default}
+.ghost{background:transparent;color:var(--bone);border:1px solid var(--line);border-radius:4px;padding:10px 16px;font-size:15px;font-weight:600}
+.join{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+#status{min-height:1.4em;font-size:14px;color:var(--ember)}
+#status.ok{color:var(--verd)}
+.foot{font-size:13px}
+.foot a{color:var(--bone)}
+.linkbox{display:grid;grid-template-columns:1fr auto;gap:8px}
+.linkbox input{font-size:13px}
+#loading{position:fixed;inset:0;display:grid;place-items:center;color:var(--mute);letter-spacing:.2em;text-transform:uppercase;font-size:12px}
+
+@media (max-width:720px){
+  #lobby{left:0;right:0;top:auto;bottom:0;transform:none;width:auto;border-radius:12px 12px 0 0;max-height:62%;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));gap:10px}
+  h1{font-size:44px}
+  .tally b{font-size:24px}
+  #roomChip{font-size:0;padding:0 12px}
+  #roomChip span{font-size:12px}
+  #team{display:none}
+}
+@media (prefers-reduced-motion:reduce){.fill,#banner{transition:none}}
+</style>
+</head>
+<body>
+<div id="loading">Hatching the dragons</div>
+<canvas id="c"></canvas>
+<canvas id="hud"></canvas>
+<div id="vignette"></div>
+
+<div id="hudTop" hidden>
+  <div class="left">
+    <div class="bars">
+      <div class="bar"><span>Vitality</span><div class="track"><div class="fill" id="hpFill"></div></div></div>
+      <div class="bar"><span>Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
+    </div>
+    <div id="team"></div>
+  </div>
+  <div class="tally"><small>Wave</small><b id="wave">-</b><small id="foes">get ready</small></div>
+  <div class="tally"><small>Team score</small><b id="score">0</b></div>
+  <div class="right">
+    <button id="roomChip" title="Copy invite link">Room <span id="roomCode">-</span></button>
+    <button id="menuBtn" aria-label="Menu">II</button>
+  </div>
+</div>
+<div id="feed"></div>
+<div id="banner"></div>
+<div id="legend" hidden>
+  <span><kbd>A</kbd><kbd>D</kbd>Turn</span><span><kbd>W</kbd><kbd>S</kbd>Climb / dive</span><span><kbd>Space</kbd>Fire breath</span><span><kbd>F</kbd>Fireball</span><span><kbd>Shift</kbd>Boost</span><span><kbd>Q</kbd><kbd>E</kbd>Barrel roll</span><span><kbd>Esc</kbd>Menu</span>
+</div>
+<div id="touch" hidden>
+  <div id="stick"><div id="nub"></div></div>
+  <div id="btns">
+    <button id="bRoll">Roll</button><button id="bBall">Ball</button>
+    <button id="bBoost">Boost</button><button id="bBreath">Breath</button>
+  </div>
+</div>
+
+<section id="lobby" class="panel" hidden>
+  <div class="eyebrow">Co-op multiplayer · beta</div>
+  <h1>Verdigris Co-op</h1>
+  <p>Fly together against waves of crimson wyverns. Up to 6 dragons, connected directly browser to browser.</p>
+  <label for="nameIn">Your dragon's name<input id="nameIn" maxlength="16" autocomplete="nickname" placeholder="Verdigris"></label>
+  <button class="cta" id="hostBtn">Host a game</button>
+  <div class="or">or join a friend</div>
+  <div class="join">
+    <label for="codeIn">Room code<input id="codeIn" maxlength="5" autocomplete="off" spellcheck="false" placeholder="K3X9Q"></label>
+    <button class="ghost" id="joinBtn">Join</button>
+  </div>
+  <div id="status" role="status"></div>
+  <p class="foot"><a href="../">Play solo instead</a></p>
+</section>
+
+<section id="menu" class="panel center" hidden>
+  <div class="eyebrow">Room <span id="menuCode">-</span></div>
+  <h2>Invite friends</h2>
+  <p>The game keeps running while this menu is open.</p>
+  <div class="linkbox"><input id="linkOut" readonly aria-label="Invite link"><button class="ghost" id="copyBtn">Copy</button></div>
+  <div class="row"><button class="cta" id="resumeBtn">Resume</button><button class="ghost" id="leaveBtn">Leave game</button></div>
+</section>
+
+<section id="over" class="panel center" hidden>
+  <div class="eyebrow" style="color:var(--blood)">The flight is lost</div>
+  <h2>All dragons down</h2>
+  <p id="overText">-</p>
+  <div class="row"><button class="cta" id="againBtn">Fly again</button><button class="ghost" id="leave2Btn">Leave game</button></div>
+</section>
+
+<section id="notice" class="panel center" hidden>
+  <div class="eyebrow" style="color:var(--blood)">Disconnected</div>
+  <h2 id="noticeTitle">The host left</h2>
+  <p id="noticeText">The game ended because the host closed their window.</p>
+  <div class="row"><button class="cta" id="backBtn">Back to lobby</button></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script>if(!window.Peer)document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script src="sim.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
