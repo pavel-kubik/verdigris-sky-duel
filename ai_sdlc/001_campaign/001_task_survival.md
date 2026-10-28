@@ -56,7 +56,7 @@ campaign/
     math.js             vector + RNG helpers (array vectors, as in mp/sim.js)
     events.js           minimal event emitter
     data.js             all tunables: stages, hunger, prey types, regions, controls
-    terrain.js          heightAt(regionId, x, z), pure, used by flight, prey and renderer
+    terrain.js          heightAt / surfaceAt(regionId, x, z), pure, used by flight, prey and renderer
     growth.js           stage + stat curves from cumulative food
     hunger.js           drain, states, effects
     flight.js           parametrised dragon flight (from mp/sim.js stepPilot)
@@ -191,11 +191,13 @@ Vectors are `[x, y, z]` arrays, as in `mp/sim.js`. All functions are pure or mut
 ### 5.1 `terrain`
 
 ```js
-heightAt(regionId, x, z) -> number        // deterministic; the renderer meshes the same function
-clampToRegion(regionId, pos, minAlt)      // keeps pos inside radius and >= ground + minAlt (mutates)
+heightAt(regionId, x, z) -> number        // deterministic; the renderer samples it on the mesh grid
+surfaceAt(regionId, x, z) -> number       // the drawn surface: heightAt on GRID corners, same triangle split as the mesh
+clampToRegion(regionId, pos, minAlt)      // keeps pos inside radius and >= surface + minAlt (mutates)
+slopeAt, lairPos, lavaLevel, GRID (7.5), CHUNK (300)
 ```
 
-Base noise is the duel `H()` formula with the region `seed` as phase offset, scaled by `terrain.amp`, plus features. `cone` adds a smooth volcano with a crater; `flatten` lerps toward height `toward` beyond `from`.
+Base noise is the duel `H()` formula with the region `seed` as phase offset, scaled by `terrain.amp`, plus features. All collision and placement uses `surfaceAt`, not `heightAt`: the duel noise has detail finer than the 7.5-unit mesh grid (up to about 3.5 units of difference), so only the interpolated surface matches what the player sees. `cone` adds a smooth volcano with a crater; `flatten` lerps toward height `toward` beyond `from`.
 
 ### 5.2 `growth`
 
@@ -372,7 +374,7 @@ Each task ends with its tests passing (`node campaign/test/run.js` and `node mp/
 | T01 | Scaffold `/campaign/` page: `index.html`, empty `game.js`, Three.js scene with sky and fog, link from home screen, `sw.js` SHELL + `vsd-v2`, first `c.*` i18n keys | - | S | Page loads offline after one online visit; EN / CS switch works; duel and co-op unchanged |
 | T02 | `shared/dragon.js`: extract `makeDragon` from `index.html` as `window.VDragon`; campaign renders the dragon in a test pose | T01 | S | Dragon renders identically to solo preview; solo page untouched |
 | T03 | `core/umd.js`, `math.js`, `events.js`, `data.js` + `test/run.js` | - | S | `node campaign/test/run.js` runs and reports 0 tests ok |
-| T04 | `core/terrain.js` + `render/terrain.js` + `render/flora.js` for both regions, volcano, cave mouth | T01, T03 | L | Both regions render at 50+ fps on a mid laptop; `heightAt` matches mesh within 0.5; deterministic for a seed |
+| T04 | `core/terrain.js` + `render/terrain.js` + `render/flora.js` for both regions, volcano, cave mouth | T01, T03 | L | Both regions render at 50+ fps on a mid laptop; `surfaceAt` matches the mesh exactly (raycast check); deterministic for a seed |
 | T05 | `core/flight.js` + input wiring + chase camera; dragon flies in Ash Wastes | T02, T04 | M | Flight test: 2 min random input stays finite, in bounds, above ground + 5; feel matches duel at hatchling stats |
 | T06 | `core/growth.js` + tests; dragon scale driven by `foodXp` | T03 | S | Unit tests for stage thresholds, scale caps, `readyStage`; debug key `?debug` adds 100 food |
 | T07 | `core/hunger.js` + tests + hunger bar + effects applied to flight | T05, T06 | M | Tests: drain rates per stage, state boundaries, HP floor never crossed by starvation, regen above 80 |
