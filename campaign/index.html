@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title data-i18n="c.title">Verdigris Campaign</title>
+<meta name="description" content="Raise a hatchling dragon: hunt to survive, grow and return to your volcano lair." data-i18n-attr="content:c.desc">
+<meta name="theme-color" content="#0d1411">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="../icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Verdigris">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ink:#0d1411;--panel:rgba(12,19,16,.8);--line:rgba(233,225,204,.16);--bone:#ebe3cd;--mute:#a9ae9b;
+  --verd:#62c48a;--ember:#ff9447;--blood:#e5484f;--hunger:#e0a040;
+  --f-display:"Grenze Gotisch",Georgia,serif;--f-ui:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--ink);color:var(--bone);font:15px/1.4 var(--f-ui);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#c,#hud{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{pointer-events:none}
+button{cursor:pointer;font-family:var(--f-ui)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--verd);outline-offset:2px}
+
+.panel{position:fixed;background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:6px;padding:22px;display:grid;gap:14px}
+#intro{left:calc(20px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);width:360px;max-height:calc(100% - 40px);overflow:auto}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ember);font-weight:700}
+h1,h2{font-family:var(--f-display);font-weight:700;line-height:.9;margin:0;text-wrap:balance}
+h1{font-size:60px}
+p{margin:0;color:var(--mute);line-height:1.45}
+.cta{background:var(--verd);color:#08130d;border:0;border-radius:4px;padding:12px 16px;font-size:16px;font-weight:700;letter-spacing:.04em}
+.cta:hover{filter:brightness(1.08)}
+.ghost{background:transparent;color:var(--bone);border:1px solid var(--line);border-radius:4px;padding:10px 16px;font-size:15px;font-weight:600;text-align:center;text-decoration:none}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px}
+.foot a{color:var(--bone)}
+.langSwitch{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.langSwitch button{background:transparent;border:0;color:var(--mute);font-size:12px;font-weight:700;letter-spacing:.12em;padding:7px 11px}
+.langSwitch button+button{border-left:1px solid var(--line)}
+.langSwitch button[aria-pressed="true"]{background:rgba(98,196,138,.18);color:var(--bone)}
+.installBtn{padding:7px 12px;font-size:13px}
+.installHint{font-size:13px}
+#loading{position:fixed;inset:0;display:grid;place-items:center;color:var(--mute);letter-spacing:.2em;text-transform:uppercase;font-size:12px}
+#wip{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;color:var(--mute);pointer-events:auto}
+#wip button{margin-left:10px;padding:4px 10px;font-size:13px}
+
+@media (max-width:720px){
+  #intro{left:0;right:0;top:auto;bottom:0;transform:none;width:auto;border-radius:12px 12px 0 0;max-height:62%;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));gap:10px}
+  h1{font-size:44px}
+}
+</style>
+</head>
+<body>
+<div id="loading" data-i18n="c.loading">Warming the volcano</div>
+<canvas id="c"></canvas>
+<canvas id="hud"></canvas>
+
+<section id="intro" class="panel" hidden>
+  <div class="eyebrow" data-i18n="c.eyebrow">Campaign · alpha</div>
+  <h1>Verdigris</h1>
+  <p data-i18n="c.intro">Deep in a dormant volcano, the last Verdigris egg is about to hatch. Hunt to survive, grow strong and one day free the realm from the Order of the Iron Lance.</p>
+  <div class="row"><button class="cta" id="startBtn" data-i18n="c.start">Hatch</button></div>
+  <a class="ghost" href="../" data-i18n="c.back">Back to the duel</a>
+  <div class="foot"><span data-i18n="c.wipNote">Early build - the world is still forming.</span><div class="langSwitch"></div></div>
+  <button class="ghost installBtn" hidden data-i18n="install.btn">Install app</button>
+  <p class="installHint" hidden></p>
+</section>
+
+<div id="wip" hidden><span data-i18n="c.wip">The campaign is under construction. Flight and hunting arrive in the next builds.</span><button class="ghost" id="menuBtn" data-i18n="c.menu">Menu</button></div>
+
+<script src="../i18n.js"></script>
+<script src="../pwa.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- core: pure logic, load order = dependency order -->
+<script src="core/umd.js"></script>
+<script src="core/math.js"></script>
+<script src="core/events.js"></script>
+<script src="core/data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

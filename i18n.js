@@ -1,5 +1,5 @@
 /*
- * Verdigris Sky Duel - translations (solo + co-op).
+ * Verdigris Sky Duel - translations (solo, co-op and campaign).
  * Adding a language: add an entry to LANGS and a dictionary to DICT with the same keys as `en`.
  * Missing keys fall back to English, so a partial dictionary still works.
  *
@@ -49,6 +49,7 @@
       'intro.text': 'A green wyrm built from primitives in Three.js. Drag to orbit, scroll or pinch to zoom.',
       'intro.learn': 'Learn to fly', 'intro.replay': 'Replay tutorial', 'intro.duel': 'Start the duel',
       'intro.coop': 'Co-op multiplayer (beta)',
+      'intro.campaign': 'Campaign (alpha)',
       'intro.k.turn': 'Turn and bank', 'intro.k.pitch': 'Climb / dive', 'intro.k.breath': 'Fire breath (hold) or left mouse',
       'intro.k.ball': 'Fireball, auto-aims, or right mouse', 'intro.k.boost': 'Boost (uses fire)', 'intro.k.roll': 'Barrel roll, dodges fire',
       'intro.t.stick': 'Left stick', 'intro.t.stickD': 'Steer, climb and dive', 'intro.t.breath': 'Breath', 'intro.t.breathD': 'Hold for a fire stream',
@@ -112,6 +113,20 @@
       'l.hunt.title': 'Chicken hunt',
       'l.hunt.text': 'Three chickens escaped and are flapping around the valley. Use everything you learned: find them with the arrows and radar, roast them with breath or fireballs, then catch and eat all three. A roasted chicken stops and hovers, waiting for you.',
       'l.hunt.boostD': 'Fly faster', 'l.hunt.breathD': 'Fire stream',
+
+      /* campaign */
+      'c.title': 'Verdigris Campaign',
+      'c.desc': 'Raise a hatchling dragon: hunt to survive, grow and return to your volcano lair.',
+      'c.loading': 'Warming the volcano',
+      'c.engineFail': 'Could not load the 3D engine. Check your connection and reload.',
+      'c.eyebrow': 'Campaign · alpha',
+      'c.intro': 'Deep in a dormant volcano, the last Verdigris egg is about to hatch. Hunt to survive, grow strong and one day free the realm from the Order of the Iron Lance.',
+      'c.start': 'Hatch',
+      'c.back': 'Back to the duel',
+      'c.wipNote': 'Early build - the world is still forming.',
+      'c.wip': 'The campaign is under construction. Flight and hunting arrive in the next builds.',
+      'c.menu': 'Menu',
+      'c.region.ash': 'Ash Wastes', 'c.region.wild': 'Wildwood',
 
       /* co-op */
       'mp.title': 'Verdigris Co-op',
@@ -192,6 +207,7 @@
       'intro.text': 'Zelený drak složený ze základních těles v Three.js. Tažením otáčíš pohledem, kolečkem myši nebo dvěma prsty přibližuješ.',
       'intro.learn': 'Nauč se létat', 'intro.replay': 'Zopakovat výcvik', 'intro.duel': 'Začít souboj',
       'intro.coop': 'Kooperativní multiplayer (beta)',
+      'intro.campaign': 'Kampaň (alfa)',
       'intro.k.turn': 'Zatáčení a náklon', 'intro.k.pitch': 'Stoupání / klesání', 'intro.k.breath': 'Ohnivý dech (držet) nebo levé tlačítko myši',
       'intro.k.ball': 'Ohnivá koule se sama navádí, nebo pravé tlačítko myši', 'intro.k.boost': 'Turbo (spotřebovává oheň)', 'intro.k.roll': 'Výkrut, uhne před střelou',
       'intro.t.stick': 'Levá páčka', 'intro.t.stickD': 'Řízení, stoupání a klesání', 'intro.t.breath': 'Dech', 'intro.t.breathD': 'Držet pro proud ohně',
@@ -255,6 +271,19 @@
       'l.hunt.title': 'Hon na kuřata',
       'l.hunt.text': 'Tři kuřata utekla a poletují po údolí. Využij všechno, co ses naučil: najdi je pomocí šipek a radaru, upeč je dechem nebo ohnivými koulemi, pak je chyť a sněz všechna tři. Upečené kuře se zastaví a čeká na tebe ve vzduchu.',
       'l.hunt.boostD': 'Rychlejší let', 'l.hunt.breathD': 'Proud ohně',
+
+      'c.title': 'Verdigris - kampaň',
+      'c.desc': 'Vychovej dračí mládě: lov, abys přežil, sílej a vracej se do sopečného doupěte.',
+      'c.loading': 'Sopka se probouzí',
+      'c.engineFail': '3D engine se nepodařilo načíst. Zkontroluj připojení a obnov stránku.',
+      'c.eyebrow': 'Kampaň · alfa',
+      'c.intro': 'Hluboko v dřímající sopce se líhne poslední vejce rodu Verdigris. Lov, abys přežil, sílej a jednou osvoboď říši od Řádu železného kopí.',
+      'c.start': 'Vylíhnout',
+      'c.back': 'Zpět na souboj',
+      'c.wipNote': 'Rozpracovaná verze - svět se teprve tvoří.',
+      'c.wip': 'Kampaň se staví. Létání a lov přijdou v dalších verzích.',
+      'c.menu': 'Menu',
+      'c.region.ash': 'Popelavé pustiny', 'c.region.wild': 'Divoký hvozd',
 
       'mp.title': 'Verdigris Co-op',
       'mp.desc': 'Leťte společně se zelenými draky proti vlnám karmínových wyveren. Kooperace v prohlížeči, spojení peer-to-peer.',
