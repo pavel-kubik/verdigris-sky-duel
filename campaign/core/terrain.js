@@ -5,7 +5,7 @@
  *
  * Height = base noise (the duel's H() formula, phase-shifted by the region seed, scaled by amp)
  *        + features (volcano cone with crater, flatten)
- *        + a rising rim beyond the region edge (natural boundary, hidden mostly by fog).
+ *        + a rugged boundary ridge just beyond the region edge.
  */
 (function (root) {
   'use strict';
@@ -13,7 +13,7 @@
   const D = M.need('data');
   const { clamp } = M.need('math');
 
-  const RIM_START = 50, RIM_SLOPE = 0.45;
+  const RIM_START = 50, RIM_WIDTH = 320, RIM_HEIGHT = 150;
   /** Mesh grid: the renderer builds chunks of CHUNK x CHUNK units with GRID-unit cells. */
   const GRID = 7.5, CHUNK = 300;
 
@@ -60,7 +60,11 @@
       if (d > f.from) h += (f.toward - h) * smooth(clamp((d - f.from) / (f.r - f.from), 0, 1)) * 0.85;
     }
     const r = Math.hypot(x, z);
-    if (r > R.radius - RIM_START) h += (r - (R.radius - RIM_START)) * RIM_SLOPE;
+    if (r > R.radius - RIM_START) {
+      // boundary ridge: rises over RIM_WIDTH to RIM_HEIGHT, with its own rugged noise so the skyline is not flat
+      const k = smooth(clamp((r - (R.radius - RIM_START)) / RIM_WIDTH, 0, 1));
+      h += k * (RIM_HEIGHT + 40 * Math.sin(x * 0.013 + z * 0.007 + R.seed) * Math.cos(z * 0.011 - x * 0.005));
+    }
     return h;
   }
 

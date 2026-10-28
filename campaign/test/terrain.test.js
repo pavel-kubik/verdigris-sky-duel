@@ -77,11 +77,17 @@ for (const id of ids) {
   ok(wet / n > 0.03 && wet / n < 0.25, 'Wildwood has lakes but is mostly land: ' + (100 * wet / n).toFixed(1) + '%');
 }
 
-// The rim rises outside the region radius (natural boundary)
+// A rugged ridge rises outside the region radius (natural boundary)
 for (const id of ids) {
   const R = D.regions[id];
-  const inside = T.heightAt(id, 0, R.radius - 60), outside = T.heightAt(id, 0, R.radius + 300);
-  ok(outside > inside + 100, 'rim rises beyond the edge: ' + id);
+  let inside = 0, outside = 0, low = Infinity, n = 0;
+  for (let a = 0; a < Math.PI * 2; a += 0.05, n++) {
+    inside += T.heightAt(id, Math.cos(a) * (R.radius - 60), Math.sin(a) * (R.radius - 60));
+    const o = T.heightAt(id, Math.cos(a) * (R.radius + 300), Math.sin(a) * (R.radius + 300));
+    outside += o; low = Math.min(low, o);
+  }
+  ok(outside / n > inside / n + 100, 'ridge rises well above the region beyond the edge: ' + id);
+  ok(low > R.ceiling * 0.25, 'no low gap in the boundary ridge: ' + id + ' lowest ' + low.toFixed(0));
 }
 
 let threw = false;

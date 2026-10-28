@@ -124,7 +124,8 @@
       'c.start': 'Hatch',
       'c.back': 'Back to the duel',
       'c.wipNote': 'Early build - the world is still forming.',
-      'c.wip': 'The campaign is under construction. Flight and hunting arrive in the next builds.',
+      'c.wip': 'Flight test - hunting, hunger and the lair arrive in the next builds.',
+      'c.stage.hatchling': 'Hatchling', 'c.stage.drake': 'Drake',
       'c.menu': 'Menu',
       'c.region.ash': 'Ash Wastes', 'c.region.wild': 'Wildwood',
 
@@ -281,7 +282,8 @@
       'c.start': 'Vylíhnout',
       'c.back': 'Zpět na souboj',
       'c.wipNote': 'Rozpracovaná verze - svět se teprve tvoří.',
-      'c.wip': 'Kampaň se staví. Létání a lov přijdou v dalších verzích.',
+      'c.wip': 'Zkušební let - lov, hlad a doupě přijdou v dalších verzích.',
+      'c.stage.hatchling': 'Mládě', 'c.stage.drake': 'Drak',
       'c.menu': 'Menu',
       'c.region.ash': 'Popelavé pustiny', 'c.region.wild': 'Divoký hvozd',
 
