@@ -5,6 +5,24 @@ A procedural low-poly green dragon built from primitives in Three.js, with an or
 - **Play solo:** https://pavel-kubik.github.io/verdigris-sky-duel/
 - **Play co-op (beta):** https://pavel-kubik.github.io/verdigris-sky-duel/mp/
 
+## Learn to fly (tutorial)
+
+New players start with **Learn to fly** on the home screen. Nine short lessons unlock the controls one at a time, using golden rings and practice chickens as targets:
+
+| # | Lesson | Goal |
+|---|---|---|
+| 1 | Steering | Turn through 4 rings (left / right only) |
+| 2 | Climb and dive | 5 rings at different heights, optional inverted up / down |
+| 3 | Finding your way | Follow the edge arrows and radar to rings behind you |
+| 4 | Boost | Boost 2.5 s and reach two distant rings |
+| 5 | Fire breath | Roast a chicken on a floating rock |
+| 6 | Dinner time | Fly into the roast to eat it (+15 vitality) |
+| 7 | Fireball | Roast two chickens with auto-aimed fireballs, then eat them |
+| 8 | Barrel roll | Dodge 3 sparks from a practice wisp |
+| 9 | Chicken hunt | Roast and eat 3 flying chickens |
+
+Nothing can hurt the dragon during the tutorial. Each lesson opens with a paused briefing; the pause menu can restart or skip a lesson. Afterwards the player can start the duel or keep practicing. Completion and the invert setting are stored in `localStorage`, and the invert setting also applies to the duel. The co-op mode (`/mp/`) is unchanged.
+
 ## Controls
 
 | Action | Keyboard / mouse | Touch |

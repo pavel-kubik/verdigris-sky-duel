@@ -18,6 +18,7 @@
   --ember:#ff9447;        /* breath */
   --blood:#e5484f;        /* wounds */
   --violet:#c38cff;       /* enemy fire */
+  --gold:#ffcf5a;         /* tutorial targets */
   --f-display:"Grenze Gotisch","UnifrakturCook",Georgia,serif;
   --f-ui:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
   color-scheme:dark;
@@ -80,13 +81,35 @@ p{margin:0;color:var(--mute);line-height:1.45}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 #loading{position:fixed;inset:0;display:grid;place-items:center;color:var(--mute);letter-spacing:.2em;text-transform:uppercase;font-size:12px}
 
+/* Tutorial */
+body.tut .tally{display:none}
+body:not(.tut) .tutOnly{display:none}
+#tutCard{left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top,0px));width:min(440px,calc(100% - 28px));padding:10px 14px 11px;gap:4px;pointer-events:auto}
+.tc-top{display:flex;align-items:center;gap:10px}
+.tc-step{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--verd);font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-goal{font-size:16px;font-weight:600;color:var(--bone);font-variant-numeric:tabular-nums;white-space:pre-wrap}
+.tc-tip{font-size:13px;color:var(--ember);font-weight:500}
+.pips{display:flex;gap:4px;flex:none}
+.pips i{width:7px;height:7px;border-radius:50%;background:rgba(233,225,204,.18)}
+.pips i.done{background:var(--verd)}
+.pips i.cur{background:var(--gold);box-shadow:0 0 0 2px rgba(255,207,90,.25)}
+.linkbtn{background:none;border:0;color:var(--mute);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:6px 2px;text-decoration:underline;text-underline-offset:3px;flex:none}
+#brief{text-align:left;width:min(400px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto}
+#brief .eyebrow{white-space:pre-wrap}
+#brief .keys{gap:8px 14px;font-size:14px}
+#brief .keys dd{color:var(--bone)}
+.toggle{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--bone);cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--verd);flex:none}
+.enterk{font-size:12px;color:var(--mute)}
+#rollNow{position:fixed;left:0;right:0;top:60%;text-align:center;font-family:var(--f-display);font-size:clamp(34px,6vw,52px);color:var(--violet);opacity:0;pointer-events:none;text-shadow:0 2px 20px rgba(0,0,0,.7);transition:opacity .12s}
+
 @media (max-width:720px){
   #intro{left:0;right:0;top:auto;bottom:0;transform:none;width:auto;border-radius:12px 12px 0 0;max-height:52%;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));gap:10px}
   h1{font-size:46px}
   .keys.desk{display:none}
   .tally b{font-size:24px}
 }
-@media (pointer:coarse){ .keys.desk{display:none} }
+@media (pointer:coarse){ .keys.desk{display:none} .enterk{display:none} }
 @media (pointer:fine){ .keys.touchk{display:none} }
 </style>
 </head>
@@ -108,8 +131,9 @@ p{margin:0;color:var(--mute);line-height:1.45}
   <button id="pauseBtn" aria-label="Pause">II</button>
 </div>
 <div id="banner"></div>
+<div id="rollNow" aria-hidden="true">Roll now!</div>
 <div id="legend" hidden>
-  <span><kbd>A</kbd><kbd>D</kbd>Turn</span><span><kbd>W</kbd><kbd>S</kbd>Climb / dive</span><span><kbd>Space</kbd>Fire breath</span><span><kbd>F</kbd>Fireball</span><span><kbd>Shift</kbd>Boost</span><span><kbd>Q</kbd><kbd>E</kbd>Barrel roll</span><span><kbd>Esc</kbd>Pause</span>
+  <span data-u="turn"><kbd>A</kbd><kbd>D</kbd>Turn</span><span data-u="pitch"><kbd>W</kbd><kbd>S</kbd>Climb / dive</span><span data-u="breath"><kbd>Space</kbd>Fire breath</span><span data-u="ball"><kbd>F</kbd>Fireball</span><span data-u="boost"><kbd>Shift</kbd>Boost</span><span data-u="roll"><kbd>Q</kbd><kbd>E</kbd>Barrel roll</span><span><kbd>Esc</kbd>Pause</span>
 </div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
@@ -128,7 +152,7 @@ p{margin:0;color:var(--mute);line-height:1.45}
     <div><b id="sMesh">-</b><span>Meshes</span></div>
   </div>
   <p>A green wyrm built from primitives in Three.js. Drag to orbit, scroll or pinch to zoom.</p>
-  <button class="cta" id="startBtn">Start the duel</button>
+  <div class="row" style="justify-content:flex-start"><button class="cta" id="tutBtn">Learn to fly</button><button class="ghost" id="startBtn">Start the duel</button></div>
   <a class="ghost" href="mp/" style="text-align:center;text-decoration:none">Co-op multiplayer (beta)</a>
   <dl class="keys desk">
     <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Turn and bank</dd>
@@ -148,7 +172,7 @@ p{margin:0;color:var(--mute);line-height:1.45}
 <section id="pause" class="panel center" hidden>
   <div class="eyebrow">Paused</div>
   <h2>Wings folded</h2>
-  <div class="row"><button class="cta" id="resumeBtn">Resume</button><button class="ghost" id="viewBtn">Model view</button></div>
+  <div class="row"><button class="cta" id="resumeBtn">Resume</button><button class="ghost tutOnly" id="restartLBtn">Restart lesson</button><button class="ghost tutOnly" id="skipLBtn">Skip lesson</button><button class="ghost" id="viewBtn">Model view</button></div>
 </section>
 
 <section id="over" class="panel center" hidden>
@@ -156,6 +180,29 @@ p{margin:0;color:var(--mute);line-height:1.45}
   <h2>Verdigris falls</h2>
   <p id="overText">-</p>
   <div class="row"><button class="cta" id="againBtn">Fly again</button><button class="ghost" id="view2Btn">Model view</button></div>
+</section>
+
+<section id="tutCard" class="panel" hidden aria-live="polite">
+  <div class="tc-top"><span class="tc-step" id="tcStep">Lesson 1</span><div class="pips" id="tcPips"></div><button class="linkbtn" id="tcSkip">Skip</button></div>
+  <div class="tc-goal" id="tcGoal"></div>
+  <div class="tc-tip" id="tcTip" hidden></div>
+</section>
+
+<section id="brief" class="panel center" hidden>
+  <div class="eyebrow" id="bfEye">Lesson 1</div>
+  <h2 id="bfTitle">Steering</h2>
+  <p id="bfText"></p>
+  <dl class="keys" id="bfKeys"></dl>
+  <label class="toggle" id="bfInvertRow" hidden><input type="checkbox" id="bfInvert"> Invert climb / dive (pull back to climb, like a plane)</label>
+  <div class="row" style="justify-content:flex-start"><button class="cta" id="bfGo">Fly</button><button class="ghost" id="bfExit">Exit tutorial</button></div>
+  <span class="enterk">or press Enter</span>
+</section>
+
+<section id="tutDone" class="panel center" hidden>
+  <div class="eyebrow">Tutorial complete</div>
+  <h2>Fledged</h2>
+  <p>You can steer, climb, boost, breathe fire, spit fireballs, roll out of danger and cook your own dinner. The crimson wyverns fly just like you, but they shoot back.</p>
+  <div class="row"><button class="cta" id="tdDuel">Start the duel</button><button class="ghost" id="tdFree">Keep practicing</button><button class="ghost" id="tdView">Model view</button></div>
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -167,6 +214,8 @@ if(!window.THREE){$('#loading').textContent='3D engine failed to load';return;}
 const V3=THREE.Vector3;
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart' in window);
+let mode='duel';
+const U={turn:1,pitch:1,boost:1,breath:1,ball:1,roll:1};
 
 /* ---------- renderer / scene ---------- */
 const canvas=$('#c'), hud=$('#hud'), hx=hud.getContext('2d');
@@ -387,9 +436,9 @@ function burst(pos,n,kind,speed,size,life){
 const fbGeo=new THREE.IcosahedronGeometry(1,1);
 const fbMatP=new THREE.MeshBasicMaterial({color:0xffd27a}),fbMatE=new THREE.MeshBasicMaterial({color:0xe9c6ff});
 const balls=[];
-function shoot(from,dir,owner){
+function shoot(from,dir,owner,spd){
   const m=new THREE.Mesh(fbGeo,owner==='p'?fbMatP:fbMatE);m.scale.setScalar(owner==='p'?0.9:0.75);m.position.copy(from);scene.add(m);
-  balls.push({m,vel:dir.clone().multiplyScalar(owner==='p'?115:58),owner,life:owner==='p'?2.4:4});
+  const b={m,vel:dir.clone().multiplyScalar(spd||(owner==='p'?115:58)),owner,life:owner==='p'?2.4:4};balls.push(b);return b;
 }
 
 /* ---------- enemies ---------- */
@@ -421,7 +470,8 @@ addEventListener('keydown',e=>{
     if(e.code==='KeyQ')doRoll(-1);
     if(e.code==='KeyE')doRoll(1);
     if(e.code==='Escape'||e.code==='KeyP')setState('paused');
-  }else if(state==='paused'&&(e.code==='Escape'||e.code==='KeyP'))setState('play');
+  }else if(state==='brief'&&(e.code==='Enter'||e.code==='NumpadEnter')){e.preventDefault();tutGo();}
+  else if(state==='paused'&&(e.code==='Escape'||e.code==='KeyP'))setState('play');
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouseBreath=false;});
@@ -465,18 +515,21 @@ $('#bRoll').addEventListener('pointerdown',e=>{e.preventDefault();doRoll(touch.x
 const tmp=new V3(),tmp2=new V3(),fwd=new V3(),right=new V3(),mouthW=new V3();
 function forwardOf(yaw,pitch,out){return out.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));}
 function fireBall(){
-  if(state!=='play'||P.ballCd>0||P.st<12)return;
+  if(state!=='play'||!U.ball||P.ballCd>0||P.st<12)return;
   P.ballCd=1.0;P.st-=12;
   forwardOf(P.yaw,P.pitch,fwd);
+  const cands=[];
+  foes.forEach(f=>{if(!f.dead)cands.push({p:f.pos,v:f.dir.clone().multiplyScalar(f.speed)});});
+  if(mode==='tut')T.chickens.forEach(c=>{if(!c.gone&&c.cook<100)cands.push({p:c.center,v:c.vel});});
   let best=null,bestA=0.38;
-  foes.forEach(f=>{if(f.dead)return;tmp.subVectors(f.pos,P.pos);const dist=tmp.length();if(dist>220)return;const ang=tmp.normalize().angleTo(fwd);if(ang<bestA){bestA=ang;best=f;}});
+  cands.forEach(c=>{tmp.subVectors(c.p,P.pos);const dist=tmp.length();if(dist>220)return;const ang=tmp.normalize().angleTo(fwd);if(ang<bestA){bestA=ang;best=c;}});
   const dir=fwd.clone();
-  if(best){const t=best.pos.distanceTo(mouthW)/115;dir.copy(best.pos).addScaledVector(best.dir,best.speed*t).sub(mouthW).normalize();}
+  if(best){const t=best.p.distanceTo(mouthW)/115;dir.copy(best.p).addScaledVector(best.v,t).sub(mouthW).normalize();}
   shoot(mouthW,dir,'p');
   burst(mouthW,14,0,8,1.6,0.35);
   hero.jaw.rotation.x=0.7;
 }
-function doRoll(dir){if(state!=='play'||P.rollT>0||P.st<10)return;P.st-=10;P.rollT=0.6;P.rollDir=dir;P.inv=0.65;}
+function doRoll(dir){if(state!=='play'||!U.roll||P.rollT>0||P.st<10)return;P.st-=10;P.rollT=0.6;P.rollDir=dir;P.inv=0.65;T.rolls++;}
 
 /* ---------- HUD helpers ---------- */
 const hpFill=$('#hpFill'),stFill=$('#stFill'),waveEl=$('#wave'),scoreEl=$('#score'),foesEl=$('#foes'),banner=$('#banner'),vig=$('#vignette');
@@ -493,21 +546,327 @@ function resetGame(){
 }
 function setState(s){
   const prev=state;state=s;
+  if(s==='preview'&&mode==='tut'){tutClear();mode='duel';T.lesson=null;setUnlocks(null);}
+  document.body.classList.toggle('tut',mode==='tut');
+  $('#brief').hidden=s!=='brief';$('#tutDone').hidden=s!=='tutdone';
+  $('#tutCard').hidden=!(mode==='tut'&&T.lesson&&(s==='play'||s==='paused'));
+  $('#viewBtn').textContent=mode==='tut'?'Exit tutorial':'Model view';
+  if(s!=='play')rollEl.style.opacity=0;
   $('#intro').hidden=s!=='preview';$('#pause').hidden=s!=='paused';$('#over').hidden=s!=='over';
-  const inGame=s==='play'||s==='paused';
+  const inGame=s==='play'||s==='paused'||s==='brief';
   $('#hudTop').hidden=!(inGame||s==='over');$('#legend').hidden=!(s==='play'&&!isTouch);$('#touch').hidden=!(s==='play'&&isTouch);
   if(s==='preview'){foes.forEach(f=>scene.remove(f.d.root));foes.length=0;balls.forEach(b=>scene.remove(b.m));balls.length=0;banner.style.opacity=0;P.pos.set(0,90,0);P.yaw=P.pitch=P.roll=0;}
   if(s==='play'&&prev==='preview')resetGame();
   if(s==='over'){$('#overText').textContent='Score '+score+' · reached wave '+wave;}
-  mouseBreath=false;
+  mouseBreath=false;touch.breath=touch.boost=false;document.querySelectorAll('#btns .on').forEach(b=>b.classList.remove('on'));
 }
 $('#startBtn').onclick=()=>setState('play');
+$('#tutBtn').onclick=tutStart;
+$('#bfGo').onclick=tutGo;
+$('#bfExit').onclick=()=>setState('preview');
+$('#bfInvert').onchange=e=>{invert=e.target.checked;store('vsd-invert',invert?'1':'0');};
+$('#tcSkip').onclick=()=>{if(state==='play')tutNext();};
+$('#skipLBtn').onclick=()=>tutNext();
+$('#restartLBtn').onclick=()=>brief(T.lesson&&T.lesson.keep?T.i-1:Math.max(0,T.i));
+$('#tdDuel').onclick=()=>{tutClear();mode='duel';T.lesson=null;setUnlocks(null);setState('play');resetGame();};
+$('#tdFree').onclick=()=>{tutClear();T.i=-1;T.lesson=FREE;T.speed=FREE.speed;T.canEat=true;setUnlocks(null);FREE.setup();setState('play');};
+$('#tdView').onclick=()=>setState('preview');
 $('#resumeBtn').onclick=()=>setState('play');
 $('#viewBtn').onclick=()=>setState('preview');
 $('#view2Btn').onclick=()=>setState('preview');
 $('#againBtn').onclick=()=>{setState('play');resetGame();};
 $('#pauseBtn').onclick=()=>{if(state==='play')setState('paused');else if(state==='paused')setState('play');};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')setState('paused');});
+
+/* ---------- tutorial: learn to fly ---------- */
+const GOLD='#ffcf5a';
+const T={i:-1,lesson:null,speed:22,objs:[],rings:[],ri:0,chickens:[],wisp:null,wt:0,boostT:0,rolls:0,dodges:0,eaten:0,roasted:0,celebrate:0,tipT:0,lastGoal:'',lastStep:'',canEat:true};
+const START=new V3(0,80,-220);
+const ringGeo=new THREE.TorusGeometry(7,0.55,8,40);
+const islRock=new THREE.MeshStandardMaterial({color:0x6a5f50,flatShading:true,roughness:1}),islGrass=new THREE.MeshStandardMaterial({color:0x4d7a40,flatShading:true,roughness:1});
+const RAW=new THREE.Color(0xf3efe4),GOLDEN=new THREE.Color(0xe0a040),ROAST=new THREE.Color(0xa0561f);
+const rollEl=$('#rollNow'),aimV=new V3();
+const K=s=>s.split(' ').map(k=>'<kbd>'+k+'</kbd>').join('');
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){return null;}}
+let invert=store('vsd-invert')==='1';
+
+function tutAdd(o){scene.add(o);T.objs.push(o);return o;}
+function tutClear(){
+  T.objs.forEach(o=>scene.remove(o));T.objs.length=0;T.rings.length=0;T.chickens.length=0;T.wisp=null;T.ri=0;
+  for(let i=balls.length-1;i>=0;i--){if(balls[i].owner==='t'){scene.remove(balls[i].m);balls.splice(i,1);}}
+  rollEl.style.opacity=0;
+}
+function setUnlocks(u){
+  ['turn','pitch','boost','breath','ball','roll'].forEach(k=>U[k]=(!u||u[k])?1:0);
+  $('#bBoost').hidden=!U.boost;$('#bBreath').hidden=!U.breath;$('#bBall').hidden=!U.ball;$('#bRoll').hidden=!U.roll;
+  document.querySelectorAll('#legend [data-u]').forEach(el=>el.hidden=!U[el.dataset.u]);
+}
+function snapCam(){const back=new V3(Math.sin(P.yaw),0,Math.cos(P.yaw));camPos.copy(P.pos).addScaledVector(back,-22).add(new V3(0,7-P.pitch*6,0));}
+function resetPose(y){
+  P.pos.set(START.x,y,START.z);P.yaw=0;P.pitch=0;P.roll=0;P.speed=T.speed;P.rollT=0;P.inv=0;P.vel.set(0,0,P.speed);
+  hero.root.position.copy(P.pos);hero.root.rotation.set(0,0,0);hero.root.updateMatrixWorld(true);hero.mouth.getWorldPosition(mouthW);snapCam();
+}
+function showTip(s){const el=$('#tcTip');el.textContent=s;el.hidden=false;T.tipT=4;}
+
+/* rings */
+function addRing(pos,dir){
+  const m=new THREE.Mesh(ringGeo,new THREE.MeshBasicMaterial({color:0xffcf5a,transparent:true,opacity:.9,fog:false}));
+  m.position.copy(pos);m.lookAt(new V3().copy(pos).add(dir));tutAdd(m);T.rings.push({m,pos:pos.clone(),passed:false});
+}
+function ringPath(start,yaw,segs){let h=yaw;const p=start.clone();segs.forEach(([dh,dist,dy])=>{h+=dh;const d=new V3(Math.sin(h)*dist,dy,Math.cos(h)*dist);p.add(d);addRing(p.clone(),d);});}
+
+/* chickens */
+function makeChicken(){
+  const M=c=>new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.7});
+  const mBody=M(0xf3efe4),mRed=M(0xd8322e),mYel=M(0xf0b429),mEye=new THREE.MeshBasicMaterial({color:0x111111});
+  const g=new THREE.Group(),model=new THREE.Group();g.add(model);
+  const body=new THREE.Mesh(segGeo,mBody);body.scale.set(0.9,0.8,1.1);model.add(body);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(0.45,0.9,5),mBody);tail.position.set(0,0.45,-0.95);tail.rotation.x=-0.9;model.add(tail);
+  const head=new THREE.Group();head.position.set(0,0.75,0.8);model.add(head);
+  const hm=new THREE.Mesh(segGeo,mBody);hm.scale.setScalar(0.45);head.add(hm);
+  const beak=new THREE.Mesh(new THREE.ConeGeometry(0.13,0.35,4),mYel);beak.rotation.x=Math.PI/2;beak.position.set(0,-0.02,0.5);head.add(beak);
+  [[0.45,0.05,.16],[0.42,-0.15,.13],[0.44,0.22,.12]].forEach(a=>{const c=new THREE.Mesh(segGeo,mRed);c.scale.setScalar(a[2]);c.position.set(0,a[0],a[1]);head.add(c);});
+  const wat=new THREE.Mesh(segGeo,mRed);wat.scale.set(.08,.14,.08);wat.position.set(0,-0.25,0.38);head.add(wat);
+  [-1,1].forEach(s=>{const e=new THREE.Mesh(segGeo,mEye);e.scale.setScalar(0.07);e.position.set(s*0.3,0.1,0.28);head.add(e);});
+  const wings=[];
+  [-1,1].forEach(s=>{const p=new THREE.Group();p.position.set(s*0.78,0.25,0);model.add(p);const w=new THREE.Mesh(segGeo,mBody);w.scale.set(0.16,0.5,0.75);w.position.set(s*0.12,-0.1,-0.05);p.add(w);wings.push({p,s});});
+  [-1,1].forEach(s=>{const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.7,5),mYel);leg.position.set(s*0.3,-0.95,0.05);model.add(leg);
+    const foot=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.06,0.4),mYel);foot.position.set(s*0.3,-1.3,0.15);model.add(foot);});
+  g.scale.setScalar(1.8);
+  return {g,model,head,wings,mat:mBody};
+}
+function island(top){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.ConeGeometry(6,13,7),islRock);base.rotation.x=Math.PI;base.position.y=-7.1;g.add(base);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(6.2,6,1.2,7),islGrass);cap.position.y=-0.6;g.add(cap);
+  g.position.copy(top);return g;
+}
+function addChicken(pos,flying){
+  const k=makeChicken();tutAdd(k.g);
+  const c={k,base:pos.clone(),center:pos.clone(),vel:new V3(),cook:0,gone:false,flying,ang:Math.random()*6,rad:22,heat:0,bonk:0,hop:0,t:Math.random()*6,yaw:Math.random()*6,flip:0};
+  if(!flying)tutAdd(island(pos));
+  T.chickens.push(c);updChicken(c,0);return c;
+}
+function chickenColor(c){const t=c.cook/100;if(t<0.6)c.k.mat.color.copy(RAW).lerp(GOLDEN,t/0.6);else c.k.mat.color.copy(GOLDEN).lerp(ROAST,(t-0.6)/0.4);}
+function updChicken(c,dt){
+  c.t+=dt;c.bonk=Math.max(0,c.bonk-dt);c.heat=Math.max(0,c.heat-dt);c.hop=Math.max(0,c.hop-dt*1.6);
+  const roasted=c.cook>=100;
+  c.flip+=((roasted?1:0)-c.flip)*Math.min(1,dt*5);
+  if(c.flying){
+    if(!roasted){
+      c.ang+=dt*0.35;
+      const nx=c.base.x+Math.cos(c.ang)*c.rad,nz=c.base.z+Math.sin(c.ang)*c.rad,ny=c.base.y+Math.sin(c.t*0.8)*4;
+      if(dt>0){c.vel.set(nx-c.center.x,ny-c.center.y,nz-c.center.z).divideScalar(dt);c.yaw=Math.atan2(c.vel.x,c.vel.z);}
+      c.center.set(nx,ny,nz);
+    }else{c.vel.set(0,0,0);c.yaw+=dt*0.6;}
+  }else{
+    c.center.copy(c.base);c.center.y+=2.4-0.96*c.flip+Math.sin(c.hop*Math.PI)*3;
+    if(!roasted)c.yaw+=dt*0.3;
+  }
+  const g=c.k.g;g.position.copy(c.center);g.rotation.y=c.yaw;
+  c.k.model.rotation.z=c.flip*Math.PI;
+  const flap=c.flying&&!roasted?0.3+Math.sin(c.t*18)*0.7:roasted?0.15:(c.heat>0||c.bonk>0?Math.sin(c.t*22)*0.7:0.05);
+  c.k.wings.forEach(w=>w.p.rotation.z=w.s*flap);
+  c.k.head.rotation.x=roasted?0:Math.max(0,Math.sin(c.t*2.2))*0.6*(c.flying?0:1);
+  if(roasted&&Math.random()<dt*7)spawnP(c.center.x+(Math.random()-.5)*2,c.center.y+1,c.center.z+(Math.random()-.5)*2,0,3+Math.random()*2,0,1.2,1.2,2,2,0,0.3,0.45,0.42,0.4);
+  if(c.heat>0&&Math.random()<dt*25)spawnP(c.center.x+(Math.random()-.5)*2,c.center.y,c.center.z+(Math.random()-.5)*2,0,5,0,0.5,1,2,0,0,0.5);
+}
+function cookChicken(c,amt){if(c.gone||c.cook>=100)return;c.cook=Math.min(100,c.cook+amt);c.heat=0.4;chickenColor(c);if(c.cook>=100)roast(c);}
+function roast(c){
+  c.cook=100;chickenColor(c);T.roasted++;
+  burst(c.center,30,0,12,1.6,0.6);
+  for(let k=0;k<30;k++){const v=new V3(Math.random()-.5,Math.random(),Math.random()-.5).normalize().multiplyScalar(8+Math.random()*8);spawnP(c.center.x,c.center.y,c.center.z,v.x,v.y,v.z,0.8,0.9,0.5,2,0,1.5,1,0.82,0.35);}
+  showBanner('Roasted!',T.canEat?'Fly into it to eat':'');bannerT=1.2;
+}
+function eatChicken(c){
+  c.gone=true;scene.remove(c.k.g);hero.jaw.rotation.x=0.9;
+  for(let k=0;k<26;k++){const v=new V3(Math.random()-.5,Math.random()-.3,Math.random()-.5).normalize().multiplyScalar(6+Math.random()*8);spawnP(c.center.x,c.center.y,c.center.z,v.x+P.vel.x*0.6,v.y+P.vel.y*0.6,v.z+P.vel.z*0.6,0.7,0.8,0.3,2,0,1.5,0.9,0.55,0.2);}
+  P.hp=Math.min(100,P.hp+15);T.eaten++;hero.flash=0.4;
+  showBanner('Crunch!','+15 vitality');bannerT=1.3;
+}
+function bumpChicken(c){
+  c.bonk=1.4;c.hop=1;
+  for(let k=0;k<22;k++){const v=new V3(Math.random()-.5,Math.random()-.2,Math.random()-.5).normalize().multiplyScalar(8+Math.random()*6);spawnP(c.center.x,c.center.y,c.center.z,v.x,v.y,v.z,0.9,0.8,0.4,2,0,2,1,1,1);}
+  showTip('Raw chicken! Roast it with fire first.');
+}
+function huntChickens(){[[80,95,-60],[-90,110,40],[20,85,140]].forEach(a=>addChicken(new V3(a[0],a[1],a[2]),true));}
+
+/* practice wisp for the roll lesson */
+function makeWisp(){
+  const g=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.IcosahedronGeometry(1.6,1),new THREE.MeshBasicMaterial({color:0xc38cff}));g.add(core);
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(2.8,0.18,6,28),new THREE.MeshBasicMaterial({color:0xe9c6ff,transparent:true,opacity:.7}));g.add(halo);
+  g.userData={core,halo};return g;
+}
+function wispTarget(o){return o.set(P.pos.x+Math.sin(P.yaw)*75,P.pos.y+3,P.pos.z+Math.cos(P.yaw)*75);}
+function updWisp(dt){
+  const w=T.wisp;w.position.lerp(wispTarget(tmp),1-Math.exp(-dt*1.2));w.lookAt(P.pos);
+  T.wt+=dt;const ch=Math.max(0,(T.wt-1.7)/0.9);
+  w.userData.core.scale.setScalar(1+ch*0.6);w.userData.halo.rotation.z+=dt*(2+ch*8);
+  if(T.wt>=2.6){
+    T.wt=0;const t=w.position.distanceTo(P.pos)/34;
+    const aim=new V3().copy(P.pos).addScaledVector(P.vel,t*0.5).sub(w.position).normalize();
+    const b=shoot(w.position,aim,'t',34);b.minD=1e9;burst(w.position,12,1,6,1.2,0.3);
+  }
+}
+function tutSpark(b,p){
+  const d=P.pos.distanceTo(p);
+  if(P.inv>0&&d<40)b.rolled=true;
+  if(d<3.6&&P.inv<=0&&!b.judged){hero.flash=1;shake=Math.max(shake,0.3);hurt=0.5;showTip('Hit! Roll a little sooner, as the spark gets close.');return true;}
+  if(d<b.minD)b.minD=d;
+  else if(!b.judged&&b.minD<30){b.judged=true;if(b.rolled){T.dodges++;showBanner('Dodged!','');bannerT=0.8;}}
+  return false;
+}
+function breathAim(){
+  if(mode!=='tut')return fwd;
+  let best=null,bd=50;
+  T.chickens.forEach(c=>{if(c.gone||c.cook>=100)return;aimV.subVectors(c.center,mouthW);const d=aimV.length();if(d<bd&&aimV.normalize().angleTo(fwd)<0.5){bd=d;best=c;}});
+  if(!best)return fwd;
+  return aimV.subVectors(best.center,mouthW).normalize().lerp(fwd,0.35).normalize();
+}
+
+/* lessons */
+const STEER={turn:1,pitch:1},FIRE={turn:1,pitch:1,boost:1,breath:1};
+const ringGoal=()=>'Fly through the rings  '+T.ri+' / '+T.rings.length,ringsDone=()=>T.ri>=T.rings.length;
+const LESSONS=[
+{grp:'Flight basics',title:'Steering',speed:18,reset:80,unlock:{turn:1},
+ text:'Your dragon always flies forward on its own, so you only choose the direction. Steer through the golden rings. The first ring is straight ahead: just relax and let the dragon fly through it.',
+ desk:[[K('A D'),'Turn left / right (arrow keys work too)']],touch:[['Stick left / right','Turn left / right']],
+ setup(){ringPath(START,0,[[0,60,0],[0.6,70,0],[-1.2,80,0],[-0.6,80,0]]);},goal:ringGoal,done:ringsDone},
+{grp:'Flight basics',title:'Climb and dive',speed:20,reset:80,unlock:STEER,invert:true,
+ text:'Now the rings sit higher and lower. Climb for the high ones, dive for the low ones. You cannot crash: close to the ground the dragon pulls up by itself.',
+ desk:[[K('W'),'Climb (nose up)'],[K('S'),'Dive (nose down)'],[K('A D'),'Turn']],touch:[['Stick up','Climb'],['Stick down','Dive'],['Stick sideways','Turn']],
+ setup(){ringPath(START,0,[[0,60,0],[0,70,22],[0.25,70,-28],[-0.25,70,22],[0,60,-12]]);},goal:ringGoal,done:ringsDone},
+{grp:'Flight basics',title:'Finding your way',speed:22,reset:85,unlock:STEER,
+ text:'Targets will not always be in front of you. When one is off-screen, a gold arrow on the edge of the screen points to it. The round radar shows the valley from above: you are the green triangle and the top of the radar is straight ahead. The first ring is behind you, so turn around.',
+ desk:[[K('A D'),'Turn'],[K('W S'),'Climb / dive']],touch:[['Stick','Steer, climb and dive']],
+ setup(){const pts=[[60,95,-330],[-140,115,-250],[-60,80,-40]].map(a=>new V3(a[0],a[1],a[2]));pts.forEach((p,i)=>addRing(p,p.clone().sub(i?pts[i-1]:START)));},goal:ringGoal,done:ringsDone},
+{grp:'Flight basics',title:'Boost',speed:26,reset:85,unlock:{turn:1,pitch:1,boost:1},
+ text:'Boost makes the dragon much faster. It burns the orange Fire bar at the top left, which refills by itself as soon as you let go. Boost for a few seconds and reach the two distant rings.',
+ desk:[[K('Shift'),'Hold to boost'],[K('A D')+K('W S'),'Steer']],touch:[['Boost','Hold to boost'],['Stick','Steer']],
+ setup(){T.boostT=0;ringPath(START,0,[[0,140,0],[0,180,0]]);},
+ goal:()=>'Boost  '+Math.min(2.5,T.boostT).toFixed(1)+' / 2.5 s  ·  Rings  '+T.ri+' / '+T.rings.length,done:()=>T.boostT>=2.5&&ringsDone()},
+{grp:'Fire and food',title:'Fire breath',speed:22,reset:80,unlock:FIRE,noEat:true,
+ text:'Dragons like their chicken roasted. Fly toward the chicken on the floating rock and breathe fire at it. The flame only reaches about 35 m, so get close. Keep it burning until the chicken turns golden brown. Flew past? Turn around and try again.',
+ desk:[[K('Space'),'Hold to breathe fire (or hold the left mouse button)']],touch:[['Breath','Hold for a stream of fire']],
+ setup(){T.roasted=0;addChicken(new V3(0,77.6,-60),false);},
+ goal:()=>{const c=T.chickens[0];return 'Roast the chicken  '+Math.round(c?c.cook:0)+' %';},done:()=>T.roasted>=1},
+{grp:'Fire and food',title:'Dinner time',speed:22,reset:null,keep:true,unlock:FIRE,
+ text:'Roast ready. To eat, simply fly into the chicken and your dragon snaps it up. Eating refills the green Vitality bar.',
+ desk:[[K('A D')+K('W S'),'Steer into the chicken']],touch:[['Stick','Steer into the chicken']],
+ setup(){T.eaten=0;T.chickens.forEach(c=>{if(!c.gone&&c.cook<100){c.cook=100;chickenColor(c);}});},
+ goal:()=>'Eat the roast chicken',done:()=>T.eaten>=1},
+{grp:'Fire and food',title:'Fireball',speed:24,reset:85,unlock:{turn:1,pitch:1,boost:1,breath:1,ball:1},
+ text:'A fireball flies much further than breath and steers itself toward the target nearest the middle of your view, so point roughly at a chicken and fire. One hit roasts it. Each fireball costs some Fire, and you can spit one per second. Roast both chickens, then eat them.',
+ desk:[[K('F'),'Fireball (or the right mouse button)']],touch:[['Ball','Spit a fireball']],
+ setup(){T.roasted=0;T.eaten=0;addChicken(new V3(60,82.6,-30),false);addChicken(new V3(-70,72.6,20),false);},
+ goal:()=>'Roasted  '+Math.min(2,T.roasted)+' / 2  ·  Eaten  '+T.eaten+' / 2',done:()=>T.eaten>=2},
+{grp:'Fire and food',title:'Barrel roll',speed:24,reset:90,unlock:null,
+ text:'Q and E spin the dragon sideways in a quick barrel roll. While it spins, nothing can hit it. Do two rolls first. Then a practice wisp will shoot slow sparks at you: roll just before a spark reaches you. Practice sparks do not hurt.',
+ desk:[[K('Q'),'Roll left'],[K('E'),'Roll right']],touch:[['Roll','Barrel roll (tilt the stick to pick the side)']],
+ setup(){T.rolls=0;T.dodges=0;T.wt=0;},
+ tick(dt){
+   if(T.rolls>=2&&!T.wisp){T.wisp=tutAdd(makeWisp());wispTarget(T.wisp.position);T.wt=0.6;showTip('Here comes the wisp. Roll when you see "Roll now!"');}
+   if(T.wisp)updWisp(dt);
+ },
+ goal:()=>T.rolls<2?'Do a barrel roll  '+T.rolls+' / 2':'Dodge sparks with a roll  '+T.dodges+' / 3',done:()=>T.dodges>=3},
+{grp:'Final test',title:'Chicken hunt',speed:28,reset:90,unlock:null,
+ text:'Three chickens escaped and are flapping around the valley. Use everything you learned: find them with the arrows and radar, roast them with breath or fireballs, then catch and eat all three. A roasted chicken stops and hovers, waiting for you.',
+ desk:[[K('A D')+K('W S'),'Steer'],[K('Shift'),'Boost'],[K('Space'),'Fire breath'],[K('F'),'Fireball'],[K('Q E'),'Barrel roll']],
+ touch:[['Stick','Steer'],['Boost','Fly faster'],['Breath','Fire stream'],['Ball','Fireball'],['Roll','Barrel roll']],
+ setup(){T.eaten=0;T.roasted=0;huntChickens();},goal:()=>'Chickens eaten  '+T.eaten+' / 3',done:()=>T.eaten>=3},
+];
+const FREE={grp:'Free practice',title:'Free practice',speed:30,
+  setup(){T.eaten=0;huntChickens();},goal:()=>'Chickens eaten  '+T.eaten,done:()=>false,
+  tick(){if(T.chickens.length&&T.chickens.every(c=>c.gone)){T.chickens.length=0;huntChickens();showTip('Three more chickens took off.');}}};
+
+function buildPips(){$('#tcPips').innerHTML=LESSONS.map(()=>'<i></i>').join('');}
+function updCard(){
+  const L=T.lesson;if(!L)return;
+  const step=L===FREE?'Free practice':'Lesson '+(T.i+1)+' / '+LESSONS.length+'  ·  '+L.title;
+  if(step!==T.lastStep){T.lastStep=step;$('#tcStep').textContent=step;$('#tcSkip').hidden=L===FREE;
+    [...$('#tcPips').children].forEach((el,i)=>el.className=(L===FREE||i<T.i)?'done':i===T.i?'cur':'');}
+  const g=L.goal();if(g!==T.lastGoal){T.lastGoal=g;$('#tcGoal').textContent=g;}
+}
+function tutStart(){
+  mode='tut';
+  foes.forEach(f=>scene.remove(f.d.root));foes.length=0;balls.forEach(b=>scene.remove(b.m));balls.length=0;pN=0;wave=0;score=0;
+  Object.assign(P,{hp:55,st:100,ballCd:0,rollT:0,inv:0});
+  brief(0);
+}
+function brief(i){
+  const L=LESSONS[i];T.i=i;T.lesson=L;T.celebrate=0;T.tipT=0;$('#tcTip').hidden=true;
+  if(!L.keep)tutClear();
+  T.speed=L.speed;T.canEat=!L.noEat;setUnlocks(L.unlock);
+  if(L.reset!=null)resetPose(L.reset);
+  L.setup();
+  $('#bfEye').textContent='Lesson '+(i+1)+' of '+LESSONS.length+'  ·  '+L.grp;
+  $('#bfTitle').textContent=L.title;$('#bfText').textContent=L.text;
+  $('#bfKeys').innerHTML=(isTouch?L.touch.map(r=>[K(r[0].replace(/ /g,' ')),r[1]]):L.desk).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
+  $('#bfInvertRow').hidden=!L.invert;$('#bfInvert').checked=invert;
+  updCard();setState('brief');
+}
+function tutGo(){if(state==='brief')setState('play');}
+function tutNext(){
+  if(T.lesson===FREE)return;
+  if(T.i+1>=LESSONS.length){store('vsd-tut','1');updIntroBtns();setState('tutdone');}
+  else brief(T.i+1);
+}
+function tutUpdate(dt){
+  const L=T.lesson;if(!L)return;
+  T.rings.forEach((r,i)=>{if(r.passed){r.m.visible=false;return;}const cur=i===T.ri;r.m.visible=cur||i===T.ri+1;r.m.material.opacity=cur?0.95:0.28;r.m.scale.setScalar(cur?1+Math.sin(time*4)*0.06:0.85);});
+  const r=T.rings[T.ri];
+  if(r&&P.pos.distanceTo(r.pos)<8.8){
+    r.passed=true;T.ri++;
+    for(let k=0;k<40;k++){const v=new V3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(10+Math.random()*10);spawnP(r.pos.x,r.pos.y,r.pos.z,v.x,v.y,v.z,0.7,1.2,0.5,2,0,1.5,1,0.82,0.35);}
+  }
+  T.chickens.forEach(c=>{
+    if(c.gone)return;updChicken(c,dt);
+    const d=Math.min(c.center.distanceTo(P.pos),c.center.distanceTo(mouthW));
+    if(c.cook>=100){if(T.canEat&&d<6.5)eatChicken(c);}
+    else if(d<5&&c.bonk<=0)bumpChicken(c);
+  });
+  if(L.tick)L.tick(dt);
+  let warn=false;balls.forEach(b=>{if(b.owner==='t'&&!b.judged&&P.inv<=0&&b.m.position.distanceTo(P.pos)<34)warn=true;});
+  rollEl.style.opacity=warn?1:0;
+  if(T.tipT>0){T.tipT-=dt;if(T.tipT<=0)$('#tcTip').hidden=true;}
+  if(T.celebrate>0){T.celebrate-=dt;if(T.celebrate<=0)tutNext();}
+  else if(L.done()){const nx=LESSONS[T.i+1];T.celebrate=1.8;showBanner('Well done',nx?'Next: '+nx.title:'Tutorial complete');}
+  updCard();
+}
+function tutMarks(){
+  const out=[];const r=T.rings[T.ri];if(r)out.push({pos:r.pos,col:GOLD,label:'Ring'});
+  T.chickens.forEach(c=>{if(c.gone)return;const done=c.cook>=100;out.push({pos:c.center,col:done?'#62c48a':GOLD,label:done?(T.canEat?'Eat':'Roasted'):'Chicken',bar:done?null:c.cook/100});});
+  if(T.wisp)out.push({pos:T.wisp.position,col:'#c38cff',label:'Wisp'});
+  return out;
+}
+function drawMark(m){
+  proj.copy(m.pos).project(camera);
+  const behind=proj.z>1;let x=(proj.x+1)/2*W,y=(1-proj.y)/2*Hh;
+  const on=!behind&&x>0&&x<W&&y>0&&y<Hh,d=Math.round(m.pos.distanceTo(P.pos));
+  hx.save();hx.font='600 12px "Barlow Semi Condensed",sans-serif';hx.textAlign='center';
+  if(on){
+    const s=Math.max(9,Math.min(22,500/Math.max(1,m.pos.distanceTo(camera.position))));
+    hx.strokeStyle=m.col;hx.lineWidth=2;hx.beginPath();hx.moveTo(x,y-s);hx.lineTo(x+s,y);hx.lineTo(x,y+s);hx.lineTo(x-s,y);hx.closePath();hx.stroke();
+    hx.fillStyle='rgba(0,0,0,.55)';hx.fillText(m.label+'  '+d+' m',x+1,y+s+16);hx.fillStyle=m.col;hx.fillText(m.label+'  '+d+' m',x,y+s+15);
+    if(m.bar!=null){hx.fillStyle='rgba(0,0,0,.5)';hx.fillRect(x-22,y-s-12,44,5);hx.fillStyle='#ff9447';hx.fillRect(x-22,y-s-12,44*m.bar,5);}
+  }else{
+    if(behind){x=W-x;y=Hh-y;if(Math.hypot(x-W/2,y-Hh/2)<20)y=Hh;}
+    const ang=Math.atan2(y-Hh/2,x-W/2),mg=40;
+    const ex=W/2+Math.cos(ang)*(W/2-mg),ey=Hh/2+Math.sin(ang)*(Hh/2-mg);
+    const px=Math.max(mg,Math.min(W-mg,ex)),py=Math.max(mg+140,Math.min(Hh-mg-(isTouch?180:50),ey));
+    const pulse=1+Math.sin(time*6)*0.12;
+    hx.translate(px,py);hx.fillStyle=m.col;
+    hx.save();hx.rotate(ang);hx.scale(pulse,pulse);hx.beginPath();hx.moveTo(16,0);hx.lineTo(-8,-11);hx.lineTo(-8,11);hx.closePath();hx.fill();hx.restore();
+    hx.fillText(d+' m',-Math.cos(ang)*26,-Math.sin(ang)*26+4);
+  }
+  hx.restore();
+}
+function updIntroBtns(){
+  const done=store('vsd-tut')==='1',tb=$('#tutBtn'),sb=$('#startBtn');
+  tb.className=done?'ghost':'cta';tb.textContent=done?'Replay tutorial':'Learn to fly';sb.className=done?'cta':'ghost';
+  if(done)tb.parentNode.insertBefore(sb,tb);else tb.parentNode.insertBefore(tb,sb);
+}
 
 /* ---------- resize ---------- */
 let W=1,Hh=1,dpr=1;
@@ -522,10 +881,11 @@ addEventListener('resize',resize);resize();
 /* ---------- update loops ---------- */
 let time=0;const camPos=new V3(0,100,-30),camLook=new V3();
 function updatePlayer(dt){
-  const sx=Math.max(-1,Math.min(1,((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0)+touch.x));
-  const sy=Math.max(-1,Math.min(1,((keys.KeyW||keys.ArrowUp)?1:0)-((keys.KeyS||keys.ArrowDown)?1:0)+touch.y));
-  const wantBoost=(keys.ShiftLeft||keys.ShiftRight||touch.boost)&&P.st>2;
-  const wantBreath=(keys.Space||mouseBreath||touch.breath);
+  let sx=Math.max(-1,Math.min(1,((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0)+touch.x));
+  let sy=Math.max(-1,Math.min(1,((keys.KeyW||keys.ArrowUp)?1:0)-((keys.KeyS||keys.ArrowDown)?1:0)+touch.y));
+  sx*=U.turn;sy=(invert?-sy:sy)*U.pitch;
+  const wantBoost=(keys.ShiftLeft||keys.ShiftRight||touch.boost)&&P.st>2&&!!U.boost;
+  const wantBreath=(keys.Space||mouseBreath||touch.breath)&&!!U.breath;
   P.breathing=wantBreath&&P.st>(P.breathing?0.5:8);
   P.boosting=wantBoost;
   P.yaw-=sx*1.55*dt;
@@ -537,13 +897,13 @@ function updatePlayer(dt){
   // soft boundary: turn back toward centre
   const r=Math.hypot(P.pos.x,P.pos.z);
   if(r>400){const toC=Math.atan2(-P.pos.x,-P.pos.z);let d=toC-P.yaw;d=Math.atan2(Math.sin(d),Math.cos(d));P.yaw+=d*Math.min(1,dt*1.2*(r-400)/30);}
-  const target=(P.boosting?54:30)-P.pitch*8;
+  const target=(P.boosting?54:(mode==='tut'?T.speed:30))-P.pitch*8;
   P.speed+=(target-P.speed)*Math.min(1,dt*2.2);
-  if(P.boosting)P.st-=20*dt;
+  if(P.boosting){P.st-=20*dt;T.boostT+=dt;}
   if(P.breathing)P.st-=32*dt;
   if(!P.boosting&&!P.breathing)P.st+=17*dt;
   P.st=Math.max(0,Math.min(100,P.st));
-  P.hp=Math.min(100,P.hp+1.2*dt);
+  if(mode==='duel')P.hp=Math.min(100,P.hp+1.2*dt);
   forwardOf(P.yaw,P.pitch,fwd);
   P.vel.copy(fwd).multiplyScalar(P.speed);
   P.pos.addScaledVector(P.vel,dt);
@@ -561,9 +921,9 @@ function updatePlayer(dt){
   hero.root.updateMatrixWorld(true);
   hero.mouth.getWorldPosition(mouthW);
   if(P.breathing){
-    const n=Math.ceil(dt*70);
+    const n=Math.ceil(dt*70),aim=breathAim();
     for(let i=0;i<n;i++){
-      const sp=0.12;const vx=fwd.x+(Math.random()-.5)*sp,vy=fwd.y+(Math.random()-.5)*sp,vz=fwd.z+(Math.random()-.5)*sp;
+      const sp=0.12;const vx=aim.x+(Math.random()-.5)*sp,vy=aim.y+(Math.random()-.5)*sp,vz=aim.z+(Math.random()-.5)*sp;
       const s=62+Math.random()*12;
       spawnP(mouthW.x,mouthW.y,mouthW.z,vx*s+P.vel.x*0.9,vy*s+P.vel.y*0.9,vz*s+P.vel.z*0.9,0.55+Math.random()*0.2,1.1,4.5,0,2.4,1.1);
     }
@@ -620,8 +980,11 @@ function updateBalls(dt){
     for(let k=0;k<3;k++)spawnP(p.x+(Math.random()-.5)*.6,p.y+(Math.random()-.5)*.6,p.z+(Math.random()-.5)*.6,b.vel.x*0.05,b.vel.y*0.05+1,b.vel.z*0.05,0.45,b.owner==='p'?2.4:2,1.2,tr,0,1);
     let hit=false;
     if(b.owner==='p'){
-      for(const f of foes){if(!f.dead&&f.pos.distanceTo(p)<4.2){damageFoe(f,40,p);hit=true;break;}}
+      if(mode==='tut')for(const c of T.chickens){if(!c.gone&&c.cook<100&&c.center.distanceTo(p)<4.8){roast(c);hit=true;break;}}
+      if(!hit)for(const f of foes){if(!f.dead&&f.pos.distanceTo(p)<4.2){damageFoe(f,40,p);hit=true;break;}}
       if(hit)foes.forEach(f=>{if(!f.dead){const d=f.pos.distanceTo(p);if(d<11&&d>=4.2)damageFoe(f,14,p);}});
+    }else if(b.owner==='t'){
+      if(tutSpark(b,p))hit=true;
     }else if(P.inv<=0&&P.pos.distanceTo(p)<3.6){
       P.hp-=13;hit=true;hurt=1;shake=Math.max(shake,0.5);hero.flash=1;
     }
@@ -643,6 +1006,7 @@ function updateParticles(dt){
     else if(kind===1){pCol[k]=0.55+0.4*t;pCol[k+1]=0.25+0.5*t*t;pCol[k+2]=1;}
     else{pCol[k]=pBase[k];pCol[k+1]=pBase[k+1]*t+0.5*(1-t);pCol[k+2]=pBase[k+2]*t;}
     if(pDmg[i]>0){
+      if(mode==='tut'&&T.chickens.length){let hc=false;for(const c of T.chickens){if(c.gone||c.cook>=100)continue;const dx=c.center.x-pPos[k],dy=c.center.y-pPos[k+1],dz=c.center.z-pPos[k+2];if(dx*dx+dy*dy+dz*dz<14){cookChicken(c,pDmg[i]*1.7);pDmg[i]=0;hc=true;break;}}if(hc)continue;}
       for(const f of foes){if(f.dead)continue;const dx=f.pos.x-pPos[k],dy=f.pos.y-pPos[k+1],dz=f.pos.z-pPos[k+2];
         if(dx*dx+dy*dy+dz*dz<12){damageFoe(f,pDmg[i],null);pDmg[i]=0;if(Math.random()<0.3)spawnP(pPos[k],pPos[k+1],pPos[k+2],(Math.random()-.5)*10,(Math.random())*8,(Math.random()-.5)*10,0.4,0.6,0,2,0,1,1,0.9,0.5);break;}}
     }
@@ -655,7 +1019,7 @@ function updateParticles(dt){
 const proj=new V3();
 function drawHud(){
   hx.setTransform(dpr,0,0,dpr,0,0);hx.clearRect(0,0,W,Hh);
-  if(state!=='play'&&state!=='paused')return;
+  if(state!=='play'&&state!=='paused'&&state!=='brief')return;
   // crosshair
   forwardOf(P.yaw,P.pitch,fwd);proj.copy(P.pos).addScaledVector(fwd,60).project(camera);
   const cx=(proj.x+1)/2*W,cy=(1-proj.y)/2*Hh;
@@ -682,8 +1046,9 @@ function drawHud(){
       hx.save();hx.translate(px,py);hx.rotate(ang);hx.fillStyle='rgba(229,72,79,.85)';hx.beginPath();hx.moveTo(10,0);hx.lineTo(-6,-7);hx.lineTo(-6,7);hx.closePath();hx.fill();hx.restore();
     }
   });
+  if(mode==='tut')tutMarks().forEach(drawMark);
   // radar
-  const R=52,rx=isTouch?W-R-18:W-R-20,ry=isTouch?150+R:Hh-R-20;
+  const R=52,rx=isTouch?W-R-18:W-R-20,ry=isTouch?176+R:Hh-R-20;
   hx.fillStyle='rgba(12,19,16,.6)';hx.strokeStyle='rgba(235,227,205,.18)';hx.lineWidth=1;
   hx.beginPath();hx.arc(rx,ry,R,0,Math.PI*2);hx.fill();hx.stroke();
   hx.beginPath();hx.arc(rx,ry,R/2,0,Math.PI*2);hx.stroke();
@@ -693,6 +1058,8 @@ function drawHud(){
     // local: forward = up on radar, dragon right = right on radar
     const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4){px*=(R-4)/l;py*=(R-4)/l;}
     hx.fillStyle=f.pos.y>P.pos.y+10?'#ff8a8f':f.pos.y<P.pos.y-10?'#a8262c':'#e5484f';hx.beginPath();hx.arc(rx+px,ry+py,3.2,0,Math.PI*2);hx.fill();});
+  if(mode==='tut')tutMarks().forEach(m=>{const dx=m.pos.x-P.pos.x,dz=m.pos.z-P.pos.z;const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4){px*=(R-4)/l;py*=(R-4)/l;}
+    hx.fillStyle=m.col;hx.beginPath();hx.arc(rx+px,ry+py,4,0,Math.PI*2);hx.fill();});
   hx.fillStyle='rgba(235,227,205,.5)';hx.font='600 10px "Barlow Semi Condensed",sans-serif';hx.textAlign='center';hx.fillText('250 m',rx,ry+R-6);
 }
 
@@ -701,7 +1068,7 @@ let last=performance.now();let lastHp=-1,lastSt=-1;
 function frame(now){
   requestAnimationFrame(frame);
   let dt=Math.min(0.05,(now-last)/1000);last=now;
-  if(state==='paused'||state==='over')dt=state==='over'?dt*0.25:0;
+  if(state==='paused'||state==='over'||state==='brief'||state==='tutdone')dt=state==='over'?dt*0.25:0;
   time+=dt;
   clouds.forEach((c,i)=>{c.position.x+=dt*(1.5+i%3);if(c.position.x>560)c.position.x=-560;});
 
@@ -722,7 +1089,8 @@ function frame(now){
     if(state==='play'||state==='over'){
       if(state==='play')updatePlayer(dt);
       const alive=updateFoes(dt);updateBalls(dt);updateParticles(dt);
-      if(state==='play'){
+      if(mode==='tut'&&state==='play')tutUpdate(dt);
+      if(state==='play'&&mode==='duel'){
         if(alive===0&&foes.length===0){waveTimer+=dt;if(waveTimer>0.2&&waveTimer-dt<=0.2){showBanner('Wave '+wave+' cleared','+30 vitality');P.hp=Math.min(100,P.hp+30);}if(waveTimer>3){waveTimer=0;spawnWave();}}
         if(P.hp<=0){P.hp=0;burst(P.pos,80,0,30,3,1.2);setState('over');}
         foesEl.textContent=alive+(alive===1?' wyvern':' wyverns');
@@ -755,6 +1123,7 @@ function frame(now){
   drawHud();
 }
 $('#loading').remove();
+buildPips();updIntroBtns();
 setState('preview');
 requestAnimationFrame(frame);
 })();
