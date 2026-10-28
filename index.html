@@ -3,7 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Verdigris Sky Duel</title>
+<title data-i18n="solo.title">Verdigris Sky Duel</title>
+<meta name="description" content="Fly a procedural low-poly green dragon and duel waves of crimson wyverns in your browser." data-i18n-attr="content:solo.desc">
+<meta name="theme-color" content="#0d1411">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Verdigris">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
 <style>
@@ -79,6 +89,14 @@ p{margin:0;color:var(--mute);line-height:1.45}
 .keys dt{white-space:nowrap}
 .keys dd{margin:0;color:var(--mute)}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+/* Language switch + install */
+.introFoot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.langSwitch{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.langSwitch button{background:transparent;border:0;color:var(--mute);font-size:12px;font-weight:700;letter-spacing:.12em;padding:7px 11px}
+.langSwitch button+button{border-left:1px solid var(--line)}
+.langSwitch button[aria-pressed="true"]{background:rgba(98,196,138,.18);color:var(--bone)}
+.installBtn{padding:7px 12px;font-size:13px}
+.installHint{font-size:13px}
 #loading{position:fixed;inset:0;display:grid;place-items:center;color:var(--mute);letter-spacing:.2em;text-transform:uppercase;font-size:12px}
 
 /* Tutorial */
@@ -116,74 +134,76 @@ body:not(.tut) .tutOnly{display:none}
 <body>
 
 
-<div id="loading">Hatching the dragon</div>
+<div id="loading" data-i18n="solo.loading">Hatching the dragon</div>
 <canvas id="c"></canvas>
 <canvas id="hud"></canvas>
 <div id="vignette"></div>
 
 <div id="hudTop" hidden>
   <div class="bars">
-    <div class="bar"><span>Vitality</span><div class="track"><div class="fill" id="hpFill"></div></div></div>
-    <div class="bar"><span>Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
+    <div class="bar"><span data-i18n="hud.vitality">Vitality</span><div class="track"><div class="fill" id="hpFill"></div></div></div>
+    <div class="bar"><span data-i18n="hud.fire">Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
   </div>
-  <div class="tally"><small>Wave</small><b id="wave">1</b><small id="foes">3 wyverns</small></div>
-  <div class="tally" style="text-align:right"><small>Score</small><b id="score">0</b></div>
-  <button id="pauseBtn" aria-label="Pause">II</button>
+  <div class="tally"><small data-i18n="hud.wave">Wave</small><b id="wave">1</b><small id="foes">3 wyverns</small></div>
+  <div class="tally" style="text-align:right"><small data-i18n="hud.score">Score</small><b id="score">0</b></div>
+  <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
 </div>
 <div id="banner"></div>
-<div id="rollNow" aria-hidden="true">Roll now!</div>
+<div id="rollNow" aria-hidden="true" data-i18n="tut.rollNow">Roll now!</div>
 <div id="legend" hidden>
-  <span data-u="turn"><kbd>A</kbd><kbd>D</kbd>Turn</span><span data-u="pitch"><kbd>W</kbd><kbd>S</kbd>Climb / dive</span><span data-u="breath"><kbd>Space</kbd>Fire breath</span><span data-u="ball"><kbd>F</kbd>Fireball</span><span data-u="boost"><kbd>Shift</kbd>Boost</span><span data-u="roll"><kbd>Q</kbd><kbd>E</kbd>Barrel roll</span><span><kbd>Esc</kbd>Pause</span>
+  <span data-u="turn"><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span data-u="pitch"><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span data-u="breath"><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span data-u="ball"><kbd>F</kbd><span data-i18n="legend.ball">Fireball</span></span><span data-u="boost"><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span data-u="roll"><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
 </div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
   <div id="btns">
-    <button id="bRoll">Roll</button><button id="bBall">Ball</button>
-    <button id="bBoost">Boost</button><button id="bBreath">Breath</button>
+    <button id="bRoll" data-i18n="btn.roll">Roll</button><button id="bBall" data-i18n="btn.ball">Ball</button>
+    <button id="bBoost" data-i18n="btn.boost">Boost</button><button id="bBreath" data-i18n="btn.breath">Breath</button>
   </div>
 </div>
 
 <section id="intro" class="panel" hidden>
-  <div class="eyebrow">Procedural 3D model</div>
+  <div class="eyebrow" data-i18n="intro.eyebrow">Procedural 3D model</div>
   <h1>Verdigris</h1>
   <div class="stats">
-    <div><b id="sSpan">-</b><span>Wingspan</span></div>
-    <div><b id="sLen">-</b><span>Length</span></div>
-    <div><b id="sMesh">-</b><span>Meshes</span></div>
+    <div><b id="sSpan">-</b><span data-i18n="intro.span">Wingspan</span></div>
+    <div><b id="sLen">-</b><span data-i18n="intro.len">Length</span></div>
+    <div><b id="sMesh">-</b><span data-i18n="intro.mesh">Meshes</span></div>
   </div>
-  <p>A green wyrm built from primitives in Three.js. Drag to orbit, scroll or pinch to zoom.</p>
+  <p data-i18n="intro.text">A green wyrm built from primitives in Three.js. Drag to orbit, scroll or pinch to zoom.</p>
   <div class="row" style="justify-content:flex-start"><button class="cta" id="tutBtn">Learn to fly</button><button class="ghost" id="startBtn">Start the duel</button></div>
-  <a class="ghost" href="mp/" style="text-align:center;text-decoration:none">Co-op multiplayer (beta)</a>
+  <a class="ghost" href="mp/" style="text-align:center;text-decoration:none" data-i18n="intro.coop">Co-op multiplayer (beta)</a>
   <dl class="keys desk">
-    <dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Turn and bank</dd>
-    <dt><kbd>W</kbd><kbd>S</kbd></dt><dd>Climb / dive</dd>
-    <dt><kbd>Space</kbd></dt><dd>Fire breath (hold) or left mouse</dd>
-    <dt><kbd>F</kbd></dt><dd>Fireball, auto-aims, or right mouse</dd>
-    <dt><kbd>Shift</kbd></dt><dd>Boost (uses fire)</dd>
-    <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd>Barrel roll, dodges fire</dd>
+    <dt><kbd>A</kbd><kbd>D</kbd></dt><dd data-i18n="intro.k.turn">Turn and bank</dd>
+    <dt><kbd>W</kbd><kbd>S</kbd></dt><dd data-i18n="intro.k.pitch">Climb / dive</dd>
+    <dt><kbd data-i18n="key.space">Space</kbd></dt><dd data-i18n="intro.k.breath">Fire breath (hold) or left mouse</dd>
+    <dt><kbd>F</kbd></dt><dd data-i18n="intro.k.ball">Fireball, auto-aims, or right mouse</dd>
+    <dt><kbd>Shift</kbd></dt><dd data-i18n="intro.k.boost">Boost (uses fire)</dd>
+    <dt><kbd>Q</kbd><kbd>E</kbd></dt><dd data-i18n="intro.k.roll">Barrel roll, dodges fire</dd>
   </dl>
   <dl class="keys touchk">
-    <dt>Left stick</dt><dd>Steer, climb and dive</dd>
-    <dt>Breath</dt><dd>Hold for a fire stream</dd>
-    <dt>Ball / Roll</dt><dd>Fireball, dodge roll</dd>
+    <dt data-i18n="intro.t.stick">Left stick</dt><dd data-i18n="intro.t.stickD">Steer, climb and dive</dd>
+    <dt data-i18n="intro.t.breath">Breath</dt><dd data-i18n="intro.t.breathD">Hold for a fire stream</dd>
+    <dt data-i18n="intro.t.ballroll">Ball / Roll</dt><dd data-i18n="intro.t.ballrollD">Fireball, dodge roll</dd>
   </dl>
+  <div class="introFoot"><div class="langSwitch"></div><button class="ghost installBtn" hidden data-i18n="install.btn">Install app</button></div>
+  <p class="installHint" hidden></p>
 </section>
 
 <section id="pause" class="panel center" hidden>
-  <div class="eyebrow">Paused</div>
-  <h2>Wings folded</h2>
-  <div class="row"><button class="cta" id="resumeBtn">Resume</button><button class="ghost tutOnly" id="restartLBtn">Restart lesson</button><button class="ghost tutOnly" id="skipLBtn">Skip lesson</button><button class="ghost" id="viewBtn">Model view</button></div>
+  <div class="eyebrow" data-i18n="pause.eyebrow">Paused</div>
+  <h2 data-i18n="pause.title">Wings folded</h2>
+  <div class="row"><button class="cta" id="resumeBtn" data-i18n="btn.resume">Resume</button><button class="ghost tutOnly" id="restartLBtn" data-i18n="pause.restart">Restart lesson</button><button class="ghost tutOnly" id="skipLBtn" data-i18n="pause.skip">Skip lesson</button><button class="ghost" id="viewBtn">Model view</button></div>
 </section>
 
 <section id="over" class="panel center" hidden>
-  <div class="eyebrow" style="color:var(--blood)">Defeated</div>
-  <h2>Verdigris falls</h2>
+  <div class="eyebrow" style="color:var(--blood)" data-i18n="over.eyebrow">Defeated</div>
+  <h2 data-i18n="over.title">Verdigris falls</h2>
   <p id="overText">-</p>
-  <div class="row"><button class="cta" id="againBtn">Fly again</button><button class="ghost" id="view2Btn">Model view</button></div>
+  <div class="row"><button class="cta" id="againBtn" data-i18n="btn.again">Fly again</button><button class="ghost" id="view2Btn" data-i18n="pause.view">Model view</button></div>
 </section>
 
 <section id="tutCard" class="panel" hidden aria-live="polite">
-  <div class="tc-top"><span class="tc-step" id="tcStep">Lesson 1</span><div class="pips" id="tcPips"></div><button class="linkbtn" id="tcSkip">Skip</button></div>
+  <div class="tc-top"><span class="tc-step" id="tcStep">Lesson 1</span><div class="pips" id="tcPips"></div><button class="linkbtn" id="tcSkip" data-i18n="tut.skip">Skip</button></div>
   <div class="tc-goal" id="tcGoal"></div>
   <div class="tc-tip" id="tcTip" hidden></div>
 </section>
@@ -193,24 +213,27 @@ body:not(.tut) .tutOnly{display:none}
   <h2 id="bfTitle">Steering</h2>
   <p id="bfText"></p>
   <dl class="keys" id="bfKeys"></dl>
-  <label class="toggle" id="bfInvertRow" hidden><input type="checkbox" id="bfInvert"> Invert climb / dive (pull back to climb, like a plane)</label>
-  <div class="row" style="justify-content:flex-start"><button class="cta" id="bfGo">Fly</button><button class="ghost" id="bfExit">Exit tutorial</button></div>
-  <span class="enterk">or press Enter</span>
+  <label class="toggle" id="bfInvertRow" hidden><input type="checkbox" id="bfInvert"> <span data-i18n="tut.invert">Invert climb / dive (pull back to climb, like a plane)</span></label>
+  <div class="row" style="justify-content:flex-start"><button class="cta" id="bfGo" data-i18n="tut.fly">Fly</button><button class="ghost" id="bfExit" data-i18n="tut.exit">Exit tutorial</button></div>
+  <span class="enterk" data-i18n="tut.enter">or press Enter</span>
 </section>
 
 <section id="tutDone" class="panel center" hidden>
-  <div class="eyebrow">Tutorial complete</div>
-  <h2>Fledged</h2>
-  <p>You can steer, climb, boost, breathe fire, spit fireballs, roll out of danger and cook your own dinner. The crimson wyverns fly just like you, but they shoot back.</p>
-  <div class="row"><button class="cta" id="tdDuel">Start the duel</button><button class="ghost" id="tdFree">Keep practicing</button><button class="ghost" id="tdView">Model view</button></div>
+  <div class="eyebrow" data-i18n="tut.done.eyebrow">Tutorial complete</div>
+  <h2 data-i18n="tut.done.title">Fledged</h2>
+  <p data-i18n="tut.done.text">You can steer, climb, boost, breathe fire, spit fireballs, roll out of danger and cook your own dinner. The crimson wyverns fly just like you, but they shoot back.</p>
+  <div class="row"><button class="cta" id="tdDuel" data-i18n="intro.duel">Start the duel</button><button class="ghost" id="tdFree" data-i18n="tut.done.free">Keep practicing</button><button class="ghost" id="tdView" data-i18n="pause.view">Model view</button></div>
 </section>
 
+<script src="i18n.js"></script>
+<script src="pwa.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
 "use strict";
 const $=s=>document.querySelector(s);
-if(!window.THREE){$('#loading').textContent='3D engine failed to load';return;}
+const t=(k,p)=>window.I18N?I18N.t(k,p):k,num=(x,d)=>window.I18N?I18N.num(x,d):Number(x).toFixed(d||0);
+if(!window.THREE){$('#loading').textContent=t('solo.engineFail');return;}
 const V3=THREE.Vector3;
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isTouch=matchMedia('(pointer: coarse)').matches||('ontouchstart' in window);
@@ -395,10 +418,9 @@ const CRIMSON={body:0x8c2026,dark:0x5a1218,belly:0x3d1717,wing:0x6d1a28,horn:0x2
 
 /* ---------- player ---------- */
 const hero=makeDragon(GREEN);scene.add(hero.root);
-(function measure(){
-  hero.root.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(hero.root),s=b.getSize(new V3());
-  $('#sSpan').textContent=s.x.toFixed(1)+' m';$('#sLen').textContent=s.z.toFixed(1)+' m';$('#sMesh').textContent=hero.meshes;
-})();
+const heroSize=(function(){hero.root.updateMatrixWorld(true);return new THREE.Box3().setFromObject(hero.root).getSize(new V3());})();
+function showStats(){$('#sSpan').textContent=num(heroSize.x,1)+' m';$('#sLen').textContent=num(heroSize.z,1)+' m';$('#sMesh').textContent=hero.meshes;}
+showStats();
 const P={pos:new V3(0,90,0),vel:new V3(),yaw:0,pitch:0,roll:0,speed:30,hp:100,st:100,phase:0,ballCd:0,rollT:0,rollDir:1,inv:0,boosting:false,breathing:false};
 
 /* ---------- particles ---------- */
@@ -453,7 +475,7 @@ function spawnWave(){
     clampWorld(pos);
     foes.push({d,pos,dir:new V3().subVectors(P.pos,pos).normalize(),hp:90+wave*15,max:90+wave*15,speed:21+wave*1.2+Math.random()*4,cd:2+Math.random()*2,orbit:Math.random()*Math.PI*2,orbitR:30+Math.random()*25,alt:(Math.random()-.5)*30,phase:Math.random()*6,dead:false,fall:0,spin:0,roll:0,yaw:0,pitch:0});
   }
-  showBanner('Wave '+wave,n+' crimson wyverns');
+  showBanner(t('banner.wave',{n:wave}),t('banner.waveFoes',{n}));
 }
 function clampWorld(p){const r=Math.hypot(p.x,p.z);if(r>430){p.x*=430/r;p.z*=430/r;}p.y=Math.min(240,Math.max(H(p.x,p.z)+8,p.y));}
 
@@ -550,14 +572,14 @@ function setState(s){
   document.body.classList.toggle('tut',mode==='tut');
   $('#brief').hidden=s!=='brief';$('#tutDone').hidden=s!=='tutdone';
   $('#tutCard').hidden=!(mode==='tut'&&T.lesson&&(s==='play'||s==='paused'));
-  $('#viewBtn').textContent=mode==='tut'?'Exit tutorial':'Model view';
+  $('#viewBtn').textContent=t(mode==='tut'?'pause.exitTut':'pause.view');
   if(s!=='play')rollEl.style.opacity=0;
   $('#intro').hidden=s!=='preview';$('#pause').hidden=s!=='paused';$('#over').hidden=s!=='over';
   const inGame=s==='play'||s==='paused'||s==='brief';
   $('#hudTop').hidden=!(inGame||s==='over');$('#legend').hidden=!(s==='play'&&!isTouch);$('#touch').hidden=!(s==='play'&&isTouch);
   if(s==='preview'){foes.forEach(f=>scene.remove(f.d.root));foes.length=0;balls.forEach(b=>scene.remove(b.m));balls.length=0;banner.style.opacity=0;P.pos.set(0,90,0);P.yaw=P.pitch=P.roll=0;}
   if(s==='play'&&prev==='preview')resetGame();
-  if(s==='over'){$('#overText').textContent='Score '+score+' · reached wave '+wave;}
+  if(s==='over'){$('#overText').textContent=t('over.text',{s:score,w:wave});}
   mouseBreath=false;touch.breath=touch.boost=false;document.querySelectorAll('#btns .on').forEach(b=>b.classList.remove('on'));
 }
 $('#startBtn').onclick=()=>setState('play');
@@ -586,7 +608,7 @@ const ringGeo=new THREE.TorusGeometry(7,0.55,8,40);
 const islRock=new THREE.MeshStandardMaterial({color:0x6a5f50,flatShading:true,roughness:1}),islGrass=new THREE.MeshStandardMaterial({color:0x4d7a40,flatShading:true,roughness:1});
 const RAW=new THREE.Color(0xf3efe4),GOLDEN=new THREE.Color(0xe0a040),ROAST=new THREE.Color(0xa0561f);
 const rollEl=$('#rollNow'),aimV=new V3();
-const K=s=>s.split(' ').map(k=>'<kbd>'+k+'</kbd>').join('');
+const K=s=>s.split(' ').map(k=>'<kbd>'+(k==='Space'?t('key.space'):k)+'</kbd>').join('');
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(e){return null;}}
 let invert=store('vsd-invert')==='1';
 
@@ -676,18 +698,18 @@ function roast(c){
   c.cook=100;chickenColor(c);T.roasted++;
   burst(c.center,30,0,12,1.6,0.6);
   for(let k=0;k<30;k++){const v=new V3(Math.random()-.5,Math.random(),Math.random()-.5).normalize().multiplyScalar(8+Math.random()*8);spawnP(c.center.x,c.center.y,c.center.z,v.x,v.y,v.z,0.8,0.9,0.5,2,0,1.5,1,0.82,0.35);}
-  showBanner('Roasted!',T.canEat?'Fly into it to eat':'');bannerT=1.2;
+  showBanner(t('tut.roasted'),T.canEat?t('tut.flyToEat'):'');bannerT=1.2;
 }
 function eatChicken(c){
   c.gone=true;scene.remove(c.k.g);hero.jaw.rotation.x=0.9;
   for(let k=0;k<26;k++){const v=new V3(Math.random()-.5,Math.random()-.3,Math.random()-.5).normalize().multiplyScalar(6+Math.random()*8);spawnP(c.center.x,c.center.y,c.center.z,v.x+P.vel.x*0.6,v.y+P.vel.y*0.6,v.z+P.vel.z*0.6,0.7,0.8,0.3,2,0,1.5,0.9,0.55,0.2);}
   P.hp=Math.min(100,P.hp+15);T.eaten++;hero.flash=0.4;
-  showBanner('Crunch!','+15 vitality');bannerT=1.3;
+  showBanner(t('tut.crunch'),t('tut.vit15'));bannerT=1.3;
 }
 function bumpChicken(c){
   c.bonk=1.4;c.hop=1;
   for(let k=0;k<22;k++){const v=new V3(Math.random()-.5,Math.random()-.2,Math.random()-.5).normalize().multiplyScalar(8+Math.random()*6);spawnP(c.center.x,c.center.y,c.center.z,v.x,v.y,v.z,0.9,0.8,0.4,2,0,2,1,1,1);}
-  showTip('Raw chicken! Roast it with fire first.');
+  showTip(t('tut.rawTip'));
 }
 function huntChickens(){[[80,95,-60],[-90,110,40],[20,85,140]].forEach(a=>addChicken(new V3(a[0],a[1],a[2]),true));}
 
@@ -712,9 +734,9 @@ function updWisp(dt){
 function tutSpark(b,p){
   const d=P.pos.distanceTo(p);
   if(P.inv>0&&d<40)b.rolled=true;
-  if(d<3.6&&P.inv<=0&&!b.judged){hero.flash=1;shake=Math.max(shake,0.3);hurt=0.5;showTip('Hit! Roll a little sooner, as the spark gets close.');return true;}
+  if(d<3.6&&P.inv<=0&&!b.judged){hero.flash=1;shake=Math.max(shake,0.3);hurt=0.5;showTip(t('tut.hitTip'));return true;}
   if(d<b.minD)b.minD=d;
-  else if(!b.judged&&b.minD<30){b.judged=true;if(b.rolled){T.dodges++;showBanner('Dodged!','');bannerT=0.8;}}
+  else if(!b.judged&&b.minD<30){b.judged=true;if(b.rolled){T.dodges++;showBanner(t('tut.dodged'),'');bannerT=0.8;}}
   return false;
 }
 function breathAim(){
@@ -727,63 +749,57 @@ function breathAim(){
 
 /* lessons */
 const STEER={turn:1,pitch:1},FIRE={turn:1,pitch:1,boost:1,breath:1};
-const ringGoal=()=>'Fly through the rings  '+T.ri+' / '+T.rings.length,ringsDone=()=>T.ri>=T.rings.length;
+// Text lives in i18n.js: title/text under 'l.<k>.*', group under 'tut.grp.<grp>'.
+// desk rows: [keys, descriptionKey]; touch rows: [labelKey, descriptionKey].
+const ringGoal=()=>t('goal.rings',{a:T.ri,b:T.rings.length}),ringsDone=()=>T.ri>=T.rings.length;
 const LESSONS=[
-{grp:'Flight basics',title:'Steering',speed:18,reset:80,unlock:{turn:1},
- text:'Your dragon always flies forward on its own, so you only choose the direction. Steer through the golden rings. The first ring is straight ahead: just relax and let the dragon fly through it.',
- desk:[[K('A D'),'Turn left / right (arrow keys work too)']],touch:[['Stick left / right','Turn left / right']],
+{k:'steer',grp:'basics',speed:18,reset:80,unlock:{turn:1},
+ desk:[['A D','l.steer.k1']],touch:[['l.steer.t1','l.steer.t1d']],
  setup(){ringPath(START,0,[[0,60,0],[0.6,70,0],[-1.2,80,0],[-0.6,80,0]]);},goal:ringGoal,done:ringsDone},
-{grp:'Flight basics',title:'Climb and dive',speed:20,reset:80,unlock:STEER,invert:true,
- text:'Now the rings sit higher and lower. Climb for the high ones, dive for the low ones. You cannot crash: close to the ground the dragon pulls up by itself.',
- desk:[[K('W'),'Climb (nose up)'],[K('S'),'Dive (nose down)'],[K('A D'),'Turn']],touch:[['Stick up','Climb'],['Stick down','Dive'],['Stick sideways','Turn']],
+{k:'climb',grp:'basics',speed:20,reset:80,unlock:STEER,invert:true,
+ desk:[['W','l.climb.k1'],['S','l.climb.k2'],['A D','c.turn']],touch:[['l.climb.t1','l.climb.t1d'],['l.climb.t2','l.climb.t2d'],['l.climb.t3','c.turn']],
  setup(){ringPath(START,0,[[0,60,0],[0,70,22],[0.25,70,-28],[-0.25,70,22],[0,60,-12]]);},goal:ringGoal,done:ringsDone},
-{grp:'Flight basics',title:'Finding your way',speed:22,reset:85,unlock:STEER,
- text:'Targets will not always be in front of you. When one is off-screen, a gold arrow on the edge of the screen points to it. The round radar shows the valley from above: you are the green triangle and the top of the radar is straight ahead. The first ring is behind you, so turn around.',
- desk:[[K('A D'),'Turn'],[K('W S'),'Climb / dive']],touch:[['Stick','Steer, climb and dive']],
+{k:'find',grp:'basics',speed:22,reset:85,unlock:STEER,
+ desk:[['A D','c.turn'],['W S','c.climbDive']],touch:[['c.stick','c.steerAll']],
  setup(){const pts=[[60,95,-330],[-140,115,-250],[-60,80,-40]].map(a=>new V3(a[0],a[1],a[2]));pts.forEach((p,i)=>addRing(p,p.clone().sub(i?pts[i-1]:START)));},goal:ringGoal,done:ringsDone},
-{grp:'Flight basics',title:'Boost',speed:26,reset:85,unlock:{turn:1,pitch:1,boost:1},
- text:'Boost makes the dragon much faster. It burns the orange Fire bar at the top left, which refills by itself as soon as you let go. Boost for a few seconds and reach the two distant rings.',
- desk:[[K('Shift'),'Hold to boost'],[K('A D')+K('W S'),'Steer']],touch:[['Boost','Hold to boost'],['Stick','Steer']],
+{k:'boost',grp:'basics',speed:26,reset:85,unlock:{turn:1,pitch:1,boost:1},
+ desk:[['Shift','c.holdBoost'],['A D W S','c.steer']],touch:[['btn.boost','c.holdBoost'],['c.stick','c.steer']],
  setup(){T.boostT=0;ringPath(START,0,[[0,140,0],[0,180,0]]);},
- goal:()=>'Boost  '+Math.min(2.5,T.boostT).toFixed(1)+' / 2.5 s  ·  Rings  '+T.ri+' / '+T.rings.length,done:()=>T.boostT>=2.5&&ringsDone()},
-{grp:'Fire and food',title:'Fire breath',speed:22,reset:80,unlock:FIRE,noEat:true,
- text:'Dragons like their chicken roasted. Fly toward the chicken on the floating rock and breathe fire at it. The flame only reaches about 35 m, so get close. Keep it burning until the chicken turns golden brown. Flew past? Turn around and try again.',
- desk:[[K('Space'),'Hold to breathe fire (or hold the left mouse button)']],touch:[['Breath','Hold for a stream of fire']],
+ goal:()=>t('goal.boost',{t:num(Math.min(2.5,T.boostT),1),max:num(2.5,1),a:T.ri,b:T.rings.length}),done:()=>T.boostT>=2.5&&ringsDone()},
+{k:'breath',grp:'fire',speed:22,reset:80,unlock:FIRE,noEat:true,
+ desk:[['Space','l.breath.k1']],touch:[['l.breath.t1','l.breath.t1d']],
  setup(){T.roasted=0;addChicken(new V3(0,77.6,-60),false);},
- goal:()=>{const c=T.chickens[0];return 'Roast the chicken  '+Math.round(c?c.cook:0)+' %';},done:()=>T.roasted>=1},
-{grp:'Fire and food',title:'Dinner time',speed:22,reset:null,keep:true,unlock:FIRE,
- text:'Roast ready. To eat, simply fly into the chicken and your dragon snaps it up. Eating refills the green Vitality bar.',
- desk:[[K('A D')+K('W S'),'Steer into the chicken']],touch:[['Stick','Steer into the chicken']],
+ goal:()=>{const c=T.chickens[0];return t('goal.roast',{p:Math.round(c?c.cook:0)});},done:()=>T.roasted>=1},
+{k:'dinner',grp:'fire',speed:22,reset:null,keep:true,unlock:FIRE,
+ desk:[['A D W S','c.intoChicken']],touch:[['c.stick','c.intoChicken']],
  setup(){T.eaten=0;T.chickens.forEach(c=>{if(!c.gone&&c.cook<100){c.cook=100;chickenColor(c);}});},
- goal:()=>'Eat the roast chicken',done:()=>T.eaten>=1},
-{grp:'Fire and food',title:'Fireball',speed:24,reset:85,unlock:{turn:1,pitch:1,boost:1,breath:1,ball:1},
- text:'A fireball flies much further than breath and steers itself toward the target nearest the middle of your view, so point roughly at a chicken and fire. One hit roasts it. Each fireball costs some Fire, and you can spit one per second. Roast both chickens, then eat them.',
- desk:[[K('F'),'Fireball (or the right mouse button)']],touch:[['Ball','Spit a fireball']],
+ goal:()=>t('goal.eat'),done:()=>T.eaten>=1},
+{k:'ball',grp:'fire',speed:24,reset:85,unlock:{turn:1,pitch:1,boost:1,breath:1,ball:1},
+ desk:[['F','l.ball.k1']],touch:[['l.ball.t1','l.ball.t1d']],
  setup(){T.roasted=0;T.eaten=0;addChicken(new V3(60,82.6,-30),false);addChicken(new V3(-70,72.6,20),false);},
- goal:()=>'Roasted  '+Math.min(2,T.roasted)+' / 2  ·  Eaten  '+T.eaten+' / 2',done:()=>T.eaten>=2},
-{grp:'Fire and food',title:'Barrel roll',speed:24,reset:90,unlock:null,
- text:'Q and E spin the dragon sideways in a quick barrel roll. While it spins, nothing can hit it. Do two rolls first. Then a practice wisp will shoot slow sparks at you: roll just before a spark reaches you. Practice sparks do not hurt.',
- desk:[[K('Q'),'Roll left'],[K('E'),'Roll right']],touch:[['Roll','Barrel roll (tilt the stick to pick the side)']],
+ goal:()=>t('goal.ball',{a:Math.min(2,T.roasted),b:T.eaten}),done:()=>T.eaten>=2},
+{k:'roll',grp:'fire',speed:24,reset:90,unlock:null,
+ desk:[['Q','l.roll.k1'],['E','l.roll.k2']],touch:[['l.roll.t1','l.roll.t1d']],
  setup(){T.rolls=0;T.dodges=0;T.wt=0;},
  tick(dt){
-   if(T.rolls>=2&&!T.wisp){T.wisp=tutAdd(makeWisp());wispTarget(T.wisp.position);T.wt=0.6;showTip('Here comes the wisp. Roll when you see "Roll now!"');}
+   if(T.rolls>=2&&!T.wisp){T.wisp=tutAdd(makeWisp());wispTarget(T.wisp.position);T.wt=0.6;showTip(t('tut.wispTip'));}
    if(T.wisp)updWisp(dt);
  },
- goal:()=>T.rolls<2?'Do a barrel roll  '+T.rolls+' / 2':'Dodge sparks with a roll  '+T.dodges+' / 3',done:()=>T.dodges>=3},
-{grp:'Final test',title:'Chicken hunt',speed:28,reset:90,unlock:null,
- text:'Three chickens escaped and are flapping around the valley. Use everything you learned: find them with the arrows and radar, roast them with breath or fireballs, then catch and eat all three. A roasted chicken stops and hovers, waiting for you.',
- desk:[[K('A D')+K('W S'),'Steer'],[K('Shift'),'Boost'],[K('Space'),'Fire breath'],[K('F'),'Fireball'],[K('Q E'),'Barrel roll']],
- touch:[['Stick','Steer'],['Boost','Fly faster'],['Breath','Fire stream'],['Ball','Fireball'],['Roll','Barrel roll']],
- setup(){T.eaten=0;T.roasted=0;huntChickens();},goal:()=>'Chickens eaten  '+T.eaten+' / 3',done:()=>T.eaten>=3},
+ goal:()=>T.rolls<2?t('goal.roll',{a:T.rolls}):t('goal.dodge',{a:T.dodges}),done:()=>T.dodges>=3},
+{k:'hunt',grp:'final',speed:28,reset:90,unlock:null,
+ desk:[['A D W S','c.steer'],['Shift','legend.boost'],['Space','legend.breath'],['F','legend.ball'],['Q E','legend.roll']],
+ touch:[['c.stick','c.steer'],['btn.boost','l.hunt.boostD'],['btn.breath','l.hunt.breathD'],['btn.ball','legend.ball'],['btn.roll','legend.roll']],
+ setup(){T.eaten=0;T.roasted=0;huntChickens();},goal:()=>t('goal.hunt',{a:T.eaten}),done:()=>T.eaten>=3},
 ];
-const FREE={grp:'Free practice',title:'Free practice',speed:30,
-  setup(){T.eaten=0;huntChickens();},goal:()=>'Chickens eaten  '+T.eaten,done:()=>false,
-  tick(){if(T.chickens.length&&T.chickens.every(c=>c.gone)){T.chickens.length=0;huntChickens();showTip('Three more chickens took off.');}}};
+const FREE={k:'free',speed:30,
+  setup(){T.eaten=0;huntChickens();},goal:()=>t('goal.free',{a:T.eaten}),done:()=>false,
+  tick(){if(T.chickens.length&&T.chickens.every(c=>c.gone)){T.chickens.length=0;huntChickens();showTip(t('tut.moreChickens'));}}};
+const LT=L=>L===FREE?t('tut.free'):t('l.'+L.k+'.title');
 
 function buildPips(){$('#tcPips').innerHTML=LESSONS.map(()=>'<i></i>').join('');}
 function updCard(){
   const L=T.lesson;if(!L)return;
-  const step=L===FREE?'Free practice':'Lesson '+(T.i+1)+' / '+LESSONS.length+'  ·  '+L.title;
+  const step=L===FREE?t('tut.free'):t('tut.step',{i:T.i+1,n:LESSONS.length,title:LT(L)});
   if(step!==T.lastStep){T.lastStep=step;$('#tcStep').textContent=step;$('#tcSkip').hidden=L===FREE;
     [...$('#tcPips').children].forEach((el,i)=>el.className=(L===FREE||i<T.i)?'done':i===T.i?'cur':'');}
   const g=L.goal();if(g!==T.lastGoal){T.lastGoal=g;$('#tcGoal').textContent=g;}
@@ -800,9 +816,9 @@ function brief(i){
   T.speed=L.speed;T.canEat=!L.noEat;setUnlocks(L.unlock);
   if(L.reset!=null)resetPose(L.reset);
   L.setup();
-  $('#bfEye').textContent='Lesson '+(i+1)+' of '+LESSONS.length+'  ·  '+L.grp;
-  $('#bfTitle').textContent=L.title;$('#bfText').textContent=L.text;
-  $('#bfKeys').innerHTML=(isTouch?L.touch.map(r=>[K(r[0].replace(/ /g,' ')),r[1]]):L.desk).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
+  $('#bfEye').textContent=t('tut.briefEye',{i:i+1,n:LESSONS.length,grp:t('tut.grp.'+L.grp)});
+  $('#bfTitle').textContent=LT(L);$('#bfText').textContent=t('l.'+L.k+'.text');
+  $('#bfKeys').innerHTML=(isTouch?L.touch.map(r=>[K(t(r[0]).replace(/ /g,' ')),t(r[1])]):L.desk.map(r=>[K(r[0]),t(r[1])])).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
   $('#bfInvertRow').hidden=!L.invert;$('#bfInvert').checked=invert;
   updCard();setState('brief');
 }
@@ -831,13 +847,13 @@ function tutUpdate(dt){
   rollEl.style.opacity=warn?1:0;
   if(T.tipT>0){T.tipT-=dt;if(T.tipT<=0)$('#tcTip').hidden=true;}
   if(T.celebrate>0){T.celebrate-=dt;if(T.celebrate<=0)tutNext();}
-  else if(L.done()){const nx=LESSONS[T.i+1];T.celebrate=1.8;showBanner('Well done',nx?'Next: '+nx.title:'Tutorial complete');}
+  else if(L.done()){const nx=LESSONS[T.i+1];T.celebrate=1.8;showBanner(t('tut.wellDone'),nx?t('tut.next',{t:LT(nx)}):t('tut.complete'));}
   updCard();
 }
 function tutMarks(){
-  const out=[];const r=T.rings[T.ri];if(r)out.push({pos:r.pos,col:GOLD,label:'Ring'});
-  T.chickens.forEach(c=>{if(c.gone)return;const done=c.cook>=100;out.push({pos:c.center,col:done?'#62c48a':GOLD,label:done?(T.canEat?'Eat':'Roasted'):'Chicken',bar:done?null:c.cook/100});});
-  if(T.wisp)out.push({pos:T.wisp.position,col:'#c38cff',label:'Wisp'});
+  const out=[];const r=T.rings[T.ri];if(r)out.push({pos:r.pos,col:GOLD,label:t('mark.ring')});
+  T.chickens.forEach(c=>{if(c.gone)return;const done=c.cook>=100;out.push({pos:c.center,col:done?'#62c48a':GOLD,label:done?t(T.canEat?'mark.eat':'mark.roasted'):t('mark.chicken'),bar:done?null:c.cook/100});});
+  if(T.wisp)out.push({pos:T.wisp.position,col:'#c38cff',label:t('mark.wisp')});
   return out;
 }
 function drawMark(m){
@@ -864,7 +880,7 @@ function drawMark(m){
 }
 function updIntroBtns(){
   const done=store('vsd-tut')==='1',tb=$('#tutBtn'),sb=$('#startBtn');
-  tb.className=done?'ghost':'cta';tb.textContent=done?'Replay tutorial':'Learn to fly';sb.className=done?'cta':'ghost';
+  tb.className=done?'ghost':'cta';tb.textContent=t(done?'intro.replay':'intro.learn');sb.textContent=t('intro.duel');sb.className=done?'cta':'ghost';
   if(done)tb.parentNode.insertBefore(sb,tb);else tb.parentNode.insertBefore(tb,sb);
 }
 
@@ -1091,9 +1107,9 @@ function frame(now){
       const alive=updateFoes(dt);updateBalls(dt);updateParticles(dt);
       if(mode==='tut'&&state==='play')tutUpdate(dt);
       if(state==='play'&&mode==='duel'){
-        if(alive===0&&foes.length===0){waveTimer+=dt;if(waveTimer>0.2&&waveTimer-dt<=0.2){showBanner('Wave '+wave+' cleared','+30 vitality');P.hp=Math.min(100,P.hp+30);}if(waveTimer>3){waveTimer=0;spawnWave();}}
+        if(alive===0&&foes.length===0){waveTimer+=dt;if(waveTimer>0.2&&waveTimer-dt<=0.2){showBanner(t('banner.cleared',{n:wave}),t('banner.vit30'));P.hp=Math.min(100,P.hp+30);}if(waveTimer>3){waveTimer=0;spawnWave();}}
         if(P.hp<=0){P.hp=0;burst(P.pos,80,0,30,3,1.2);setState('over');}
-        foesEl.textContent=alive+(alive===1?' wyvern':' wyverns');
+        foesEl.textContent=t('hud.foes',{n:alive});
       }
     }
     // chase cam
@@ -1124,6 +1140,7 @@ function frame(now){
 }
 $('#loading').remove();
 buildPips();updIntroBtns();
+if(window.I18N)I18N.onChange(()=>{updIntroBtns();showStats();$('#viewBtn').textContent=t(mode==='tut'?'pause.exitTut':'pause.view');T.lastStep=T.lastGoal='';updCard();});
 setState('preview');
 requestAnimationFrame(frame);
 })();
