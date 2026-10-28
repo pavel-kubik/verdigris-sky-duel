@@ -61,8 +61,20 @@ p{margin:0;color:var(--mute);line-height:1.45}
 .fill{height:100%;width:100%;transform-origin:left;transition:transform .12s linear}
 #hpFill{background:linear-gradient(90deg,#3d9a63,var(--verd))}
 #stFill{background:linear-gradient(90deg,#d8562a,var(--ember))}
+#hgFill{background:linear-gradient(90deg,#b07a2a,var(--hunger))}
+.bar.hungry span{color:var(--hunger)}
+.bar.starving span{color:var(--blood)}
+.bar.starving #hgFill{background:var(--blood)}
+.bar.starving .track{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:inset 0 0 0 1px var(--blood),0 0 10px rgba(229,72,79,.6)}}
+#stageRow{display:inline-flex;gap:6px;align-items:center;justify-content:center;margin-top:4px}
+#stageRow small{font-family:var(--f-ui);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:600}
+#growRing{width:14px;height:14px;border-radius:50%;--p:0;background:conic-gradient(var(--verd) calc(var(--p) * 1turn),rgba(233,225,204,.16) 0);box-shadow:0 0 0 1px var(--line)}
+#growRing.ready{background:var(--verd);box-shadow:0 0 8px var(--verd)}
+#vignette{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(229,72,79,.55) 100%)}
+#toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-family:var(--f-display);font-size:clamp(28px,5vw,46px);text-shadow:0 2px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s;padding-inline:16px;width:min(720px,100%)}
+#toast small{display:block;font-family:var(--f-ui);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-top:6px}
 #regionName{text-align:center;font-family:var(--f-display);font-size:26px;line-height:1;text-shadow:0 2px 12px rgba(0,0,0,.5)}
-#regionName small{display:block;font-family:var(--f-ui);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:600;margin-top:4px}
 #pauseBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(620px,70vw);font-size:12px;color:var(--mute);pointer-events:none}
 kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin-right:4px;background:rgba(12,19,16,.5)}
@@ -89,6 +101,8 @@ h2{font-size:42px}
 <div id="loading" data-i18n="c.loading">Warming the volcano</div>
 <canvas id="c"></canvas>
 <canvas id="hud"></canvas>
+<div id="vignette"></div>
+<div id="toast"></div>
 
 <section id="intro" class="panel" hidden>
   <div class="eyebrow" data-i18n="c.eyebrow">Campaign · alpha</div>
@@ -105,8 +119,9 @@ h2{font-size:42px}
   <div class="bars">
     <div class="bar"><span data-i18n="hud.vitality">Vitality</span><div class="track"><div class="fill" id="hpFill"></div></div></div>
     <div class="bar"><span data-i18n="hud.fire">Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
+    <div class="bar" id="hgBar"><span data-i18n="c.hud.hunger">Hunger</span><div class="track"><div class="fill" id="hgFill"></div></div></div>
   </div>
-  <div id="regionName">-<small data-i18n="c.stage.hatchling">Hatchling</small></div>
+  <div id="regionName"><span id="regionText">-</span><br><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span></div>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
 </div>
 <div id="legend" hidden>
@@ -138,6 +153,8 @@ h2{font-size:42px}
 <script src="core/events.js"></script>
 <script src="core/data.js"></script>
 <script src="core/terrain.js"></script>
+<script src="core/growth.js"></script>
+<script src="core/hunger.js"></script>
 <script src="core/flight.js"></script>
 <!-- render: THREE-side builders -->
 <script src="render/flora.js"></script>

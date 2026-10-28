@@ -9,7 +9,7 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -47,16 +47,23 @@
     scene.fog.color.set(region.fog);
     const u = sky.material.uniforms;
     u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
-    $('#regionName').firstChild.textContent = t(TR.region(id).nameKey);
+    $('#regionText').textContent = t(TR.region(id).nameKey);
   }
   loadRegion(D.regions[params.get('region')] ? params.get('region') : D.startRegion);
 
   /* ---------- the hatchling ---------- */
   const hero = VDragon.makeDragon(VDragon.GREEN);
   scene.add(hero.root);
-  const stage = D.stages[0];                      // growth stages arrive in T06
-  const stats = { turn: stage.turn, cruise: stage.cruise, boost: stage.boost };
+  // Dragon progress (moves into core/state with the save in T12-T14)
+  const dragon = { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start };
+  let stats = G.statsOf(0), heroScale = 1;
   let pilot = null, phase = 0;
+  function refreshStage() {
+    stats = G.statsOf(dragon.stage);
+    heroScale = G.scaleOf(dragon.foodXp, dragon.stage);
+    hero.root.scale.setScalar(heroScale);
+    $('#stageText').textContent = t('c.stage.' + D.stages[dragon.stage].id);
+  }
 
   // Fire breath: a flickering additive cone at the mouth (real particles and cooking come with T10)
   const flame = new THREE.Group();
@@ -82,6 +89,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
+    if (debug) debugKey(e.code);
   });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseBreath = false; });
@@ -132,6 +140,7 @@
   /* ---------- state ---------- */
   let state = 'intro', hintT = 0;
   function spawnPilot() {
+    refreshStage();
     const s = TR.region(regionId).spawn || { x: 0, z: 0, y: 120, yaw: 0 };
     pilot = F.newPilot([s.x, Math.max(s.y, TR.surfaceAt(regionId, s.x, s.z) + 40), s.z], s.yaw, stats.cruise);
     snapCam();
@@ -146,7 +155,7 @@
     $('#touch').hidden = !(s === 'play' && isTouch);
     if (s === 'play' && prev === 'intro') { spawnPilot(); hintT = 8; }
     $('#hint').hidden = !(s === 'play' && hintT > 0);
-    if (s === 'intro') pilot = null;
+    if (s === 'intro') { pilot = null; hero.root.scale.setScalar(1); }
     mouseBreath = false; touch.breath = touch.boost = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
@@ -160,7 +169,8 @@
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
   function camDesired(out) {
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
-    out.set(p[0] - bx * 22, p[1] + 7 - pilot.pitch * 6, p[2] - bz * 22);
+    const k = Math.pow(heroScale, 0.75), back = 22 * k;        // a bigger dragon needs the camera further back
+    out.set(p[0] - bx * back, p[1] + (7 - pilot.pitch * 6) * k, p[2] - bz * back);
     out.y = Math.max(out.y, TR.surfaceAt(regionId, out.x, out.z) + 3);
     return out;
   }
@@ -180,8 +190,8 @@
       flame.position.copy(mouthW);
       fwdV.set(Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), Math.cos(p.yaw) * Math.cos(p.pitch));
       flame.lookAt(mouthW.x + fwdV.x, mouthW.y + fwdV.y, mouthW.z + fwdV.z);
-      const f = 0.85 + Math.random() * 0.3;
-      flame.scale.set(f, f, 0.9 + Math.random() * 0.25);
+      const f = (0.85 + Math.random() * 0.3) * heroScale;
+      flame.scale.set(f, f, (0.9 + Math.random() * 0.25) * heroScale);
     }
   }
 
@@ -199,13 +209,56 @@
   }
 
   /* ---------- HUD ---------- */
-  const hpFill = $('#hpFill'), stFill = $('#stFill');
-  let lastSt = -1;
+  const hpFill = $('#hpFill'), stFill = $('#stFill'), hgFill = $('#hgFill'), hgBar = $('#hgBar'), ring = $('#growRing'), vig = $('#vignette');
+  const shown = { st: -1, hp: -1, hg: -1, ring: -1, hs: '' };
   function hud(dt) {
-    const st = Math.round(pilot.st);
-    if (st !== lastSt) { stFill.style.transform = 'scaleX(' + st / 100 + ')'; lastSt = st; }
-    hpFill.style.transform = 'scaleX(1)';                       // vitality is driven by hunger and damage from T07
+    const st = Math.round(pilot.st), hp = Math.round(100 * dragon.hp / stats.hpMax), hg = Math.round(dragon.hunger);
+    if (st !== shown.st) { stFill.style.transform = 'scaleX(' + st / 100 + ')'; shown.st = st; }
+    if (hp !== shown.hp) { hpFill.style.transform = 'scaleX(' + hp / 100 + ')'; shown.hp = hp; }
+    if (hg !== shown.hg) { hgFill.style.transform = 'scaleX(' + hg / D.hunger.max + ')'; shown.hg = hg; }
+    const hs = HN.stateOf(dragon.hunger);
+    if (hs !== shown.hs) { hgBar.classList.toggle('hungry', hs === 'hungry'); hgBar.classList.toggle('starving', hs === 'starving'); shown.hs = hs; }
+    const ready = G.readyStage(dragon.foodXp, dragon.stage) > dragon.stage;
+    const pr = ready ? 1 : Math.round(G.progressIn(dragon.stage, dragon.foodXp) * 100) / 100;
+    if (pr !== shown.ring) { ring.style.setProperty('--p', pr); ring.classList.toggle('ready', ready); shown.ring = pr; }
+    vig.style.opacity = hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0;
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0) $('#hint').hidden = true; }
+    if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
+  }
+  const toastEl = $('#toast'); let toastT = 0;
+  function toast(title, sub, secs) {
+    toastEl.innerHTML = '';
+    toastEl.append(title);
+    if (sub) { const sm = document.createElement('small'); sm.textContent = sub; toastEl.append(sm); }
+    toastEl.style.opacity = 1; toastT = secs || 3;
+  }
+  const stageName = i => t('c.stage.' + D.stages[i].id);
+
+  /* ---------- survival tick: hunger, its effects, growth moments ---------- */
+  function survive(dt) {
+    const changed = HN.step(dragon, dt, { boosting: pilot.boosting, breathing: pilot.breathing });
+    if (changed === 'hungry') toast(t('c.toast.hungry'), t('c.toast.hungrySub'));
+    if (changed === 'starving') toast(t('c.toast.starving'), t('c.toast.starvingSub'));
+    // the dragon keeps growing visibly within its stage as it eats
+    const sc = G.scaleOf(dragon.foodXp, dragon.stage);
+    if (Math.abs(sc - heroScale) > 1e-4) { heroScale += (sc - heroScale) * Math.min(1, dt * 2); hero.root.scale.setScalar(heroScale); }
+  }
+  function feed(food) {
+    if (HN.feed(dragon, food)) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(dragon.stage + 1) }), 4);
+  }
+  /** Stand-in for lair.rest (T12): heal, refill fire and grow if ready. */
+  function rest() {
+    const r = G.growUp(dragon);
+    stats = G.statsOf(dragon.stage);
+    dragon.hp = stats.hpMax; pilot.st = 100;
+    $('#stageText').textContent = stageName(dragon.stage);
+    if (r.grew) toast(t('c.toast.grew', { stage: stageName(r.to) }), t('c.toast.grewSub'), 4);
+  }
+  function debugKey(code) {
+    if (state !== 'play') return;
+    if (code === 'KeyN') feed(100);
+    if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
+    if (code === 'KeyL') rest();
   }
 
   /* ---------- main loop ---------- */
@@ -219,7 +272,10 @@
     if (state === 'intro' || !pilot) {
       idleHero(dt);
     } else {
-      if (state === 'play') F.step(pilot, readInput(), dt, { regionId, stats });
+      if (state === 'play') {
+        F.step(pilot, readInput(), dt, { regionId, stats, effects: HN.effects(dragon.hunger) });
+        survive(dt);
+      }
       poseHero(dt);
       camDesired(tmpV);
       if (dt > 0) camPos.lerp(tmpV, 1 - Math.exp(-dt * 4.5));
@@ -259,7 +315,8 @@
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { $('#regionName').firstChild.textContent = t(TR.region(regionId).nameKey); });
+  if (window.I18N) I18N.onChange(() => { $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
+  if (debug) { const h = $('#hint'); h.removeAttribute('data-i18n'); h.textContent = t('c.debug.keys'); }
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, dragon, feed, rest };
 })();
