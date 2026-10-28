@@ -1,0 +1,325 @@
+# Campaign Mode - Design Spec
+
+Status: approved concept, 2026-10-28. Source of truth for all campaign phases; phase task files (`001_task_*.md`, ...) refine this spec for implementation.
+
+## 1. Overview
+
+Campaign mode turns the duel game into a growth story: a hatchling dragon hunts to survive, raids the oppressor's castles in timed missions and grows into an elder wyrm. It is a new mode next to duel, co-op and tutorial, reusing the existing flight, breath and combat code.
+
+**Core tension:** bigger means stronger, but also hungrier, slower and easier to spot. A hatchling sneaks and steals; an elder burns fortresses.
+
+### Core loop
+
+```
+        +----------------+          +----------------+
+        |  Volcano lair  |  ----->  |      Hunt      |
+        | rest, save,    |          | eat prey -     |
+        | stage-up,      |          | hunger +       |
+        | spend hoard    |          | growth XP      |
+        +----------------+          +----------------+
+                ^                           |
+                |                           v
+        +----------------+          +----------------+
+        | Kingdom reacts |  <-----  | Timed mission  |
+        | alert rises,   |          | 5-10 min raid -|
+        | defenses adapt |          | gold, relics   |
+        +----------------+          +----------------+
+```
+
+Each lap either grows the dragon (food) or its power (hoard), and pushes the region's alert up until the player lies low.
+
+### Design pillars
+
+1. **Growth you can feel** - each stage changes size, handling and play style, not just numbers.
+2. **Hunger keeps you moving** - food is the clock of free roam; starving weakens, never kills.
+3. **The kingdom fights back** - every raid raises alert and the defenses adapt.
+4. **Short, focused missions** - 5-10 minute timed objectives that fit a browser session.
+5. **A lair worth returning to** - the hoard pile, trophies and upgrades show progress at a glance.
+
+### Locked decisions
+
+| Topic | Decision |
+| --- | --- |
+| Tone | Classic fantasy, the dragon is the hero |
+| Starvation | Dragon gets weak, cannot die of hunger |
+| Death penalty | Respawn at the lair, carried loot is lost |
+| Story | Light - intro, act cards, mission briefings |
+| Mission length | 5-10 minutes, timer runs out = mission fail |
+| World structure | Separate regions with loading between them |
+
+## 2. Story
+
+The player is the last Verdigris dragon, hatched in a dormant volcano, who frees the realm from the Order of the Iron Lance - a dragon-slayer order that seized the crown and hoards the relics of the old dragons. Names are working titles.
+
+**Premise:** the Order drove the dragons to extinction and now rules the villages through garrisons. Villagers were taught to fear dragons, so they defend themselves at first. Stolen dragon relics (eggs, scale-crowns, the Ember Heart) sit in the Order's castles.
+
+**Hero framing in gameplay:** Order structures, soldiers and war machines are fair targets. Burning civilian homes or stealing village livestock lowers **Renown**. High Renown makes freed villages send food tribute to the lair; low Renown keeps them hostile. (Proposal - see Open questions.)
+
+### Acts
+
+| Act | Stage | Story beat | Ends with |
+| --- | --- | --- | --- |
+| 1 - Awakening | Hatchling | Hatch in the volcano, learn to hunt, find the first relic in an Order outpost | First relic on the trophy wall |
+| 2 - Embers | Drake | Raid Order supply lines, free the first village | Village sends first tribute |
+| 3 - Wyrmfire | Wyrm | Storm castles, recover the stolen dragon eggs | Grand Slayer hunts the dragon (lair raid) |
+| 4 - Crown of Ash | Elder | Siege of the capital, the Order's war machine | Order falls, free roam continues |
+
+**Delivery:** a short illustrated intro, one text card per act, a 2-4 line briefing per mission and a one-line outcome after it. No cutscenes, no dialogue trees.
+
+## 3. Dragon progression
+
+Food makes the dragon grow, hoard makes it powerful: two resources with separate jobs, so hunting and raiding both matter.
+
+| Resource | Source | Spent on | Banked when |
+| --- | --- | --- | --- |
+| Food (biomass) | Wild prey, fish, tribute, livestock | Hunger + growth XP | Eaten (instant) or stored in the larder |
+| Hoard (gold, relics) | Castles, caravans, Order vaults | Upgrades at the lair altar | Delivered to the lair or a regional aerie |
+
+### Growth stages
+
+Growth is one value `growth` from 0 to 1; model scale and all stats are curves over it. Stage thresholds gate missions and regions. Numbers are starting values for tuning.
+
+| Stage | growth | Scale | HP | Turn rate | Hunger drain | Spot range | Carry |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Hatchling | 0.00-0.24 | 1.0x | 100 | 100% | 1.0x | 1.0x | Small (goat, chalice) |
+| Drake | 0.25-0.54 | 1.6x | 220 | 85% | 1.5x | 1.5x | Medium (sheep, chest) |
+| Wyrm | 0.55-0.84 | 2.5x | 450 | 65% | 2.2x | 2.3x | Large (cattle, knight, egg) |
+| Elder | 0.85-1.00 | 4.0x | 900 | 50% | 3.0x | 3.5x | Huge (ballista, statue) |
+
+Stage-up is a moment: it only happens while resting in the lair, with a short growth animation and an act card when it starts a new act.
+
+### Upgrades (bought with hoard)
+
+| Branch | Upgrades | Effect |
+| --- | --- | --- |
+| Breath | Hotter fire, long cone, fireball volley, frost or acid breath (late) | Damage, range, alternative breath types |
+| Body | Iron scales, wing muscles, strong claws | Arrow resistance, stamina and dive speed, carry capacity |
+| Senses | Prey sense, guard sight, night vision | Highlights prey, shows guard vision cones, darker nights playable |
+| Abilities | Roar, tail sweep, silent glide, ground slam | Stun, close defense, stealth approach, area damage (elder only) |
+
+Some upgrades require a stage (ground slam needs Elder) so the tree opens up as the dragon grows.
+
+## 4. Hunger and survival
+
+Hunger never kills the dragon - it strips away its strength until it eats, which makes food a constant small decision without a frustrating death.
+
+### Hunger meter (0-100)
+
+Drains at a base rate times the stage multiplier; hard flight (boost, climbing) and breath use drain extra. Resting in the lair pauses it.
+
+| Hunger | State | Effects |
+| --- | --- | --- |
+| 100-31 | Fed | No penalty; above 80 HP regenerates |
+| 30-11 | Hungry | Stamina regen -50%, HP regen stops, warning pulse on HUD |
+| 10-0 | Starving | Max speed -30%, breath disabled, can carry only small loot, slow HP drain down to a floor of 25% max HP |
+
+The HP floor keeps the "weak, not dead" rule: starvation alone never ends a run, but a starving dragon is easy prey for defenders.
+
+### Food sources
+
+| Source | Where | Food | Risk | Notes |
+| --- | --- | --- | --- | --- |
+| Goat, deer | Ash Wastes, Wildwood | Low-medium | None | Herds flee and scatter into forest |
+| Boar, bear | Wildwood | Medium-high | Fights back | Bear can knock a hatchling out of a grab |
+| Fish | Rivers, lakes | Low | None | Needs a low dive over water |
+| Order supply wagon | Roads | High | Guards, alert +1 | Hero-approved food, counts as a raid |
+| Village tribute | Freed villages | High | None | Delivered to the larder over time |
+| Village livestock | Farms | High | Alert +1, Renown down | Easy but costly |
+
+### Hunting mechanics
+
+- **Grab:** dive and hold the grab key near prey; prey bigger than the carry class cannot be lifted.
+- **Eat or carry:** eat on the ground (vulnerable for 2-3 s) or carry it to the larder.
+- **Burned prey** gives 50% food - fire is a quick kill but wasteful.
+- **Larder:** stores a few carcasses, capacity grows with lair upgrades; stored food slowly spoils.
+- **Prey respawn** per region, with herds moving away from areas the dragon hunts too often.
+
+## 5. Kingdom defenses
+
+Settlements scale from a hamlet with pitchforks to a capital with a dragon-slayer order, and a per-region alert level makes the defenses react to how the player behaves.
+
+### Settlements
+
+| Type | Defenses | Loot | Behavior |
+| --- | --- | --- | --- |
+| Hamlet | Peasants, alarm bell | Livestock | Bell alerts the nearest village |
+| Village | Archers, watchtower, 1 ballista | Grain, small gold | Calls knights if the alarm lasts > 60 s |
+| Order outpost | Archers, 2 ballistae, net launcher | Gold, minor relic | Main early mission target |
+| Town | Walls, ballistae, mangonels | Treasury | Sends riders after the dragon |
+| Castle | All of the above + knights, frost mages | Relics, vault | Mission targets with courtyard and keep |
+| Capital | Everything + Grand Slayer | Crown relics | Act 4 only |
+
+### Defender types
+
+| Defender | Threat | Counterplay |
+| --- | --- | --- |
+| Archer | Chip damage in volleys | Iron scales, fly high, burn towers |
+| Ballista | High damage bolt, slow reload | Telegraphed aim line - dodge, then strike during reload |
+| Mangonel | Area damage on a landed dragon | Don't stay on the ground |
+| Net launcher | Grounds the dragon for 3 s | Tail sweep, roar, approach from behind |
+| Frost mage | Slows wings, weakens fire | Close distance fast, acid breath (late) |
+| Mounted knight | Chases on the ground, lance hits | Take off, grab and drop (wyrm+) |
+| Dragon slayer | Named mini-boss with mirror shield or chain harpoon | Unique pattern per slayer |
+
+### Alert level (per region, 0-5)
+
+Raids and sightings raise alert; it decays by one level after a few in-game hours without incidents. Destroying watchtowers lowers it faster.
+
+| Level | Kingdom response |
+| --- | --- |
+| 0 | Normal life, few guards |
+| 1-2 | More archers, bells manned, road patrols |
+| 3 | Ballistae built in villages, livestock moved inside |
+| 4 | Hunting parties search near aeries and the lair |
+| 5 | A dragon slayer is sent - triggers a lair-defense event |
+
+The rhythm this creates: raid, lie low and hunt in the wilds, raid again.
+
+## 6. Missions
+
+Every mission is a timed run of 5-10 minutes: accept at the lair, fly to the target, complete the objective and deliver the loot to an aerie or the lair before the timer hits zero.
+
+### Mission types
+
+| Type | Example | Tests | Time limit |
+| --- | --- | --- | --- |
+| Steal | Ember chalice from an outpost chapel | Stealth, landing, escape while carrying | 6-8 min |
+| Destroy | Siege workshop building anti-dragon ballistae | Breath damage, dodging | 5-7 min |
+| Intercept | Gold caravan crossing the pass | Speed, timing | 5-6 min |
+| Hunt | Slayer captain riding toward the lair | Combat, tracking | 6-8 min |
+| Rescue | Caged wild dragonling in the royal menagerie | Stealth + carry | 8-10 min |
+| Defend | Order hunting party storms the lair | Combat on home ground | 5 min (survive) |
+| Boss | Grand Slayer, the war machine | Everything | 10 min |
+
+Missions are gated by growth stage and act. Optional side activities (burn a watchtower, free caged animals, raid a tax cart) have no timer.
+
+### Timer rules
+
+- **Start:** when the dragon leaves the lair region or the aerie with the mission active - flight time to the target is part of the challenge.
+- **Display:** always visible; turns amber at 60 s and red at 20 s.
+- **Success:** objective done and loot delivered to the lair or a regional aerie before 0. Remaining time gives a bonus (e.g. +1% hoard per 5 s left).
+- **Fail on timeout:** objective lost, mission loot vanishes, region alert +1, mission can be retried after resting.
+- **Hunger still runs:** stopping to hunt costs mission time - eat before you leave.
+
+### Death and failure
+
+| Event | Result |
+| --- | --- |
+| Dragon dies | Respawn at the lair; carried loot (relic, gold, prey) is lost; active mission fails |
+| Timer runs out | Mission fails; carried mission loot is lost; non-mission gold already carried is kept |
+| Starvation | No death - weakness effects only (see Hunger) |
+| Banked hoard | Always safe - delivered loot is never lost |
+
+Aeries (small caves, one per region) are where loot is banked and missions end, so the death rule stays fair even far from the volcano.
+
+### Example: steal mission flow
+
+1. Briefing at the lair: "The Order hides the Ember Chalice in the Harrow outpost chapel." Timer 7:00.
+2. Fly to the River Farmlands; scout from altitude, guard sight shows vision cones.
+3. Approach low along the river or wait for night.
+4. Land in the courtyard or break through the chapel roof, grab the chalice.
+5. Carrying: speed -20%, no breath. Bells ring, ballistae wake, knights mount.
+6. Escape to the Farmlands aerie. Delivered at 1:12 left: success + time bonus.
+
+## 7. World and lair
+
+The world is six regions radiating from the volcano, each a seamless map loaded separately; difficulty and stage requirements grow with distance from the lair.
+
+### Regions
+
+| Region | Content | Unlocked at | Aerie |
+| --- | --- | --- | --- |
+| Ash Wastes | Volcano lair, goats, lava fields | Start | Lair itself |
+| Wildwood | Deer, boar, bears, hamlets, first outpost | Hatchling | Yes |
+| River Farmlands | Villages, livestock, fish, first town | Drake | Yes |
+| Highland Pass | Fortresses, caravans, bridges | Drake (late) | Yes |
+| Royal Lowlands | Castles, slayer headquarters | Wyrm | Yes |
+| Capital | Final act | Elder | No - boss arena |
+
+**Transitions:** flying to a region edge shows a short "fly to" prompt; confirming loads the neighbour region with the dragon entering from that edge. The mission timer pauses during loading. A fast-travel option from the lair to any discovered aerie keeps long trips short.
+
+**Region size target:** about 2-3 minutes of straight flight across for a hatchling, so a 5-10 minute mission covers approach, objective and escape.
+
+### Volcano lair
+
+| Feature | Purpose |
+| --- | --- |
+| Rest nest | Save, heal, pass time to day or night, triggers stage-up |
+| Hoard pile | Grows visibly with banked gold (instanced coins) |
+| Larder | Food storage for a few carcasses |
+| Upgrade altar | Spend hoard on upgrades |
+| Trophy wall | Shows recovered relics and story progress |
+| Mission board | Pick the next mission, shows briefing and time limit |
+| Lava vents | Hazards that hurt intruders in lair-defense missions |
+
+### Day and night
+
+A full cycle lasts about 20 real minutes. At night guards see less far and fewer are awake, but prey hides and is harder to spot. Resting in the lair can skip to dusk or dawn.
+
+## 8. Technical design
+
+Campaign is a separate mode built from small, data-driven systems on top of the existing flight and combat code; all content (regions, prey, defenders, missions, upgrades) lives in data files so balancing and AI-assisted iteration don't touch logic. Concrete file layout, module format and interfaces are defined per phase in the task files (Phase 1: `001_task_survival.md`).
+
+### Systems (all phases)
+
+| System | Responsibility | Depends on |
+| --- | --- | --- |
+| CampaignState | Single source of truth for progress, emits change events | SaveService |
+| GrowthSystem | Maps `growth` to scale and stat curves, stage thresholds | CampaignState |
+| HungerSystem | Drain, states, effects on dragon stats | GrowthSystem |
+| PreySystem | Herd spawning, graze / flee / hide AI, grab and eat | Perception |
+| Perception | Shared vision cones + hearing for prey and guards | Dragon size, day/night |
+| SettlementSystem | Spawns buildings and defenders from region data | AlertSystem |
+| DefenderAI | State machines: idle, alert, attack, search | Perception |
+| AlertSystem | Per-region alert level, decay, escalation events | CampaignState |
+| MissionSystem | Accept, timer, objectives, success / fail, rewards | CampaignState, RegionLoader |
+| RegionLoader | Load / unload region scenes, edge transitions, aeries | Asset cache |
+| LairScene | Hub UI: rest, altar, larder, mission board, hoard pile | All of the above |
+| SaveService | Versioned save, autosave, migrations | - |
+
+### Save state (target shape, all phases)
+
+Stored in `localStorage` (IndexedDB if it grows), autosaved on rest, mission end and region change. The shape is kept server-friendly for the planned persistent multiplayer.
+
+```json
+{
+  "version": 1,
+  "dragon": { "growth": 0.31, "hp": 180, "hunger": 64, "upgrades": ["iron_scales_1", "prey_sense"] },
+  "hoard": { "gold": 1240, "relics": ["ember_chalice"] },
+  "larder": [{ "prey": "deer", "food": 30, "storedAt": 5120 }],
+  "renown": 12,
+  "regions": { "wildwood": { "alert": 1, "aerieFound": true }, "farmlands": { "alert": 3, "aerieFound": false } },
+  "missions": { "completed": ["a1_outpost_chalice"], "active": null },
+  "story": { "act": 2 },
+  "world": { "timeOfDay": 0.72, "location": "lair" }
+}
+```
+
+### Performance notes
+
+- Heightmap terrain per region, chunked with LOD; fog limits draw distance.
+- Instanced meshes for trees, houses, herds and the hoard coins.
+- One dragon model scaled by `growth`, not separate assets per stage.
+- AI ticks at a lower rate for far entities; off-screen herds are simulated as groups.
+
+## 9. Roadmap
+
+Six phases, each a playable increment on its own branch and PR; Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built.
+
+| Phase | Task file | Scope | Exit criteria |
+| --- | --- | --- | --- |
+| 1 - Survival MVP | `001_task_survival.md` | Ash Wastes + Wildwood, lair (rest, save, larder), hunger, goat / deer / boar, grab and eat, growth Hatchling to Drake, save v1 | A new player can hunt, starve, recover and reach Drake in about 30 min; save survives reload |
+| 2 - Kingdom | `002_task_kingdom.md` | River Farmlands, hamlet + village + outpost, archers + ballista, Perception, alert levels 0-3, livestock, Renown | Raiding raises alert and defenses visibly change; lying low lowers it |
+| 3 - Missions | `003_task_missions.md` | Mission board, timer, steal + destroy types, carry mechanic, aeries, hoard + upgrade altar, Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified |
+| 4 - Expansion | `004_task_expansion.md` | Highland Pass + Royal Lowlands, Wyrm stage, knights, mages, net launchers, first slayer, alert 4-5, lair defense, day/night | Act 3 playable end to end |
+| 5 - Endgame | `005_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
+| 6 - Co-op campaign | `006_task_coop.md` | Two dragons, shared lair and hoard, sync on the planned persistent multiplayer backend | Two players finish a mission together |
+
+## 10. Open questions
+
+- [x] Confirm current renderer, module layout and input handling in the repo - done in Phase 1 task file (Three.js r128, no build step, UMD sim modules tested with Node).
+- [ ] Keep Renown (hero mechanic: civilians and livestock cost Renown, tribute rewards it) or drop it for simplicity?
+- [ ] Grab controls: hold key near prey, or auto-grab on a low dive? (Phase 1 picks one provisionally, see task file.)
+- [ ] Does the mission timer pause during region loading only, or also inside the lair menus?
+- [ ] Visual difference between stages: scale only, or extra horns / spines per stage?
+- [ ] When does co-op campaign start - after Phase 5, or earlier alongside persistent multiplayer?
