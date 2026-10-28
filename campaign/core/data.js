@@ -56,21 +56,23 @@
     regions: {
       ash: {
         nameKey: 'c.region.ash', radius: 1100, seed: 11, ceiling: 320,
-        terrain: { amp: 1.4, base: 2, features: [
+        terrain: { amp: 0.9, base: 20, features: [
           { type: 'cone', x: 0, z: 0, r: 260, h: 150, crater: { r: 38, depth: 30 } },
-          { type: 'flatten', x: 0, z: 0, r: 1100, toward: 6, from: 700 },
+          { type: 'flatten', x: 0, z: 0, r: 1100, toward: 14, from: 700 },
         ] },
         palette: 'ash',
-        lair: { x: 0, z: 150, y: 70, r: 18 },            // cave mouth on the volcano's south flank
+        // cave mouth on the volcano's +Z flank, opening toward the Wildwood exit;
+        // the mouth centre sits `above` units over the slope (terrain.lairPos computes it)
+        lair: { x: 0, z: 150, above: 7, r: 18, facing: 0 },
         spawn: { x: 0, z: 260, y: 110, yaw: 0 },          // respawn point in front of the cave, facing away (+Z)
         flora: { trees: 60, rocks: 140 },
         herds: [{ type: 'goat', count: 4, ring: [350, 900] }],
-        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }],     // radians around +Z (north arc)
+        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }],     // radians, 0 = +Z; region edge arc on the +Z side
         entries: { wild: { angle: 0 } },
       },
       wild: {
         nameKey: 'c.region.wild', radius: 1100, seed: 23, ceiling: 280,
-        terrain: { amp: 1.0, base: 4, features: [] },
+        terrain: { amp: 1.0, base: 12, features: [] },
         palette: 'forest',
         flora: { trees: 1400, rocks: 120 },
         herds: [{ type: 'deer', count: 5, ring: [200, 1000] }, { type: 'boar', count: 3, ring: [300, 1000] },
