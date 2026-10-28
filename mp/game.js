@@ -6,8 +6,9 @@
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
+  const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   const S = window.VSim;
-  if (!window.THREE || !S) { $('#loading').textContent = 'Could not load the 3D engine. Check your connection and reload.'; return; }
+  if (!window.THREE || !S) { $('#loading').textContent = t('mp.engineFail'); return; }
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -295,7 +296,7 @@
     });
     view.foes.forEach((e, id) => { if (!seenF.has(id)) { e.d.dispose(); view.foes.delete(id); } });
   }
-  const nameOf = id => (id === view.myId ? 'You' : (view.names[id] || 'A dragon'));
+  const nameOf = id => (id === view.myId ? t('mp.you') : (view.names[id] || t('mp.aDragon')));
   function applyEvents(evs) {
     evs.forEach(ev => {
       switch (ev.e) {
@@ -314,7 +315,7 @@
         case 'hit': { const f = view.foes.get(ev.f); if (f) f.d.flash = 1; break; }
         case 'die':
           burst(ev.p, 30, 0, 18, 2, 0.7);
-          feed(ev.by === view.myId ? 'You downed a wyvern  +' + ev.pts : nameOf(ev.by) + ' downed a wyvern  +' + ev.pts, ev.by === view.myId);
+          feed(ev.by === view.myId ? t('mp.feed.youKill', { p: ev.pts }) : t('mp.feed.kill', { name: nameOf(ev.by), p: ev.pts }), ev.by === view.myId);
           break;
         case 'boom':
           burst(ev.p, 60, 0, 26, 2.8, 1.0); burst(ev.p, 25, 2, 18, 1.4, 0.8);
@@ -325,8 +326,8 @@
           else { const p = view.players.get(ev.pl); if (p) p.d.flash = 1; }
           break;
         case 'down':
-          if (ev.pl === view.myId) { pilot.down = true; showBanner('You are down', 'Back in the air in ' + ev.t + ' s'); }
-          else feed(ev.name + ' is down');
+          if (ev.pl === view.myId) { pilot.down = true; showBanner(t('mp.youDown'), t('mp.backIn', { t: ev.t })); }
+          else feed(t('mp.feed.down', { name: ev.name }));
           break;
         case 'spawn':
           if (ev.pl === view.myId) {
@@ -334,21 +335,21 @@
             camPos.set(ev.p[0], ev.p[1] + 8, ev.p[2] - 22);
           }
           break;
-        case 'join': if (ev.pl !== view.myId) feed(ev.name + ' joined the flight'); break;
-        case 'left': feed(ev.name + ' left'); break;
-        case 'wave': showBanner('Wave ' + ev.n, ev.count + ' crimson wyverns'); break;
-        case 'clear': showBanner('Wave ' + ev.n + ' cleared', '+30 vitality'); break;
+        case 'join': if (ev.pl !== view.myId) feed(t('mp.feed.join', { name: ev.name })); break;
+        case 'left': feed(t('mp.feed.left', { name: ev.name })); break;
+        case 'wave': showBanner(t('banner.wave', { n: ev.n }), t('banner.waveFoes', { n: ev.count })); break;
+        case 'clear': showBanner(t('banner.cleared', { n: ev.n }), t('banner.vit30')); break;
         case 'over':
           view.over = true;
-          $('#overText').textContent = 'Team score ' + ev.score + ' · reached wave ' + ev.wave;
+          $('#overText').textContent = t('mp.over.text', { s: ev.score, w: ev.wave });
           $('#againBtn').hidden = role !== 'host';
-          $('#overText').textContent += role === 'host' ? '' : '. Waiting for the host to fly again.';
+          $('#overText').textContent += role === 'host' ? '' : t('mp.over.wait');
           $('#over').hidden = false;
           break;
         case 'restart':
           view.over = false; $('#over').hidden = true;
           ballViews.forEach(b => scene.remove(b.m)); ballViews.clear();
-          showBanner('Fly again', 'Wave 1 in 5 s');
+          showBanner(t('btn.again'), t('mp.wave1in'));
           break;
       }
     });
@@ -369,8 +370,8 @@
       const [id, , , , , , , , , hp, down, color, name] = r;
       const row = document.createElement('div'); if (down) row.className = 'down';
       const dot = document.createElement('i'); dot.style.background = PALETTES[color % PALETTES.length].ui;
-      const b = document.createElement('b'); b.textContent = name + (id === view.myId ? ' (you)' : '');
-      const em = document.createElement('em'); em.textContent = down ? 'down' : hp + ' hp';
+      const b = document.createElement('b'); b.textContent = name + (id === view.myId ? t('mp.youTag') : '');
+      const em = document.createElement('em'); em.textContent = down ? t('mp.downTag') : t('mp.hp', { n: hp });
       row.append(dot, b, em); el.appendChild(row);
     });
   }
@@ -458,7 +459,7 @@
     const name = myName();
     setBusy(true);
     if (!window.Peer) { startHost(name, false); return; }
-    setStatus('Opening a room…', true);
+    setStatus(t('mp.opening'), true);
     let tries = 0;
     const attempt = () => {
       const code = makeCode();
@@ -484,8 +485,8 @@
     view.myId = 1; nextId = 2;
     const me = S.addPlayer(world, 1, name, 0);
     startGame(me.color, me.pos);
-    if (online) showBanner('Room ' + roomCode, 'Send friends the link · wave 1 in 8 s');
-    else { roomCode = ''; showBanner('Solo flight', "The matchmaking server couldn't be reached, so friends can't join this game"); }
+    if (online) showBanner(t('mp.roomBanner', { c: roomCode }), t('mp.sendLink'));
+    else { roomCode = ''; showBanner(t('mp.soloFlight'), t('mp.noServerHost')); }
   }
   function onGuestConn(conn) {
     conn.on('data', m => onGuestMsg(conn, m));
@@ -515,10 +516,10 @@
 
   function joinGame() {
     const code = ($('#codeIn').value || '').trim().toUpperCase();
-    if (!/^[A-Z0-9]{5}$/.test(code)) { setStatus('Room codes are 5 letters or digits, like K3X9Q.'); return; }
-    if (!window.Peer) { setStatus("The multiplayer library didn't load. Check your connection and reload."); return; }
+    if (!/^[A-Z0-9]{5}$/.test(code)) { setStatus(t('mp.badCode')); return; }
+    if (!window.Peer) { setStatus(t('mp.noLib')); return; }
     const name = myName();
-    setBusy(true); setStatus('Connecting to room ' + code + '…', true);
+    setBusy(true); setStatus(t('mp.connecting', { c: code }), true);
     let welcomed = false, failed = false;
     const p = new window.Peer({ debug: 1 }); peer = p;
     const fail = msg => {
@@ -526,7 +527,7 @@
       setStatus(msg); setBusy(false);
       try { p.destroy(); } catch (_) { }
     };
-    const timer = setTimeout(() => fail("Couldn't reach room " + code + '. Check the code. If it is right, one of you may be on a network that blocks direct connections (try mobile data).'), 15000);
+    const timer = setTimeout(() => fail(t('mp.unreachable', { c: code })), 15000);
     p.on('open', () => {
       const c = p.connect(PREFIX + code, { reliable: true, serialization: 'json' });
       hostConn = c;
@@ -538,21 +539,21 @@
           welcomed = true; clearTimeout(timer);
           role = 'guest'; roomCode = code; view.myId = m.id; lastSnapAt = performance.now();
           startGame(m.color, m.p);
-          showBanner('Joined room ' + code, 'Fly with your team');
+          showBanner(t('mp.joined', { c: code }), t('mp.flyTeam'));
         } else if (m.k === 's') {
           lastSnapAt = performance.now();
           if (mode === 'game') { applyEvents(m.e || []); applySnapshot(m.s); }
-        } else if (m.k === 'full') fail('Room ' + code + ' is full (6 dragons).');
+        } else if (m.k === 'full') fail(t('mp.full', { c: code }));
       });
-      c.on('close', () => { if (welcomed) showNotice('The host left', 'The game ended because the host closed their window or lost the connection.'); else fail('The host closed the connection.'); });
+      c.on('close', () => { if (welcomed) showNotice(t('mp.hostLeft'), t('mp.hostLeftText')); else fail(t('mp.hostClosed')); });
     });
     p.on('disconnected', () => { if (welcomed) { try { p.reconnect(); } catch (_) { } } });
     p.on('error', err => {
-      const t = err && err.type;
-      if (welcomed) { console.warn('peer error', t); return; }
-      if (t === 'peer-unavailable') fail('No room with code ' + code + '. Check the code with your host.');
-      else if (t === 'network' || t === 'server-error' || t === 'socket-error') fail("Couldn't reach the matchmaking server. Try again in a moment.");
-      else fail('Connection failed (' + (t || 'unknown') + '). Try again.');
+      const et = err && err.type;
+      if (welcomed) { console.warn('peer error', et); return; }
+      if (et === 'peer-unavailable') fail(t('mp.noRoom', { c: code }));
+      else if (et === 'network' || et === 'server-error' || et === 'socket-error') fail(t('mp.noServer'));
+      else fail(t('mp.failed', { t: et || t('mp.unknown') }));
     });
   }
 
@@ -566,7 +567,7 @@
     camPos.set(pos[0], pos[1] + 8, pos[2] - 22);
     camera.clearViewOffset();
     if (roomCode) history.replaceState(null, '', location.pathname + '#' + roomCode);
-    $('#roomCode').textContent = roomCode || 'solo'; $('#menuCode').textContent = roomCode || 'solo';
+    $('#roomCode').textContent = roomCode || t('mp.solo'); $('#menuCode').textContent = roomCode || t('mp.solo');
     $('#roomChip').hidden = !roomCode;
     $('#lobby').hidden = true; $('#hudTop').hidden = false;
     $('#legend').hidden = isTouch; $('#touch').hidden = !isTouch;
@@ -584,15 +585,15 @@
   function toggleMenu(force) {
     menuOpen = force == null ? !menuOpen : force;
     $('#menu').hidden = !menuOpen;
-    $('#linkOut').value = roomCode ? inviteLink() : 'Solo game - nobody can join';
+    $('#linkOut').value = roomCode ? inviteLink() : t('mp.soloLink');
     $('#copyBtn').disabled = !roomCode;
     if (menuOpen) mouseBreath = false;
   }
   function copyLink() {
     const link = inviteLink(), box = $('#linkOut');
     box.value = link;
-    const fallback = () => { box.focus(); box.select(); feed('Select the link and copy it'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(() => feed('Invite link copied'), fallback);
+    const fallback = () => { box.focus(); box.select(); feed(t('mp.feed.copyManual')); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(() => feed(t('mp.feed.copied')), fallback);
     else fallback();
   }
 
@@ -734,7 +735,7 @@
 
       if (role === 'host') { hostTick(dt); applySnapshot(S.snapshot(world)); }
       else {
-        if (lastSnapAt && performance.now() - lastSnapAt > PEER_TIMEOUT && $('#notice').hidden) showNotice('Connection lost', 'No word from the host for 15 seconds. They may have closed the game or lost their connection.');
+        if (lastSnapAt && performance.now() - lastSnapAt > PEER_TIMEOUT && $('#notice').hidden) showNotice(t('mp.lost'), t('mp.lostText'));
         netT += dt;
         if (netT >= NET_DT) { netT = 0; if (hostConn && hostConn.open) { try { hostConn.send(Object.assign({ k: 'p' }, S.poseOf(pilot))); } catch (_) { } } }
       }
@@ -780,7 +781,7 @@
       $('#wave').textContent = view.wave || '-';
       $('#score').textContent = view.score;
       let alive = 0; view.foes.forEach(e => { if (!e.dead) alive++; });
-      $('#foes').textContent = view.wave === 0 ? (view.cd > 0 ? 'starts in ' + view.cd + ' s' : 'get ready') : alive + (alive === 1 ? ' wyvern' : ' wyverns');
+      $('#foes').textContent = view.wave === 0 ? (view.cd > 0 ? t('mp.startsIn', { n: view.cd }) : t('mp.getReady')) : t('hud.foes', { n: alive });
       teamT -= dt; if (teamT <= 0) { teamT = 0.3; renderTeam(); }
       hurt = Math.max(0, hurt - dt * 1.8);
       $('#vignette').style.opacity = Math.max(hurt, view.hp < 30 && !pilot.down ? 0.35 + Math.sin(time * 5) * 0.15 : 0);
@@ -796,11 +797,14 @@
   if (/[?&]debug\b/.test(location.search)) window.__vsd = { get world() { return world; }, get pilot() { return pilot; }, view, S };
   try { const n = localStorage.getItem('vsd-name'); if (n) $('#nameIn').value = n; } catch (_) { }
   const invited = location.hash.slice(1).toUpperCase();
-  if (/^[A-Z0-9]{5}$/.test(invited)) {
-    $('#codeIn').value = invited;
-    setStatus('You are invited to room ' + invited + '. Pick a name and press Join.', true);
-  }
-  if (!window.Peer) setStatus("The multiplayer library didn't load, so only a solo flight is possible.");
+  const lobbyStatus = () => {
+    if (/^[A-Z0-9]{5}$/.test(invited)) setStatus(t('mp.invited', { c: invited }), true);
+    if (!window.Peer) setStatus(t('mp.noLibSolo'));
+  };
+  if (/^[A-Z0-9]{5}$/.test(invited)) $('#codeIn').value = invited;
+  lobbyStatus();
+  // The language switch lives in the lobby; refresh the one message that may be showing there.
+  if (window.I18N) I18N.onChange(() => { if (mode === 'lobby') { setStatus(''); lobbyStatus(); } });
   $('#loading').remove();
   $('#lobby').hidden = false;
   requestAnimationFrame(frame);

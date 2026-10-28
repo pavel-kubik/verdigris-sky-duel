@@ -3,8 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Verdigris Co-op</title>
-<meta name="description" content="Fly green dragons together against waves of crimson wyverns. Peer-to-peer co-op in the browser.">
+<title data-i18n="mp.title">Verdigris Co-op</title>
+<meta name="description" content="Fly green dragons together against waves of crimson wyverns. Peer-to-peer co-op in the browser." data-i18n-attr="content:mp.desc">
+<meta name="theme-color" content="#0d1411">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="../icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Verdigris">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
 <style>
@@ -45,7 +54,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--verd);outline-o
 .tally small{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:600}
 .right{display:flex;gap:8px;align-items:flex-start}
 #roomChip{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;border-radius:20px;padding:0 14px;font-size:13px;font-weight:600;letter-spacing:.06em}
-#roomChip span{color:var(--verd);font-weight:700;letter-spacing:.14em}
+#roomChip #roomCode{color:var(--verd);font-weight:700;letter-spacing:.14em}
 #menuBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #banner{position:fixed;left:0;right:0;top:28%;text-align:center;font-family:var(--f-display);font-size:clamp(34px,7vw,64px);text-shadow:0 2px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s;padding-inline:16px}
 #banner small{display:block;font-family:var(--f-ui);font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--ember);margin-top:6px}
@@ -86,6 +95,13 @@ input{background:rgba(233,225,204,.06);border:1px solid var(--line);border-radiu
 .foot a{color:var(--bone)}
 .linkbox{display:grid;grid-template-columns:1fr auto;gap:8px}
 .linkbox input{font-size:13px}
+.lobbyFoot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.langSwitch{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.langSwitch button{background:transparent;border:0;color:var(--mute);font-size:12px;font-weight:700;letter-spacing:.12em;padding:7px 11px}
+.langSwitch button+button{border-left:1px solid var(--line)}
+.langSwitch button[aria-pressed="true"]{background:rgba(98,196,138,.18);color:var(--bone)}
+.installBtn{padding:7px 12px;font-size:13px}
+.installHint{font-size:13px}
 #loading{position:fixed;inset:0;display:grid;place-items:center;color:var(--mute);letter-spacing:.2em;text-transform:uppercase;font-size:12px}
 
 @media (max-width:720px){
@@ -93,14 +109,14 @@ input{background:rgba(233,225,204,.06);border:1px solid var(--line);border-radiu
   h1{font-size:44px}
   .tally b{font-size:24px}
   #roomChip{font-size:0;padding:0 12px}
-  #roomChip span{font-size:12px}
+  #roomChip #roomCode{font-size:12px}
   #team{display:none}
 }
 @media (prefers-reduced-motion:reduce){.fill,#banner{transition:none}}
 </style>
 </head>
 <body>
-<div id="loading">Hatching the dragons</div>
+<div id="loading" data-i18n="mp.loading">Hatching the dragons</div>
 <canvas id="c"></canvas>
 <canvas id="hud"></canvas>
 <div id="vignette"></div>
@@ -108,68 +124,72 @@ input{background:rgba(233,225,204,.06);border:1px solid var(--line);border-radiu
 <div id="hudTop" hidden>
   <div class="left">
     <div class="bars">
-      <div class="bar"><span>Vitality</span><div class="track"><div class="fill" id="hpFill"></div></div></div>
-      <div class="bar"><span>Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
+      <div class="bar"><span data-i18n="hud.vitality">Vitality</span><div class="track"><div class="fill" id="hpFill"></div></div></div>
+      <div class="bar"><span data-i18n="hud.fire">Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
     </div>
     <div id="team"></div>
   </div>
-  <div class="tally"><small>Wave</small><b id="wave">-</b><small id="foes">get ready</small></div>
-  <div class="tally"><small>Team score</small><b id="score">0</b></div>
+  <div class="tally"><small data-i18n="hud.wave">Wave</small><b id="wave">-</b><small id="foes">get ready</small></div>
+  <div class="tally"><small data-i18n="mp.teamScore">Team score</small><b id="score">0</b></div>
   <div class="right">
-    <button id="roomChip" title="Copy invite link">Room <span id="roomCode">-</span></button>
-    <button id="menuBtn" aria-label="Menu">II</button>
+    <button id="roomChip" title="Copy invite link" data-i18n-attr="title:mp.copyInvite"><span data-i18n="mp.room">Room</span> <span id="roomCode">-</span></button>
+    <button id="menuBtn" aria-label="Menu" data-i18n-attr="aria-label:mp.menu">II</button>
   </div>
 </div>
 <div id="feed"></div>
 <div id="banner"></div>
 <div id="legend" hidden>
-  <span><kbd>A</kbd><kbd>D</kbd>Turn</span><span><kbd>W</kbd><kbd>S</kbd>Climb / dive</span><span><kbd>Space</kbd>Fire breath</span><span><kbd>F</kbd>Fireball</span><span><kbd>Shift</kbd>Boost</span><span><kbd>Q</kbd><kbd>E</kbd>Barrel roll</span><span><kbd>Esc</kbd>Menu</span>
+  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>F</kbd><span data-i18n="legend.ball">Fireball</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>Esc</kbd><span data-i18n="legend.menu">Menu</span></span>
 </div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
   <div id="btns">
-    <button id="bRoll">Roll</button><button id="bBall">Ball</button>
-    <button id="bBoost">Boost</button><button id="bBreath">Breath</button>
+    <button id="bRoll" data-i18n="btn.roll">Roll</button><button id="bBall" data-i18n="btn.ball">Ball</button>
+    <button id="bBoost" data-i18n="btn.boost">Boost</button><button id="bBreath" data-i18n="btn.breath">Breath</button>
   </div>
 </div>
 
 <section id="lobby" class="panel" hidden>
-  <div class="eyebrow">Co-op multiplayer · beta</div>
-  <h1>Verdigris Co-op</h1>
-  <p>Fly together against waves of crimson wyverns. Up to 6 dragons, connected directly browser to browser.</p>
-  <label for="nameIn">Your dragon's name<input id="nameIn" maxlength="16" autocomplete="nickname" placeholder="Verdigris"></label>
-  <button class="cta" id="hostBtn">Host a game</button>
-  <div class="or">or join a friend</div>
+  <div class="eyebrow" data-i18n="mp.lobby.eyebrow">Co-op multiplayer · beta</div>
+  <h1 data-i18n="mp.title">Verdigris Co-op</h1>
+  <p data-i18n="mp.lobby.text">Fly together against waves of crimson wyverns. Up to 6 dragons, connected directly browser to browser.</p>
+  <label for="nameIn"><span data-i18n="mp.lobby.name">Your dragon's name</span><input id="nameIn" maxlength="16" autocomplete="nickname" placeholder="Verdigris"></label>
+  <button class="cta" id="hostBtn" data-i18n="mp.lobby.host">Host a game</button>
+  <div class="or" data-i18n="mp.lobby.or">or join a friend</div>
   <div class="join">
-    <label for="codeIn">Room code<input id="codeIn" maxlength="5" autocomplete="off" spellcheck="false" placeholder="K3X9Q"></label>
-    <button class="ghost" id="joinBtn">Join</button>
+    <label for="codeIn"><span data-i18n="mp.lobby.code">Room code</span><input id="codeIn" maxlength="5" autocomplete="off" spellcheck="false" placeholder="K3X9Q"></label>
+    <button class="ghost" id="joinBtn" data-i18n="mp.lobby.join">Join</button>
   </div>
   <div id="status" role="status"></div>
-  <p class="foot"><a href="../">Play solo instead</a></p>
+  <div class="lobbyFoot"><p class="foot"><a href="../" data-i18n="mp.lobby.solo">Play solo instead</a></p><div class="langSwitch"></div></div>
+  <button class="ghost installBtn" hidden data-i18n="install.btn">Install app</button>
+  <p class="installHint" hidden></p>
 </section>
 
 <section id="menu" class="panel center" hidden>
-  <div class="eyebrow">Room <span id="menuCode">-</span></div>
-  <h2>Invite friends</h2>
-  <p>The game keeps running while this menu is open.</p>
-  <div class="linkbox"><input id="linkOut" readonly aria-label="Invite link"><button class="ghost" id="copyBtn">Copy</button></div>
-  <div class="row"><button class="cta" id="resumeBtn">Resume</button><button class="ghost" id="leaveBtn">Leave game</button></div>
+  <div class="eyebrow"><span data-i18n="mp.room">Room</span> <span id="menuCode">-</span></div>
+  <h2 data-i18n="mp.menu.title">Invite friends</h2>
+  <p data-i18n="mp.menu.text">The game keeps running while this menu is open.</p>
+  <div class="linkbox"><input id="linkOut" readonly aria-label="Invite link" data-i18n-attr="aria-label:mp.menu.link"><button class="ghost" id="copyBtn" data-i18n="mp.menu.copy">Copy</button></div>
+  <div class="row"><button class="cta" id="resumeBtn" data-i18n="btn.resume">Resume</button><button class="ghost" id="leaveBtn" data-i18n="mp.leave">Leave game</button></div>
 </section>
 
 <section id="over" class="panel center" hidden>
-  <div class="eyebrow" style="color:var(--blood)">The flight is lost</div>
-  <h2>All dragons down</h2>
+  <div class="eyebrow" style="color:var(--blood)" data-i18n="mp.over.eyebrow">The flight is lost</div>
+  <h2 data-i18n="mp.over.title">All dragons down</h2>
   <p id="overText">-</p>
-  <div class="row"><button class="cta" id="againBtn">Fly again</button><button class="ghost" id="leave2Btn">Leave game</button></div>
+  <div class="row"><button class="cta" id="againBtn" data-i18n="btn.again">Fly again</button><button class="ghost" id="leave2Btn" data-i18n="mp.leave">Leave game</button></div>
 </section>
 
 <section id="notice" class="panel center" hidden>
-  <div class="eyebrow" style="color:var(--blood)">Disconnected</div>
+  <div class="eyebrow" style="color:var(--blood)" data-i18n="mp.notice.eyebrow">Disconnected</div>
   <h2 id="noticeTitle">The host left</h2>
   <p id="noticeText">The game ended because the host closed their window.</p>
-  <div class="row"><button class="cta" id="backBtn">Back to lobby</button></div>
+  <div class="row"><button class="cta" id="backBtn" data-i18n="mp.notice.back">Back to lobby</button></div>
 </section>
 
+<script src="../i18n.js"></script>
+<script src="../pwa.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <script>if(!window.Peer)document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>

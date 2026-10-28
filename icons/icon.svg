@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d2230"/><stop offset=".62" stop-color="#38555a"/><stop offset="1" stop-color="#c8885a"/>
+    </linearGradient>
+    <radialGradient id="sun" cx=".5" cy=".92" r=".55">
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <rect width="512" height="512" rx="112" fill="url(#sun)"/>
+  <g transform="translate(256 262) scale(1.0) translate(-256 -262)">
+  <path d="M240 232 C200 200 140 160 72 138 C96 170 104 196 104 226 C122 214 140 214 154 226 C152 246 160 266 176 280 C190 268 206 266 222 272 C226 290 234 300 244 306 Z" fill="#3f936a"/>
+  <path d="M272 232 C312 200 372 160 440 138 C416 170 408 196 408 226 C390 214 372 214 358 226 C360 246 352 266 336 280 C322 268 306 266 290 272 C286 290 278 300 268 306 Z" fill="#3f936a"/>
+  <path d="M240 234 L72 138 M168 196 L104 226 M200 214 L154 226 M218 236 L176 280 M232 260 L222 272 M272 234 L440 138 M344 196 L408 226 M312 214 L358 226 M294 236 L336 280 M280 260 L290 272" stroke="#1f5c3c" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <path d="M256 300 C238 340 234 372 252 400 C268 424 300 424 316 404 C300 410 282 404 276 388 C266 364 272 334 272 300 Z" fill="#1f5c3c"/>
+  <path d="M316 404 L344 392 L326 420 Z" fill="#e7dcc1"/>
+  <ellipse cx="256" cy="262" rx="30" ry="58" fill="#2f7f50"/>
+  <ellipse cx="256" cy="272" rx="16" ry="40" fill="#c9bf7c"/>
+  <path d="M256 128 C276 140 284 164 280 190 C276 210 266 222 256 226 C246 222 236 210 232 190 C228 164 236 140 256 128 Z" fill="#2f7f50"/>
+  <path d="M240 150 L214 104 L248 138 Z M272 150 L298 104 L264 138 Z" fill="#e7dcc1"/>
+  <path d="M244 176 L234 168 L248 170 Z M268 176 L278 168 L264 170 Z" fill="#ffd23a"/>
+</g>
+</svg>

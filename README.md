@@ -37,6 +37,28 @@ Nothing can hurt the dragon during the tutorial. Each lesson opens with a paused
 
 Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 
+## Languages
+
+The game is available in **English** and **Czech** (solo, tutorial and co-op). The language follows the browser (`cs` and `sk` get Czech, everything else English) and can be switched with the **EN / CS** buttons on the home screen and in the co-op lobby. The choice is stored in `localStorage` (`vsd-lang`); `?lang=cs` forces a language for one visit.
+
+All texts live in `i18n.js`. To add a language, add it to `LANGS` and add a dictionary with the same keys as `en`; missing keys fall back to English. Plurals use `Intl.PluralRules` (`{one, few, other}`), so Czech gets *1 wyverna, 3 wyverny, 5 wyveren*.
+
+## Install as an app
+
+The game is a Progressive Web App and can be installed from the browser:
+
+- **Chrome, Edge, Android:** an **Install app** button appears on the home screen and in the co-op lobby (or use the install icon in the address bar).
+- **iPhone / iPad:** tap **Install app** for a hint, then Share → Add to Home Screen.
+
+The installed app opens fullscreen, has a Co-op shortcut and works offline for solo play (co-op still needs a connection). `sw.js` loads game files network first, so a new deploy shows up on the next start, and caches the versioned CDN libraries. Bump `VERSION` in `sw.js` only when the list of precached files changes.
+
+| File | Role |
+|---|---|
+| `i18n.js` | Translations, language detection and the EN / CS switch |
+| `pwa.js` | Service worker registration and the install button |
+| `sw.js` | Offline cache |
+| `manifest.webmanifest`, `icons/` | App name, icons, fullscreen display |
+
 ## Co-op multiplayer (`/mp/`)
 
 Up to 6 dragons fight the wyvern waves together, connected peer-to-peer over WebRTC. There is no game server.
