@@ -1,13 +1,13 @@
 /*
  * Verdigris campaign - client: rendering, input, main loop, HUD and panels.
  * All game rules live in core/ (window.VCamp); this file only draws and wires input.
- * Phase 1 task T01: page scaffold with sky, fog, light and an idle camera over the ash plain.
+ * Built up task by task (T01 scaffold, T02 dragon, T04 terrain, ...); see ai_sdlc/001_campaign/001_task_survival.md.
  */
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
-  if (!window.THREE || !window.VCamp) { $('#loading').textContent = t('c.engineFail'); return; }
+  if (!window.THREE || !window.VCamp || !window.VDragon) { $('#loading').textContent = t('c.engineFail'); return; }
   const C = window.VCamp, D = C.need('data');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -44,6 +44,18 @@
     const lava = new THREE.PointLight(0xff6a20, 1.6, 400); lava.position.set(0, 150, 0); scene.add(lava);
   })();
 
+  /* ---------- the hatchling (flight arrives in T05; for now it circles the volcano) ---------- */
+  const hero = VDragon.makeDragon(VDragon.GREEN);
+  scene.add(hero.root);
+  let phase = 0;
+  function idleDragon(dt) {
+    phase += dt * 6.2;
+    const a = -time * 0.12, r = 330, y = 190 + Math.sin(time * 0.7) * 6;
+    hero.root.position.set(Math.sin(a) * r, y, Math.cos(a) * r);
+    hero.root.rotation.set(0, a - Math.PI / 2, 0.35, 'YXZ');    // yaw falls = right turn, bank right (as in the duel)
+    hero.anim(time, dt, { phase, amp: 1, mouth: Math.sin(time * 0.9) > 0.92, turn: 0.4, look: 0 });
+  }
+
   /* ---------- resize ---------- */
   let W = 1, Hh = 1;
   function resize() {
@@ -70,10 +82,13 @@
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     time += reduceMotion ? dt * 0.3 : dt;
-    // idle orbit around the volcano until flight arrives (T05)
-    const a = time * 0.05, r = 620;
-    camera.position.set(Math.sin(a) * r, 230, Math.cos(a) * r);
-    camera.lookAt(0, 90, 0);
+    idleDragon(dt);
+    // camera trails just outside and behind the circling dragon, looking inward so the volcano
+    // sits behind it (replaced by the chase cam in T05)
+    const a = -time * 0.12, P = hero.root.position;
+    const ox = Math.sin(a), oz = Math.cos(a), mx = -Math.cos(a), mz = Math.sin(a);   // outward, motion
+    camera.position.set(P.x + ox * 34 - mx * 26, P.y + 9, P.z + oz * 34 - mz * 26);
+    camera.lookAt(P.x * 0.82 + mx * 8, P.y - 14, P.z * 0.82 + mz * 8);
     sky.position.copy(camera.position);
     renderer.render(scene, camera);
   }
@@ -82,5 +97,5 @@
   setState('intro');
   requestAnimationFrame(frame);
 
-  if (location.search.includes('debug')) window.__vcamp = { C, D, scene, camera, setState };
+  if (location.search.includes('debug')) window.__vcamp = { C, D, scene, camera, hero, setState };
 })();

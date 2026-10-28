@@ -12,7 +12,7 @@ const NET_TIMEOUT = 4000;
 const SHELL = [
   './', 'index.html', 'i18n.js', 'pwa.js', 'manifest.webmanifest',
   'mp/', 'mp/index.html', 'mp/game.js', 'mp/sim.js',
-  'campaign/', 'campaign/index.html', 'campaign/game.js',
+  'campaign/', 'campaign/index.html', 'campaign/game.js', 'shared/dragon.js',
   'campaign/core/umd.js', 'campaign/core/math.js', 'campaign/core/events.js', 'campaign/core/data.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'icons/icon-maskable-192.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
