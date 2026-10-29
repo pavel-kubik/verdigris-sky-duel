@@ -18,8 +18,8 @@ You start with no memory: derive all state from GitHub and the repo.
   and change a PR's base with -X PATCH .../pulls/{n} -f base=... . If a REST write is refused, use the GitHub MCP
   tools (mcp__github__*) when available; otherwise report the refusal and stop.
 - Read ai_sdlc/001_campaign/000_spec.md (design, roadmap in section 9, open questions) and the ACTIVE phase spec:
-  the highest-numbered ai_sdlc/001_campaign/00N_task_*.md (N >= 1) present on the phase base branch whose tasks are
-  not all done. Its section "Task breakdown" is the task table (IDs T01, T02, ... with dependencies and acceptance).
+  the LOWEST-numbered ai_sdlc/001_campaign/00N_task_*.md (N >= 1) whose tasks are not all done. The spec of the next
+  phase can be merged while the current phase is still running; finish the current phase first. Its section "Task breakdown" is the task table (IDs T01, T02, ... with dependencies and acceptance).
 - Phase base branch = campaign-phase-<N> (e.g. campaign-phase-1). If it does not exist for the active phase, report
   that Pavel needs to create it (from main or the previous phase branch) and stop.
 
