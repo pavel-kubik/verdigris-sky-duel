@@ -28,6 +28,9 @@ for (const id in D.regions) {
 for (const st of D.stages) used.add('c.stage.' + st.id);
 for (const type in D.prey) used.add('c.prey.' + type);
 used.add('c.prey.roast');
+const hatchSrc = fs.readFileSync(path.join(root, 'campaign', 'render', 'hatch-scene.js'), 'utf8');   // scene captions: LINES [['p1', ...]] -> c.hatch.p1
+for (const m of hatchSrc.matchAll(/\['(p\d)'/g)) used.add('c.hatch.' + m[1]);
+ok(used.has('c.hatch.p4'), 'hatching scene captions collected');
 
 ok(used.size > 100, 'collected ' + used.size + ' keys');
 const missingEn = [...used].filter(k => !EN.has(k)), missingCs = [...used].filter(k => !CS.has(k));

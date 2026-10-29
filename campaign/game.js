@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't015.2 2026-10-29 hatch card text: mother out hunting';
+  const BUILD = 't015.3 2026-10-29 hatching scene opens the campaign';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -167,6 +167,7 @@
   let confirmQ = false;                                          // one-shot: Enter or the travel button
   addEventListener('keydown', e => {
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
+    if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
     keys[e.code] = true;
@@ -220,11 +221,13 @@
   }
 
   /* ---------- resize ---------- */
+  let hatchScene = null, hatchCard = false, hatchLineShown = null;   // the hatching scene (see startHatchScene)
   let W = 1, Hh = 1;
   function resize() {
     W = innerWidth; Hh = innerHeight;
     renderer.setSize(W, Hh, false);
     camera.aspect = W / Hh; camera.updateProjectionMatrix();
+    if (hatchScene) hatchScene.resize(W, Hh);
   }
   addEventListener('resize', resize); resize();
 
@@ -240,7 +243,8 @@
     const prev = state; state = s;
     const inGame = s === 'play' || s === 'paused';
     $('#intro').hidden = s !== 'intro';
-    $('#hatch').hidden = s !== 'hatch';
+    $('#hatch').hidden = !(s === 'hatch' && hatchCard);
+    $('#hatchUi').hidden = !(s === 'hatch' && !hatchCard);
     $('#pause').hidden = s !== 'paused';
     $('#hudTop').hidden = !inGame;
     if (s === 'intro') cs.inLair = false;
@@ -255,7 +259,7 @@
     $('#hint').hidden = !(s === 'play' && hintT > 0);
     if (s === 'intro' || s === 'hatch') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
     if (s === 'intro') introUi();
-    if (s === 'hatch') setTimeout(() => $('#hatchBtn').focus({ preventScroll: true }), 0);
+    if (s !== 'hatch' && hatchScene) endHatchScene();
     mouseBreath = false; confirmQ = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
@@ -281,12 +285,41 @@
     } else SV.apply(cs, SV.migrate(JSON.parse(JSON.stringify(saved))));
     if (cs.region !== regionId || !region) loadRegion(cs.region);
     cs.field = PR.spawnRegion(cs.region, rng, cs.dragon.pilot ? cs.dragon.pilot.pos : null);
-    if (!cs.dragon.pilot && !cs.flags.introSeen) { setState('hatch'); return; }
+    if (!cs.dragon.pilot && !cs.flags.introSeen) { startHatchScene(); return; }
     cs.flags.introSeen = true;
     setState('play');
     if (cs.inLair) openLair(null);
     saveNow('start');
   }
+  /* ---------- hatching scene (render/hatch-scene.js): plays on a new run, then the hatching card ---------- */
+  function startHatchScene() {
+    if (hatchScene) endHatchScene();
+    hatchScene = VRender.hatch.build();
+    hatchScene.resize(W, Hh);
+    hatchCard = false; hatchLineShown = null;
+    $('#hatchLine').textContent = ''; $('#hatchLine').classList.remove('on');
+    setState('hatch');
+  }
+  function endHatchScene() { if (!hatchScene) return; hatchScene.dispose(); hatchScene = null; $('#hatchUi').hidden = true; }
+  function showHatchCard() {
+    hatchCard = true;
+    $('#hatchUi').hidden = true; $('#hatch').hidden = false;
+    setTimeout(() => $('#hatchBtn').focus({ preventScroll: true }), 0);
+  }
+  function skipHatch() { if (state === 'hatch' && hatchScene && !hatchCard) hatchScene.skip(); }
+  /** One frame of the scene: captions fade between lines, the card appears at the end. */
+  function runHatch(dt) {
+    const r = hatchScene.update(dt);
+    if (r.line !== hatchLineShown) {
+      const el = $('#hatchLine'), key = r.line;
+      el.classList.remove('on');
+      if (key) setTimeout(() => { if (hatchLineShown === key) { el.textContent = t(key); el.classList.add('on'); } }, hatchLineShown ? 300 : 0);
+      hatchLineShown = key;
+    }
+    if (r.card && !hatchCard) showHatchCard();
+    renderer.render(hatchScene.scene, hatchScene.camera);
+  }
+  $('#hatchSkip').addEventListener('click', e => { e.preventDefault(); skipHatch(); });
   /** Hatching card -> the hatchling wakes in the lair (panel open, a first hint), saved right away. */
   function hatchNow() {
     if (state !== 'hatch') return;
@@ -609,6 +642,7 @@
     let dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (state === 'paused') dt = 0;
     time += reduceMotion ? dt * 0.3 : dt;
+    if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
 
     if (state === 'intro' || !pilot) {
       idleHero(dt);
@@ -725,7 +759,7 @@
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
+  if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
 })();

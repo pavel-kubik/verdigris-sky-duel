@@ -386,7 +386,7 @@ Implementation notes (T14):
 | HUD | Existing vitality and fire bars + new hunger bar (amber when hungry, pulsing red when starving), stage label with growth progress ring, carry icon, eat progress ring, region name toast |
 | Prompts | Bottom-centre prompt line: "Hold G to grab", "Hold X to eat", "Too heavy", "Fly to Wildwood - Enter", "Rest in the lair to grow" |
 | Lair panel | DOM panel like `#pause`: Rest, larder list with Eat buttons, current stage and next stage threshold, Leave |
-| Intro | First start only: 3-line hatching card (light story), then the lair panel |
+| Intro | First start only: the hatching scene (`render/hatch-scene.js`, about 20 s, Skip button / Esc: the mother curled around the small egg, cracks, the hatchling climbs out), then the 3-line hatching card, then the lair panel. Moved here from phase 2 T04 on Pavel's request (2026-10-29) |
 | Touch (first priority, see `000_spec.md` 1) | Existing stick + buttons, plus Grab and Eat buttons; region prompt is a tappable button; every keyboard action, debug hotkeys included, has a touch control (`?debug`: DBG button toggles the panel, one button per debug action) |
 | Home link | `index.html` intro gets "Campaign (alpha)" next to the co-op link, `href="campaign/"` |
 
