@@ -4,6 +4,7 @@
  *   enterRegion(cs, regionId, pilotPos?, yaw?)   new prey field (+ pilot placement)
  *   step(cs, input, dt) -> events[]               flight -> hunger -> prey -> grab -> eat -> lair -> region
  *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
+ *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
  * input: { sx, sy, breath, boost, grab, eat, confirm } (sx / sy in -1..1, the rest booleans).
  * The renderer reads cs; the save (T14) serialises the durable parts of it. See 001_task_survival.md 5.8.
  */
@@ -59,6 +60,7 @@
     if (!p) return ev;
     for (const e of LR.spoil(cs, dt)) emit(cs, ev, e);
     if (cs.inLair) { cs.stats.played += dt; return ev; }       // resting: hunger, prey and flight are paused
+    if (d.hp <= 0) return die(cs, ev, 'wounds');
     const stats = G.statsOf(d.stage), eff = HN.effects(d.hunger), scale = scaleOf(cs);
     let carried = carriedPrey(cs);
     if (!carried) d.carried = null;
@@ -88,11 +90,13 @@
       emit(cs, ev, e);
       if (e.e === 'boar:hit') {
         hit = true;
-        d.hp = Math.max(1, d.hp - e.damage);                     // death and respawn at the lair arrive in T13
+        d.hp = Math.max(0, d.hp - e.damage);
         if (d.eatT > 0) emit(cs, ev, { e: 'eat:cancel' });
         d.eatT = 0;                                              // a hit interrupts the meal
       }
     }
+
+    if (d.hp <= 0) return die(cs, ev, 'boar');                  // killed: wake in the lair, the carried prey is lost
 
     // fire: the breath cone cooks prey into roast chunks
     cs.breath = p.breathing ? PR.breathCone(p, scale, cs.field) : null;   // the renderer aims the stream along cs.breath.dir
@@ -152,6 +156,13 @@
     }
 
     cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : null;
+    return ev;
+  }
+
+  /** Death: hand over to lair.respawn (carried prey lost, wake in the lair) and end this step. */
+  function die(cs, ev, cause) {
+    for (const e of LR.respawn(cs, cause)) emit(cs, ev, e);
+    cs.swoop = null; cs.target = null; cs.breath = null; cs.hint = null;
     return ev;
   }
 
