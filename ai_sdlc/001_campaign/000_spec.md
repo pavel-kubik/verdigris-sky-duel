@@ -8,6 +8,16 @@ Campaign mode turns the duel game into a growth story: a hatchling dragon hunts 
 
 **Core tension:** bigger means stronger, but also hungrier, slower and easier to spot. A hatchling sneaks and steals; an elder burns fortresses.
 
+### Platform priority: mobile first
+
+The campaign is designed and built **mobile first** (touch phone, portrait and landscape); desktop (keyboard + mouse) stays supported but has lower priority.
+
+- Every action has a touch control. A feature is not done until it is playable end to end on a phone; a keyboard-only action is a bug.
+- Every keyboard shortcut has a touch alternative, including debug tools: on touch, `?debug` shows a DBG button that toggles the debug panel, and every debug hotkey is a button in that panel.
+- On touch, texts name the on-screen buttons, never keys (separate `...Touch` i18n keys where the wording differs).
+- Layout is checked at phone width (390 x 844) first: HUD, prompts and panels must not cover the stick or the action buttons; tap targets at least 36 px.
+- Performance budgets are set for a mid phone (see the phase specs).
+
 ### Core loop
 
 ```

@@ -367,7 +367,7 @@ Key: `vsd-campaign`. Autosave on: rest, region change, every 60 s of play, `visi
 | Prompts | Bottom-centre prompt line: "Hold G to grab", "Hold X to eat", "Too heavy", "Fly to Wildwood - Enter", "Rest in the lair to grow" |
 | Lair panel | DOM panel like `#pause`: Rest, larder list with Eat buttons, current stage and next stage threshold, Leave |
 | Intro | First start only: 3-line hatching card (light story), then the lair panel |
-| Touch | Existing stick + buttons, plus Grab and Eat buttons; region prompt is a tappable button |
+| Touch (first priority, see `000_spec.md` 1) | Existing stick + buttons, plus Grab and Eat buttons; region prompt is a tappable button; every keyboard action, debug hotkeys included, has a touch control (`?debug`: DBG button toggles the panel, one button per debug action) |
 | Home link | `index.html` intro gets "Campaign (alpha)" next to the co-op link, `href="campaign/"` |
 
 Controls added: `G` grab (hold), `X` eat (hold), `Enter` confirm prompt, `Esc` pause (existing). `G`, `X` and `Enter` are free in the current key map.

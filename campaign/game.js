@@ -386,14 +386,16 @@
     $('#stageText').textContent = stageName(dragon.stage);
     if (r.grew) toast(t('c.toast.grew', { stage: stageName(r.to) }), t('c.toast.grewSub'), 4);
   }
-  /* ?debug hotkeys (listed in the debug panel) */
+  /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
   const DEBUG_KEYS = [
-    ['N', '+100 food (hunger + growth)'], ['J', 'hunger +25 (no growth)'], ['H', 'hunger -25'],
-    ['K', 'damage 20 HP'], ['L', 'rest: heal, refill, grow'], ['R', 'reset to a new hatchling'],
-    ['P', 'fly to the nearest herd'], ['T', 'jump near the region exit'], ['`', 'hide / show this panel'],
+    ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
+    ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP', 'KeyK', '-20 HP'],
+    ['L', 'rest: heal, refill, grow', 'KeyL', 'rest'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
+    ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
+    ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
-    if (code === 'Backquote' && dbgEl) { dbgEl.hidden = !dbgEl.hidden; return; }
+    if (code === 'Backquote') { toggleDebug(); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
@@ -467,14 +469,49 @@
   }
 
   /* ---------- ?debug panel: performance, dragon parameters, hotkeys ---------- */
-  let dbgEl = null, dbgN = 0, dbgLast = performance.now();
+  let dbgEl = null, dbgBox = null, dbgN = 0, dbgLast = performance.now();
+  let dbgShown = !isTouch;                                       // touch: starts hidden, the DBG button shows it
+  function toggleDebug() {
+    dbgShown = !dbgShown;
+    if (dbgBox) dbgBox.hidden = !dbgShown;
+    const b = $('#dbgBtn'); if (b) b.classList.toggle('on', dbgShown);
+  }
+  /** Touch: a DBG button next to pause, and one button per debug hotkey above the panel. */
+  function debugTouchUi() {
+    const tog = document.createElement('button');
+    tog.id = 'dbgBtn'; tog.textContent = 'DBG'; tog.setAttribute('aria-label', 'Debug panel');
+    tog.style.cssText = 'pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;padding:0 10px;border-radius:20px;font:700 12px/1 ui-monospace,Menlo,monospace;margin-right:8px';
+    $('#pauseBtn').before(tog);
+    tog.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleDebug(); });
+    const bar = document.createElement('div');
+    bar.id = 'debugBar';
+    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;pointer-events:auto;margin-bottom:6px';
+    for (const [, what, code, label] of DEBUG_KEYS) {
+      if (!label) continue;
+      const b = document.createElement('button');
+      b.textContent = label; b.title = what;
+      b.style.cssText = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.style.background = 'rgba(255,148,71,.45)'; debugKey(code); });
+      const up = () => { b.style.background = 'rgba(6,10,8,.8)'; };
+      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+      bar.appendChild(b);
+    }
+    dbgBox.prepend(bar);
+  }
   const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2);
   function debugHud() {
     if (!dbgEl) {
+      // a fixed box holds the (touch) action buttons and the read-only panel
+      dbgBox = document.createElement('div');
+      dbgBox.id = 'debugBox';
+      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:5;max-width:calc(100vw - 16px);pointer-events:none';
       dbgEl = document.createElement('div');
       dbgEl.id = 'debugPanel';
-      dbgEl.style.cssText = 'position:fixed;right:8px;top:60px;font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;z-index:5;max-width:calc(100vw - 16px);overflow:hidden;opacity:.92';
-      document.body.appendChild(dbgEl);
+      dbgEl.style.cssText = 'font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;overflow:hidden;opacity:.92';
+      dbgBox.appendChild(dbgEl);
+      document.body.appendChild(dbgBox);
+      dbgBox.hidden = !dbgShown;
+      if (isTouch) debugTouchUi();
     }
     dbgN++;
     const now = performance.now(), secs = (now - dbgLast) / 1000;
@@ -502,11 +539,12 @@
       L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
       L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');
     }
-    L.push('KEYS    ' + DEBUG_KEYS.map(k => k[0] + '  ' + k[1]).join('\n        '));
+    if (!isTouch) L.push('KEYS    ' + DEBUG_KEYS.map(k => k[0] + '  ' + k[1]).join('\n        '));
     dbgEl.textContent = L.join('\n');
     dbgN = 0; dbgLast = now;
   }
 
+  if (isTouch) { const h = $('#hint'); h.setAttribute('data-i18n', 'c.wipTouch'); h.textContent = t('c.wipTouch'); }   // touch texts name buttons, not keys
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);

@@ -59,6 +59,10 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
 - Follow the task's row in the task table and the data / interfaces sections of the phase spec. Rules live in
   campaign/core (pure, Node-testable, umd.js registry, tunables in data.js); rendering in campaign/render and
   campaign/game.js; per-frame orchestration in core/state.js.
+- MOBILE FIRST (000_spec.md section 1): every feature must be playable on a touch phone; every keyboard action,
+  debug hotkeys included, needs a touch control (debug: a button in the ?debug panel, toggled by the DBG button).
+  Touch texts name buttons, not keys. Check the layout at 390x844 with hasTouch/isMobile first, desktop second.
+  "What to test" lists the phone steps first.
 - Every user-visible string goes in i18n.js in EN and CS. Add new files to the SHELL list in sw.js.
 - Add or extend tests in campaign/test/*.test.js. Both must pass: node campaign/test/run.js and node mp/sim.test.js
 - Browser check: cdnjs and npm are blocked here. Fetch Three.js r128 once into the scratchpad with
@@ -66,7 +70,8 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
   then git sparse-checkout set --no-cone /build/three.min.js. Serve the repo with python3 -m http.server (run in the
   background), drive it with the globally installed Playwright (chromium, args --use-gl=swiftshader
   --enable-unsafe-swiftshader; require it from `npm root -g`), route **/three.min.js to the local file and
-  fonts.googleapis.com to an empty stylesheet. Require zero page errors, screenshot the feature and look at the
+  fonts.googleapis.com to an empty stylesheet (use a context with serviceWorkers: "block", or the routes are bypassed
+  after the first load). Require zero page errors, screenshot the feature and look at the
   screenshots. Write screenshots only to the scratchpad, never into the repo. The software renderer runs at about
   2 fps, so drive long game-time checks through window.__vcamp (?debug) inside page.evaluate.
 - If behaviour has to differ from the spec, update the spec file in the same branch and say why in the PR.
