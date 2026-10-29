@@ -391,5 +391,5 @@ Phase 7 (co-op) starts only once the persistent multiplayer backend exists; unti
 - [ ] When does co-op campaign start? Gated on the persistent multiplayer backend (2026-10-29); exact timing still open.
 - [x] Story: the mother lives at the start, teaches flying and hunting, is killed by the Order when the hero reaches Drake; the mother once killed the King; human campaign after the dragon story (decided 2026-10-29).
 - [ ] Story 1: why did the mother kill the King? Default: the King's hunters took her first clutch of eggs, so both sides lost children and both have their reason.
-- [x] Story 2: the mother is in the game from the start of the campaign: the hatching scene and the mother NPC are Phase 2 tasks T04 and T05; her death scene comes with the Wyrm stage in Phase 4 (decided 2026-10-29). Until T04 the phase 1 hatching card stays.
+- [x] Story 2: the mother is in the game from the start of the campaign: the hatching scene already opens the campaign in phase 1 (T15), the mother NPC is Phase 2 task T05; her death scene comes with the Wyrm stage in Phase 4 (decided 2026-10-29). Until T04 the phase 1 hatching card stays.
 - [ ] Story 3: is the hero the "last" dragon? Default: no - the stolen eggs in Act 3 mean others may live, which gives the late game hope.
