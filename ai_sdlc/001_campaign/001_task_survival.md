@@ -365,6 +365,14 @@ Saved v1 shape (subset of the parent spec's target shape, with Phase 1 fields):
 
 Key: `vsd-campaign`. Autosave on: rest, region change, every 60 s of play, `visibilitychange` to hidden. A corrupt or newer-than-known save opens a "Start new / keep" choice instead of crashing.
 
+Implementation notes (T14):
+- Core decides WHEN to save: `state.step` (and `lairRest`) emit `{ e: 'save', why }` on rest, region change, death and every `save.every` (60) s of play; `game.js` writes it to `localStorage`, also on `visibilitychange` to hidden, `pagehide` and Menu. Death is an extra trigger, so a reload cannot bring back the prey lost in the fall.
+- `save.apply(cs, obj)` writes a save INTO the existing state (same `cs`, `cs.dragon` and pilot objects, which the renderer holds); `deserialise` is `apply` on a new state. Values are clamped (position into the region and above the ground, HP 1..max, hunger, XP cap, larder size); a missing / non-finite core field or an unknown stage is `corrupt`.
+- Not saved: the prey field (fresh herds spawn away from the restored dragon) and the carried prey (a reload drops it). Saved extras: `dragon.deaths`, `world.st` (fire), `flags.rested`.
+- v0 (the migration test fixture) is a flat unversioned shape `{ xp, stage, hunger, hp, region, pos, yaw, larder }`.
+- Intro: with a save, "Continue" (shows stage, region, food) and "New hatchling" (press twice). An unreadable save shows "Start new" (deletes it) or "Keep it" (plays with saving off, the old save untouched).
+- Debug: `V` / "save" saves now, `U` / "wipe save" deletes the save and reloads.
+
 ## 6. Rendering and UI (`game.js`, `render/`)
 
 | Element | Implementation |

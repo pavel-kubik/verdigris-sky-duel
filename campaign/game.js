@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't013.1 2026-10-29 death and respawn in the lair';
+  const BUILD = 't014.1 2026-10-29 save, autosave, continue';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -43,7 +43,17 @@
   let region = null, regionId = null, preyView = null;
   const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
   const startId = D.regions[params.get('region')] ? params.get('region') : D.startRegion;
-  const cs = ST.create({ regionId: startId, rng });            // the whole run: dragon, prey field, flags, stats
+
+  /* ---------- save (core/save.js): load on start, autosave on core 'save' events, Continue / New on the intro ---------- */
+  const NO_STORAGE = { getItem: () => null, setItem() { throw new Error('no storage'); }, removeItem() {} };
+  const storage = (() => { try { return window.localStorage || NO_STORAGE; } catch (_) { return NO_STORAGE; } })();
+  const boot = SV.load(storage);                               // { status: 'none' | 'ok' | 'corrupt' | 'newer', data }
+  let saveBad = boot.status === 'corrupt' || boot.status === 'newer' ? boot.status : null;   // unread save: ask before touching it
+  let saveOff = !!saveBad;                                     // never overwrite a save we could not read (until "Start new")
+  let saved = boot.status === 'ok' ? boot.data : null;         // the run to continue (this session's last save, in memory)
+  let lastSave = null;                                         // { why, ok, at } for the debug panel
+  const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
+  const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
   const dragon = cs.dragon;
   function loadRegion(id) {
     if (region) region.dispose();
@@ -59,7 +69,7 @@
     u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
     $('#regionText').textContent = t(TR.region(id).nameKey);
   }
-  loadRegion(startId);
+  loadRegion(bootRegion);
   /** After core moved cs to another region (region:enter): rebuild the scene behind a short fade. */
   function swapRegion(quiet) {
     const t0 = performance.now();
@@ -236,17 +246,72 @@
     $('#lair').hidden = !(s === 'play' && cs.inLair);
     $('#legend').hidden = !(s === 'play' && !isTouch && !cs.inLair);
     $('#touch').hidden = !(s === 'play' && isTouch && !cs.inLair);
-    if (s === 'play' && prev === 'intro') { spawnPilot(); hintT = 8; }
+    if (s === 'play' && prev === 'intro') {
+      if (!cs.dragon.pilot) { spawnPilot(); hintT = 8; }        // new hatchling (or a save without a position)
+      else { pilot = cs.dragon.pilot; refreshStage(); snapCam(); hintT = 0; }   // continue a saved run
+    }
     $('#hint').hidden = !(s === 'play' && hintT > 0);
-    if (s === 'intro') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
+    if (s === 'intro') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); introUi(); }
     mouseBreath = false; confirmQ = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
-  $('#startBtn').onclick = () => setState('play');
+  /** Writes the run to localStorage (unless saving is off) and keeps it in memory for Continue. Needs a dragon in the air or lair. */
+  function saveNow(why) {
+    if (!dragon.pilot || (state !== 'play' && state !== 'paused')) return false;
+    saved = SV.serialise(cs);
+    const okSave = saveOff ? false : SV.store(storage, cs);
+    if (!saveOff && !okSave && (!lastSave || lastSave.ok)) toast(t('c.save.failed'), '', 3);   // say it once, not every minute
+    lastSave = { why, ok: okSave, at: Math.round(cs.stats.played) };
+    return okSave;
+  }
+  /** Start / Continue: a saved run is applied into cs (same objects), a new one starts as a fresh hatchling at the spawn. */
+  function startRun(fresh) {
+    if (fresh || !saved) {
+      SV.apply(cs, SV.migrate(SV.blank()));
+      if (startId !== cs.region) cs.region = startId;
+      if (!saveOff) SV.clear(storage);
+      saved = null;
+    } else SV.apply(cs, SV.migrate(JSON.parse(JSON.stringify(saved))));
+    if (cs.region !== regionId || !region) loadRegion(cs.region);
+    cs.field = PR.spawnRegion(cs.region, rng, cs.dragon.pilot ? cs.dragon.pilot.pos : null);
+    cs.flags.introSeen = true;
+    setState('play');
+    if (cs.inLair) openLair(null);
+    saveNow('start');
+  }
+  let newArmed = false;
+  /** Intro buttons: Hatch / Continue + New hatchling (tap twice), or the Start new / Keep choice for an unreadable save. */
+  function introUi() {
+    const bad = $('#saveBad'), note = $('#saveNote'), sb = $('#startBtn'), nb = $('#newBtn');
+    bad.hidden = !saveBad; $('#startRow').hidden = !!saveBad;
+    if (saveBad) $('#saveBadText').textContent = t(saveBad === 'newer' ? 'c.save.newer' : 'c.save.corrupt');
+    sb.dataset.i18n = saved ? 'c.continue' : 'c.start'; sb.textContent = t(sb.dataset.i18n);
+    nb.hidden = !saved; newArmed = false; nb.classList.remove('confirm');
+    nb.dataset.i18n = 'c.save.new'; nb.textContent = t('c.save.new');
+    const d = saved && saved.dragon, w = saved && saved.world;
+    note.hidden = !(d || (saveOff && !saveBad));
+    note.innerHTML = '';
+    if (d) note.append(Object.assign(document.createElement('b'), { textContent: t('c.save.summary', {
+      stage: stageName(d.stage), region: t(TR.region(D.regions[w.region] ? w.region : D.startRegion).nameKey), food: Math.floor(d.foodXp) }) }));
+    if (saveOff && !saveBad) { if (d) note.append(document.createElement('br')); note.append(t('c.save.off')); }
+  }
+  $('#startBtn').onclick = () => { if (!saveBad) startRun(false); };
+  $('#newBtn').onclick = () => {
+    const nb = $('#newBtn');
+    if (!newArmed) { newArmed = true; nb.classList.add('confirm'); nb.dataset.i18n = 'c.save.newConfirm'; nb.textContent = t('c.save.newConfirm'); return; }
+    startRun(true);
+  };
+  $('#badNewBtn').onclick = () => { SV.clear(storage); saveBad = null; saveOff = false; saved = null; introUi(); };
+  $('#badKeepBtn').onclick = () => { saveBad = null; saveOff = true; saved = null; introUi(); };
   $('#resumeBtn').onclick = () => setState('play');
-  $('#menuBtn').onclick = () => setState('intro');
+  $('#menuBtn').onclick = () => { saveNow('menu'); setState('intro'); };
   $('#pauseBtn').onclick = () => { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); };
-  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') setState('paused'); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    saveNow('hidden');
+    if (state === 'play') setState('paused');
+  });
+  addEventListener('pagehide', () => saveNow('pagehide'));
 
   /* ---------- dragon pose + chase camera (same rig as the duel) ---------- */
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
@@ -342,6 +407,7 @@
       else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
       else if (e.e === 'dragon:died') { died = e; hurt = 0; shake = 0; hero.flash = 0; fadeEl.classList.add('now'); requestAnimationFrame(() => fadeEl.classList.remove('now')); }
       else if (e.e === 'region:enter') swapRegion(e.respawn);
+      else if (e.e === 'save') saveNow(e.why);
       else if (e.e === 'lair:enter') { openLair(e.respawn ? died : null); died = null; }
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
@@ -470,6 +536,7 @@
     ['Z', 'die now (wake in the lair)', 'KeyZ', 'die'],
     ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
+    ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
@@ -506,6 +573,8 @@
         pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 50, z]; pilot.yaw = mid; pilot.pitch = 0; snapCam();
       }
     }
+    if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(okS ? 'saved' : 'not saved' + (saveOff ? ' (saving off)' : ''), 1.5); }
+    if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
     if (code === 'KeyR') {
       Object.assign(dragon, { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start });
       refreshStage(); pilot.st = 100;
@@ -620,6 +689,7 @@
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + D.eat.time);
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE' : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
+      L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');
       L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
       L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');
@@ -634,7 +704,7 @@
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
+  if (window.I18N) I18N.onChange(() => { travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
 })();
