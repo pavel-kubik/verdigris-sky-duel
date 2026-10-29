@@ -98,4 +98,16 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
   branches during a rebase (always --force-with-lease).
 - Final message for Pavel (also when nothing changed: WAIT / PLAN / DONE status): what was done in 2-3 lines,
   the PR link, the test link, and the "What to test" list. Short, in English.
+
+## 5. Owner task page (every run that changed something, also WAIT / PLAN status changes)
+- Pavel's to-do page is the artifact https://claude.ai/artifact/Fs7ZvqpkF18ZegtFaEwBdh ("Verdigris Owner Tasks").
+  Read it with the Artifact tool (action read, url), save the returned HTML to the scratchpad, change ONLY the JSON
+  inside <script id="data" type="application/json">, and publish it back with the same url (never a new artifact).
+- JSON: "updated" (UTC time); "phase" {done: count of DONE tasks, review: task numbers IN REVIEW, total};
+  "tasks": for every open agent PR in stack order (oldest first) one "test" task (id pr<N>-test-v<link version>,
+  test link as primary, phone steps group first, then desktop) and one "merge" task (merge into its base after testing,
+  bottom of the stack last; plan PRs get a "review" of the spec instead); keep "setup" tasks that are still open,
+  drop tasks of merged or closed PRs; "log": prepend one row {t, what, pr} for this run, keep the last 30 rows.
+- If the read or publish is refused, say so in the final message and carry on; the PR body stays the source of truth.
+- Put the page link in the final message and the notification.
 ```
