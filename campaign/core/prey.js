@@ -6,7 +6,7 @@
  *   spawnRegion(regionId, rng, avoid?) -> field
  *   step(field, dragon, dt, ctx) -> events[]   dragon: { pos, inv }, ctx: { stats, rng }
  *   remove(field, preyId)                        (eaten, stored; used by T09)
- * Grab, carry and cooking (T09, T10) extend this module.
+ *   reach / tryGrab / release / byId               grab and carry (T09); cooking arrives in T10
  */
 (function (root) {
   'use strict';
@@ -200,6 +200,53 @@
     return ev;
   }
 
+  /* ---------- grab and carry (T09) ---------- */
+  const GRABBABLE = { graze: 1, flee: 1, charge: 1, roast: 1 };
+
+  /**
+   * What the dragon's claws can reach right now.
+   * dragon: { pos, pitch }, scale: the dragon's visual scale (bigger dragons reach further and lower).
+   * Returns { best, heavy, near }: closest liftable prey in reach, closest prey in reach that is too heavy,
+   * and whether any prey is close enough below to show the grab prompt.
+   */
+  function reach(field, dragon, stats, effects, scale) {
+    const G = D.grab, s = Math.max(1, scale || 1);
+    const radius = G.radius * s, maxUp = G.maxAboveGround + G.clawDrop * s;
+    const limit = Math.min(stats.carry, effects && effects.carryMax != null ? effects.carryMax : Infinity);
+    const pitchOk = dragon.pitch == null || dragon.pitch <= G.maxPitch;
+    let best = null, bd = Infinity, heavy = null, hd = Infinity, near = false;
+    for (const p of field.list) {
+      if (!GRABBABLE[p.state]) continue;
+      const d = dist2(p.pos, dragon.pos), up = dragon.pos[1] - p.pos[1];
+      if (d < radius * G.nearFactor && up < 40) near = true;
+      if (d > radius || up > maxUp || up < -2 || !pitchOk) continue;
+      if (p.size <= limit) { if (d < bd) { bd = d; best = p; } }
+      else if (d < hd) { hd = d; heavy = p; }
+    }
+    return { best, heavy, near };
+  }
+
+  /** Lifts the best prey in reach. Returns { prey } on success, { heavy } if only too-heavy prey was in reach, else {}. */
+  function tryGrab(field, dragon, stats, effects, scale) {
+    const r = reach(field, dragon, stats, effects, scale);
+    if (!r.best) return r.heavy ? { heavy: r.heavy } : {};
+    const p = r.best;
+    p.state = 'carried'; p.speed = 0; p.goal = null; p.calm = 0;
+    // the rest of the herd bolts
+    for (const q of field.list) if (q !== p && q.herd === p.herd && (q.state === 'graze')) { q.state = 'flee'; q.calm = 0; }
+    return { prey: p };
+  }
+
+  /** Lets a carried prey go (dropped alive): it lands below the dragon and runs. */
+  function release(field, p, pos) {
+    let x = pos[0], z = pos[2];
+    if (!groundOk(field.regionId, x, z)) { const h = field.herds.find(hh => hh.id === p.herd); if (h) { x = h.centre[0]; z = h.centre[1]; } }
+    p.pos = [x, T.surfaceAt(field.regionId, x, z), z];
+    p.state = 'flee'; p.calm = 0;
+  }
+
+  function byId(field, id) { return field.list.find(p => p.id === id) || null; }
+
   function remove(field, id) {
     const i = field.list.findIndex(p => p.id === id);
     if (i >= 0) field.list.splice(i, 1);
@@ -213,5 +260,5 @@
     return c;
   }
 
-  M.define('prey', { spawnRegion, step, remove, census, groundOk, HERD_R, ALARM_ALT, CHARGE_ALT });
+  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, tryGrab, release, byId, HERD_R, ALARM_ALT, CHARGE_ALT });
 })(typeof self !== 'undefined' ? self : this);

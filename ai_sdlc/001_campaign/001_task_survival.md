@@ -261,7 +261,7 @@ AI states:
 | carried | Position follows the dragon's claws | Eaten, dropped, stored |
 | roast | Static chunk on the ground, size 1, its share of the roast food | Grabbed |
 
-Grab succeeds when: grab key held, prey within `grab.radius * scale` horizontally, dragon less than `grab.maxAboveGround` above ground, `pitch <= grab.maxPitch` (diving), `prey.size <= min(stats.carry, effects.carryMax)`, nothing already carried. A failed grab on an oversized prey shows a "Too heavy" tip once.
+Grab succeeds when: grab key held, prey within `grab.radius * scale` horizontally, dragon less than `grab.maxAboveGround + grab.clawDrop * scale` above the prey, `pitch <= grab.maxPitch` (0.25: not climbing hard - a strict dive-only rule fights the pull-up at the altitude floor), `prey.size <= min(stats.carry, effects.carryMax)`, nothing already carried. Taking one animal sends the rest of its herd fleeing. Orchestration lives in `core/state.js` from T09 on: `state.step` runs flight, hunger, prey, grab and eat in that order; a boar hit ends eating for that frame and resets progress. A failed grab on an oversized prey shows a "Too heavy" tip once.
 
 A field (not a bare list) keeps herd bookkeeping, which respawning needs. Herds respawn `respawn.herdCooldown` seconds after being emptied, at least `minDistFromDragon` away. Only prey within 600 of the dragon run full AI each frame; the rest tick at 4 Hz.
 

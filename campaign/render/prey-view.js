@@ -2,7 +2,8 @@
  * Verdigris campaign - prey renderer.
  * Low-poly goats, deer and boars built from primitives, drawn with one InstancedMesh per body part
  * per type (about 15 draw calls for every animal in a region). Legs swing with the animal's speed.
- *   VRender.prey.build(field) -> { group, update(field, time), dispose() }
+ *   VRender.prey.build() -> { group, update(field, time, carry?), dispose() }
+ *   carry: { id, pos: Vector3, yaw, pitch } draws that prey hanging from the claw anchor instead of on the ground
  */
 (function (root) {
   'use strict';
@@ -40,7 +41,7 @@
     ] },
   };
   const CAP = 48;                        // instances per type (core caps a region at preyAi.maxActive)
-  const DRAWN = { graze: 1, flee: 1, charge: 1 };
+  const DRAWN = { graze: 1, flee: 1, charge: 1, carried: 1 };
 
   function build() {
     const group = new THREE.Group(); group.name = 'prey';
@@ -60,19 +61,26 @@
     }
     const base = new THREE.Matrix4(), m = new THREE.Matrix4(), swing = new THREE.Matrix4(), tmp = new THREE.Matrix4();
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), sc = new THREE.Vector3(VIS, VIS, VIS);
-    const colA = new THREE.Color(), colB = new THREE.Color();
+    const colA = new THREE.Color(), colB = new THREE.Color(), eul = new THREE.Euler();
 
-    function update(field, time) {
+    function update(field, time, carry) {
       const counts = {};
       for (const type in kinds) counts[type] = 0;
       for (const p of field.list) {
         if (!DRAWN[p.state] || !kinds[p.type]) continue;
         const i = counts[p.type]++;
         if (i >= CAP) continue;
-        pos.set(p.pos[0], p.pos[1], p.pos[2]);
-        q.setFromAxisAngle(up, p.yaw);
+        let gait = Math.min(1, p.speed / 6) * 0.7, ph = p.t * (4 + p.speed * 0.9);
+        if (p.state === 'carried' && carry && carry.id === p.id) {
+          // hang the animal below the claws: back up, legs kicking, tilted with the dragon's pitch
+          pos.set(carry.pos.x, carry.pos.y - 1.9 * VIS * 0.55, carry.pos.z);
+          q.setFromEuler(eul.set(-carry.pitch, carry.yaw, 0, 'YXZ'));
+          gait = 0.9; ph = time * 14;
+        } else {
+          pos.set(p.pos[0], p.pos[1], p.pos[2]);
+          q.setFromAxisAngle(up, p.yaw);
+        }
         base.compose(pos, q, sc);
-        const gait = Math.min(1, p.speed / 6) * 0.7, ph = p.t * (4 + p.speed * 0.9);
         const shade = ((p.id * 2654435761) >>> 0) / 4294967296;        // stable per-animal variation
         for (const part of kinds[p.type]) {
           part.locals.forEach((L, k) => {
@@ -91,7 +99,6 @@
         part.mesh.instanceMatrix.needsUpdate = true;
         if (part.mesh.instanceColor) part.mesh.instanceColor.needsUpdate = true;
       }
-      void time;
     }
     function dispose() {
       for (const type in kinds) for (const part of kinds[type]) { part.mesh.geometry.dispose(); part.mesh.material.dispose(); if (part.mesh.dispose) part.mesh.dispose(); }

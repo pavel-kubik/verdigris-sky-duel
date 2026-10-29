@@ -9,7 +9,7 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -38,15 +38,18 @@
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
   /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt on region change in T11) ---------- */
-  let region = null, regionId = null, field = null, preyView = null;
+  let region = null, regionId = null, preyView = null;
   const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
+  const startId = D.regions[params.get('region')] ? params.get('region') : D.startRegion;
+  const cs = ST.create({ regionId: startId, rng });            // the whole run: dragon, prey field, flags, stats
+  const dragon = cs.dragon;
   function loadRegion(id) {
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, far: FOG.far });
     scene.add(region.group);
-    field = PR.spawnRegion(id, rng);
+    if (cs.region !== id || !cs.field) ST.enterRegion(cs, id);
     preyView = VRender.prey.build();
     scene.add(preyView.group);
     scene.fog.color.set(region.fog);
@@ -54,13 +57,11 @@
     u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
     $('#regionText').textContent = t(TR.region(id).nameKey);
   }
-  loadRegion(D.regions[params.get('region')] ? params.get('region') : D.startRegion);
+  loadRegion(startId);
 
   /* ---------- the hatchling ---------- */
   const hero = VDragon.makeDragon(VDragon.GREEN);
   scene.add(hero.root);
-  // Dragon progress (moves into core/state with the save in T12-T14)
-  const dragon = { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start };
   let stats = G.statsOf(0), heroScale = 1;
   let pilot = null, phase = 0;
   function refreshStage() {
@@ -82,7 +83,7 @@
   const mouthW = new V3(), fwdV = new V3();
 
   /* ---------- input ---------- */
-  const keys = {}, touch = { x: 0, y: 0, breath: false, boost: false };
+  const keys = {}, touch = { x: 0, y: 0, breath: false, boost: false, grab: false, eat: false };
   let mouseBreath = false, invert = store('vsd-invert') === '1';
   $('#invertBox').checked = invert;
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
@@ -120,7 +121,7 @@
     const off = () => { touch[prop] = false; b.classList.remove('on'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
   }
-  holdBtn('#bBreath', 'breath'); holdBtn('#bBoost', 'boost');
+  holdBtn('#bBreath', 'breath'); holdBtn('#bBoost', 'boost'); holdBtn('#bGrab', 'grab'); holdBtn('#bEat', 'eat');
   $('#bRoll').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') F.tryRoll(pilot, touch.x < -0.2 ? -1 : 1); });
   const clamp1 = v => Math.max(-1, Math.min(1, v));
   function readInput() {
@@ -131,6 +132,8 @@
       sy: invert ? -sy : sy,
       breath: !!(keys.Space || mouseBreath || touch.breath),
       boost: !!(keys.ShiftLeft || keys.ShiftRight || touch.boost),
+      grab: !!(keys[D.controls.grab] || touch.grab),
+      eat: !!(keys[D.controls.eat] || touch.eat),
     };
   }
 
@@ -148,7 +151,7 @@
   function spawnPilot() {
     refreshStage();
     const s = TR.region(regionId).spawn || { x: 0, z: 0, y: 120, yaw: 0 };
-    pilot = F.newPilot([s.x, Math.max(s.y, TR.surfaceAt(regionId, s.x, s.z) + 40), s.z], s.yaw, stats.cruise);
+    pilot = cs.dragon.pilot = F.newPilot([s.x, Math.max(s.y, TR.surfaceAt(regionId, s.x, s.z) + 40), s.z], s.yaw, stats.cruise);
     snapCam();
   }
   function setState(s) {
@@ -161,8 +164,8 @@
     $('#touch').hidden = !(s === 'play' && isTouch);
     if (s === 'play' && prev === 'intro') { spawnPilot(); hintT = 8; }
     $('#hint').hidden = !(s === 'play' && hintT > 0);
-    if (s === 'intro') { pilot = null; hero.root.scale.setScalar(1); }
-    mouseBreath = false; touch.breath = touch.boost = false;
+    if (s === 'intro') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
+    mouseBreath = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
   $('#startBtn').onclick = () => setState('play');
@@ -181,6 +184,15 @@
     return out;
   }
   function snapCam() { camDesired(camPos); }
+
+  /** Where the carried prey hangs: at the claw anchor, facing with the dragon. */
+  const clawW = new V3();
+  function carryPose() {
+    const p = pilot && ST.carriedPrey(cs);
+    if (!p) return null;
+    hero.claws.getWorldPosition(clawW);
+    return { id: p.id, pos: clawW, yaw: pilot.yaw, pitch: pilot.pitch };
+  }
 
   function poseHero(dt) {
     const p = pilot;
@@ -231,15 +243,39 @@
     vig.style.opacity = Math.max(hurt, hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0);
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0) $('#hint').hidden = true; }
     if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
+    promptHud(dt);
   }
   const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0;
-  function preyEvents(ev) {
+  /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
+  function onEvents(ev) {
     for (const e of ev) {
-      if (e.e === 'boar:hit') {
-        dragon.hp = Math.max(1, dragon.hp - e.damage);          // death and respawn at the lair arrive in T13
-        hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5);
-      }
+      if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
+      else if (e.e === 'hunger:state' && e.state === 'hungry') toast(t('c.toast.hungry'), t('c.toast.hungrySub'));
+      else if (e.e === 'hunger:state' && e.state === 'starving') toast(t('c.toast.starving'), t('c.toast.starvingSub'));
+      else if (e.e === 'prey:grabbed') flashPrompt(null);
+      else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
+      else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
+      else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
+      else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
+      else if (e.e === 'growth:ready') toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
     }
+  }
+  /* bottom prompt: what the claws can do right now (+ eat progress) */
+  const promptEl = $('#prompt'), promptText = $('#promptText'), promptBar = $('#promptBar');
+  let promptFlash = null, promptFlashT = 0, promptShown = '';
+  function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }
+  function promptHud(dt) {
+    promptFlashT = Math.max(0, promptFlashT - dt);
+    let text = '', bar = -1;
+    if (promptFlashT > 0 && promptFlash) text = promptFlash;
+    else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
+    else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
+    else if (cs.hint === 'heavy') text = t('c.prompt.heavy');
+    else if (cs.hint === 'near') text = t('c.prompt.near');
+    if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
+    promptBar.hidden = bar < 0;
+    if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
+    $('#bGrab').classList.toggle('hot', cs.hint === 'grab'); $('#bEat').classList.toggle('hot', cs.hint === 'eat');
   }
   function toast(title, sub, secs) {
     toastEl.innerHTML = '';
@@ -251,9 +287,6 @@
 
   /* ---------- survival tick: hunger, its effects, growth moments ---------- */
   function survive(dt) {
-    const changed = HN.step(dragon, dt, { boosting: pilot.boosting, breathing: pilot.breathing });
-    if (changed === 'hungry') toast(t('c.toast.hungry'), t('c.toast.hungrySub'));
-    if (changed === 'starving') toast(t('c.toast.starving'), t('c.toast.starvingSub'));
     // the dragon keeps growing visibly within its stage as it eats
     const sc = G.scaleOf(dragon.foodXp, dragon.stage);
     if (Math.abs(sc - heroScale) > 1e-4) { heroScale += (sc - heroScale) * Math.min(1, dt * 2); hero.root.scale.setScalar(heroScale); }
@@ -283,10 +316,10 @@
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK') { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
     if (code === 'KeyL') rest();
-    if (code === 'KeyP' && field.herds.length) {
+    if (code === 'KeyP' && cs.field.herds.length) {
       let best = null, bd = Infinity;
-      for (const h of field.herds) {
-        if (!field.list.some(q => q.herd === h.id)) continue;
+      for (const h of cs.field.herds) {
+        if (!cs.field.list.some(q => q.herd === h.id)) continue;
         const d = Math.hypot(h.centre[0] - pilot.pos[0], h.centre[1] - pilot.pos[2]);
         if (d > 60 && d < bd) { bd = d; best = h; }
       }
@@ -313,12 +346,11 @@
     if (state === 'intro' || !pilot) {
       idleHero(dt);
       const h = hero.root.position;                               // herds graze under the intro flight
-      PR.step(field, { pos: [h.x, h.y + 400, h.z], inv: 0 }, dt, { stats, rng });
+      PR.step(cs.field, { pos: [h.x, h.y + 400, h.z], inv: 0 }, dt, { stats, rng });
     } else {
       if (state === 'play') {
-        F.step(pilot, readInput(), dt, { regionId, stats, effects: HN.effects(dragon.hunger) });
+        onEvents(ST.step(cs, readInput(), dt));
         survive(dt);
-        preyEvents(PR.step(field, { pos: pilot.pos, inv: pilot.inv }, dt, { stats, rng }));
       }
       poseHero(dt);
       camDesired(tmpV);
@@ -335,7 +367,7 @@
     }
     sky.position.copy(camera.position);
     region.update(camera.position, time);
-    preyView.update(field, time);
+    preyView.update(cs.field, time, carryPose());
     renderer.render(scene, camera);
     if (debug) debugHud(dt);
   }
@@ -368,8 +400,10 @@
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
-      const pc = PR.census(field);
+      const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
+      L.push('HUNT    hint ' + (cs.hint || '-') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + D.eat.time);
+      L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');
       L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
       L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');
     }
@@ -383,5 +417,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, dragon, feed, rest, snapCam, get field() { return field; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, get field() { return cs.field; } };
 })();

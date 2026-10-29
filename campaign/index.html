@@ -85,6 +85,11 @@ kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);bor
 #btns button{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);background:rgba(12,19,16,.55);color:var(--bone);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;touch-action:none}
 #btns button.on{background:rgba(255,148,71,.35);border-color:var(--ember)}
 #bBreath{border-color:var(--ember)!important;color:var(--ember)!important}
+#btns button.hot{border-color:var(--verd);color:var(--verd);box-shadow:0 0 12px rgba(98,196,138,.45)}
+#prompt{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:grid;gap:6px;justify-items:center;pointer-events:none;text-align:center}
+#promptText{font-size:15px;font-weight:600;letter-spacing:.04em;color:var(--bone);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 14px;text-shadow:0 1px 6px rgba(0,0,0,.5);white-space:nowrap}
+#promptBar{width:160px;height:6px;background:rgba(233,225,204,.12);border-radius:3px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+#promptBar i{display:block;height:100%;background:var(--hunger);transform-origin:left;transform:scaleX(0)}
 .center{left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));text-align:center}
 .center .row{justify-content:center}
 h2{font-size:42px}
@@ -125,12 +130,14 @@ h2{font-size:42px}
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
 </div>
 <div id="legend" hidden>
-  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
+  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>G</kbd><span data-i18n="c.legend.grab">Grab (hold)</span></span><span><kbd>X</kbd><span data-i18n="c.legend.eat">Eat (hold)</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
 </div>
-<div id="hint" hidden data-i18n="c.wip">Flight test - hunting, hunger and the lair arrive in the next builds.</div>
+<div id="prompt" hidden><div id="promptText"></div><div id="promptBar" hidden><i></i></div></div>
+<div id="hint" hidden data-i18n="c.wip">Hunting test - dive low at prey, hold G to grab and X to eat. The lair arrives next.</div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
   <div id="btns">
+    <button id="bGrab" data-i18n="c.btn.grab">Grab</button><button id="bEat" data-i18n="c.btn.eat">Eat</button>
     <button id="bRoll" data-i18n="btn.roll">Roll</button><button id="bBoost" data-i18n="btn.boost">Boost</button>
     <button id="bBreath" data-i18n="btn.breath" style="grid-column:2">Breath</button>
   </div>
@@ -157,6 +164,7 @@ h2{font-size:42px}
 <script src="core/hunger.js"></script>
 <script src="core/flight.js"></script>
 <script src="core/prey.js"></script>
+<script src="core/state.js"></script>
 <!-- render: THREE-side builders -->
 <script src="render/flora.js"></script>
 <script src="render/terrain.js"></script>
