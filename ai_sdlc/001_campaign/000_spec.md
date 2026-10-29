@@ -65,7 +65,7 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 | Tone | Classic fantasy with two sides that each have their own truth. The player plays the dragon and should feel for dragons; a later human campaign makes its players feel for the humans (decided 2026-10-29) |
 | Starvation | Dragon gets weak, cannot die of hunger |
 | Death penalty | Respawn at the lair, carried loot is lost |
-| Story | Light - intro, act cards, mission briefings. The mother dragon raises the hatchling and is killed by the Order when it is no longer a baby (decided 2026-10-29) |
+| Story | Light - the hatching scene opens the campaign, act cards, mission briefings. The mother dragon teaches the young dragon through its first two stages (Hatchling, Drake) and is killed by the Order as it grows into a Wyrm (decided 2026-10-29) |
 | Mission length | 5-10 minutes, timer runs out = mission fail |
 | World structure | Separate regions with loading between them |
 | Landing | The dragon lands and walks on the ground (no hopping); takeoff is an explicit action (decided 2026-10-29) |
@@ -76,14 +76,15 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 
 ## 2. Story
 
-Revised 2026-10-29: the mother dragon is alive at the start, teaches the hatchling to fly and hunt, and is killed by the Order later. Both dragons and humans have their own truth. Names are working titles.
+Revised 2026-10-29: the campaign opens with the hatching scene, the mother dragon is there from day 1 and teaches the young dragon through its first two stages, and the Order kills her later. Both dragons and humans have their own truth. Names are working titles.
 
 **Backstory (told in the intro and act cards):** years before the game, the hero's mother - one of the last Verdigris dragons - killed the King. To the humans this was a monster murdering their king and burning his city; the dragon side has its own reason for it (see open question 1). After the King's death the Order of the Iron Lance seized the crown and swore to wipe out the dragons. Since then the Order rules the villages through garrisons, villagers are taught to fear dragons, and stolen dragon relics (eggs, scale-crowns, the Ember Heart) sit in the Order's castles. Dragons are nearly extinct.
 
 **The dragon story (this campaign):** the player is the mother's last egg, hatched in a dormant volcano.
-- The mother guards the egg and is there when it cracks.
-- She teaches the hatchling to fly and to hunt. This is the campaign's tutorial: she flies ahead, shows a herd, takes the first prey, then lets the hatchling try.
-- When the hatchling is no longer a baby (it reaches Drake), the mother flies out to hunt and does not come back: the Order brings her down with ballista bolts. The player sees it happen.
+- The campaign opens with the hatching scene: the mother lies curled around the small egg and is there when it cracks.
+- From day 1 she teaches the young dragon. This is the campaign's tutorial: she flies ahead, shows a herd, takes the first prey, then lets the hatchling try. Each new skill (landing, smell, the cave, the first raid) comes as one of her lessons.
+- She stays through the first two stages, Hatchling and Drake. As a Drake the young dragon hunts and raids more on its own, and she raids the Order with it.
+- When it grows into a Wyrm, the mother flies out to hunt and does not come back: the Order brings her down with ballista bolts. The player sees it happen.
 - Her death is why the dragon hates people. The rest of the campaign is the young dragon's revenge on the Order, growing into the one dragon the Order cannot kill.
 
 **The human story (a later campaign, after the dragon story is finished):** the same world seen by the humans. They lost a king and a city to a dragon and live in fear of fire from the sky; the Order is cruel but it is the only thing between them and the dragons. The human campaign is designed and built only after the dragon story is complete (roadmap phase 8). The dragon campaign already keeps what the humans will remember: villages burned, livestock taken, people of the Order killed, and these can become the human campaign's starting history.
@@ -96,12 +97,12 @@ Revised 2026-10-29: the mother dragon is alive at the start, teaches the hatchli
 
 | Act | Stage | Story beat | Ends with |
 | --- | --- | --- | --- |
-| 1 - Awakening | Hatchling | Hatch in the volcano with the mother beside the egg; she teaches flying and hunting; first raid on an Order outpost together | The mother is killed by the Order while hunting, as the hero becomes a Drake |
-| 2 - Embers | Drake | Alone now: raid Order supply lines out of revenge, free the first village | Village sends first tribute |
-| 3 - Wyrmfire | Wyrm | Storm castles, recover the stolen dragon eggs | Grand Slayer hunts the dragon (lair raid) |
+| 1 - Awakening | Hatchling | The hatching scene; the mother teaches flying and hunting | The hatchling grows into a Drake |
+| 2 - Embers | Drake | With the mother: first raids on Order outposts and supply lines, free the first village | The mother is killed by the Order, as the hero grows into a Wyrm |
+| 3 - Wyrmfire | Wyrm | Alone now, out of revenge: storm castles, recover the stolen dragon eggs | Grand Slayer hunts the dragon (lair raid) |
 | 4 - Crown of Ash | Elder | Siege of the capital, the Order's war machine | Order falls, free roam continues |
 
-**Delivery:** a short illustrated intro, one text card per act, a 2-4 line briefing per mission and a one-line outcome after it. Two short in-engine scenes with the game's own models: the hatching (mother beside the egg) and the mother's death at the end of Act 1. No dialogue trees.
+**Delivery:** a short illustrated intro, one text card per act, a 2-4 line briefing per mission and a one-line outcome after it. Two short in-engine scenes with the game's own models: the hatching that opens the campaign (mother beside the egg) and the mother's death at the end of Act 2. No dialogue trees.
 
 **Preview:** the hatching scene (mother, egg, hatchling) is prototyped as a standalone page before it goes into the game.
 
@@ -368,9 +369,9 @@ Each phase is a playable increment on its own base branch (`campaign-phase-N`) w
 | Phase | Task file | Scope | Exit criteria |
 | --- | --- | --- | --- |
 | 1 - Survival MVP | `001_task_survival.md` | Ash Wastes + Wildwood, lair (rest, save, larder), hunger, goat / deer / boar, grab and eat, growth Hatchling to Drake, save v1 | A new player can hunt, starve, recover and reach Drake in about 30 min; save survives reload |
-| 2 - Kingdom + hoard | `002_task_kingdom.md` | Foundation first (touch action layout, phone perf baseline, shared dragon model, landing + walking), walkable cave interior (nest, larder, hoard pile, altar), compass strip with smell, then River Farmlands, hamlet + village + outpost (a small outpost in Wildwood), archers + ballista, building fire, Perception, alert 0-3, livestock, gold loot, 5 upgrades incl. prey sense, day / night, save v2 | On a phone a Drake follows the compass to the Farmlands, lands outside the Order outpost, walks in, picks up the strongbox, takes off under archer and ballista fire, carries it into the cave, sees the hoard pile grow and buys an upgrade at the altar; raids raise alert to 3 with visible changes and lying low lowers it |
+| 2 - Kingdom + hoard | `002_task_kingdom.md` | Foundation first (touch action layout, phone perf baseline, shared dragon model), the hatching scene and the mother as tutor, landing + walking, walkable cave interior (nest, larder, hoard pile, altar), compass strip with smell, then River Farmlands, hamlet + village + outpost (a small outpost in Wildwood), archers + ballista, building fire, Perception, alert 0-3, livestock, gold loot, 5 upgrades incl. prey sense, day / night, save v2 | On a phone a Drake follows the compass to the Farmlands, lands outside the Order outpost, walks in, picks up the strongbox, takes off under archer and ballista fire, carries it into the cave, sees the hoard pile grow and buys an upgrade at the altar; raids raise alert to 3 with visible changes and lying low lowers it |
 | 3 - Missions | `003_task_missions.md` | Mission board and trophy wall in the cave, timer, steal + destroy + intercept types, relics and mission carry rules, aeries, map screen + fast travel, freeing a village (Order garrison destroyed: tribute starts), Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified; the map shows discovered places and fast travel works |
-| 4 - Highlands | `004_task_highlands.md` | Highland Pass, Wyrm stage + stage visuals, knights, net launchers, caravans, Renown | A Wyrm intercepts a caravan and survives the knights; Renown changes how villages treat the dragon |
+| 4 - Highlands | `004_task_highlands.md` | The mother's death scene (end of Act 2), Highland Pass, Wyrm stage + stage visuals, knights, net launchers, caravans, Renown | A Wyrm intercepts a caravan and survives the knights; Renown changes how villages treat the dragon |
 | 5 - Lowlands | `005_task_lowlands.md` | Royal Lowlands, frost mages, mangonels, first named slayer, alert 4-5, lair defense inside the cave (lava vents), Act 3 | Act 3 playable end to end |
 | 6 - Endgame | `006_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
 | 7 - Co-op campaign | `007_task_coop.md` | Two dragons, shared lair and hoard, sync on the persistent multiplayer backend | Two players finish a mission together |
@@ -390,5 +391,5 @@ Phase 7 (co-op) starts only once the persistent multiplayer backend exists; unti
 - [ ] When does co-op campaign start? Gated on the persistent multiplayer backend (2026-10-29); exact timing still open.
 - [x] Story: the mother lives at the start, teaches flying and hunting, is killed by the Order when the hero reaches Drake; the mother once killed the King; human campaign after the dragon story (decided 2026-10-29).
 - [ ] Story 1: why did the mother kill the King? Default: the King's hunters took her first clutch of eggs, so both sides lost children and both have their reason.
-- [ ] Story 2: in which phase does the mother arrive in the game (NPC that flies with the hatchling, tutorial steps, death scene)? Default: Phase 3 together with the story cards; until then the hatching card says she is out hunting.
+- [x] Story 2: the mother is in the game from the start of the campaign: the hatching scene and the mother NPC are Phase 2 tasks T04 and T05; her death scene comes with the Wyrm stage in Phase 4 (decided 2026-10-29). Until T04 the phase 1 hatching card stays.
 - [ ] Story 3: is the hero the "last" dragon? Default: no - the stolen eggs in Act 3 mean others may live, which gives the late game hope.
