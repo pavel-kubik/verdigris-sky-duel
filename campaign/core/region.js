@@ -32,6 +32,13 @@
     return arcAt(regionId, pos);
   }
 
+  /** Bearing of the middle of an exit arc. */
+  function arcMid(e) {
+    let span = e.angleTo - e.angleFrom;
+    span = ((span % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    return wrap(e.angleFrom + span / 2);
+  }
+
   /** The exit whose arc contains the dragon's bearing from the centre (any heading, any distance), or null. */
   function arcAt(regionId, pos) {
     const R = T.region(regionId);
@@ -85,5 +92,5 @@
     return [{ e: 'region:enter', region: toId, from: fromId }];
   }
 
-  M.define('region', { exitAt, arcAt, softEdgeAt, entryPoint, enter, inArc });
+  M.define('region', { exitAt, arcAt, arcMid, softEdgeAt, entryPoint, enter, inArc });
 })(typeof self !== 'undefined' ? self : this);

@@ -13,6 +13,9 @@ const at = (id, a, inset, up) => {
 ok(RG.inArc(Math.PI - 0.1, Math.PI - 0.6, Math.PI + 0.6) && RG.inArc(-Math.PI + 0.1, Math.PI - 0.6, Math.PI + 0.6), 'arc across the seam');
 ok(!RG.inArc(0, Math.PI - 0.6, Math.PI + 0.6) && RG.inArc(0.5, -0.6, 0.6) && !RG.inArc(0.7, -0.6, 0.6), 'arc bounds');
 
+near(RG.arcMid({ angleFrom: -0.6, angleTo: 0.6 }), 0, 1e-12, 'arc middle');
+near(Math.abs(RG.arcMid({ angleFrom: Math.PI - 0.6, angleTo: Math.PI + 0.6 })), Math.PI, 1e-9, 'arc middle across the seam');
+
 // 2. exitAt: only near the edge, inside an exit arc, heading outward
 {
   const near0 = at('ash', 0, 30), far0 = at('ash', 0, 300), side = at('ash', Math.PI / 2, 30);

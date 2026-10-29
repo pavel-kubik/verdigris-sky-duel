@@ -142,6 +142,9 @@
       'c.toast.grew': 'You are now a {stage}', 'c.toast.grewSub': 'Stronger, hungrier, harder to hide',
       'c.menu': 'Menu',
       'c.region.ash': 'Ash Wastes', 'c.region.wild': 'Wildwood',
+      'c.prompt.travel.wild': 'Fly to Wildwood - press Enter', 'c.prompt.travel.ash': 'Fly to the Ash Wastes - press Enter',
+      'c.btn.travel.wild': 'Fly to Wildwood', 'c.btn.travel.ash': 'Fly to the Ash Wastes',
+      'c.toast.enterSub': 'New hunting grounds',
 
       /* co-op */
       'mp.title': 'Verdigris Co-op',
@@ -314,6 +317,9 @@
       'c.toast.grew': 'Nyní jsi: {stage}', 'c.toast.grewSub': 'Silnější, hladovější, hůř se skrýváš',
       'c.menu': 'Menu',
       'c.region.ash': 'Popelavé pustiny', 'c.region.wild': 'Divoký hvozd',
+      'c.prompt.travel.wild': 'Leť do Divokého hvozdu - stiskni Enter', 'c.prompt.travel.ash': 'Leť do Popelavých pustin - stiskni Enter',
+      'c.btn.travel.wild': 'Do Divokého hvozdu', 'c.btn.travel.ash': 'Do Popelavých pustin',
+      'c.toast.enterSub': 'Nová loviště',
 
       'mp.title': 'Verdigris Co-op',
       'mp.desc': 'Leťte společně se zelenými draky proti vlnám karmínových wyveren. Kooperace v prohlížeči, spojení peer-to-peer.',
