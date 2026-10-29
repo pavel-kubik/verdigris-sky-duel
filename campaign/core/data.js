@@ -12,6 +12,8 @@
   const data = {
     version: 1,
     saveKey: 'vsd-campaign',
+    // autosave: every `every` s of play, plus on rest, region change and death (core emits a 'save' event)
+    save: { every: 60 },
 
     /* Growth stages. carry = max prey size class (1 small, 2 medium, 3 large, 4 huge).
        Visual scale grows from scaleFrom to scaleTo with food XP inside a stage;
