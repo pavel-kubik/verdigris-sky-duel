@@ -9,7 +9,7 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -38,12 +38,17 @@
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
   /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt on region change in T11) ---------- */
-  let region = null, regionId = null;
+  let region = null, regionId = null, field = null, preyView = null;
+  const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
   function loadRegion(id) {
     if (region) region.dispose();
+    if (preyView) preyView.dispose();
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, far: FOG.far });
     scene.add(region.group);
+    field = PR.spawnRegion(id, rng);
+    preyView = VRender.prey.build();
+    scene.add(preyView.group);
     scene.fog.color.set(region.fog);
     const u = sky.material.uniforms;
     u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
@@ -222,11 +227,20 @@
     const ready = G.readyStage(dragon.foodXp, dragon.stage) > dragon.stage;
     const pr = ready ? 1 : Math.round(G.progressIn(dragon.stage, dragon.foodXp) * 100) / 100;
     if (pr !== shown.ring) { ring.style.setProperty('--p', pr); ring.classList.toggle('ready', ready); shown.ring = pr; }
-    vig.style.opacity = hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0;
+    hurt = Math.max(0, hurt - dt * 1.8);
+    vig.style.opacity = Math.max(hurt, hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0);
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0) $('#hint').hidden = true; }
     if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
   }
-  const toastEl = $('#toast'); let toastT = 0;
+  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0;
+  function preyEvents(ev) {
+    for (const e of ev) {
+      if (e.e === 'boar:hit') {
+        dragon.hp = Math.max(1, dragon.hp - e.damage);          // death and respawn at the lair arrive in T13
+        hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5);
+      }
+    }
+  }
   function toast(title, sub, secs) {
     toastEl.innerHTML = '';
     toastEl.append(title);
@@ -259,7 +273,7 @@
   const DEBUG_KEYS = [
     ['N', '+100 food (hunger + growth)'], ['J', 'hunger +25 (no growth)'], ['H', 'hunger -25'],
     ['K', 'damage 20 HP'], ['L', 'rest: heal, refill, grow'], ['R', 'reset to a new hatchling'],
-    ['`', 'hide / show this panel'],
+    ['P', 'fly to the nearest herd'], ['`', 'hide / show this panel'],
   ];
   function debugKey(code) {
     if (code === 'Backquote' && dbgEl) { dbgEl.hidden = !dbgEl.hidden; return; }
@@ -269,6 +283,19 @@
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK') { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
     if (code === 'KeyL') rest();
+    if (code === 'KeyP' && field.herds.length) {
+      let best = null, bd = Infinity;
+      for (const h of field.herds) {
+        if (!field.list.some(q => q.herd === h.id)) continue;
+        const d = Math.hypot(h.centre[0] - pilot.pos[0], h.centre[1] - pilot.pos[2]);
+        if (d > 60 && d < bd) { bd = d; best = h; }
+      }
+      if (best) {                                                 // arrive 160 out, low, facing the herd
+        const a = Math.atan2(pilot.pos[0] - best.centre[0], pilot.pos[2] - best.centre[1]);
+        const x = best.centre[0] + Math.sin(a) * 160, z = best.centre[1] + Math.cos(a) * 160;
+        pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 30, z]; pilot.yaw = a + Math.PI; pilot.pitch = 0; snapCam();
+      }
+    }
     if (code === 'KeyR') {
       Object.assign(dragon, { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start });
       refreshStage(); pilot.st = 100;
@@ -285,10 +312,13 @@
 
     if (state === 'intro' || !pilot) {
       idleHero(dt);
+      const h = hero.root.position;                               // herds graze under the intro flight
+      PR.step(field, { pos: [h.x, h.y + 400, h.z], inv: 0 }, dt, { stats, rng });
     } else {
       if (state === 'play') {
         F.step(pilot, readInput(), dt, { regionId, stats, effects: HN.effects(dragon.hunger) });
         survive(dt);
+        preyEvents(PR.step(field, { pos: pilot.pos, inv: pilot.inv }, dt, { stats, rng }));
       }
       poseHero(dt);
       camDesired(tmpV);
@@ -296,6 +326,8 @@
       fwdV.set(Math.sin(pilot.yaw) * Math.cos(pilot.pitch), Math.sin(pilot.pitch), Math.cos(pilot.yaw) * Math.cos(pilot.pitch));
       camLook.set(pilot.pos[0], pilot.pos[1] + 2, pilot.pos[2]).addScaledVector(fwdV, 12);
       camera.position.copy(camPos);
+      if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
+      shake = Math.max(0, shake - dt * 1.5);
       camera.lookAt(camLook);
       const fovT = pilot.boosting && state === 'play' ? 72 : 60;
       if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
@@ -303,6 +335,7 @@
     }
     sky.position.copy(camera.position);
     region.update(camera.position, time);
+    preyView.update(field, time);
     renderer.render(scene, camera);
     if (debug) debugHud(dt);
   }
@@ -335,6 +368,8 @@
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
+      const pc = PR.census(field);
+      L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
       L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');
     }
@@ -348,5 +383,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, dragon, feed, rest };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, dragon, feed, rest, snapCam, get field() { return field; } };
 })();

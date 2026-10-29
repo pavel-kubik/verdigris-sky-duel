@@ -236,10 +236,11 @@ Copied from `stepPilot` with these changes: world radius, ceiling and ground fro
 ### 5.5 `prey`
 
 ```js
-spawnRegion(regionId, rng) -> prey[]            // herds from region data, placed on terrain
-step(list, dragon, dt, ctx)                     // ctx {regionId, stats, rng}; AI + charge damage; returns events[]
-tryGrab(list, dragon, stats, effects) -> prey|null
-cook(list, breathCone, dt) -> events[]          // exposure accumulates; at cookTime the prey dies and becomes chunks
+spawnRegion(regionId, rng, avoid?) -> field   // { regionId, herds, list, nextId }: herds from region data on valid ground
+step(field, dragon, dt, ctx) -> events[]      // dragon {pos, inv}, ctx {stats, rng}; AI, charge damage, herd respawn
+remove(field, preyId); census(field)          // eaten / stored prey; counts per state for the debug panel
+tryGrab(field, dragon, stats, effects) -> prey|null
+cook(field, breathCone, dt) -> events[]          // exposure accumulates; at cookTime the prey dies and becomes chunks
 drop(prey, pos)                                 // releases a carried prey (death, larder)
 ```
 
@@ -262,7 +263,7 @@ AI states:
 
 Grab succeeds when: grab key held, prey within `grab.radius * scale` horizontally, dragon less than `grab.maxAboveGround` above ground, `pitch <= grab.maxPitch` (diving), `prey.size <= min(stats.carry, effects.carryMax)`, nothing already carried. A failed grab on an oversized prey shows a "Too heavy" tip once.
 
-Herds respawn `respawn.herdCooldown` seconds after being emptied, at least `minDistFromDragon` away. Only prey within 600 of the dragon run full AI each frame; the rest tick at 4 Hz.
+A field (not a bare list) keeps herd bookkeeping, which respawning needs. Herds respawn `respawn.herdCooldown` seconds after being emptied, at least `minDistFromDragon` away. Only prey within 600 of the dragon run full AI each frame; the rest tick at 4 Hz.
 
 ### 5.6 `region`
 

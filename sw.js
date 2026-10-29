@@ -14,7 +14,8 @@ const SHELL = [
   'mp/', 'mp/index.html', 'mp/game.js', 'mp/sim.js',
   'campaign/', 'campaign/index.html', 'campaign/game.js', 'shared/dragon.js',
   'campaign/core/umd.js', 'campaign/core/math.js', 'campaign/core/events.js', 'campaign/core/data.js',
-  'campaign/core/terrain.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/flight.js', 'campaign/render/flora.js', 'campaign/render/terrain.js',
+  'campaign/core/terrain.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/flight.js', 'campaign/core/prey.js',
+  'campaign/render/flora.js', 'campaign/render/terrain.js', 'campaign/render/prey-view.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'icons/icon-maskable-192.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
 ];
