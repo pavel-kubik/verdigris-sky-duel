@@ -156,26 +156,18 @@ h2{font-size:42px}
   <div class="row"><button class="cta" id="resumeBtn" data-i18n="btn.resume">Resume</button><button class="ghost" id="menuBtn" data-i18n="c.menu">Menu</button></div>
 </section>
 
-<script src="../i18n.js"></script>
-<script src="../pwa.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="../shared/dragon.js"></script>
-<!-- core: pure logic, load order = dependency order -->
-<script src="core/umd.js"></script>
-<script src="core/math.js"></script>
-<script src="core/events.js"></script>
-<script src="core/data.js"></script>
-<script src="core/terrain.js"></script>
-<script src="core/growth.js"></script>
-<script src="core/hunger.js"></script>
-<script src="core/flight.js"></script>
-<script src="core/prey.js"></script>
-<script src="core/region.js"></script>
-<script src="core/state.js"></script>
-<!-- render: THREE-side builders -->
-<script src="render/flora.js"></script>
-<script src="render/terrain.js"></script>
-<script src="render/prey-view.js"></script>
-<script src="game.js"></script>
+<script>
+  /* Game scripts carry the page's ?v= so a test link with a new v also fetches fresh scripts (no stale cache).
+     Load order = dependency order (core: pure logic, then render: THREE-side builders, then game.js). */
+  (function () {
+    var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
+    ['../i18n.js', '../pwa.js', '../shared/dragon.js',
+     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js',
+     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/state.js',
+     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'game.js'
+    ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
+  })();
+</script>
 </body>
 </html>

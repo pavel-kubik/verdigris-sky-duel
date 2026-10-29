@@ -63,6 +63,9 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
   debug hotkeys included, needs a touch control (debug: a button in the ?debug panel, toggled by the DBG button).
   Touch texts name buttons, not keys. Check the layout at 390x844 with hasTouch/isMobile first, desktop second.
   "What to test" lists the phone steps first.
+- Bump BUILD at the top of campaign/game.js on every push (e.g. 't012.1 <date> <what>'); the debug panel's first
+  line and the intro footer show it with the link's v=, so Pavel can tell which build he is running. Game scripts are
+  loaded with the page's ?v= (loader in campaign/index.html), so a new link version always fetches fresh files.
 - Every user-visible string goes in i18n.js in EN and CS. Add new files to the SHELL list in sw.js.
 - Add or extend tests in campaign/test/*.test.js. Both must pass: node campaign/test/run.js and node mp/sim.test.js
 - Browser check: cdnjs and npm are blocked here. Fetch Three.js r128 once into the scratchpad with

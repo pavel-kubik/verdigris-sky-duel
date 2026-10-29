@@ -15,6 +15,8 @@
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
+  /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
+  const BUILD = 't011.3 2026-10-29 debug toggle on all devices, versioned scripts';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -470,14 +472,14 @@
 
   /* ---------- ?debug panel: performance, dragon parameters, hotkeys ---------- */
   let dbgEl = null, dbgBox = null, dbgN = 0, dbgLast = performance.now();
-  let dbgShown = !isTouch;                                       // touch: starts hidden, the DBG button shows it
+  let dbgShown = !isTouch;                                       // touch: starts hidden; the DBG button toggles it everywhere
   function toggleDebug() {
     dbgShown = !dbgShown;
     if (dbgBox) dbgBox.hidden = !dbgShown;
     const b = $('#dbgBtn'); if (b) b.classList.toggle('on', dbgShown);
   }
-  /** Touch: a DBG button next to pause, and one button per debug hotkey above the panel. */
-  function debugTouchUi() {
+  /** A DBG button next to pause (all devices), and one button per debug hotkey above the panel. */
+  function debugUi() {
     const tog = document.createElement('button');
     tog.id = 'dbgBtn'; tog.textContent = 'DBG'; tog.setAttribute('aria-label', 'Debug panel');
     tog.style.cssText = 'pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;padding:0 10px;border-radius:20px;font:700 12px/1 ui-monospace,Menlo,monospace;margin-right:8px';
@@ -511,13 +513,14 @@
       dbgBox.appendChild(dbgEl);
       document.body.appendChild(dbgBox);
       dbgBox.hidden = !dbgShown;
-      if (isTouch) debugTouchUi();
+      debugUi();
     }
     dbgN++;
     const now = performance.now(), secs = (now - dbgLast) / 1000;
     if (secs < 0.5) return;
     const i = region.info, r = renderer.info.render;
     const L = [];
+    L.push('BUILD   ' + BUILD + (params.get('v') ? '  (v=' + params.get('v') + ')' : ''));
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
     L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');
@@ -545,6 +548,7 @@
   }
 
   if (isTouch) { const h = $('#hint'); h.setAttribute('data-i18n', 'c.wipTouch'); h.textContent = t('c.wipTouch'); }   // touch texts name buttons, not keys
+  if (debug) { const f = document.querySelector('#intro .foot'); if (f) f.prepend(Object.assign(document.createElement('code'), { textContent: 'build ' + BUILD + ' ', style: 'font-size:11px;opacity:.7;display:block' })); }
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
