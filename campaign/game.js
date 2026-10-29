@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't014.1 2026-10-29 save, autosave, continue';
+  const BUILD = 't015.3 2026-10-29 hatching scene opens the campaign';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -167,6 +167,7 @@
   let confirmQ = false;                                          // one-shot: Enter or the travel button
   addEventListener('keydown', e => {
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
+    if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
     keys[e.code] = true;
@@ -220,11 +221,13 @@
   }
 
   /* ---------- resize ---------- */
+  let hatchScene = null, hatchCard = false, hatchLineShown = null;   // the hatching scene (see startHatchScene)
   let W = 1, Hh = 1;
   function resize() {
     W = innerWidth; Hh = innerHeight;
     renderer.setSize(W, Hh, false);
     camera.aspect = W / Hh; camera.updateProjectionMatrix();
+    if (hatchScene) hatchScene.resize(W, Hh);
   }
   addEventListener('resize', resize); resize();
 
@@ -240,18 +243,23 @@
     const prev = state; state = s;
     const inGame = s === 'play' || s === 'paused';
     $('#intro').hidden = s !== 'intro';
+    $('#hatch').hidden = !(s === 'hatch' && hatchCard);
+    $('#hatchUi').hidden = !(s === 'hatch' && !hatchCard);
     $('#pause').hidden = s !== 'paused';
     $('#hudTop').hidden = !inGame;
     if (s === 'intro') cs.inLair = false;
     $('#lair').hidden = !(s === 'play' && cs.inLair);
     $('#legend').hidden = !(s === 'play' && !isTouch && !cs.inLair);
     $('#touch').hidden = !(s === 'play' && isTouch && !cs.inLair);
-    if (s === 'play' && prev === 'intro') {
-      if (!cs.dragon.pilot) { spawnPilot(); hintT = 8; }        // new hatchling (or a save without a position)
-      else { pilot = cs.dragon.pilot; refreshStage(); snapCam(); hintT = 0; }   // continue a saved run
+    if (s === 'play' && (prev === 'intro' || prev === 'hatch')) {
+      hintT = 0;
+      if (!cs.dragon.pilot) spawnPilot();                        // a save without a position
+      else { pilot = cs.dragon.pilot; refreshStage(); snapCam(); }   // continue a saved run, or the hatchling in the lair
     }
     $('#hint').hidden = !(s === 'play' && hintT > 0);
-    if (s === 'intro') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); introUi(); }
+    if (s === 'intro' || s === 'hatch') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
+    if (s === 'intro') introUi();
+    if (s !== 'hatch' && hatchScene) endHatchScene();
     mouseBreath = false; confirmQ = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
@@ -264,7 +272,10 @@
     lastSave = { why, ok: okSave, at: Math.round(cs.stats.played) };
     return okSave;
   }
-  /** Start / Continue: a saved run is applied into cs (same objects), a new one starts as a fresh hatchling at the spawn. */
+  /**
+   * Start / Continue: a saved run is applied into cs (same objects) and play resumes. A new run (Hatch, New hatchling)
+   * first shows the hatching card; its button wakes the hatchling inside the lair (lair.hatch) with the panel open.
+   */
   function startRun(fresh) {
     if (fresh || !saved) {
       SV.apply(cs, SV.migrate(SV.blank()));
@@ -274,11 +285,52 @@
     } else SV.apply(cs, SV.migrate(JSON.parse(JSON.stringify(saved))));
     if (cs.region !== regionId || !region) loadRegion(cs.region);
     cs.field = PR.spawnRegion(cs.region, rng, cs.dragon.pilot ? cs.dragon.pilot.pos : null);
+    if (!cs.dragon.pilot && !cs.flags.introSeen) { startHatchScene(); return; }
     cs.flags.introSeen = true;
     setState('play');
     if (cs.inLair) openLair(null);
     saveNow('start');
   }
+  /* ---------- hatching scene (render/hatch-scene.js): plays on a new run, then the hatching card ---------- */
+  function startHatchScene() {
+    if (hatchScene) endHatchScene();
+    hatchScene = VRender.hatch.build();
+    hatchScene.resize(W, Hh);
+    hatchCard = false; hatchLineShown = null;
+    $('#hatchLine').textContent = ''; $('#hatchLine').classList.remove('on');
+    setState('hatch');
+  }
+  function endHatchScene() { if (!hatchScene) return; hatchScene.dispose(); hatchScene = null; $('#hatchUi').hidden = true; }
+  function showHatchCard() {
+    hatchCard = true;
+    $('#hatchUi').hidden = true; $('#hatch').hidden = false;
+    setTimeout(() => $('#hatchBtn').focus({ preventScroll: true }), 0);
+  }
+  function skipHatch() { if (state === 'hatch' && hatchScene && !hatchCard) hatchScene.skip(); }
+  /** One frame of the scene: captions fade between lines, the card appears at the end. */
+  function runHatch(dt) {
+    const r = hatchScene.update(dt);
+    if (r.line !== hatchLineShown) {
+      const el = $('#hatchLine'), key = r.line;
+      el.classList.remove('on');
+      if (key) setTimeout(() => { if (hatchLineShown === key) { el.textContent = t(key); el.classList.add('on'); } }, hatchLineShown ? 300 : 0);
+      hatchLineShown = key;
+    }
+    if (r.card && !hatchCard) showHatchCard();
+    renderer.render(hatchScene.scene, hatchScene.camera);
+  }
+  $('#hatchSkip').addEventListener('click', e => { e.preventDefault(); skipHatch(); });
+  /** Hatching card -> the hatchling wakes in the lair (panel open, a first hint), saved right away. */
+  function hatchNow() {
+    if (state !== 'hatch') return;
+    cs.flags.introSeen = true;
+    const ev = LR.hatch(cs);
+    setState('play');
+    onEvents(ev);
+    lairMsg(t('c.lair.hatched'), 12);
+    saveNow('start');
+  }
+  $('#hatchBtn').onclick = hatchNow;
   let newArmed = false;
   /** Intro buttons: Hatch / Continue + New hatchling (tap twice), or the Start new / Keep choice for an unreadable save. */
   function introUi() {
@@ -412,7 +464,7 @@
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
-      else if (e.e === 'lair:leave') closeLair();
+      else if (e.e === 'lair:leave') { closeLair(); if (!cs.stats.eaten) showTip(12); }   // first hunt: how to grab and eat
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
       else if (e.e === 'growth:ready' && !cs.inLair) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
     }
@@ -463,7 +515,9 @@
   /* ---------- lair panel (core/lair.js does the rules; the panel only shows cs and calls state.lair*) ---------- */
   const lairEl = $('#lair'), larderList = $('#larderList');
   let lairMsgT = 0, lairTick = 0, lairShown = '';
-  function lairMsg(text) { $('#lairMsg').textContent = text || ''; lairMsgT = text ? 4 : 0; }
+  function lairMsg(text, secs) { $('#lairMsg').textContent = text || ''; lairMsgT = text ? secs || 4 : 0; }
+  /** The hunting tip under the HUD (touch names buttons, desktop names keys), hidden after secs. */
+  function showTip(secs) { hintT = secs; $('#hint').hidden = !(state === 'play' && !cs.inLair); }
   function renderLair() {
     if (!cs.inLair) return;
     const d = dragon, st = D.stages[d.stage], nx = D.stages[d.stage + 1], ready = G.readyStage(d.foodXp, d.stage) > d.stage;
@@ -573,7 +627,7 @@
         pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 50, z]; pilot.yaw = mid; pilot.pitch = 0; snapCam();
       }
     }
-    if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(okS ? 'saved' : 'not saved' + (saveOff ? ' (saving off)' : ''), 1.5); }
+    if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(t(okS ? 'c.dbg.saved' : saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); }
     if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
     if (code === 'KeyR') {
       Object.assign(dragon, { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start });
@@ -588,6 +642,7 @@
     let dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (state === 'paused') dt = 0;
     time += reduceMotion ? dt * 0.3 : dt;
+    if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
 
     if (state === 'intro' || !pilot) {
       idleHero(dt);
@@ -631,7 +686,7 @@
   /** A DBG button next to pause (all devices), and one button per debug hotkey above the panel. */
   function debugUi() {
     const tog = document.createElement('button');
-    tog.id = 'dbgBtn'; tog.textContent = 'DBG'; tog.setAttribute('aria-label', 'Debug panel');
+    tog.id = 'dbgBtn'; tog.textContent = 'DBG'; tog.setAttribute('aria-label', t('c.dbg.panel'));
     tog.style.cssText = 'pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;padding:0 10px;border-radius:20px;font:700 12px/1 ui-monospace,Menlo,monospace;margin-right:8px';
     $('#pauseBtn').before(tog);
     tog.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleDebug(); });
@@ -699,12 +754,12 @@
     dbgN = 0; dbgLast = now;
   }
 
-  if (isTouch) { const h = $('#hint'); h.setAttribute('data-i18n', 'c.wipTouch'); h.textContent = t('c.wipTouch'); }   // touch texts name buttons, not keys
+  if (isTouch) { const h = $('#hint'); h.setAttribute('data-i18n', 'c.tip.huntTouch'); h.textContent = t('c.tip.huntTouch'); }   // touch texts name buttons, not keys
   if (debug) { const f = document.querySelector('#intro .foot'); if (f) f.prepend(Object.assign(document.createElement('code'), { textContent: 'build ' + BUILD + ' ', style: 'font-size:11px;opacity:.7;display:block' })); }
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
+  if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
 })();

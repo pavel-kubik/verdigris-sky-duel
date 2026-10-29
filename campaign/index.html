@@ -110,12 +110,17 @@ h2{font-size:42px}
 #newBtn.confirm{border-color:var(--ember);color:var(--ember)}
 #lairDeath small{display:block;font-weight:400;color:var(--mute);margin-top:2px}
 #lairStage.ready{color:var(--verd);font-weight:700}
+#hatchLine{position:fixed;left:50%;top:30%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));margin:0;text-align:center;font:500 clamp(20px,4.6vw,30px)/1.25 var(--f-display);color:var(--bone);text-shadow:0 2px 18px rgba(0,0,0,.8);opacity:0;transition:opacity .6s;pointer-events:none;text-wrap:balance}
+#hatchLine.on{opacity:1}
+#hatchSkip{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));min-height:44px;background:var(--panel)}
 
 @media (max-width:720px){
   #hint{bottom:auto;top:calc(110px + env(safe-area-inset-top,0px));white-space:normal;width:min(420px,calc(100% - 32px));text-align:center}
   #regionName{font-size:20px}
   #intro{left:0;right:0;top:auto;bottom:0;transform:none;width:auto;border-radius:12px 12px 0 0;max-height:62%;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));gap:10px}
   h1{font-size:44px}
+  #hatchLine{top:16%}
+  #hatch{top:auto;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%)}
 }
 </style>
 </head>
@@ -157,7 +162,7 @@ h2{font-size:42px}
 <div id="prompt" hidden><div id="promptText"></div><div id="promptBar" hidden><i></i></div></div>
 <button id="travelBtn" class="cta" hidden></button>
 <div id="fade"></div>
-<div id="hint" hidden data-i18n="c.wip">Hunting test - hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).</div>
+<div id="hint" hidden data-i18n="c.tip.hunt">Hunt: fly low over a herd and hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).</div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
   <div id="btns">
@@ -166,6 +171,19 @@ h2{font-size:42px}
     <button id="bBreath" data-i18n="btn.breath" style="grid-column:2">Breath</button>
   </div>
 </div>
+
+<div id="hatchUi" hidden>
+  <p id="hatchLine" aria-live="polite"></p>
+  <button class="ghost" id="hatchSkip" data-i18n="c.hatch.skip">Skip</button>
+</div>
+<section id="hatch" class="panel center" hidden aria-labelledby="hatchTitle">
+  <div class="eyebrow" data-i18n="c.hatch.eyebrow">The egg cracks</div>
+  <h2 id="hatchTitle" data-i18n="c.hatch.title">Hatched</h2>
+  <p data-i18n="c.hatch.l1">Warm ash, the hiss of lava, a world too big for your wings.</p>
+  <p data-i18n="c.hatch.l2">Your mother is out hunting, and your belly already aches with hunger.</p>
+  <p data-i18n="c.hatch.l3">Hunt beyond the volcano, grow strong and come back to the lair to rest.</p>
+  <div class="row"><button class="cta" id="hatchBtn" data-i18n="c.hatch.go">Open your eyes</button></div>
+</section>
 
 <section id="lair" class="panel center" hidden aria-labelledby="lairTitle">
   <p id="lairDeath" role="status" hidden></p>
@@ -195,7 +213,7 @@ h2{font-size:42px}
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js',
      'core/flight.js', 'core/prey.js', 'core/region.js', 'core/lair.js', 'core/state.js', 'core/save.js',
-     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'game.js'
+     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>
