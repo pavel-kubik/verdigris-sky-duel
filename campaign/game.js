@@ -185,6 +185,21 @@
   }
   function snapCam() { camDesired(camPos); }
 
+  /* target ring: marks the prey a held G will swoop at (bright while swooping) */
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x62c48a, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  const ringMesh = new THREE.Mesh(new THREE.RingGeometry(2.6, 3.3, 28), ringMat);
+  ringMesh.rotation.x = -Math.PI / 2; ringMesh.renderOrder = 5; ringMesh.visible = false; scene.add(ringMesh);
+  function targetRing() {
+    const id = state === 'play' && pilot ? (cs.swoop != null ? cs.swoop : cs.hint === 'swoop' ? cs.target : null) : null;
+    const q = id != null ? PR.byId(cs.field, id) : null;
+    ringMesh.visible = !!q;
+    if (!q) return;
+    const k = VRender.prey.VIS * (q.size > 1 ? 1.3 : 1) * (cs.swoop != null ? 1 + 0.12 * Math.sin(time * 12) : 1);
+    ringMesh.position.set(q.pos[0], q.pos[1] + 0.4, q.pos[2]);
+    ringMesh.scale.setScalar(k);
+    ringMat.opacity = cs.swoop != null ? 0.9 : 0.45;
+  }
+
   /** Where the carried prey hangs: at the claw anchor, facing with the dragon. */
   const clawW = new V3();
   function carryPose() {
@@ -270,12 +285,13 @@
     if (promptFlashT > 0 && promptFlash) text = promptFlash;
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
+    else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
     else if (cs.hint === 'heavy') text = t('c.prompt.heavy');
     else if (cs.hint === 'near') text = t('c.prompt.near');
     if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
     promptBar.hidden = bar < 0;
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
-    $('#bGrab').classList.toggle('hot', cs.hint === 'grab'); $('#bEat').classList.toggle('hot', cs.hint === 'eat');
+    $('#bGrab').classList.toggle('hot', cs.hint === 'grab' || cs.hint === 'swoop'); $('#bEat').classList.toggle('hot', cs.hint === 'eat');
   }
   function toast(title, sub, secs) {
     toastEl.innerHTML = '';
@@ -368,6 +384,7 @@
     sky.position.copy(camera.position);
     region.update(camera.position, time);
     preyView.update(cs.field, time, carryPose());
+    targetRing();
     renderer.render(scene, camera);
     if (debug) debugHud(dt);
   }
@@ -402,7 +419,7 @@
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
-      L.push('HUNT    hint ' + (cs.hint || '-') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + D.eat.time);
+      L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + D.eat.time);
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');
       L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
       L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');

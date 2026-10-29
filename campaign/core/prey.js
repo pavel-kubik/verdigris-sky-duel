@@ -226,6 +226,27 @@
     return { best, heavy, near };
   }
 
+  /**
+   * Swoop target: the liftable prey the dragon is heading for - ahead within swoop.cone (radians off the
+   * heading), within swoop.range x scale horizontally and below the dragon. Returns the best by angle and distance.
+   */
+  function swoopTarget(field, dragon, stats, effects, scale) {
+    const S = D.swoop, s = Math.max(1, scale || 1);
+    const limit = Math.min(stats.carry, effects && effects.carryMax != null ? effects.carryMax : Infinity);
+    let best = null, score = Infinity;
+    for (const p of field.list) {
+      if (!GRABBABLE[p.state] || p.size > limit) continue;
+      const dx = p.pos[0] - dragon.pos[0], dz = p.pos[2] - dragon.pos[2], d = Math.hypot(dx, dz);
+      const up = dragon.pos[1] - p.pos[1];
+      if (d > S.range * s || up < -3 || up > S.below) continue;
+      const off = Math.abs(wrap(Math.atan2(dx, dz) - dragon.yaw));
+      if (d > D.grab.radius * s && off > S.cone) continue;          // must be ahead unless already right below
+      const sc = d * (1 + off * 1.5);
+      if (sc < score) { score = sc; best = p; }
+    }
+    return best;
+  }
+
   /** Lifts the best prey in reach. Returns { prey } on success, { heavy } if only too-heavy prey was in reach, else {}. */
   function tryGrab(field, dragon, stats, effects, scale) {
     const r = reach(field, dragon, stats, effects, scale);
@@ -260,5 +281,5 @@
     return c;
   }
 
-  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, tryGrab, release, byId, HERD_R, ALARM_ALT, CHARGE_ALT });
+  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, swoopTarget, tryGrab, release, byId, HERD_R, ALARM_ALT, CHARGE_ALT });
 })(typeof self !== 'undefined' ? self : this);

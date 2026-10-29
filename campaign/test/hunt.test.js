@@ -138,3 +138,40 @@ for (const type of ['goat', 'deer']) {
   ok(seen.length === 1 && seen[0] === 'goat', 'events go to the bus too');
   near(S.scaleOf(cs), D.stages[0].scaleFrom, 1e-9, 'scale helper');
 }
+
+// 10. Swoop: a casual player who flies roughly at prey and just holds G gets it (no precise steering)
+{
+  const F = core('flight');
+  let got = 0, n = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const r = mulberry(seed * 13);
+    const cs = S.create({ regionId: 'wild', rng: mulberry(seed) });
+    const prey = cs.field.list.find(p => p.type === 'goat' || p.type === 'deer');
+    const a = r() * Math.PI * 2, dist = 70 + r() * 15, err = (r() - 0.5) * 1.2;     // heading up to ~35 degrees off
+    const x = prey.pos[0] + Math.sin(a) * dist, z = prey.pos[2] + Math.cos(a) * dist;
+    cs.dragon.pilot = F.newPilot([x, T.surfaceAt('wild', x, z) + 28, z], a + Math.PI + err, 30);
+    let ok1 = false;
+    for (let i = 0; i < 60 * 8 && !ok1; i++) { S.step(cs, { grab: true }, dt); if (cs.dragon.carried != null) ok1 = true; }
+    n++; if (ok1) got++;
+  }
+  ok(got / n >= 0.9, 'holding G while heading roughly at prey grabs it: ' + got + '/' + n);
+}
+
+// 11. Swoop targets only liftable prey ahead; the prompt offers it before reach
+{
+  const F = core('flight');
+  const { cs, d, prey } = setup('goat', 0);
+  cs.field.list = [prey];
+  const x = prey.pos[0], z = prey.pos[2] - 60;
+  d.pilot = F.newPilot([x, prey.pos[1] + 25, z], 0, 30);            // heading +Z, straight at it
+  S.step(cs, {}, dt);
+  ok(cs.hint === 'swoop', 'prompt offers a swoop at prey ahead');
+  d.pilot = F.newPilot([x, prey.pos[1] + 25, z], Math.PI, 30);      // facing away
+  S.step(cs, { grab: true }, dt);
+  ok(cs.swoop === null && cs.hint !== 'swoop', 'no swoop at prey behind the dragon');
+  const b = setup('boar', 0);
+  b.cs.field.list = [b.prey];
+  b.d.pilot = F.newPilot([b.prey.pos[0], b.prey.pos[1] + 25, b.prey.pos[2] - 60], 0, 30);
+  S.step(b.cs, { grab: true }, dt);
+  ok(b.cs.swoop === null, 'a hatchling does not swoop at a boar');
+}

@@ -46,7 +46,9 @@
     roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11, cookTime: 1.2 },
     // grab reach: horizontal radius x dragon scale, height over the prey's back (+ the claw drop at this scale),
     // and not climbing harder than maxPitch (the floor pull-up rules out a strict dive-only grab)
-    grab: { radius: 7, maxAboveGround: 8, maxPitch: 0.25, clawDrop: 1.35, nearFactor: 3.5, heavyCooldown: 3 },
+    grab: { radius: 9, maxAboveGround: 10, maxPitch: 0.25, clawDrop: 1.35, nearFactor: 3.5, heavyCooldown: 3 },
+    // swoop: holding grab with liftable prey ahead locks on and steers the dive onto it
+    swoop: { range: 90, cone: 0.9, below: 70, steer: 3.2, aimAbove: 6 },
     eat: { time: 2.5, speedCap: 18 },
     respawn: { herdCooldown: 90, minDistFromDragon: 250 },
     preyAi: { fullRange: 600, farTickHz: 4, maxActive: 40 },

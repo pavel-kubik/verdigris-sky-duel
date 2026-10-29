@@ -11,6 +11,7 @@
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey');
   const { createBus } = M.need('events');
+  const { wrap, clamp } = M.need('math');
 
   function create(opts) {
     const regionId = (opts && opts.regionId) || D.startRegion;
@@ -25,7 +26,9 @@
       field: null,
       flags: { introSeen: false, heavyT: 0 },
       stats: { played: 0, eaten: 0, food: 0 },
-      hint: null,                    // 'grab' | 'heavy' | 'eat' | null, for the HUD prompt
+      hint: null,                    // 'swoop' | 'grab' | 'heavy' | 'eat' | 'near' | null, for the HUD prompt
+      swoop: null,                   // id of the prey a held grab is diving at
+      target: null,                  // id of the prey a grab would swoop at (for the target ring)
       rng: (opts && opts.rng) || Math.random,
       bus: createBus(),
     };
@@ -54,7 +57,20 @@
     const eating = !!carried && !!inp.eat;
     cs.stats.played += dt;
 
-    F.step(p, inp, dt, { regionId: cs.region, stats, effects: eff, eating });
+    // swoop: holding grab with liftable prey ahead steers the dive onto it (aim assist for the claws)
+    let fly = inp;
+    const target = !carried ? PR.swoopTarget(cs.field, p, stats, eff, scale) : null;
+    cs.target = target ? target.id : null;
+    cs.swoop = inp.grab && target ? target.id : null;
+    if (cs.swoop != null) {
+      const Sw = D.swoop, dx = target.pos[0] - p.pos[0], dz = target.pos[2] - p.pos[2], d = Math.hypot(dx, dz);
+      const turn = wrap(Math.atan2(dx, dz) - p.yaw);
+      const aimY = target.pos[1] + Sw.aimAbove * Math.max(1, scale * 0.7);
+      const pitchWant = Math.atan2(aimY - p.pos[1], Math.max(4, d));
+      fly = Object.assign({}, inp, { sx: clamp(-turn * Sw.steer, -1, 1), sy: clamp(pitchWant / 0.75, -1, 1), boost: false });
+    }
+
+    F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating });
 
     const hs = HN.step(d, dt, { boosting: p.boosting, breathing: p.breathing });
     if (hs) emit(cs, ev, { e: 'hunger:state', state: hs });
@@ -104,7 +120,7 @@
       }
     } else d.eatT = 0;
 
-    cs.hint = carried ? 'eat' : r.best ? 'grab' : r.heavy ? 'heavy' : r.near ? 'near' : null;
+    cs.hint = carried ? 'eat' : r.best ? 'grab' : target ? 'swoop' : r.heavy ? 'heavy' : r.near ? 'near' : null;
     return ev;
   }
 
