@@ -61,6 +61,6 @@ ok(Hn.stateOf(H.states.starving) === 'starving' && Hn.stateOf(0) === 'starving',
   Hn.feed(d, 45);
   ok(d.hunger === H.max && d.foodXp === 45, 'feed caps hunger and adds the full meal as food XP');
   let ready = false;
-  for (let i = 0; i < 30 && !ready; i++) ready = Hn.feed(d, 30);
+  for (let i = 0; i < Math.ceil(D.stages[1].foodFrom / 30) + 1 && !ready; i++) ready = Hn.feed(d, 30);
   ok(ready && G.readyStage(d.foodXp, d.stage) === 1, 'feeding eventually makes the drake stage ready');
 }

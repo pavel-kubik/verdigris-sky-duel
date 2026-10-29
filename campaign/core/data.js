@@ -21,7 +21,7 @@
     stages: [
       { id: 'hatchling', foodFrom: 0, growthFrom: 0.00, scaleFrom: 1.0, scaleTo: 1.5,
         hp: 100, turn: 1.00, cruise: 30, boost: 54, hungerMult: 1.0, spot: 1.0, carry: 1 },
-      { id: 'drake', foodFrom: 600, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
+      { id: 'drake', foodFrom: 1000, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
         hp: 220, turn: 0.85, cruise: 32, boost: 56, hungerMult: 1.5, spot: 1.5, carry: 2 },
       // wyrm (foodFrom 2400, growthFrom 0.55) and elder (growthFrom 0.85) arrive in phases 4-5
     ],
@@ -29,7 +29,7 @@
 
     hunger: {
       max: 100, start: 80,
-      drain: 0.28,            // per second at hungerMult 1 (100 to 0 in about 6 min)
+      drain: 0.33,            // per second at hungerMult 1 (100 to 0 in about 5 min)
       boostDrain: 0.25,       // extra per second while boosting
       breathDrain: 0.15,      // extra per second while breathing fire
       states: { hungry: 30, starving: 10 },
@@ -54,7 +54,7 @@
     // swoop: holding grab with liftable prey ahead locks on and steers the dive onto it
     swoop: { range: 90, cone: 0.9, below: 70, steer: 3.2, aimAbove: 6 },
     eat: { time: 2.5, speedCap: 18 },
-    respawn: { herdCooldown: 90, minDistFromDragon: 250 },
+    respawn: { herdCooldown: 150, minDistFromDragon: 250 },
     preyAi: { fullRange: 600, farTickHz: 4, maxActive: 40 },
 
     flight: { minAlt: 5, edgeMargin: 60, baseTurn: 1.55 },
