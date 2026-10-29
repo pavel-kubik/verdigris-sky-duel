@@ -104,6 +104,10 @@ h2{font-size:42px}
 #larderList button{min-height:38px;min-width:64px}
 #lairMsg{min-height:1.4em;color:var(--verd);font-weight:600}
 #lairDeath{margin:0;padding:8px 12px;border:1px solid var(--blood);border-radius:4px;color:var(--bone);background:rgba(229,72,79,.14);font-weight:600}
+#saveNote{margin:0;font-size:14px;color:var(--mute)}
+#saveNote b{color:var(--bone);font-weight:600}
+#saveBad p{margin:0 0 10px;font-size:14px;color:var(--ember)}
+#newBtn.confirm{border-color:var(--ember);color:var(--ember)}
 #lairDeath small{display:block;font-weight:400;color:var(--mute);margin-top:2px}
 #lairStage.ready{color:var(--verd);font-weight:700}
 
@@ -126,7 +130,12 @@ h2{font-size:42px}
   <div class="eyebrow" data-i18n="c.eyebrow">Campaign · alpha</div>
   <h1>Verdigris</h1>
   <p data-i18n="c.intro">Deep in a dormant volcano, the last Verdigris egg is about to hatch. Hunt to survive, grow strong and one day free the realm from the Order of the Iron Lance.</p>
-  <div class="row"><button class="cta" id="startBtn" data-i18n="c.start">Hatch</button></div>
+  <p id="saveNote" hidden></p>
+  <div id="saveBad" hidden>
+    <p id="saveBadText"></p>
+    <div class="row"><button class="cta" id="badNewBtn" data-i18n="c.save.badNew">Start new</button><button class="ghost" id="badKeepBtn" data-i18n="c.save.badKeep">Keep it</button></div>
+  </div>
+  <div class="row" id="startRow"><button class="cta" id="startBtn" data-i18n="c.start">Hatch</button><button class="ghost" id="newBtn" hidden data-i18n="c.save.new">New hatchling</button></div>
   <a class="ghost" href="../" data-i18n="c.back">Back to the duel</a>
   <div class="foot"><span data-i18n="c.wipNote">Early build - the world is still forming.</span><div class="langSwitch"></div></div>
   <button class="ghost installBtn" hidden data-i18n="install.btn">Install app</button>
@@ -185,7 +194,7 @@ h2{font-size:42px}
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js',
-     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/lair.js', 'core/state.js',
+     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/lair.js', 'core/state.js', 'core/save.js',
      'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();

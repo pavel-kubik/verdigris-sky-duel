@@ -6,7 +6,7 @@
  *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
  *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
  * input: { sx, sy, breath, boost, grab, eat, confirm } (sx / sy in -1..1, the rest booleans).
- * The renderer reads cs; the save (T14) serialises the durable parts of it. See 001_task_survival.md 5.8.
+ * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
@@ -36,6 +36,7 @@
       breath: null,                  // the breath cone this frame (aimed), or null
       exit: null,                    // the region exit on offer (prompt "Fly to ..."), or null
       exitT: 0,                      // seconds the offer stays after the dragon turns back from the edge
+      saveT: 0,                      // seconds since the last autosave
       rng: (opts && opts.rng) || Math.random,
       bus: createBus(),
     };
@@ -55,9 +56,30 @@
 
   function emit(cs, ev, e) { ev.push(e); cs.bus.emit(e.e, e); }
 
+  /** One frame; ends with the autosave check (a 'save' event the client stores, see save.js). */
   function step(cs, inp, dt) {
-    const ev = [], d = cs.dragon, p = d.pilot;
-    if (!p) return ev;
+    const ev = [];
+    if (!cs.dragon.pilot) return ev;
+    run(cs, inp, dt, ev);
+    return autosave(cs, ev, dt);
+  }
+
+  /**
+   * Autosave triggers (5.9): rest, region change, death (wake in the lair) and every save.every s of play.
+   * Core only emits { e: 'save', why }; game.js writes it to localStorage (and on visibilitychange to hidden).
+   */
+  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death' };
+  function autosave(cs, ev, dt) {
+    cs.saveT = (cs.saveT || 0) + dt;
+    let why = null;
+    for (const e of ev) if (SAVE_ON[e.e]) { why = SAVE_ON[e.e]; break; }
+    if (!why && cs.saveT >= D.save.every) why = 'timer';
+    if (why) { cs.saveT = 0; emit(cs, ev, { e: 'save', why }); }
+    return ev;
+  }
+
+  function run(cs, inp, dt, ev) {
+    const d = cs.dragon, p = d.pilot;
     for (const e of LR.spoil(cs, dt)) emit(cs, ev, e);
     if (cs.inLair) { cs.stats.played += dt; return ev; }       // resting: hunger, prey and flight are paused
     if (d.hp <= 0) return die(cs, ev, 'wounds');
@@ -168,9 +190,9 @@
 
   /** Lair panel actions (game.js buttons); each returns events and emits them on the bus. */
   const relay = (cs, list) => { const ev = []; for (const e of list) emit(cs, ev, e); return ev; };
-  const lairRest = cs => relay(cs, LR.rest(cs).events);
+  const lairRest = cs => autosave(cs, relay(cs, LR.rest(cs).events), 0);
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
 
-  M.define('state', { create, enterRegion, step, scaleOf, carriedPrey, lairRest, lairEat, lairLeave });
+  M.define('state', { create, enterRegion, step, autosave, scaleOf, carriedPrey, lairRest, lairEat, lairLeave });
 })(typeof self !== 'undefined' ? self : this);
