@@ -103,6 +103,8 @@ h2{font-size:42px}
 #larderList li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:4px;padding:4px 4px 4px 12px}
 #larderList button{min-height:38px;min-width:64px}
 #lairMsg{min-height:1.4em;color:var(--verd);font-weight:600}
+#lairDeath{margin:0;padding:8px 12px;border:1px solid var(--blood);border-radius:4px;color:var(--bone);background:rgba(229,72,79,.14);font-weight:600}
+#lairDeath small{display:block;font-weight:400;color:var(--mute);margin-top:2px}
 #lairStage.ready{color:var(--verd);font-weight:700}
 
 @media (max-width:720px){
@@ -157,6 +159,7 @@ h2{font-size:42px}
 </div>
 
 <section id="lair" class="panel center" hidden aria-labelledby="lairTitle">
+  <p id="lairDeath" role="status" hidden></p>
   <div class="eyebrow" data-i18n="c.lair.eyebrow">Volcano lair</div>
   <h2 id="lairTitle" data-i18n="c.lair.title">Your lair</h2>
   <p id="lairStage"></p>
