@@ -106,7 +106,7 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
 - JSON: "updated" (UTC time); "phase" {done: count of DONE tasks, review: task numbers IN REVIEW, total};
   "tasks": for every open agent PR in stack order (oldest first) one "test" task (id pr<N>-test-v<link version>,
   test link as primary, phone steps group first, then desktop) and one "merge" task (merge into its base after testing,
-  bottom of the stack last; plan PRs get a "review" of the spec instead); keep "setup" tasks that are still open,
+  the oldest PR of the stack is merged first; plan PRs get a "review" task for the spec instead); keep "setup" tasks that are still open,
   drop tasks of merged or closed PRs; "log": prepend one row {t, what, pr} for this run, keep the last 30 rows.
 - If the read or publish is refused, say so in the final message and carry on; the PR body stays the source of truth.
 - Put the page link in the final message and the notification.
