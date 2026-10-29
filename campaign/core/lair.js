@@ -31,7 +31,12 @@
     return !!R && distToMouth(cs) < R.r * Math.max(1, scaleOf(cs) * 0.8);
   }
 
-  const near = cs => !cs.inLair && distToMouth(cs) < L.nearRange;
+  /** Close to the mouth and heading roughly toward it (so leaving the cave does not show the prompt). */
+  function near(cs) {
+    if (cs.inLair || !(distToMouth(cs) < L.nearRange)) return false;
+    const m = mouthPos(cs.region), p = cs.dragon.pilot;
+    return Math.cos(Math.atan2(m[0] - p.pos[0], m[2] - p.pos[2]) - p.yaw) > 0.3;
+  }
 
   function enter(cs) {
     const d = cs.dragon, ev = [];
@@ -80,8 +85,9 @@
     if (!s) { cs.inLair = false; return [{ e: 'lair:leave' }]; }
     const y = Math.max(s.y, T.surfaceAt(cs.region, s.x, s.z) + 40);
     const st = d.pilot ? d.pilot.st : 100;
-    d.pilot = F.newPilot([s.x, y, s.z], s.yaw, G.statsOf(d.stage).cruise);
-    d.pilot.st = st;
+    const np = F.newPilot([s.x, y, s.z], s.yaw, G.statsOf(d.stage).cruise);
+    np.st = st;
+    if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;   // same object: the renderer keeps its reference
     cs.inLair = false;
     return [{ e: 'lair:leave' }];
   }

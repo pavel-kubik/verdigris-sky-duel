@@ -39,9 +39,11 @@ ok(mouth[1] > T.surfaceAt('ash', mouth[0], mouth[2]) + D.flight.minAlt, 'mouth c
 {
   const cs = fresh();
   const p = cs.dragon.pilot;
-  p.pos = [mouth[0], mouth[1] + 40, mouth[2] + 80]; p.yaw = 0;
+  p.pos = [mouth[0], mouth[1] + 40, mouth[2] + 80]; p.yaw = Math.PI;
   S.step(cs, {}, dt);
   ok(cs.hint === 'lair' && !cs.inLair, 'near the cave: "fly in" prompt');
+  p.yaw = 0; S.step(cs, {}, dt);
+  ok(cs.hint !== 'lair', 'flying away from the cave: no prompt');
 }
 
 // 3. Carried prey goes into the larder (capacity 3, a 4th stays in the claws); inside, hunger and prey are paused
