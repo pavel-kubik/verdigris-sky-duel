@@ -138,3 +138,27 @@ ok(mouth[1] > T.surfaceAt('ash', mouth[0], mouth[2]) + D.flight.minAlt, 'mouth c
   const ev = homeIn(cs, 60 * 120);
   ok(cs.inLair && cs.larder.length === 1 && cs.larder[0].type === 'deer' && ev.some(e => e.e === 'lair:stored'), 'deer from Wildwood stored in the larder');
 }
+
+// Hatch (T15): a new hatchling (no pilot yet, start region set by ?region=) wakes inside the lair of the Ash Wastes
+{
+  const SV = core('save');
+  for (const start of ['ash', 'wild']) {
+    const cs = S.create({ regionId: start, rng: mulberry(12) });
+    SV.apply(cs, SV.migrate(SV.blank()));
+    cs.region = start;
+    ok(!cs.dragon.pilot && !cs.flags.introSeen, start + ': a blank run has no pilot and has not seen the intro');
+    const ev = LR.hatch(cs);
+    ok(cs.inLair && cs.region === LR.home() && cs.dragon.pilot, start + ': hatched inside the lair of the home region');
+    const le = ev.find(e => e.e === 'lair:enter');
+    ok(le && le.hatch && !le.respawn, start + ': lair:enter tagged hatch');
+    ok(ev.some(e => e.e === 'region:enter') === (start !== LR.home()), start + ': region:enter only when the start region differs');
+    ok(!ev.some(e => e.e === 'dragon:died'), start + ': no death');
+    ok(cs.dragon.stage === 0 && cs.dragon.hp === D.stages[0].hp && cs.dragon.deaths === 0, start + ': full HP hatchling, no deaths');
+    const m = LR.mouthPos(LR.home());
+    ok(Math.hypot(cs.dragon.pilot.pos[0] - m[0], cs.dragon.pilot.pos[2] - m[2]) < 1, start + ': pilot at the cave mouth');
+    const n = S.step(cs, { sx: 1, sy: 1, breath: true }, 1 / 60);
+    ok(cs.inLair && !n.some(e => e.e === 'lair:leave'), start + ': stays inside until Leave');
+    LR.leave(cs);
+    ok(!cs.inLair && cs.dragon.pilot.pos[1] > T.surfaceAt(cs.region, cs.dragon.pilot.pos[0], cs.dragon.pilot.pos[2]), start + ': Leave puts it in the air');
+  }
+}

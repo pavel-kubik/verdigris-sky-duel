@@ -157,7 +157,7 @@ h2{font-size:42px}
 <div id="prompt" hidden><div id="promptText"></div><div id="promptBar" hidden><i></i></div></div>
 <button id="travelBtn" class="cta" hidden></button>
 <div id="fade"></div>
-<div id="hint" hidden data-i18n="c.wip">Hunting test - hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).</div>
+<div id="hint" hidden data-i18n="c.tip.hunt">Hunt: fly low over a herd and hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).</div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
   <div id="btns">
@@ -166,6 +166,15 @@ h2{font-size:42px}
     <button id="bBreath" data-i18n="btn.breath" style="grid-column:2">Breath</button>
   </div>
 </div>
+
+<section id="hatch" class="panel center" hidden aria-labelledby="hatchTitle">
+  <div class="eyebrow" data-i18n="c.hatch.eyebrow">The egg cracks</div>
+  <h2 id="hatchTitle" data-i18n="c.hatch.title">Hatched</h2>
+  <p data-i18n="c.hatch.l1">Warm ash, the hiss of lava, a world too big for your wings.</p>
+  <p data-i18n="c.hatch.l2">You are the last Verdigris. Your belly already aches with hunger.</p>
+  <p data-i18n="c.hatch.l3">Hunt beyond the volcano, grow strong and come back to the lair to rest.</p>
+  <div class="row"><button class="cta" id="hatchBtn" data-i18n="c.hatch.go">Open your eyes</button></div>
+</section>
 
 <section id="lair" class="panel center" hidden aria-labelledby="lairTitle">
   <p id="lairDeath" role="status" hidden></p>

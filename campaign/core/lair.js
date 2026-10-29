@@ -12,6 +12,7 @@
  *   home() -> regionId                        the region with the lair (where a dead dragon wakes)
  *   respawn(cs, cause) -> events[]            after death: carried prey lost, back in the lair region, HP respawnHp x max,
  *                                             hunger at least respawnHunger, cs.inLair = true (the panel opens)
+ *   hatch(cs) -> events[]                     new hatchling: wakes inside the lair of home() (intro card -> lair panel)
  * While cs.inLair, state.step only runs spoil (hunger and prey are paused).
  */
 (function (root) {
@@ -118,29 +119,44 @@
    * Events: dragon:died, then region:enter (only when the region changed, respawn: true), then lair:enter (respawn: true).
    */
   function respawn(cs, cause) {
-    const d = cs.dragon, from = cs.region, to = home(), ev = [];
+    const d = cs.dragon, ev = [];
     const carried = d.carried == null || !cs.field ? null : PR.byId(cs.field, d.carried);
     if (carried) PR.remove(cs.field, carried.id);
-    ev.push({ e: 'dragon:died', cause: cause || 'wounds', region: from, lost: carried ? carried.type : null });
+    ev.push({ e: 'dragon:died', cause: cause || 'wounds', region: cs.region, lost: carried ? carried.type : null });
     d.carried = null; d.eatT = 0; d.deaths = (d.deaths || 0) + 1;
     const st = G.statsOf(d.stage);
     d.hp = Math.round(L.respawnHp * st.hpMax);
     d.hunger = Math.max(d.hunger, L.respawnHunger);
+    return wake(cs, ev, { respawn: true });
+  }
+
+  /**
+   * Puts the dragon inside the lair of home(): switches region when needed (region:enter with the given tag),
+   * a pilot at the cave mouth (the same object if there is one), then enter(). Shared by respawn and hatch.
+   */
+  function wake(cs, ev, tag) {
+    const d = cs.dragon, from = cs.region, to = home(), st = G.statsOf(d.stage);
     const R = T.region(to), s = R.spawn || { x: 0, z: 0, y: 100, yaw: 0 };
     const m = mouthPos(to) || [s.x, Math.max(s.y, T.surfaceAt(to, s.x, s.z) + 40), s.z];
     if (to !== from || !cs.field) {
       cs.region = to;
       cs.field = PR.spawnRegion(to, cs.rng, m);
-      ev.push({ e: 'region:enter', region: to, from, respawn: true });
+      ev.push(Object.assign({ e: 'region:enter', region: to, from }, tag));
     }
     const stamina = d.pilot ? d.pilot.st : 100;
     const np = F.newPilot(m.slice(), s.yaw || 0, st.cruise);
     np.st = stamina;
     if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;      // same object: the renderer keeps its reference
     cs.exit = null; cs.exitT = 0;
-    ev.push(...enter(cs).map(e => (e.e === 'lair:enter' ? Object.assign(e, { respawn: true }) : e)));
+    ev.push(...enter(cs).map(e => (e.e === 'lair:enter' ? Object.assign(e, tag) : e)));
     return ev;
   }
 
-  M.define('lair', { mouthPos, distToMouth, inMouth, near, enter, rest, eatFromLarder, leave, spoil, home, respawn });
+  /** New hatchling (first start): the egg breaks inside the lair, the panel opens. Events: [region:enter,] lair:enter (hatch: true). */
+  function hatch(cs) {
+    cs.dragon.carried = null; cs.dragon.eatT = 0;
+    return wake(cs, [], { hatch: true });
+  }
+
+  M.define('lair', { mouthPos, distToMouth, inMouth, near, enter, rest, eatFromLarder, leave, spoil, home, respawn, hatch });
 })(typeof self !== 'undefined' ? self : this);
