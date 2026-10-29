@@ -9,6 +9,9 @@
  *   eatFromLarder(cs, index) -> events[]      feeds the stored item's current food
  *   leave(cs) -> events[]                     dragon back in the air at the region spawn, cs.inLair = false
  *   spoil(cs, dt) -> events[]                 larder items lose 1 food per spoilEvery s, removed at 0
+ *   home() -> regionId                        the region with the lair (where a dead dragon wakes)
+ *   respawn(cs, cause) -> events[]            after death: carried prey lost, back in the lair region, HP respawnHp x max,
+ *                                             hunger at least respawnHunger, cs.inLair = true (the panel opens)
  * While cs.inLair, state.step only runs spoil (hunger and prey are paused).
  */
 (function (root) {
@@ -102,5 +105,42 @@
     return ev;
   }
 
-  M.define('lair', { mouthPos, distToMouth, inMouth, near, enter, rest, eatFromLarder, leave, spoil });
+  /** The region that has the lair (the start region when it has one). */
+  function home() {
+    if (T.region(D.startRegion).lair) return D.startRegion;
+    for (const id in D.regions) if (D.regions[id].lair) return id;
+    return D.startRegion;
+  }
+
+  /**
+   * Death: the carried prey is lost, the dragon wakes inside the lair (switching back to the lair region if it
+   * died elsewhere) with respawnHp of its max HP and hunger at least respawnHunger. Stage, food XP and the larder stay.
+   * Events: dragon:died, then region:enter (only when the region changed, respawn: true), then lair:enter (respawn: true).
+   */
+  function respawn(cs, cause) {
+    const d = cs.dragon, from = cs.region, to = home(), ev = [];
+    const carried = d.carried == null || !cs.field ? null : PR.byId(cs.field, d.carried);
+    if (carried) PR.remove(cs.field, carried.id);
+    ev.push({ e: 'dragon:died', cause: cause || 'wounds', region: from, lost: carried ? carried.type : null });
+    d.carried = null; d.eatT = 0; d.deaths = (d.deaths || 0) + 1;
+    const st = G.statsOf(d.stage);
+    d.hp = Math.round(L.respawnHp * st.hpMax);
+    d.hunger = Math.max(d.hunger, L.respawnHunger);
+    const R = T.region(to), s = R.spawn || { x: 0, z: 0, y: 100, yaw: 0 };
+    const m = mouthPos(to) || [s.x, Math.max(s.y, T.surfaceAt(to, s.x, s.z) + 40), s.z];
+    if (to !== from || !cs.field) {
+      cs.region = to;
+      cs.field = PR.spawnRegion(to, cs.rng, m);
+      ev.push({ e: 'region:enter', region: to, from, respawn: true });
+    }
+    const stamina = d.pilot ? d.pilot.st : 100;
+    const np = F.newPilot(m.slice(), s.yaw || 0, st.cruise);
+    np.st = stamina;
+    if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;      // same object: the renderer keeps its reference
+    cs.exit = null; cs.exitT = 0;
+    ev.push(...enter(cs).map(e => (e.e === 'lair:enter' ? Object.assign(e, { respawn: true }) : e)));
+    return ev;
+  }
+
+  M.define('lair', { mouthPos, distToMouth, inMouth, near, enter, rest, eatFromLarder, leave, spoil, home, respawn });
 })(typeof self !== 'undefined' ? self : this);

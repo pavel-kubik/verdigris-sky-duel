@@ -301,6 +301,11 @@ Implementation notes (T12):
 - Spoilage is continuous (food is a float, shown rounded) and runs inside and outside the lair. Rest does not pass time. `respawn` is left to T13 and the autosave on rest to T14.
 - Debug: `L` / "to lair" puts the dragon in the mouth (replaces the old rest stand-in).
 
+Implementation notes (T13):
+- `state.step` kills at `hp <= 0` (a boar's charge can now take the last HP; starvation still stops at its floor). `lair.respawn(cs, cause)` emits `dragon:died { cause, region, lost }`, then `region:enter { respawn: true }` when the dragon died outside the lair region (a fresh Ash Wastes prey field), then `lair:enter { respawn: true }`.
+- The dragon wakes INSIDE the lair (`cs.inLair = true`, pilot parked at the mouth): the lair panel opens with a "You fell - you wake in the lair" card naming the lost prey. HP is `respawnHp` (50%) of max, hunger `max(hunger, respawnHunger)`; stage, food XP, stamina and the larder are kept; `dragon.deaths` counts deaths. Rest heals fully as usual, Leave puts the dragon at the spawn.
+- Debug: `Z` / "die" sets HP to 0 (`K` / "-20 HP" can also kill now).
+
 ### 5.8 `state` (CampaignState)
 
 ```js
