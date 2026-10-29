@@ -156,7 +156,7 @@
       'c.lair.rested': 'Rested - wounds healed, fire rekindled', 'c.lair.grew': 'You grew into a {stage}!',
       'c.lair.stored': '{prey} stored in the larder', 'c.lair.full': 'Larder full - eat something, the prey stays in your claws',
       'c.lair.spoiled': 'Spoiled in the larder: {prey}', 'c.lair.ate': '{prey} eaten: +{food} food',
-      'c.lair.died': 'You fell - you wake in the lair', 'c.lair.diedLost': 'The {prey} in your claws is lost',
+      'c.lair.died': 'You fell - you wake in the lair', 'c.lair.diedLost': 'Lost from your claws: {prey}',
       'c.lair.diedSub': 'Wounds half healed - rest to recover fully',
 
       /* co-op */
@@ -344,7 +344,7 @@
       'c.lair.rested': 'Odpočinuto - rány zahojeny, oheň obnoven', 'c.lair.grew': 'Vyrostl jsi: {stage}!',
       'c.lair.stored': 'Uloženo ve spižírně: {prey}', 'c.lair.full': 'Spižírna je plná - něco sněz, kořist ti zůstává v drápech',
       'c.lair.spoiled': 'Ve spižírně se zkazilo: {prey}', 'c.lair.ate': 'Snědeno ({prey}): +{food} potravy',
-      'c.lair.died': 'Padl jsi - probouzíš se v doupěti', 'c.lair.diedLost': 'Kořist v drápech je ztracena ({prey})',
+      'c.lair.died': 'Padl jsi - probouzíš se v doupěti', 'c.lair.diedLost': 'Ztraceno z drápů: {prey}',
       'c.lair.diedSub': 'Rány napůl zahojeny - odpočiň si a uzdrav se',
 
       'mp.title': 'Verdigris Co-op',
