@@ -131,7 +131,6 @@
       'c.toast.starving': 'Starving', 'c.toast.starvingSub': 'No fire, slow wings - find food',
       'c.toast.ready': 'You feel the urge to grow', 'c.toast.readySub': 'Rest in the lair to become a {stage}',
       'c.toast.grew': 'You are now a {stage}', 'c.toast.grewSub': 'Stronger, hungrier, harder to hide',
-      'c.debug.keys': 'Debug: N feed +100 · H hunger -25 · L rest (grow)',
       'c.menu': 'Menu',
       'c.region.ash': 'Ash Wastes', 'c.region.wild': 'Wildwood',
 
@@ -295,7 +294,6 @@
       'c.toast.starving': 'Hladovění', 'c.toast.starvingSub': 'Žádný oheň, slabá křídla - najdi potravu',
       'c.toast.ready': 'Cítíš, že rosteš', 'c.toast.readySub': 'Odpočiň si v doupěti a staň se: {stage}',
       'c.toast.grew': 'Nyní jsi: {stage}', 'c.toast.grewSub': 'Silnější, hladovější, hůř se skrýváš',
-      'c.debug.keys': 'Debug: N jídlo +100 · H hlad -25 · L odpočinek (růst)',
       'c.menu': 'Menu',
       'c.region.ash': 'Popelavé pustiny', 'c.region.wild': 'Divoký hvozd',
 

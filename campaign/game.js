@@ -91,6 +91,7 @@
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
     if (debug) debugKey(e.code);
   });
+  if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseBreath = false; });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -254,11 +255,24 @@
     $('#stageText').textContent = stageName(dragon.stage);
     if (r.grew) toast(t('c.toast.grew', { stage: stageName(r.to) }), t('c.toast.grewSub'), 4);
   }
+  /* ?debug hotkeys (listed in the debug panel) */
+  const DEBUG_KEYS = [
+    ['N', '+100 food (hunger + growth)'], ['J', 'hunger +25 (no growth)'], ['H', 'hunger -25'],
+    ['K', 'damage 20 HP'], ['L', 'rest: heal, refill, grow'], ['R', 'reset to a new hatchling'],
+    ['`', 'hide / show this panel'],
+  ];
   function debugKey(code) {
+    if (code === 'Backquote' && dbgEl) { dbgEl.hidden = !dbgEl.hidden; return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
+    if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
+    if (code === 'KeyK') { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
     if (code === 'KeyL') rest();
+    if (code === 'KeyR') {
+      Object.assign(dragon, { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start });
+      refreshStage(); pilot.st = 100;
+    }
   }
 
   /* ---------- main loop ---------- */
@@ -293,22 +307,39 @@
     if (debug) debugHud(dt);
   }
 
-  /* ---------- ?debug: frame rate, draw calls, chunks (performance budget checks) ---------- */
-  let dbgEl = null, dbgT = 0, dbgN = 0, dbgLast = performance.now();
+  /* ---------- ?debug panel: performance, dragon parameters, hotkeys ---------- */
+  let dbgEl = null, dbgN = 0, dbgLast = performance.now();
+  const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2);
   function debugHud() {
     if (!dbgEl) {
       dbgEl = document.createElement('div');
-      dbgEl.style.cssText = 'position:fixed;right:8px;top:60px;font:12px/1.35 monospace;color:#ebe3cd;background:rgba(0,0,0,.55);padding:6px 8px;border-radius:4px;pointer-events:none;white-space:pre;z-index:5';
+      dbgEl.id = 'debugPanel';
+      dbgEl.style.cssText = 'position:fixed;right:8px;top:60px;font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;z-index:5;max-width:calc(100vw - 16px);overflow:hidden;opacity:.92';
       document.body.appendChild(dbgEl);
     }
     dbgN++;
-    const now = performance.now();
-    dbgT = (now - dbgLast) / 1000;
-    if (dbgT < 0.5) return;
+    const now = performance.now(), secs = (now - dbgLast) / 1000;
+    if (secs < 0.5) return;
     const i = region.info, r = renderer.info.render;
-    let s = regionId + '  ' + Math.round(dbgN / dbgT) + ' fps\ndraw calls ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k\nchunks ' + i.visible + '/' + i.chunks + '  trees ' + i.trees + '  rocks ' + i.rocks;
-    if (pilot) s += '\nalt ' + F.altitude(pilot, regionId).toFixed(1) + '  speed ' + pilot.speed.toFixed(1) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2]));
-    dbgEl.textContent = s;
+    const L = [];
+    L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
+    L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
+    L.push('        trees ' + i.trees + '  rocks ' + i.rocks);
+    if (pilot) {
+      const st = D.stages[dragon.stage], next = D.stages[dragon.stage + 1];
+      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = HN.effects(dragon.hunger);
+      L.push('DRAGON  ' + st.id + (ready > dragon.stage ? '  READY: ' + D.stages[ready].id : ''));
+      L.push('        food ' + Math.round(dragon.foodXp) + (next ? '/' + next.foodFrom : ' max') + '  growth ' + f2(G.growthValue(dragon.foodXp)) + '  scale ' + f2(heroScale));
+      L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
+      L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
+      L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
+      L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
+      L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
+      L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
+      L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');
+    }
+    L.push('KEYS    ' + DEBUG_KEYS.map(k => k[0] + '  ' + k[1]).join('\n        '));
+    dbgEl.textContent = L.join('\n');
     dbgN = 0; dbgLast = now;
   }
 
@@ -316,7 +347,6 @@
   setState('intro');
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
-  if (debug) { const h = $('#hint'); h.removeAttribute('data-i18n'); h.textContent = t('c.debug.keys'); }
 
   if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, dragon, feed, rest };
 })();
