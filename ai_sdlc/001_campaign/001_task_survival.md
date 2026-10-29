@@ -108,7 +108,7 @@ All numbers are starting values for tuning. Units: world units (the duel world r
 stages: [
   { id: 'hatchling', foodFrom: 0,   growthFrom: 0.00, scaleFrom: 1.0, scaleTo: 1.5,
     hp: 100, turn: 1.00, cruise: 30, boost: 54, hungerMult: 1.0, spot: 1.0, carry: 1 },
-  { id: 'drake',     foodFrom: 600, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
+  { id: 'drake',     foodFrom: 1000, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
     hp: 220, turn: 0.85, cruise: 32, boost: 56, hungerMult: 1.5, spot: 1.5, carry: 2 },
   // wyrm (foodFrom 2400, growthFrom 0.55) and elder are Phase 4-5; Phase 1 caps food XP at 2399
 ],
@@ -124,7 +124,7 @@ growthCap: { food: 2399 },
 ```js
 hunger: {
   max: 100, start: 80,
-  drain: 0.28,            // per second at hungerMult 1 (100 to 0 in about 6 min)
+  drain: 0.33,            // per second at hungerMult 1 (100 to 0 in about 5 min)
   boostDrain: 0.25,       // extra per second while boosting
   breathDrain: 0.15,      // extra per second while breathing fire
   states: { hungry: 30, starving: 10 },
@@ -147,7 +147,7 @@ roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11.5, cookTime: 1.2, cool: 0.5,
 breath: { range: 30, cone: 0.42, mouth: 2.8 },   // cone from the mouth, range x dragon scale
 grab: { radius: 6, maxAboveGround: 8, maxPitch: -0.12, key: 'KeyG' },
 eat:  { time: 2.5, speedCap: 18, key: 'KeyX' },
-respawn: { herdCooldown: 90, minDistFromDragon: 250 },
+respawn: { herdCooldown: 150, minDistFromDragon: 250 },
 ```
 
 - `fleeRange` is multiplied by the dragon's stage `spot`: a bigger dragon scares prey from further away.
@@ -416,6 +416,8 @@ Each task ends with its tests passing (`node campaign/test/run.js` and `node mp/
 | T16 | `test/sim.test.js` long seeded run + balancing pass against the 30 min target | T14 | M | Scripted bot reaches Drake in 25-35 simulated min; numbers adjusted in `data.js` only |
 | T17 | README campaign section, controls table update, mark Phase 1 done in `000_spec.md` | T16 | S | README describes `/campaign/` and the test command |
 
+T16 balancing (done): the bot in `test/bot.js` has two profiles. **novice** stands for a new player: it sees prey only within 320 units, sweeps the region to search, goes to the other region after 90 s without a sighting, holds grab 0.8 s after a target shows up and botches 40% of the swoops (pulls up, 5 s to come round). **expert** sees every animal and never misses, a lower bound. The 25-35 min acceptance is checked on the novice mean over 6 seeds (each single seed 15-45 min); with the Phase 1 starting values it took about 19 min (expert 8), so `data.js` changed: drake `foodFrom` 600 -> 1000 (main lever, about 45 meals instead of 30), `respawn.herdCooldown` 90 -> 150 (empty herds come back later, so searching and region travel matter), `hunger.drain` 0.28 -> 0.33 (hunger bites sooner). Result: novice mean 28.4 min (22.6-33.1), expert about 13 min. A long idle start checks starve-and-recover: HP rests at the floor, hunting brings the dragon back and it still grows.
+
 Suggested order: T01, T03 (parallel), T02, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13, T14, T15, T16, T17.
 
 ## 8. Testing
@@ -423,7 +425,7 @@ Suggested order: T01, T03 (parallel), T02, T04, T05, T06, T07, T08, T09, T10, T1
 | Level | What | How |
 | --- | --- | --- |
 | Unit | growth, hunger, prey rules, region exits, lair, save | `node campaign/test/run.js`, same `ok()` style as `mp/sim.test.js`, seeded `mulberry` RNG |
-| Simulation | 30 simulated minutes with a scripted hunter bot: finite state, invariants (hunger 0-100, HP floor under starvation, prey count bounded, stage only changes on rest) | `test/sim.test.js` |
+| Simulation | 30 simulated minutes with a scripted hunter bot: finite state, invariants (hunger 0-100, HP floor under starvation, prey count bounded, stage only changes on rest) | `test/sim.test.js` + `test/bot.js` |
 | Regression | Duel and co-op unaffected | `node mp/sim.test.js` + manual play of solo and tutorial |
 | Manual | Playthrough from new save to Drake on desktop and on a phone, offline reload | Checklist in the PR description |
 
