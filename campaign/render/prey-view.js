@@ -39,9 +39,15 @@
       { geo: box(0.12, 0.55, 0.9), col: 0x2a201a, places: [[0, 1.5, -0.1, 0, 0, 0]] },   // bristly ridge
       { geo: leg(0.11, 0.55), col: 0x2a201a, legs: true, places: [[0.3, 0.55, 0.6], [-0.3, 0.55, 0.6], [0.3, 0.55, -0.6], [-0.3, 0.55, -0.6]] },
     ] },
+    roast: { parts: [
+      { geo: new THREE.DodecahedronGeometry(0.55, 0), col: [0x8a4a1e, 0x6a3416], places: [[0, 0.45, 0, 0.3, 0, 0.2]] },
+      { geo: new THREE.CylinderGeometry(0.09, 0.12, 0.9, 5), col: 0xeee4cc, places: [[0.55, 0.42, 0.1, 0, 0, 1.25]] },
+      { geo: new THREE.SphereGeometry(0.14, 6, 4), col: 0xeee4cc, places: [[1.0, 0.42, 0.1, 0, 0, 0]] },
+    ] },
   };
   const CAP = 48;                        // instances per type (core caps a region at preyAi.maxActive)
-  const DRAWN = { graze: 1, flee: 1, charge: 1, carried: 1 };
+  const DRAWN = { graze: 1, flee: 1, charge: 1, carried: 1, roast: 1 };
+  const COOK_TIME = C.need('data').roast.cookTime, SCORCH = new THREE.Color(0x4a1e0c);
 
   function build() {
     const group = new THREE.Group(); group.name = 'prey';
@@ -90,7 +96,11 @@
               m.multiplyMatrices(base, tmp.multiplyMatrices(L, swing));
             } else m.multiplyMatrices(base, L);
             part.mesh.setMatrixAt(i * part.locals.length + k, m);
-            if (Array.isArray(part.pt.col)) part.mesh.setColorAt(i * part.locals.length + k, colA.set(part.pt.col[0]).lerp(colB.set(part.pt.col[1]), shade));
+            if (Array.isArray(part.pt.col)) {
+              colA.set(part.pt.col[0]).lerp(colB.set(part.pt.col[1]), shade);
+              if (p.cook > 0 && p.state !== 'roast') colA.lerp(SCORCH, Math.min(1, p.cook / COOK_TIME) * 0.85);   // scorching as it heats
+              part.mesh.setColorAt(i * part.locals.length + k, colA);
+            }
           });
         }
       }

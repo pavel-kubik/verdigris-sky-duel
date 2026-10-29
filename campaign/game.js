@@ -71,15 +71,67 @@
     $('#stageText').textContent = t('c.stage.' + D.stages[dragon.stage].id);
   }
 
-  // Fire breath: a flickering additive cone at the mouth (real particles and cooking come with T10)
-  const flame = new THREE.Group();
-  const flameMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  const flameCore = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  // cones with the tip at the origin, widening along +Z (Object3D.lookAt points +Z at the target)
-  const fg = new THREE.ConeGeometry(3.2, 26, 10, 1, true); fg.translate(0, -13, 0); fg.rotateX(-Math.PI / 2);
-  const fc = new THREE.ConeGeometry(1.2, 14, 8, 1, true); fc.translate(0, -7, 0); fc.rotateX(-Math.PI / 2);
-  flame.add(new THREE.Mesh(fg, flameMat), new THREE.Mesh(fc, flameCore));
-  flame.visible = false; scene.add(flame);
+  /* ---------- fire particles: breath stream and roast embers (additive points, fixed pool) ---------- */
+  const PN = 900;
+  const pPos = new Float32Array(PN * 3), pCol = new Float32Array(PN * 3), pVel = new Float32Array(PN * 3), pLife = new Float32Array(PN), pMax = new Float32Array(PN);
+  const pKind = new Uint8Array(PN);                               // 0 breath, 1 ember
+  for (let i = 0; i < PN; i++) pPos[i * 3 + 1] = -9999;
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+  const pTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  const pMat = new THREE.PointsMaterial({ size: 3.4, map: pTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true });
+  const points = new THREE.Points(pGeo, pMat); points.frustumCulled = false; scene.add(points);
+  let pNext = 0, pAcc = 0;
+  function spawnP(x, y, z, vx, vy, vz, life, kind) {
+    const i = pNext; pNext = (pNext + 1) % PN;
+    pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
+    pVel[i * 3] = vx; pVel[i * 3 + 1] = vy; pVel[i * 3 + 2] = vz;
+    pLife[i] = life; pMax[i] = life; pKind[i] = kind;
+  }
+  function breathParticles(dt, p) {
+    if (!p.breathing) { pAcc = 0; return; }
+    hero.mouth.getWorldPosition(mouthW);
+    const c = Math.cos(p.pitch), aim = cs.breath && cs.breath.dir;       // follow the aimed cone from core
+    const dx = aim ? aim[0] : Math.sin(p.yaw) * c, dy = aim ? aim[1] : Math.sin(p.pitch), dz = aim ? aim[2] : Math.cos(p.yaw) * c;
+    const sp = 55 * Math.sqrt(heroScale), spread = 0.22;
+    pAcc += dt * 190;
+    while (pAcc >= 1) {
+      pAcc--;
+      const jx = (Math.random() - 0.5) * spread, jy = (Math.random() - 0.5) * spread, jz = (Math.random() - 0.5) * spread;
+      const k = sp * (0.85 + Math.random() * 0.3);
+      spawnP(mouthW.x, mouthW.y, mouthW.z, (dx + jx) * k + p.vel[0] * 0.85, (dy + jy) * k + p.vel[1] * 0.85, (dz + jz) * k + p.vel[2] * 0.85, 0.42 + Math.random() * 0.18, 0);
+    }
+  }
+  function embers(pos, n) {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, s = 4 + Math.random() * 9;
+      spawnP(pos[0], pos[1] + 1, pos[2], Math.cos(a) * s, 6 + Math.random() * 10, Math.sin(a) * s, 0.7 + Math.random() * 0.6, 1);
+    }
+  }
+  function updateParticles(dt) {
+    pMat.size = 3.4 * Math.sqrt(heroScale);
+    for (let i = 0; i < PN; i++) {
+      if (pLife[i] <= 0) continue;
+      pLife[i] -= dt;
+      const j = i * 3;
+      if (pLife[i] <= 0) { pPos[j + 1] = -9999; pCol[j] = pCol[j + 1] = pCol[j + 2] = 0; continue; }
+      const drag = pKind[i] ? 0.6 : 2.2;
+      pVel[j] *= 1 - drag * dt; pVel[j + 1] = pVel[j + 1] * (1 - drag * dt) + (pKind[i] ? -9 : 5) * dt; pVel[j + 2] *= 1 - drag * dt;
+      pPos[j] += pVel[j] * dt; pPos[j + 1] += pVel[j + 1] * dt; pPos[j + 2] += pVel[j + 2] * dt;
+      const age = 1 - pLife[i] / pMax[i], fade = Math.pow(1 - age, 1.4);
+      // white-yellow at the mouth, orange, then deep red fading out
+      pCol[j] = fade * 1.0; pCol[j + 1] = fade * (age < 0.25 ? 0.9 - age * 1.4 : 0.55 - Math.min(0.45, (age - 0.25) * 0.7)); pCol[j + 2] = fade * Math.max(0, 0.55 - age * 2.2);
+    }
+    pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+  }
+
   const mouthW = new V3(), fwdV = new V3();
 
   /* ---------- input ---------- */
@@ -217,15 +269,7 @@
     phase += dt * (p.boosting ? 9 : glide ? 3 : 6.2);
     hero.anim(time, dt, { phase, amp: glide ? 0.35 : p.boosting ? 1.1 : 1, mouth: p.breathing, turn: -p.sx, look: 0 });
     hero.root.updateMatrixWorld(true);
-    flame.visible = p.breathing;
-    if (p.breathing) {
-      hero.mouth.getWorldPosition(mouthW);
-      flame.position.copy(mouthW);
-      fwdV.set(Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), Math.cos(p.yaw) * Math.cos(p.pitch));
-      flame.lookAt(mouthW.x + fwdV.x, mouthW.y + fwdV.y, mouthW.z + fwdV.z);
-      const f = (0.85 + Math.random() * 0.3) * heroScale;
-      flame.scale.set(f, f, (0.9 + Math.random() * 0.25) * heroScale);
-    }
+    if (dt > 0) breathParticles(dt, p);
   }
 
   function idleHero(dt) {
@@ -234,7 +278,6 @@
     hero.root.position.set(Math.sin(a) * r, y, Math.cos(a) * r);
     hero.root.rotation.set(0, a - Math.PI / 2, 0.35, 'YXZ');    // yaw falls = right turn, bank right (as in the duel)
     hero.anim(time, dt, { phase, amp: 1, mouth: false, turn: 0.4, look: 0 });
-    flame.visible = false;
     // camera trails just outside and behind the circling dragon, looking inward at the volcano
     const P = hero.root.position, ox = Math.sin(a), oz = Math.cos(a), mx = -Math.cos(a), mz = Math.sin(a);
     camera.position.set(P.x + ox * 34 - mx * 26, P.y + 9, P.z + oz * 34 - mz * 26);
@@ -271,6 +314,7 @@
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
       else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
       else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
+      else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
       else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
       else if (e.e === 'growth:ready') toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
     }
@@ -286,7 +330,7 @@
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
-    else if (cs.hint === 'heavy') text = t('c.prompt.heavy');
+    else if (cs.hint === 'heavy') text = t(isTouch ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
     else if (cs.hint === 'near') text = t('c.prompt.near');
     if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
     promptBar.hidden = bar < 0;
@@ -383,6 +427,7 @@
     }
     sky.position.copy(camera.position);
     region.update(camera.position, time);
+    if (dt > 0) updateParticles(dt);
     preyView.update(cs.field, time, carryPose());
     targetRing();
     renderer.render(scene, camera);

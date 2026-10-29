@@ -143,7 +143,8 @@ prey: {
   boar: { size: 2, food: 45, hp: 60, speed: 10, flee: 12, fleeRange: 40, herd: [1, 3], fights: true,
           charge: { range: 14, maxAboveGround: 7, damage: 8, cooldown: 3 } },
 },
-roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11, cookTime: 1.2 },   // n = ceil(food * foodMult / chunkFood) chunks, food split evenly
+roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11.5, cookTime: 1.2, cool: 0.5, life: 120 },   // n = ceil(food * foodMult / chunkFood) chunks, food split evenly
+breath: { range: 30, cone: 0.42, mouth: 2.8 },   // cone from the mouth, range x dragon scale
 grab: { radius: 6, maxAboveGround: 8, maxPitch: -0.12, key: 'KeyG' },
 eat:  { time: 2.5, speedCap: 18, key: 'KeyX' },
 respawn: { herdCooldown: 90, minDistFromDragon: 250 },

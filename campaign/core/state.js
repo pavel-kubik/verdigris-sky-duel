@@ -29,6 +29,7 @@
       hint: null,                    // 'swoop' | 'grab' | 'heavy' | 'eat' | 'near' | null, for the HUD prompt
       swoop: null,                   // id of the prey a held grab is diving at
       target: null,                  // id of the prey a grab would swoop at (for the target ring)
+      breath: null,                  // the breath cone this frame (aimed), or null
       rng: (opts && opts.rng) || Math.random,
       bus: createBus(),
     };
@@ -86,6 +87,10 @@
       }
     }
 
+    // fire: the breath cone cooks prey into roast chunks
+    cs.breath = p.breathing ? PR.breathCone(p, scale, cs.field) : null;   // the renderer aims the stream along cs.breath.dir
+    for (const e of PR.cook(cs.field, cs.breath, dt, cs.rng)) emit(cs, ev, e);
+
     // starving claws cannot hold anything bigger than small prey
     const limit = Math.min(stats.carry, HN.effects(d.hunger).carryMax);
     if (carried && carried.size > limit) {
@@ -120,7 +125,7 @@
       }
     } else d.eatT = 0;
 
-    cs.hint = carried ? 'eat' : r.best ? 'grab' : target ? 'swoop' : r.heavy ? 'heavy' : r.near ? 'near' : null;
+    cs.hint = carried ? 'eat' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : null;
     return ev;
   }
 
