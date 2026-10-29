@@ -2,6 +2,8 @@
 
 A procedural low-poly green dragon built from primitives in Three.js, with an orbit preview and an aerial fight mode against waves of crimson wyverns.
 
+**Mobile first.** The game is designed and built for touch phones first (portrait and landscape); desktop keyboard and mouse stay supported with lower priority. Every action has a touch control, on-screen texts on touch name the buttons rather than keys, layouts are checked at phone width (390 x 844) first, and performance budgets target a mid-range phone.
+
 - **Play solo:** https://pavel-kubik.github.io/verdigris-sky-duel/
 - **Play co-op (beta):** https://pavel-kubik.github.io/verdigris-sky-duel/mp/
 
