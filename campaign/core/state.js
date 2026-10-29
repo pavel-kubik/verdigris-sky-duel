@@ -2,14 +2,15 @@
  * Verdigris campaign - CampaignState: one object for the whole run and the per-frame orchestration.
  *   create({ regionId, rng }) -> cs
  *   enterRegion(cs, regionId, pilotPos?, yaw?)   new prey field (+ pilot placement)
- *   step(cs, input, dt) -> events[]               flight -> hunger -> prey -> grab -> eat -> region
+ *   step(cs, input, dt) -> events[]               flight -> hunger -> prey -> grab -> eat -> lair -> region
+ *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
  * input: { sx, sy, breath, boost, grab, eat, confirm } (sx / sy in -1..1, the rest booleans).
  * The renderer reads cs; the save (T14) serialises the durable parts of it. See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -24,6 +25,8 @@
         eatT: 0, deaths: 0,
       },
       field: null,
+      larder: [],                    // stored prey in the lair: { type, food }
+      inLair: false,
       flags: { introSeen: false, heavyT: 0 },
       stats: { played: 0, eaten: 0, food: 0 },
       hint: null,                    // 'swoop' | 'grab' | 'heavy' | 'eat' | 'near' | null, for the HUD prompt
@@ -54,6 +57,8 @@
   function step(cs, inp, dt) {
     const ev = [], d = cs.dragon, p = d.pilot;
     if (!p) return ev;
+    for (const e of LR.spoil(cs, dt)) emit(cs, ev, e);
+    if (cs.inLair) { cs.stats.played += dt; return ev; }       // resting: hunger, prey and flight are paused
     const stats = G.statsOf(d.stage), eff = HN.effects(d.hunger), scale = scaleOf(cs);
     let carried = carriedPrey(cs);
     if (!carried) d.carried = null;
@@ -127,6 +132,13 @@
       }
     } else d.eatT = 0;
 
+    // lair: flying into the cave mouth enters it (a carried prey goes into the larder)
+    if (LR.inMouth(cs)) {
+      for (const e of LR.enter(cs)) emit(cs, ev, e);
+      cs.exit = null; cs.exitT = 0;
+      return ev;
+    }
+
     // region edge: offer the exit while near it heading outward (and a moment after); confirm travels
     const ex = RG.exitAt(cs.region, p.pos, p.yaw);
     if (ex) {
@@ -139,9 +151,15 @@
       carried = carriedPrey(cs);
     }
 
-    cs.hint = carried ? 'eat' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : null;
+    cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : null;
     return ev;
   }
 
-  M.define('state', { create, enterRegion, step, scaleOf, carriedPrey });
+  /** Lair panel actions (game.js buttons); each returns events and emits them on the bus. */
+  const relay = (cs, list) => { const ev = []; for (const e of list) emit(cs, ev, e); return ev; };
+  const lairRest = cs => relay(cs, LR.rest(cs).events);
+  const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
+  const lairLeave = cs => relay(cs, LR.leave(cs));
+
+  M.define('state', { create, enterRegion, step, scaleOf, carriedPrey, lairRest, lairEat, lairLeave });
 })(typeof self !== 'undefined' ? self : this);
