@@ -294,6 +294,13 @@ spoil(cs, dt)                            // larder items lose 1 food per 30 s, r
 
 Larder capacity: 3 items. While `cs.inLair` the simulation is paused except `spoil` (hunger does not drain).
 
+Implementation notes (T12):
+- Flying into the mouth sphere (`lair.r`, x0.8 of the dragon scale once it is above 1.25) enters the lair at once, no confirm; a carried prey goes into the larder, or stays in the claws with a "Larder full" note.
+- Near the mouth (`lair.nearRange`, 140) and heading toward it the prompt says "Fly into the cave to rest" (carrying: "... to store it - or hold X / Eat").
+- The panel (Rest, larder list with Eat buttons, stage progress, vitals, Leave) works by tap and by mouse / Tab + Enter, so it needs no extra hotkeys. `state.lairRest / lairEat / lairLeave` are the panel actions.
+- Spoilage is continuous (food is a float, shown rounded) and runs inside and outside the lair. Rest does not pass time. `respawn` is left to T13 and the autosave on rest to T14.
+- Debug: `L` / "to lair" puts the dragon in the mouth (replaces the old rest stand-in).
+
 ### 5.8 `state` (CampaignState)
 
 ```js

@@ -90,13 +90,20 @@ kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);bor
 #promptText{font-size:15px;font-weight:600;letter-spacing:.04em;color:var(--bone);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 14px;text-shadow:0 1px 6px rgba(0,0,0,.5);white-space:nowrap}
 #promptBar{width:160px;height:6px;background:rgba(233,225,204,.12);border-radius:3px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
 #travelBtn{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);white-space:nowrap;z-index:3}
-@media (pointer:coarse){#travelBtn{bottom:calc(250px + env(safe-area-inset-bottom,0px))}}
+@media (pointer:coarse){#travelBtn{bottom:calc(300px + env(safe-area-inset-bottom,0px))}#prompt{bottom:calc(252px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 24px)}#promptText{white-space:normal}}
 #fade{position:fixed;inset:0;background:#06090a;opacity:0;pointer-events:none;transition:opacity .6s ease-out}
 #fade.now{transition:none;opacity:1}
 #promptBar i{display:block;height:100%;background:var(--hunger);transform-origin:left;transform:scaleX(0)}
 .center{left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));text-align:center}
 .center .row{justify-content:center}
 h2{font-size:42px}
+#lair{max-height:calc(100% - 24px);overflow:auto;gap:10px}
+#lair .larder{display:grid;gap:6px;text-align:left}
+#larderList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#larderList li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:4px;padding:4px 4px 4px 12px}
+#larderList button{min-height:38px;min-width:64px}
+#lairMsg{min-height:1.4em;color:var(--verd);font-weight:600}
+#lairStage.ready{color:var(--verd);font-weight:700}
 
 @media (max-width:720px){
   #hint{bottom:auto;top:calc(110px + env(safe-area-inset-top,0px));white-space:normal;width:min(420px,calc(100% - 32px));text-align:center}
@@ -149,6 +156,17 @@ h2{font-size:42px}
   </div>
 </div>
 
+<section id="lair" class="panel center" hidden aria-labelledby="lairTitle">
+  <div class="eyebrow" data-i18n="c.lair.eyebrow">Volcano lair</div>
+  <h2 id="lairTitle" data-i18n="c.lair.title">Your lair</h2>
+  <p id="lairStage"></p>
+  <p id="lairVitals"></p>
+  <div class="row"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button></div>
+  <div class="larder"><div class="eyebrow" id="larderHead"></div><ul id="larderList"></ul><p id="larderEmpty" data-i18n="c.lair.empty">Empty - carry prey into the cave to store it</p></div>
+  <p id="lairMsg" aria-live="polite"></p>
+  <button class="ghost" id="leaveBtn" data-i18n="c.lair.leave">Leave the lair</button>
+</section>
+
 <section id="pause" class="panel center" hidden>
   <div class="eyebrow" data-i18n="pause.eyebrow">Paused</div>
   <h2 data-i18n="pause.title">Wings folded</h2>
@@ -164,7 +182,7 @@ h2{font-size:42px}
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js',
-     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/state.js',
+     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/lair.js', 'core/state.js',
      'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
