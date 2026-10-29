@@ -62,10 +62,10 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 
 | Topic | Decision |
 | --- | --- |
-| Tone | Classic fantasy, the dragon is the hero |
+| Tone | Classic fantasy with two sides that each have their own truth. The player plays the dragon and should feel for dragons; a later human campaign makes its players feel for the humans (decided 2026-10-29) |
 | Starvation | Dragon gets weak, cannot die of hunger |
 | Death penalty | Respawn at the lair, carried loot is lost |
-| Story | Light - intro, act cards, mission briefings |
+| Story | Light - intro, act cards, mission briefings. The mother dragon raises the hatchling and is killed by the Order when it is no longer a baby (decided 2026-10-29) |
 | Mission length | 5-10 minutes, timer runs out = mission fail |
 | World structure | Separate regions with loading between them |
 | Landing | The dragon lands and walks on the ground (no hopping); takeoff is an explicit action (decided 2026-10-29) |
@@ -76,22 +76,34 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 
 ## 2. Story
 
-The player is the last Verdigris dragon, hatched in a dormant volcano, who frees the realm from the Order of the Iron Lance - a dragon-slayer order that seized the crown and hoards the relics of the old dragons. Names are working titles.
+Revised 2026-10-29: the mother dragon is alive at the start, teaches the hatchling to fly and hunt, and is killed by the Order later. Both dragons and humans have their own truth. Names are working titles.
 
-**Premise:** the Order drove the dragons to extinction and now rules the villages through garrisons. Villagers were taught to fear dragons, so they defend themselves at first. Stolen dragon relics (eggs, scale-crowns, the Ember Heart) sit in the Order's castles.
+**Backstory (told in the intro and act cards):** years before the game, the hero's mother - one of the last Verdigris dragons - killed the King. To the humans this was a monster murdering their king and burning his city; the dragon side has its own reason for it (see open question 1). After the King's death the Order of the Iron Lance seized the crown and swore to wipe out the dragons. Since then the Order rules the villages through garrisons, villagers are taught to fear dragons, and stolen dragon relics (eggs, scale-crowns, the Ember Heart) sit in the Order's castles. Dragons are nearly extinct.
 
-**Hero framing in gameplay:** Order structures, soldiers and war machines are fair targets. Burning civilian homes or stealing village livestock lowers **Renown**. High Renown makes freed villages send food tribute to the lair; low Renown keeps them hostile. (Deferred to Phase 4. Until then the save counts civilian buildings burned and livestock taken, so Renown can start from real history.)
+**The dragon story (this campaign):** the player is the mother's last egg, hatched in a dormant volcano.
+- The mother guards the egg and is there when it cracks.
+- She teaches the hatchling to fly and to hunt. This is the campaign's tutorial: she flies ahead, shows a herd, takes the first prey, then lets the hatchling try.
+- When the hatchling is no longer a baby (it reaches Drake), the mother flies out to hunt and does not come back: the Order brings her down with ballista bolts. The player sees it happen.
+- Her death is why the dragon hates people. The rest of the campaign is the young dragon's revenge on the Order, growing into the one dragon the Order cannot kill.
+
+**The human story (a later campaign, after the dragon story is finished):** the same world seen by the humans. They lost a king and a city to a dragon and live in fear of fire from the sky; the Order is cruel but it is the only thing between them and the dragons. The human campaign is designed and built only after the dragon story is complete (roadmap phase 8). The dragon campaign already keeps what the humans will remember: villages burned, livestock taken, people of the Order killed, and these can become the human campaign's starting history.
+
+**Two truths, two sentiments:** whoever plays the dragon should feel for the dragons; whoever plays the humans should feel for the humans. So neither campaign paints the other side as plain evil: the Order commits real cruelty, the mother really killed the King. Each side's texts speak from its own point of view and are never "corrected" by the other.
+
+**Gameplay framing in the dragon campaign:** Order structures, soldiers and war machines are fair targets. Burning civilian homes or stealing village livestock lowers **Renown**. High Renown makes freed villages send food tribute to the lair; low Renown keeps them hostile. (Deferred to Phase 4. Until then the save counts civilian buildings burned and livestock taken, so Renown can start from real history.)
 
 ### Acts
 
 | Act | Stage | Story beat | Ends with |
 | --- | --- | --- | --- |
-| 1 - Awakening | Hatchling | Hatch in the volcano, learn to hunt, find the first relic in an Order outpost | First relic on the trophy wall |
-| 2 - Embers | Drake | Raid Order supply lines, free the first village | Village sends first tribute |
+| 1 - Awakening | Hatchling | Hatch in the volcano with the mother beside the egg; she teaches flying and hunting; first raid on an Order outpost together | The mother is killed by the Order while hunting, as the hero becomes a Drake |
+| 2 - Embers | Drake | Alone now: raid Order supply lines out of revenge, free the first village | Village sends first tribute |
 | 3 - Wyrmfire | Wyrm | Storm castles, recover the stolen dragon eggs | Grand Slayer hunts the dragon (lair raid) |
 | 4 - Crown of Ash | Elder | Siege of the capital, the Order's war machine | Order falls, free roam continues |
 
-**Delivery:** a short illustrated intro, one text card per act, a 2-4 line briefing per mission and a one-line outcome after it. No cutscenes, no dialogue trees.
+**Delivery:** a short illustrated intro, one text card per act, a 2-4 line briefing per mission and a one-line outcome after it. Two short in-engine scenes with the game's own models: the hatching (mother beside the egg) and the mother's death at the end of Act 1. No dialogue trees.
+
+**Preview:** the hatching scene (mother, egg, hatchling) is prototyped as a standalone page before it goes into the game.
 
 ## 3. Dragon progression
 
@@ -363,7 +375,9 @@ Each phase is a playable increment on its own base branch (`campaign-phase-N`) w
 | 6 - Endgame | `006_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
 | 7 - Co-op campaign | `007_task_coop.md` | Two dragons, shared lair and hoard, sync on the persistent multiplayer backend | Two players finish a mission together |
 
-Phase 7 (co-op) starts only once the persistent multiplayer backend exists; until then every phase keeps the save shape server-friendly.
+| 8 - Human campaign | later | The same world from the humans' side (the King's death, life under dragon fire and the Order), its own hero and missions, starting from the history the dragon campaign saved | Designed only after the dragon story (phases 1-6) is complete |
+
+Phase 7 (co-op) starts only once the persistent multiplayer backend exists; until then every phase keeps the save shape server-friendly. Phase 8 (human campaign) starts only after the dragon story is finished.
 
 ## 10. Open questions
 
@@ -374,3 +388,7 @@ Phase 7 (co-op) starts only once the persistent multiplayer backend exists; unti
 - [ ] Does the mission timer pause during region loading only, or also inside the lair menus?
 - [ ] Visual difference between stages: scale only, or extra horns / spines per stage?
 - [ ] When does co-op campaign start? Gated on the persistent multiplayer backend (2026-10-29); exact timing still open.
+- [x] Story: the mother lives at the start, teaches flying and hunting, is killed by the Order when the hero reaches Drake; the mother once killed the King; human campaign after the dragon story (decided 2026-10-29).
+- [ ] Story 1: why did the mother kill the King? Default: the King's hunters took her first clutch of eggs, so both sides lost children and both have their reason.
+- [ ] Story 2: in which phase does the mother arrive in the game (NPC that flies with the hatchling, tutorial steps, death scene)? Default: Phase 3 together with the story cards; until then the hatching card says she is out hunting.
+- [ ] Story 3: is the hero the "last" dragon? Default: no - the stolen eggs in Act 3 mean others may live, which gives the late game hope.
