@@ -18,6 +18,18 @@ The campaign is designed and built **mobile first** (touch phone, portrait and l
 - Layout is checked at phone width (390 x 844) first: HUD, prompts and panels must not cover the stick or the action buttons; tap targets at least 36 px.
 - Performance budgets are set for a mid phone (see the phase specs).
 
+**Touch action layout (from Phase 2 on).** The right thumb has a fixed set of buttons, so new actions reuse slots instead of adding buttons:
+
+| Slot | Kind | Air | Ground |
+| --- | --- | --- | --- |
+| Breath | Fixed, hold | Fire | Fire |
+| Boost | Fixed, hold | Boost | Run |
+| Roll | Fixed, tap | Barrel roll | - (hidden) |
+| Action | Context, hold | Grab / swoop, Eat | Pick up, Eat |
+| Move | Context, tap | Land, Fly to region, Enter cave | Fly (take off) |
+
+The context slots show the action that applies right now (label and icon change) and hide when nothing applies. Desktop keeps one key per action.
+
 ### Core loop
 
 ```
@@ -56,6 +68,9 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 | Story | Light - intro, act cards, mission briefings |
 | Mission length | 5-10 minutes, timer runs out = mission fail |
 | World structure | Separate regions with loading between them |
+| Landing | The dragon lands and walks on the ground (no hopping); takeoff is an explicit action (decided 2026-10-29) |
+| Renown | Deferred to Phase 4; Phase 2-3 only count civilian damage and livestock taken in the save (decided 2026-10-29) |
+| Hoard | Gold, the hoard pile and the first upgrades arrive in Phase 2 together with the kingdom, so raiding pays off from the start (decided 2026-10-29) |
 
 ## 2. Story
 
@@ -63,7 +78,7 @@ The player is the last Verdigris dragon, hatched in a dormant volcano, who frees
 
 **Premise:** the Order drove the dragons to extinction and now rules the villages through garrisons. Villagers were taught to fear dragons, so they defend themselves at first. Stolen dragon relics (eggs, scale-crowns, the Ember Heart) sit in the Order's castles.
 
-**Hero framing in gameplay:** Order structures, soldiers and war machines are fair targets. Burning civilian homes or stealing village livestock lowers **Renown**. High Renown makes freed villages send food tribute to the lair; low Renown keeps them hostile. (Proposal - see Open questions.)
+**Hero framing in gameplay:** Order structures, soldiers and war machines are fair targets. Burning civilian homes or stealing village livestock lowers **Renown**. High Renown makes freed villages send food tribute to the lair; low Renown keeps them hostile. (Deferred to Phase 4. Until then the save counts civilian buildings burned and livestock taken, so Renown can start from real history.)
 
 ### Acts
 
@@ -134,12 +149,13 @@ The HP floor keeps the "weak, not dead" rule: starvation alone never ends a run,
 | Fish | Rivers, lakes | Low | None | Needs a low dive over water |
 | Order supply wagon | Roads | High | Guards, alert +1 | Hero-approved food, counts as a raid |
 | Village tribute | Freed villages | High | None | Delivered to the larder over time |
-| Village livestock | Farms | High | Alert +1, Renown down | Easy but costly |
+| Village livestock | Farms | High | Alert +1 (Renown down from Phase 4) | Easy but costly |
 
 ### Hunting mechanics
 
 - **Grab:** dive and hold the grab key near prey; prey bigger than the carry class cannot be lifted.
-- **Eat or carry:** eat on the ground (vulnerable for 2-3 s) or carry it to the larder.
+- **Eat or carry:** eat in flight (speed capped) or on the ground after landing (vulnerable for 2-3 s), or carry it to the larder.
+- **Land and walk:** from Phase 2 the dragon can land on walkable ground, walk, pick up prey and loot in front of it, breathe fire and take off again. Ground time is where steals happen and where mangonels and knights are dangerous.
 - **Burned prey** gives 50% food - fire is a quick kill but wasteful.
 - **Larder:** stores a few carcasses, capacity grows with lair upgrades; stored food slowly spoils.
 - **Prey respawn** per region, with herds moving away from areas the dragon hunts too often.
@@ -277,11 +293,14 @@ Campaign is a separate mode built from small, data-driven systems on top of the 
 | CampaignState | Single source of truth for progress, emits change events | SaveService |
 | GrowthSystem | Maps `growth` to scale and stat curves, stage thresholds | CampaignState |
 | HungerSystem | Drain, states, effects on dragon stats | GrowthSystem |
+| Locomotion | Flight, landing, walking, takeoff (one pilot, a mode per state) | Terrain, settlements (roofs and walls) |
 | PreySystem | Herd spawning, graze / flee / hide AI, grab and eat | Perception |
 | Perception | Shared vision cones + hearing for prey and guards | Dragon size, day/night |
 | SettlementSystem | Spawns buildings and defenders from region data | AlertSystem |
 | DefenderAI | State machines: idle, alert, attack, search | Perception |
 | AlertSystem | Per-region alert level, decay, escalation events | CampaignState |
+| UpgradeSystem | Owned upgrades and their stat effects | CampaignState |
+| WorldClock | Day and night cycle, sleep until dusk or dawn | CampaignState |
 | MissionSystem | Accept, timer, objectives, success / fail, rewards | CampaignState, RegionLoader |
 | RegionLoader | Load / unload region scenes, edge transitions, aeries | Asset cache |
 | LairScene | Hub UI: rest, altar, larder, mission board, hoard pile | All of the above |
@@ -314,22 +333,26 @@ Stored in `localStorage` (IndexedDB if it grows), autosaved on rest, mission end
 
 ## 9. Roadmap
 
-Six phases, each a playable increment on its own branch and PR; Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built.
+Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard and upgrades moved from Phase 3 to Phase 2, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
 
 | Phase | Task file | Scope | Exit criteria |
 | --- | --- | --- | --- |
 | 1 - Survival MVP | `001_task_survival.md` | Ash Wastes + Wildwood, lair (rest, save, larder), hunger, goat / deer / boar, grab and eat, growth Hatchling to Drake, save v1 | A new player can hunt, starve, recover and reach Drake in about 30 min; save survives reload |
-| 2 - Kingdom | `002_task_kingdom.md` | River Farmlands, hamlet + village + outpost, archers + ballista, Perception, alert levels 0-3, livestock, Renown | Raiding raises alert and defenses visibly change; lying low lowers it |
-| 3 - Missions | `003_task_missions.md` | Mission board, timer, steal + destroy types, carry mechanic, aeries, hoard + upgrade altar, Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified |
-| 4 - Expansion | `004_task_expansion.md` | Highland Pass + Royal Lowlands, Wyrm stage, knights, mages, net launchers, first slayer, alert 4-5, lair defense, day/night | Act 3 playable end to end |
-| 5 - Endgame | `005_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
-| 6 - Co-op campaign | `006_task_coop.md` | Two dragons, shared lair and hoard, sync on the planned persistent multiplayer backend | Two players finish a mission together |
+| 2 - Kingdom + hoard | `002_task_kingdom.md` | Foundation first (touch action layout, phone perf baseline, shared dragon model, landing + walking), then River Farmlands, hamlet + village + outpost (a small outpost in Wildwood), archers + ballista, building fire, Perception, alert 0-3, livestock, gold loot, hoard pile + upgrade altar (4 upgrades), day / night, save v2 | On a phone a Drake lands at an outpost, walks in, steals the strongbox, escapes the archers and the ballista, banks the gold and buys an upgrade; raids raise alert to 3 with visible changes and lying low lowers it |
+| 3 - Missions | `003_task_missions.md` | Mission board, timer, steal + destroy + intercept types, relics and mission carry rules, aeries + fast travel, freeing a village (Order garrison destroyed: tribute starts), Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified |
+| 4 - Highlands | `004_task_highlands.md` | Highland Pass, Wyrm stage + stage visuals, knights, net launchers, caravans, Renown | A Wyrm intercepts a caravan and survives the knights; Renown changes how villages treat the dragon |
+| 5 - Lowlands | `005_task_lowlands.md` | Royal Lowlands, frost mages, mangonels, first named slayer, alert 4-5, lair defense, Act 3 | Act 3 playable end to end |
+| 6 - Endgame | `006_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
+| 7 - Co-op campaign | `007_task_coop.md` | Two dragons, shared lair and hoard, sync on the persistent multiplayer backend | Two players finish a mission together |
+
+Phase 7 (co-op) starts only once the persistent multiplayer backend exists; until then every phase keeps the save shape server-friendly.
 
 ## 10. Open questions
 
 - [x] Confirm current renderer, module layout and input handling in the repo - done in Phase 1 task file (Three.js r128, no build step, UMD sim modules tested with Node).
-- [ ] Keep Renown (hero mechanic: civilians and livestock cost Renown, tribute rewards it) or drop it for simplicity?
-- [ ] Grab controls: hold key near prey, or auto-grab on a low dive? (Phase 1 picks one provisionally, see task file.)
+- [x] Keep Renown? Yes, but later: deferred to Phase 4 (decided 2026-10-29).
+- [x] Grab controls: hold Grab near prey, with a swoop that steers the dive (Phase 1).
+- [x] Landing: real landing with walking, not hopping (decided 2026-10-29, built at the start of Phase 2).
 - [ ] Does the mission timer pause during region loading only, or also inside the lair menus?
 - [ ] Visual difference between stages: scale only, or extra horns / spines per stage?
-- [ ] When does co-op campaign start - after Phase 5, or earlier alongside persistent multiplayer?
+- [ ] When does co-op campaign start? Gated on the persistent multiplayer backend (2026-10-29); exact timing still open.
