@@ -125,6 +125,7 @@
       'c.back': 'Back to the duel',
       'c.wipNote': 'Early build - the world is still forming.',
       'c.wip': 'Hunting test - hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).',
+      'c.wipTouch': 'Hunting test - hold Grab to swoop and grab, Eat to eat. Too heavy? Roast it with Breath.',
       'c.stage.hatchling': 'Hatchling', 'c.stage.drake': 'Drake',
       'c.hud.hunger': 'Hunger',
       'c.legend.grab': 'Grab (hold)', 'c.legend.eat': 'Eat (hold)', 'c.btn.grab': 'Grab', 'c.btn.eat': 'Eat',
@@ -142,6 +143,9 @@
       'c.toast.grew': 'You are now a {stage}', 'c.toast.grewSub': 'Stronger, hungrier, harder to hide',
       'c.menu': 'Menu',
       'c.region.ash': 'Ash Wastes', 'c.region.wild': 'Wildwood',
+      'c.prompt.travel.wild': 'Fly to Wildwood - press Enter', 'c.prompt.travel.ash': 'Fly to the Ash Wastes - press Enter',
+      'c.btn.travel.wild': 'Fly to Wildwood', 'c.btn.travel.ash': 'Fly to the Ash Wastes',
+      'c.toast.enterSub': 'New hunting grounds',
 
       /* co-op */
       'mp.title': 'Verdigris Co-op',
@@ -297,6 +301,7 @@
       'c.back': 'Zpět na souboj',
       'c.wipNote': 'Rozpracovaná verze - svět se teprve tvoří.',
       'c.wip': 'Zkouška lovu - drž G a chyť, X a sněz. Moc těžké? Opeč to ohněm (mezerník).',
+      'c.wipTouch': 'Zkouška lovu - drž Chyť a střemhlav uchop, Jez a sněz. Moc těžké? Opeč to Dechem.',
       'c.stage.hatchling': 'Mládě', 'c.stage.drake': 'Drak',
       'c.hud.hunger': 'Hlad',
       'c.legend.grab': 'Uchopit (držet)', 'c.legend.eat': 'Sníst (držet)', 'c.btn.grab': 'Chyť', 'c.btn.eat': 'Jez',
@@ -314,6 +319,9 @@
       'c.toast.grew': 'Nyní jsi: {stage}', 'c.toast.grewSub': 'Silnější, hladovější, hůř se skrýváš',
       'c.menu': 'Menu',
       'c.region.ash': 'Popelavé pustiny', 'c.region.wild': 'Divoký hvozd',
+      'c.prompt.travel.wild': 'Leť do Divokého hvozdu - stiskni Enter', 'c.prompt.travel.ash': 'Leť do Popelavých pustin - stiskni Enter',
+      'c.btn.travel.wild': 'Do Divokého hvozdu', 'c.btn.travel.ash': 'Do Popelavých pustin',
+      'c.toast.enterSub': 'Nová loviště',
 
       'mp.title': 'Verdigris Co-op',
       'mp.desc': 'Leťte společně se zelenými draky proti vlnám karmínových wyveren. Kooperace v prohlížeči, spojení peer-to-peer.',

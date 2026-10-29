@@ -273,7 +273,12 @@ exitAt(regionId, pos, yaw) -> exit|null   // dragon within 60 of the radius, hea
 enter(cs, toRegionId, fromRegionId)       // sets cs.region, places the dragon at the entry edge facing inward, respawns prey
 ```
 
-Flow: `exitAt` non-null shows the prompt "Fly to Wildwood - Enter" (touch: a button). Confirming pauses the loop, `game.js` disposes the region scene, builds the new one, calls `region.enter`, autosaves, resumes. Without confirmation the soft boundary turns the dragon back as usual.
+Flow: `exitAt` non-null shows the prompt "Fly to Wildwood - press Enter" (touch: a button). `state.step` keeps the offer for `travel.promptHold` seconds after the dragon turns back, and on `confirm` calls `region.enter` itself (so travel is testable in Node); `game.js` reacts to `region:enter` by disposing the region scene and building the new one behind a short fade (autosave arrives in T14). Without confirmation the soft boundary turns the dragon back as usual.
+
+Implementation notes (T11):
+- Inside an exit arc the flight soft boundary narrows from 120 to `travel.softEdge` (45); with the full 120 band the steer-back turns a cruising dragon around before it reaches the exit band (`travel.edgeBand`, 90).
+- A carried prey travels with the dragon into the new region (re-homed into the new field without a herd), so Wildwood prey can be brought to the lair larder in T12.
+- Entry: `travel.entryInset` (220) inside the new radius on the `entries[from]` angle, facing the centre, at about the same height above ground (clamped around `travel.entryAlt`); new herds spawn at least `respawn.minDistFromDragon` away.
 
 ### 5.7 `lair`
 
@@ -362,7 +367,7 @@ Key: `vsd-campaign`. Autosave on: rest, region change, every 60 s of play, `visi
 | Prompts | Bottom-centre prompt line: "Hold G to grab", "Hold X to eat", "Too heavy", "Fly to Wildwood - Enter", "Rest in the lair to grow" |
 | Lair panel | DOM panel like `#pause`: Rest, larder list with Eat buttons, current stage and next stage threshold, Leave |
 | Intro | First start only: 3-line hatching card (light story), then the lair panel |
-| Touch | Existing stick + buttons, plus Grab and Eat buttons; region prompt is a tappable button |
+| Touch (first priority, see `000_spec.md` 1) | Existing stick + buttons, plus Grab and Eat buttons; region prompt is a tappable button; every keyboard action, debug hotkeys included, has a touch control (`?debug`: DBG button toggles the panel, one button per debug action) |
 | Home link | `index.html` intro gets "Campaign (alpha)" next to the co-op link, `href="campaign/"` |
 
 Controls added: `G` grab (hold), `X` eat (hold), `Enter` confirm prompt, `Esc` pause (existing). `G`, `X` and `Enter` are free in the current key map.

@@ -35,7 +35,8 @@
   /**
    * One flight step.
    * input: { sx, sy, breath, boost } with sx / sy in -1..1
-   * ctx:   { regionId, stats: { turn, cruise, boost }, effects?, eating?, minAlt? }
+   * ctx:   { regionId, stats: { turn, cruise, boost }, effects?, eating?, minAlt?, softEdge? }
+   *        softEdge: width of the steer-back band inside the radius (narrower in front of a region exit)
    */
   function step(p, inp, dt, ctx) {
     const R = T.region(ctx.regionId), st = ctx.stats, eff = ctx.effects || NO_EFFECTS;
@@ -54,10 +55,10 @@
     if (p.pos[1] > R.ceiling - 10) tp = Math.min(tp, -0.1);
     p.pitch += (tp - p.pitch) * Math.min(1, dt * 3);
 
-    const r = Math.hypot(p.pos[0], p.pos[2]);
-    if (r > R.radius - SOFT_EDGE) {                           // soft boundary: steer back toward the centre
+    const r = Math.hypot(p.pos[0], p.pos[2]), soft = ctx.softEdge == null ? SOFT_EDGE : ctx.softEdge;
+    if (r > R.radius - soft) {                                // soft boundary: steer back toward the centre
       const d = wrap(Math.atan2(-p.pos[0], -p.pos[2]) - p.yaw);
-      p.yaw = wrap(p.yaw + d * Math.min(1, dt * 1.2 * (r - (R.radius - SOFT_EDGE)) / 30));
+      p.yaw = wrap(p.yaw + d * Math.min(1, dt * 1.2 * (r - (R.radius - soft)) / 30));
     }
 
     let target = (p.boosting ? st.boost : st.cruise) * eff.speedMult - p.pitch * 8;

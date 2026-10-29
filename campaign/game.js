@@ -9,12 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
+  /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
+  const BUILD = 't011.3 2026-10-29 debug toggle on all devices, versioned scripts';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -37,7 +39,7 @@
   const sunLight = new THREE.DirectionalLight(0xffc68c, 1.3); sunLight.position.copy(sunDir).multiplyScalar(300); scene.add(sunLight);
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
-  /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt on region change in T11) ---------- */
+  /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt when the dragon travels, T11) ---------- */
   let region = null, regionId = null, preyView = null;
   const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
   const startId = D.regions[params.get('region')] ? params.get('region') : D.startRegion;
@@ -58,6 +60,19 @@
     $('#regionText').textContent = t(TR.region(id).nameKey);
   }
   loadRegion(startId);
+  /** After core moved cs to another region (region:enter): rebuild the scene behind a short fade. */
+  function swapRegion() {
+    const t0 = performance.now();
+    fadeEl.classList.add('now');
+    loadRegion(cs.region);
+    region.update(new V3(pilot.pos[0], pilot.pos[1], pilot.pos[2]), time);
+    snapCam();
+    lastSwapMs = performance.now() - t0;
+    requestAnimationFrame(() => fadeEl.classList.remove('now'));
+    toast(t(TR.region(cs.region).nameKey), t('c.toast.enterSub'), 2.5);
+  }
+  const fadeEl = $('#fade');
+  let lastSwapMs = 0;
 
   /* ---------- the hatchling ---------- */
   const hero = VDragon.makeDragon(VDragon.GREEN);
@@ -139,7 +154,9 @@
   let mouseBreath = false, invert = store('vsd-invert') === '1';
   $('#invertBox').checked = invert;
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
+  let confirmQ = false;                                          // one-shot: Enter or the travel button
   addEventListener('keydown', e => {
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
     keys[e.code] = true;
@@ -175,6 +192,8 @@
   }
   holdBtn('#bBreath', 'breath'); holdBtn('#bBoost', 'boost'); holdBtn('#bGrab', 'grab'); holdBtn('#bEat', 'eat');
   $('#bRoll').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') F.tryRoll(pilot, touch.x < -0.2 ? -1 : 1); });
+  const takeConfirm = () => { const c = confirmQ; confirmQ = false; return c; };
+  $('#travelBtn').addEventListener('click', e => { e.preventDefault(); if (state === 'play') confirmQ = true; });
   const clamp1 = v => Math.max(-1, Math.min(1, v));
   function readInput() {
     if (state !== 'play') return { sx: 0, sy: 0, breath: false, boost: false };
@@ -186,6 +205,7 @@
       boost: !!(keys.ShiftLeft || keys.ShiftRight || touch.boost),
       grab: !!(keys[D.controls.grab] || touch.grab),
       eat: !!(keys[D.controls.eat] || touch.eat),
+      confirm: takeConfirm(),
     };
   }
 
@@ -217,7 +237,7 @@
     if (s === 'play' && prev === 'intro') { spawnPilot(); hintT = 8; }
     $('#hint').hidden = !(s === 'play' && hintT > 0);
     if (s === 'intro') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
-    mouseBreath = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
+    mouseBreath = false; confirmQ = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
   $('#startBtn').onclick = () => setState('play');
@@ -316,17 +336,21 @@
       else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
       else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
       else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
+      else if (e.e === 'region:enter') swapRegion();
       else if (e.e === 'growth:ready') toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
     }
   }
   /* bottom prompt: what the claws can do right now (+ eat progress) */
   const promptEl = $('#prompt'), promptText = $('#promptText'), promptBar = $('#promptBar');
-  let promptFlash = null, promptFlashT = 0, promptShown = '';
+  let promptFlash = null, promptFlashT = 0, promptShown = '', travelShown = '';
+  const travelBtn = $('#travelBtn');
   function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }
   function promptHud(dt) {
     promptFlashT = Math.max(0, promptFlashT - dt);
     let text = '', bar = -1;
+    const ex = state === 'play' && cs.exit;
     if (promptFlashT > 0 && promptFlash) text = promptFlash;
+    else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
@@ -335,6 +359,8 @@
     if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
     promptBar.hidden = bar < 0;
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
+    const tb = ex && isTouch ? 'c.btn.travel.' + ex.to : '';          // touch: a tappable button (desktop: Enter)
+    if (tb !== travelShown) { travelBtn.hidden = !tb; if (tb) travelBtn.textContent = t(tb); travelShown = tb; }
     $('#bGrab').classList.toggle('hot', cs.hint === 'grab' || cs.hint === 'swoop'); $('#bEat').classList.toggle('hot', cs.hint === 'eat');
   }
   function toast(title, sub, secs) {
@@ -362,14 +388,16 @@
     $('#stageText').textContent = stageName(dragon.stage);
     if (r.grew) toast(t('c.toast.grew', { stage: stageName(r.to) }), t('c.toast.grewSub'), 4);
   }
-  /* ?debug hotkeys (listed in the debug panel) */
+  /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
   const DEBUG_KEYS = [
-    ['N', '+100 food (hunger + growth)'], ['J', 'hunger +25 (no growth)'], ['H', 'hunger -25'],
-    ['K', 'damage 20 HP'], ['L', 'rest: heal, refill, grow'], ['R', 'reset to a new hatchling'],
-    ['P', 'fly to the nearest herd'], ['`', 'hide / show this panel'],
+    ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
+    ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP', 'KeyK', '-20 HP'],
+    ['L', 'rest: heal, refill, grow', 'KeyL', 'rest'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
+    ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
+    ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
-    if (code === 'Backquote' && dbgEl) { dbgEl.hidden = !dbgEl.hidden; return; }
+    if (code === 'Backquote') { toggleDebug(); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
@@ -387,6 +415,14 @@
         const a = Math.atan2(pilot.pos[0] - best.centre[0], pilot.pos[2] - best.centre[1]);
         const x = best.centre[0] + Math.sin(a) * 160, z = best.centre[1] + Math.cos(a) * 160;
         pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 30, z]; pilot.yaw = a + Math.PI; pilot.pitch = 0; snapCam();
+      }
+    }
+    if (code === 'KeyT') {                                        // 200 inside the edge, mid exit arc, heading out
+      const ex = (TR.region(regionId).exits || [])[0];
+      if (ex) {
+        const mid = RG.arcMid(ex);
+        const r = TR.region(regionId).radius - 200, x = Math.sin(mid) * r, z = Math.cos(mid) * r;
+        pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 50, z]; pilot.yaw = mid; pilot.pitch = 0; snapCam();
       }
     }
     if (code === 'KeyR') {
@@ -435,23 +471,59 @@
   }
 
   /* ---------- ?debug panel: performance, dragon parameters, hotkeys ---------- */
-  let dbgEl = null, dbgN = 0, dbgLast = performance.now();
+  let dbgEl = null, dbgBox = null, dbgN = 0, dbgLast = performance.now();
+  let dbgShown = !isTouch;                                       // touch: starts hidden; the DBG button toggles it everywhere
+  function toggleDebug() {
+    dbgShown = !dbgShown;
+    if (dbgBox) dbgBox.hidden = !dbgShown;
+    const b = $('#dbgBtn'); if (b) b.classList.toggle('on', dbgShown);
+  }
+  /** A DBG button next to pause (all devices), and one button per debug hotkey above the panel. */
+  function debugUi() {
+    const tog = document.createElement('button');
+    tog.id = 'dbgBtn'; tog.textContent = 'DBG'; tog.setAttribute('aria-label', 'Debug panel');
+    tog.style.cssText = 'pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;padding:0 10px;border-radius:20px;font:700 12px/1 ui-monospace,Menlo,monospace;margin-right:8px';
+    $('#pauseBtn').before(tog);
+    tog.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleDebug(); });
+    const bar = document.createElement('div');
+    bar.id = 'debugBar';
+    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;pointer-events:auto;margin-bottom:6px';
+    for (const [, what, code, label] of DEBUG_KEYS) {
+      if (!label) continue;
+      const b = document.createElement('button');
+      b.textContent = label; b.title = what;
+      b.style.cssText = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.style.background = 'rgba(255,148,71,.45)'; debugKey(code); });
+      const up = () => { b.style.background = 'rgba(6,10,8,.8)'; };
+      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+      bar.appendChild(b);
+    }
+    dbgBox.prepend(bar);
+  }
   const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2);
   function debugHud() {
     if (!dbgEl) {
+      // a fixed box holds the (touch) action buttons and the read-only panel
+      dbgBox = document.createElement('div');
+      dbgBox.id = 'debugBox';
+      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:5;max-width:calc(100vw - 16px);pointer-events:none';
       dbgEl = document.createElement('div');
       dbgEl.id = 'debugPanel';
-      dbgEl.style.cssText = 'position:fixed;right:8px;top:60px;font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;z-index:5;max-width:calc(100vw - 16px);overflow:hidden;opacity:.92';
-      document.body.appendChild(dbgEl);
+      dbgEl.style.cssText = 'font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;overflow:hidden;opacity:.92';
+      dbgBox.appendChild(dbgEl);
+      document.body.appendChild(dbgBox);
+      dbgBox.hidden = !dbgShown;
+      debugUi();
     }
     dbgN++;
     const now = performance.now(), secs = (now - dbgLast) / 1000;
     if (secs < 0.5) return;
     const i = region.info, r = renderer.info.render;
     const L = [];
+    L.push('BUILD   ' + BUILD + (params.get('v') ? '  (v=' + params.get('v') + ')' : ''));
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
-    L.push('        trees ' + i.trees + '  rocks ' + i.rocks);
+    L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');
     if (pilot) {
       const st = D.stages[dragon.stage], next = D.stages[dragon.stage + 1];
       const ready = G.readyStage(dragon.foodXp, dragon.stage), e = HN.effects(dragon.hunger);
@@ -465,19 +537,22 @@
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + D.eat.time);
+      L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');
       L.push('EFFECT  speed x' + f2(e.speedMult) + '  fire regen x' + f2(e.stRegenMult));
       L.push('        breath ' + (e.canBreath ? 'yes' : 'NO') + '  carry max ' + (e.carryMax === Infinity ? '-' : e.carryMax) + '  hp ' + (e.hpRegen ? '+' + e.hpRegen : e.hpDrain ? '-' + e.hpDrain : '0') + '/s');
     }
-    L.push('KEYS    ' + DEBUG_KEYS.map(k => k[0] + '  ' + k[1]).join('\n        '));
+    if (!isTouch) L.push('KEYS    ' + DEBUG_KEYS.map(k => k[0] + '  ' + k[1]).join('\n        '));
     dbgEl.textContent = L.join('\n');
     dbgN = 0; dbgLast = now;
   }
 
+  if (isTouch) { const h = $('#hint'); h.setAttribute('data-i18n', 'c.wipTouch'); h.textContent = t('c.wipTouch'); }   // touch texts name buttons, not keys
+  if (debug) { const f = document.querySelector('#intro .foot'); if (f) f.prepend(Object.assign(document.createElement('code'), { textContent: 'build ' + BUILD + ' ', style: 'font-size:11px;opacity:.7;display:block' })); }
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
+  if (window.I18N) I18N.onChange(() => { travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, get field() { return cs.field; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
 })();

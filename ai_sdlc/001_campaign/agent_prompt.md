@@ -59,6 +59,13 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
 - Follow the task's row in the task table and the data / interfaces sections of the phase spec. Rules live in
   campaign/core (pure, Node-testable, umd.js registry, tunables in data.js); rendering in campaign/render and
   campaign/game.js; per-frame orchestration in core/state.js.
+- MOBILE FIRST (000_spec.md section 1): every feature must be playable on a touch phone; every keyboard action,
+  debug hotkeys included, needs a touch control (debug: a button in the ?debug panel, toggled by the DBG button).
+  Touch texts name buttons, not keys. Check the layout at 390x844 with hasTouch/isMobile first, desktop second.
+  "What to test" lists the phone steps first.
+- Bump BUILD at the top of campaign/game.js on every push (e.g. 't012.1 <date> <what>'); the debug panel's first
+  line and the intro footer show it with the link's v=, so Pavel can tell which build he is running. Game scripts are
+  loaded with the page's ?v= (loader in campaign/index.html), so a new link version always fetches fresh files.
 - Every user-visible string goes in i18n.js in EN and CS. Add new files to the SHELL list in sw.js.
 - Add or extend tests in campaign/test/*.test.js. Both must pass: node campaign/test/run.js and node mp/sim.test.js
 - Browser check: cdnjs and npm are blocked here. Fetch Three.js r128 once into the scratchpad with
@@ -66,7 +73,8 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
   then git sparse-checkout set --no-cone /build/three.min.js. Serve the repo with python3 -m http.server (run in the
   background), drive it with the globally installed Playwright (chromium, args --use-gl=swiftshader
   --enable-unsafe-swiftshader; require it from `npm root -g`), route **/three.min.js to the local file and
-  fonts.googleapis.com to an empty stylesheet. Require zero page errors, screenshot the feature and look at the
+  fonts.googleapis.com to an empty stylesheet (use a context with serviceWorkers: "block", or the routes are bypassed
+  after the first load). Require zero page errors, screenshot the feature and look at the
   screenshots. Write screenshots only to the scratchpad, never into the repo. The software renderer runs at about
   2 fps, so drive long game-time checks through window.__vcamp (?debug) inside page.evaluate.
 - If behaviour has to differ from the spec, update the spec file in the same branch and say why in the PR.
@@ -93,4 +101,16 @@ g) NEXT TASK: the lowest task of the active phase that is not DONE, IN REVIEW or
   branches during a rebase (always --force-with-lease).
 - Final message for Pavel (also when nothing changed: WAIT / PLAN / DONE status): what was done in 2-3 lines,
   the PR link, the test link, and the "What to test" list. Short, in English.
+
+## 5. Owner task page (every run that changed something, also WAIT / PLAN status changes)
+- Pavel's to-do page is the artifact https://claude.ai/artifact/Fs7ZvqpkF18ZegtFaEwBdh ("Verdigris Owner Tasks").
+  Read it with the Artifact tool (action read, url), save the returned HTML to the scratchpad, change ONLY the JSON
+  inside <script id="data" type="application/json">, and publish it back with the same url (never a new artifact).
+- JSON: "updated" (UTC time); "phase" {done: count of DONE tasks, review: task numbers IN REVIEW, total};
+  "tasks": for every open agent PR in stack order (oldest first) one "test" task (id pr<N>-test-v<link version>,
+  test link as primary, phone steps group first, then desktop) and one "merge" task (merge into its base after testing,
+  the oldest PR of the stack is merged first; plan PRs get a "review" task for the spec instead); keep "setup" tasks that are still open,
+  drop tasks of merged or closed PRs; "log": prepend one row {t, what, pr} for this run, keep the last 30 rows.
+- If the read or publish is refused, say so in the final message and carry on; the PR body stays the source of truth.
+- Put the page link in the final message and the notification.
 ```

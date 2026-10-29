@@ -56,6 +56,11 @@
     preyAi: { fullRange: 600, farTickHz: 4, maxActive: 40 },
 
     flight: { minAlt: 5, edgeMargin: 60, baseTurn: 1.55 },
+    // region travel: the exit prompt shows within edgeBand of the radius while heading outward (cos of the angle
+    // between heading and the outward direction >= outwardCos) and stays promptHold s after the dragon turns back;
+    // a traveller appears entryInset inside the new region's radius, about entryAlt above the ground;
+    // inside an exit arc the flight soft boundary narrows to softEdge (120 elsewhere) so the dragon can reach the exit
+    travel: { edgeBand: 90, outwardCos: 0.2, promptHold: 3, entryInset: 220, entryAlt: 45, softEdge: 45 },
 
     lair: { larderSize: 3, spoilEvery: 30, respawnHp: 0.5, respawnHunger: 40 },
 
