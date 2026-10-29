@@ -4,13 +4,14 @@ Status: draft for review, 2026-10-29. Refines `000_spec.md` for Phase 2. Built o
 
 ## 1. Goal
 
-The dragon meets the kingdom. It can land and walk, raid Order settlements for gold, bank the gold in the lair, buy its first upgrades and watch the region react: more archers, bells, patrols, a ballista built in the village and livestock moved inside. Lying low in the wilds calms the region down again.
+The dragon meets the kingdom. It can land and walk, find its way by compass and smell, raid Order settlements for gold, bank the gold in its walkable cave lair, buy its first upgrades and watch the region react: more archers, bells, patrols, a ballista built in the village and livestock moved inside. Lying low in the wilds calms the region down again.
 
-The phase starts with a short foundation block (touch action layout, phone performance baseline, shared dragon model, landing and walking), because every later task in this phase depends on it.
+The phase starts with a foundation block (touch action layout, phone performance baseline, shared dragon model, landing and walking), followed by the compass and the cave interior, because every later task in this phase depends on them.
 
 **Exit criteria**
 
-- On a phone, a Drake flies to the River Farmlands, lands outside the Order outpost, walks in, picks up the strongbox, takes off under archer and ballista fire, banks the gold in the lair and buys an upgrade.
+- On a phone, a Drake follows the compass to the River Farmlands, lands outside the Order outpost, walks in, picks up the strongbox, takes off under archer and ballista fire, carries it into the cave, watches the hoard pile grow and buys an upgrade at the altar.
+- A hungry dragon finds food by smell: the compass leads it to a herd it cannot see yet.
 - A hatchling can raid the small Wildwood outpost for a tithe chest the same way (no ballista there).
 - Repeated raids raise the region's alert to 3 with visible changes; about 5 minutes of quiet (hunting elsewhere or sleeping) lowers it by one level.
 - Day and night change how far defenders see.
@@ -23,6 +24,8 @@ The phase starts with a short foundation block (touch action layout, phone perfo
 | Foundation | Touch action layout (fixed + context slots, `000_spec.md` section 1), phone perf readout and quality tiers, `shared/dragon.js` used by solo and co-op too, legs and walk cycle |
 | Locomotion | Land on walkable ground, walk (tank steering), run, turn on the spot, take off; collisions with buildings for walking and flying |
 | Ground actions | Pick up prey and loot in front of the dragon, eat on the ground, breath on the ground |
+| Cave interior | Walkable lava-lit cave hall replacing the lair panel: stations nest (rest, sleep), larder (stored carcasses visible), hoard pile, altar, exit tunnel; respawn on the nest |
+| Navigation | Compass strip (lair, region exits, discovered settlements), smell markers toward herds, discovery of settlements |
 | Regions | River Farmlands (new, gated at Drake, from Wildwood), a hamlet and a small Order outpost added to Wildwood |
 | Settlements | Hamlet, village, Order outpost (small and full), built from building templates in data |
 | Buildings | House, barn, granary, tax house, watchtower, bell post, barracks, palisade, ballista platform; burnable, ruins, rebuilt later |
@@ -30,15 +33,15 @@ The phase starts with a short foundation block (touch action layout, phone perfo
 | Perception | Vision cones with line of sight, light, dragon size and altitude; hearing; awareness per defender |
 | Alert | Per region, heat 0-4 shown as level 0-3, rises on incidents, decays when quiet (also while the dragon is elsewhere) |
 | Livestock | Sheep and cows in pens and barns; taking them raises alert |
-| Hoard | Tithe chest and strongbox as carried loot, banked on entering the lair, lost on death; hoard pile in the lair panel |
-| Upgrades | Altar in the lair panel with 4 upgrades: iron scales, wing muscles, hotter fire, guard sight |
+| Hoard | Tithe chest and strongbox as carried loot, banked on entering the lair, lost on death; 3D hoard pile of instanced coins in the cave |
+| Upgrades | Altar station in the cave with 5 upgrades: prey sense, iron scales, wing muscles, hotter fire, guard sight |
 | Day / night | 20 min cycle, lighting, perception factor, "Sleep until dusk / dawn" in the lair |
 | Save | v2 with hoard, upgrades, region states, clock and ground pose; v1 -> v2 migration |
 | UI | Alert indicator, awareness marks over defenders, aim line warning, loot in claws icon, EN + CS texts |
 
 ### Out of scope (later phases)
 
-Renown and tribute (Renown in Phase 4, tribute when a village is freed in Phase 3), missions and the timer, relics, aeries and fast travel, story cards, knights, mages, net launchers, mangonels, slayers, alert 4-5, lair defense, towns and castles, fish, Wyrm stage, a 3D lair scene.
+Renown and tribute (Renown in Phase 4, tribute when a village is freed in Phase 3), missions and the timer, relics, aeries and fast travel, the map screen, the trophy wall, mission board and map stone stations (Phase 3), story cards, knights, mages, net launchers, mangonels, slayers, alert 4-5, lair defense and lava vents (Phase 5), towns and castles, fish, Wyrm stage.
 
 ## 2. Constraints from the current code
 
@@ -48,7 +51,9 @@ Renown and tribute (Renown in Phase 4, tribute when a village is freed in Phase 
 | `shared/dragon.js` has tucked legs only and an `anim(time, dt, o)` for flight | Add leg joints and a walk / idle / land / takeoff pose to `anim`; the flight pose stays the same for the duel |
 | `makeDragon` still exists in `index.html` and `mp/game.js` (phase 1 risk) | T03 switches solo and co-op to `shared/dragon.js` before the model gets legs, so all modes share one model |
 | Touch buttons are fixed in `#btns` (Grab, Eat, Roll, Boost, Breath) plus a separate travel button | T01 moves to 3 fixed + 2 context slots; travel and cave entry move into the Move slot |
-| Lair is a DOM panel, not a 3D scene | Hoard pile and altar are panel sections; a 3D lair is out of scope |
+| Lair is a DOM panel over the outside view (`lair.js` enter / rest / eat / leave, `state.lairRest / lairEat / lairLeave`) | T08 replaces it with a walkable cave scene; the panel actions stay as the logic behind station panels, so `lair.test.js` keeps working |
+| `walk.step` would read `terrain.surfaceAt` | `walk.step` takes the ground from `ctx.surface(x, z)` and solids from `ctx.solidAt`, so the same code walks in regions and in the cave |
+| The HUD top row holds bars, region name and pause | The compass strip goes under it, full width minus the pause button, 28 px high on phones |
 | Prey are a field per region (`core/prey.js`), never saved | Livestock are prey types with a `pen` / `barn` home; settlements and region alert are saved per region |
 | `terrain.surfaceAt` is the only ground | Buildings add solids: `settlement.solidAt(x, z)` gives a roof height that flight and walking respect |
 | Save v1 (`core/save.js`) has `regions: {}` and `hoard`, `upgrades` placeholders | v2 fills them; `migrate` gets a v1 -> v2 step |
@@ -69,19 +74,23 @@ campaign/
     loot.js             tithe chest / strongbox items, carry, bank, lose
     upgrades.js         upgrade catalogue, buy, effects
     clock.js            time of day, light factor, sleep to dusk / dawn
+    cave.js             lair interior: floor, bounds, stations, enter / leave, station actions
+    nav.js              compass markers, smell (scent markers), discovery
     (data.js, prey.js, flight.js, state.js, lair.js, region.js, save.js, terrain.js extended)
   render/
     settlement-view.js  instanced buildings, fire and smoke, ruins
     defender-view.js    defenders, arrows, bolts, aim lines, awareness marks
     sky.js              day / night lighting, sun, fog colour
+    cave-view.js        cave hall mesh, lava light, nest, larder carcasses, hoard coins, altar, tunnel
+    compass.js          HUD compass strip (canvas), marker icons
   test/
     walk.test.js  settlement.test.js  perception.test.js  defenders.test.js
-    alert.test.js  loot.test.js  upgrades.test.js  clock.test.js  save2.test.js  raid.test.js
+    alert.test.js  loot.test.js  upgrades.test.js  clock.test.js  cave.test.js  nav.test.js  save2.test.js  raid.test.js
 shared/
   dragon.js             legs, walk cycle; used by index.html and mp/game.js too (T03)
 ```
 
-Script order in `campaign/index.html`: `umd, math, events, data, terrain, clock, growth, hunger, upgrades, settlement, flight, walk, perception, prey, defenders, alert, loot, region, lair, state, save`.
+Script order in `campaign/index.html`: `umd, math, events, data, terrain, clock, growth, hunger, upgrades, settlement, flight, walk, perception, prey, defenders, alert, loot, region, lair, cave, nav, state, save`.
 
 ## 4. Data schemas (`core/data.js`)
 
@@ -192,6 +201,7 @@ loot: {
   strongbox: { size: 2, gold: 150, carry: { speedMult: 0.8,  breath: false } },
 },
 upgrades: {
+  prey_sense:     { cost: 120, effect: { smellRange: 1.6, smellType: true, preyHighlight: true } },
   iron_scales_1:  { cost: 150, effect: { arrowDamage: 0.7, boltDamage: 0.85 } },
   wing_muscles_1: { cost: 200, effect: { stRegen: 1.2, boostSt: 0.85, takeoffSt: 0.7 } },
   hotter_fire_1:  { cost: 250, effect: { cookRate: 1.3, burnRate: 1.3 } },
@@ -201,9 +211,45 @@ clock: { dayLength: 1200, start: 0.3, dusk: 0.75, dawn: 0.25, nightFrom: 0.8, ni
 ```
 
 - Loot and prey share the one claw slot. Carrying loot applies `carry.speedMult` and may block breath.
+- Prey sense is the cheapest upgrade, so the first tithe chest buys better hunting.
 - Iron scales applies to arrows and bolts; guard sight draws defender vision cones and awareness marks at any distance (without it, marks show only within 120).
 
-### 4.7 Regions
+### 4.7 Cave interior and navigation
+
+```js
+cave: {
+  room: { r: 60, h: 28 },                   // dome hall; fits an Elder (scale 4) with room to turn
+  floor: 0, bounds: 54,                     // flat floor, walkable circle
+  stations: {                               // [x, z, radius] in the hall, the tunnel leads out at +Z
+    nest:   [0, -34, 12],
+    larder: [-30, -8, 8],
+    hoard:  [30, -8, 10],
+    altar:  [0, 8, 5],
+    exit:   [0, 50, 8],
+    // Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]; Phase 5: vents
+  },
+  reach: 8,                                 // + station radius, x dragon scale ^ 0.5
+  camera: { dist: 12, height: 6, maxDist: 'room' },   // the camera never leaves the dome
+  hoardTiers: [0, 100, 300, 700, 1500],     // coin pile size steps; coins = min(800, gold / 2) instances
+},
+nav: {
+  discover: 250,                            // a settlement within this range (and seen) is discovered for good
+  markers: 7, fov: 2.4,                     // max markers on the strip, the strip's angular width (rad)
+},
+smell: {
+  range: 380,                               // x stage spot ^ 0.5; x hungryMult when hungry, x 1.3 more when starving
+  hungryMult: 1.4,
+  sharp: 120,                               // inside this the marker points exactly at the herd
+  blur: 0.7,                                // angular noise (rad) at full range, shrinks to 0 at `sharp`
+  update: 0.5,                              // s between scent updates (markers drift, they do not jitter)
+  max: 3,                                   // strongest scents shown
+},
+```
+
+- Scent strength = herd size x (1 - distance / range); the strongest `smell.max` herds get markers. Livestock use a different icon.
+- The compass strip shows markers within `nav.fov` of the heading; markers behind the dragon stick to the strip's edges as arrows.
+
+### 4.8 Regions
 
 ```js
 regions: {
@@ -296,27 +342,41 @@ clock.step(cs, dt) ; clock.light(t) -> 0..1 ; clock.sleepTo(cs, 'dusk' | 'dawn')
 
 `upgrades.effects` is read by flight, walk, hunger, prey (cook rate), settlement (burn rate) and defenders (damage).
 
-### 5.7 `state` and `lair` changes
+### 5.7 `cave` and `nav`
+
+```js
+cave.enter(cs) -> events[]          // after lair.enter: cs.location = 'cave', pilot in mode 'ground' at the tunnel, facing in
+cave.stationAt(cs) -> id | null     // station within reach (the Action slot label)
+cave.act(cs, id, arg) -> events[]   // nest: rest | sleep dusk / dawn; larder: eat item; altar: buy; exit: leave
+cave.leave(cs) -> events[]          // lair.leave: back in the air in front of the mouth
+nav.markers(cs) -> [{ kind, bearing, dist, label, dim? }]   // kind: lair | exit | settlement | scent | scentLivestock
+nav.step(cs, dt, rng) -> events[]   // smell update, discovery ('place:discovered')
+```
+
+Inside the cave, `state.step` runs `walk.step` with the cave floor and station solids, plus `lair.spoil`; hunger, prey, defenders and alert of the outside region are paused (region alert decays by timestamp as usual). The cave is a separate scene: entering hides the region scene, which stays loaded for a fast exit.
+
+### 5.8 `state` and `lair` changes
 
 - Input gains `land` (one-shot, the Move slot or F). Grab on the ground means pick up in front.
 - `cs` gains `town`, `squad`, `items`, `regionStates`, `clock`, `hoard`, `upgrades`, `carriedLoot`.
 - Order in `state.step`: clock -> locomotion -> hunger -> prey -> settlement fire -> defenders -> alert -> grab / pick up -> eat -> lair -> region -> death.
-- `lair.enter` banks carried loot (`hoard:banked`); `lair.respawn` loses it (`loot:lost`). The panel gains a hoard section (gold, pile picture in 5 tiers) and the altar (upgrade list with Buy buttons) and the Sleep until dusk / dawn buttons.
+- `cs` also gains `location: 'field' | 'cave'` (replaces the plain `inLair` flag; `inLair` stays as a getter for Phase 1 code) and `nav` (scent markers, discovered places).
+- `lair.enter` banks carried loot (`hoard:banked`); `lair.respawn` loses it (`loot:lost`) and wakes the dragon on the nest. The old lair panel becomes station panels: nest (Rest, Sleep until dusk / dawn, stage progress), larder (items with Eat), altar (upgrades with cost, effect, Buy).
 
-### 5.8 `save` v2
+### 5.9 `save` v2
 
 ```json
 {
   "version": 2,
   "dragon": { "stage": 1, "foodXp": 820, "hp": 200, "hunger": 60, "upgrades": ["iron_scales_1"] },
   "hoard": { "gold": 320, "relics": [] },
-  "regions": { "farm": { "heat": 2.4, "lastIncident": 5120, "ruins": [{ "id": "farm.outpost.tower1", "at": 5000 }], "lootTaken": [{ "id": "farm.outpost.vault", "at": 5100 }] } },
-  "world": { "region": "farm", "pos": [600, 12, -480], "yaw": 2.0, "mode": "ground", "clock": 0.62, "now": 5200 },
+  "regions": { "farm": { "discovered": ["farm.outpost", "farm.village"], "heat": 2.4, "lastIncident": 5120, "ruins": [{ "id": "farm.outpost.tower1", "at": 5000 }], "lootTaken": [{ "id": "farm.outpost.vault", "at": 5100 }] } },
+  "world": { "region": "farm", "pos": [600, 12, -480], "yaw": 2.0, "mode": "ground", "location": "field", "clock": 0.62, "now": 5200 },
   "stats": { "played": 5200, "eaten": 40, "food": 820, "civilBurned": 3, "orderBurned": 5, "livestockTaken": 2 }
 }
 ```
 
-`now` is the game clock in seconds used for decay and rebuild timestamps. `migrate` v1 -> v2 fills defaults (gold 0, no upgrades, mode `air`, clock `clock.start`). A save in mode `ground` or `landing` restores on the ground; `takeoff` restores in the air.
+`now` is the game clock in seconds used for decay and rebuild timestamps. `migrate` v1 -> v2 fills defaults (gold 0, no upgrades, mode `air`, clock `clock.start`). A save in mode `ground` or `landing` restores on the ground; `takeoff` restores in the air; `location: 'cave'` restores inside the cave at the nest.
 
 ## 6. Rendering and UI
 
@@ -327,7 +387,9 @@ clock.step(cs, dt) ; clock.light(t) -> 0..1 ; clock.sleepTo(cs, 'dusk' | 'dawn')
 | Buildings | `InstancedMesh` per building type and per state (whole, ruin); fire = shared particle pool + flicker light for the nearest 2 fires; smoke columns |
 | Defenders | Low-poly figures, one `InstancedMesh` per type; arrows as instanced thin boxes; bolts as a mesh; ballista aim line as a red fading line; awareness `?` (amber) / `!` (red) sprites |
 | Alert | Small banner pips under the region name (0-3), pulse on change, toast "The Farmlands are on alert" |
-| Hoard | Lair panel section: gold number + a pile picture in 5 tiers (inline SVG), altar list with cost, effect, Buy |
+| Cave | One dome mesh with rock vertex colours, a lava channel (emissive + 1 point light, flicker), nest of bones and ash, larder slab with stored carcasses (prey meshes), hoard pile = `InstancedMesh` of coins in `hoardTiers` heaps, altar stone with glowing runes for affordable upgrades, tunnel glow at the exit; station rings on the floor when in reach |
+| Station panels | Small bottom sheet on phones (does not cover the stick), side panel on desktop; opened by the Action slot or E |
+| Compass | Canvas strip under the top HUD row: heading ticks, N mark, markers as icons (lair, exit, settlement in alert colour, scent puffs), distance for the lair and the selected marker; tap a marker to show its name |
 | Day / night | `render/sky.js` lerps sun direction, ambient, fog and sky colours; night keeps enough ambient to read the stick area and terrain on a phone |
 | Fields and river | Vertex colour patches for fields, a water plane per river segment |
 
@@ -343,32 +405,34 @@ Each task ends with both test runs passing and the browser check from the agent 
 | T04 | `core/walk.js` + pilot modes, `canLand`, landing / takeoff transitions, terrain-only collisions (buildings come in T08), tests | - | L | Tests: landing refused when high, fast, steep or over water; walking stays on the surface, cannot climb slopes over `maxSlope`; takeoff ends airborne above `minAlt` |
 | T05 | Legs and walk cycle in `shared/dragon.js`, ground camera, land / takeoff animation, Move slot Land / Fly + F key | T03, T04 | M | On a phone: Land appears near the ground, the dragon lands, walks with the stick, runs with Boost, takes off with Fly; duel flight pose unchanged |
 | T06 | Ground actions: pick up prey in front, eat on the ground (vulnerable, cancelled by damage), breath along the ground | T05 | M | Hatchling lands next to a goat, picks it up, eats it on the ground; a boar charge cancels the meal; breath cooks prey from the ground |
-| T07 | River Farmlands terrain: river, roads, plateaus, fields, palette; exit from Wildwood with `minStage`; Wildwood settlement plateaus | T04 | L | Region loads in under 1.5 s on a mid laptop; water not landable; hatchling sees the "Too small" prompt, Drake travels; no geometry leak after 5 round trips |
-| T08 | `core/settlement.js` + `render/settlement-view.js`: templates, placement, solids for flight and walking | T07 | L | All 5 settlements render; the dragon cannot walk or fly through buildings; tests for `solidAt` and placement determinism |
-| T09 | Building fire: ignite, burn, spread, ruins, rebuild timer; `stats.civilBurned` / `orderBurned` | T08 | M | A tower burns down in about 10 s of breath at hatchling stats; fire spreads only to neighbours; ruins come back after `fire.rebuild` |
-| T10 | `core/perception.js`: cones, range factors, LOS, hearing, awareness, tests | T08 | M | Tests: hidden behind a hill = not seen; night and altitude shorten range; landing near a guard is heard |
-| T11 | Peasants and archers: posts, AI states, bell, volleys, pooled arrows, burning defenders; awareness marks | T09, T10 | L | Archers on the outpost tower volley at a low dragon and stop when it climbs out of range; peasants run to the bell; at most 60 projectiles |
-| T12 | Ballista: aim line, bolt, reload, crew, burnable platform | T11 | M | The aim line shows 2 s before each bolt; changing course dodges it; burning the crew or the platform stops it |
-| T13 | `core/alert.js` + responses: extra archers, patrols on roads, village ballista at level 3, livestock inside; HUD pips; offline decay | T11, T12 | L | Tests: incidents raise heat as in data, decay after `quiet`, faster with a ruined tower, catch-up on region load; in game level 3 builds the village platform |
-| T14 | Livestock: sheep and cows in pens and barns, alert on taking them, barn burn releases them | T13 | S | Taking a sheep raises heat by 1; at level 3 pens are empty and the barn holds the herd |
-| T15 | `core/loot.js` + hoard: tithe chests and strongboxes, carry penalties, bank on lair enter, lose on death; hoard section in the lair panel | T06, T08 | M | Drake carries a strongbox at 80% speed without breath; entering the lair adds 150 gold; dying with it loses it and the vault refills after `fire.rebuild` |
-| T16 | `core/upgrades.js` + altar: 4 upgrades, effects wired, guard sight cones | T15 | M | Buying iron scales cuts arrow damage by 30% (test); guard sight shows cones; gold cannot go negative |
-| T17 | `core/clock.js` + `render/sky.js`: cycle, lighting, perception factor, Sleep until dusk / dawn | T10 | M | Night halves archer sight (test); a full cycle takes 20 min; night is readable on a phone screenshot |
-| T18 | Save v2 + migration v1 -> v2: hoard, upgrades, region states, clock, ground pose | T13, T15, T16, T17 | M | Reload restores gold, upgrades, alert, ruins and a landed dragon; a phase 1 save migrates; corrupt v2 handled like v1 |
-| T19 | Texts and tips: landing, raiding, alert and altar tips, EN + CS, touch wording pass, intro note for the Farmlands | T18 | M | Every new visible string from `i18n.js`; touch texts name buttons; all Phase 2 flows playable on a phone end to end |
-| T20 | `test/raid.test.js` scripted raid bot + balancing pass | T18 | M | Seeded bot: Drake raids the outpost and banks a strongbox in 6-12 simulated min with at least 20% HP left at full hunger; alert reaches 3 after 3 raids and drops a level after 5 quiet min; numbers changed in `data.js` only |
-| T21 | README campaign section update, controls table, mark Phase 2 done in `000_spec.md` | T20 | S | README lists landing, raiding, alert and the altar for phone and desktop |
+| T07 | `core/nav.js` + `render/compass.js`: compass strip with lair and exit markers, smell markers toward herds (wild and livestock icons), tap to name a marker | T01 | M | Tests: scent bearing is exact inside `smell.sharp`, blurred and stable (no jitter) far out, range grows when hungry; on a phone the strip leads to the lair and to a herd out of sight; strip does not overlap the bars or the pause button at 390 x 844 |
+| T08 | `core/cave.js` + `render/cave-view.js`: cave hall scene, walk inside, stations nest (Rest), larder (Eat, carcasses visible) and exit; station panels replace the lair panel; respawn on the nest | T05, T06 | L | Flying into the mouth loads the cave in under 0.5 s; the dragon walks to the nest and rests, eats from the larder, leaves through the tunnel; dying wakes it on the nest; `lair.test.js` passes; an Elder-sized dragon (debug scale 4) fits and the camera never clips through the dome |
+| T09 | River Farmlands terrain: river, roads, plateaus, fields, palette; exit from Wildwood with `minStage`; Wildwood settlement plateaus | T04 | L | Region loads in under 1.5 s on a mid laptop; water not landable; hatchling sees the "Too small" prompt, Drake travels; no geometry leak after 5 round trips |
+| T10 | `core/settlement.js` + `render/settlement-view.js`: templates, placement, solids for flight and walking; discovered settlements on the compass | T07, T09 | L | All 5 settlements render; the dragon cannot walk or fly through buildings; tests for `solidAt`, placement determinism and discovery; a settlement shows on the compass after it was first seen |
+| T11 | Building fire: ignite, burn, spread, ruins, rebuild timer; `stats.civilBurned` / `orderBurned` | T10 | M | A tower burns down in about 10 s of breath at hatchling stats; fire spreads only to neighbours; ruins come back after `fire.rebuild` |
+| T12 | `core/perception.js`: cones, range factors, LOS, hearing, awareness, tests | T10 | M | Tests: hidden behind a hill = not seen; night and altitude shorten range; landing near a guard is heard |
+| T13 | Peasants and archers: posts, AI states, bell, volleys, pooled arrows, burning defenders; awareness marks | T11, T12 | L | Archers on the outpost tower volley at a low dragon and stop when it climbs out of range; peasants run to the bell; at most 60 projectiles |
+| T14 | Ballista: aim line, bolt, reload, crew, burnable platform | T13 | M | The aim line shows 2 s before each bolt; changing course dodges it; burning the crew or the platform stops it |
+| T15 | `core/alert.js` + responses: extra archers, patrols on roads, village ballista at level 3, livestock inside; HUD pips; offline decay | T13, T14 | L | Tests: incidents raise heat as in data, decay after `quiet`, faster with a ruined tower, catch-up on region load; in game level 3 builds the village platform |
+| T16 | Livestock: sheep and cows in pens and barns, alert on taking them, barn burn releases them | T15 | S | Taking a sheep raises heat by 1; at level 3 pens are empty and the barn holds the herd |
+| T17 | `core/loot.js` + hoard: tithe chests and strongboxes, carry penalties, bank on lair enter, lose on death; hoard pile station in the cave | T06, T08, T10 | M | Drake carries a strongbox at 80% speed without breath; entering the lair adds 150 gold and the coin pile grows a tier; dying with it loses it and the vault refills after `fire.rebuild` |
+| T18 | `core/upgrades.js` + altar station: 5 upgrades, effects wired, prey sense on the compass and in the world, guard sight cones | T17 | M | Buying iron scales cuts arrow damage by 30% (test); prey sense lengthens smell and names the prey; guard sight shows cones; gold cannot go negative |
+| T19 | `core/clock.js` + `render/sky.js`: cycle, lighting, perception factor, Sleep until dusk / dawn at the nest | T08, T12 | M | Night halves archer sight (test); a full cycle takes 20 min; night is readable on a phone screenshot |
+| T20 | Save v2 + migration v1 -> v2: hoard, upgrades, region states, discovered places, clock, ground pose, cave location | T15, T17, T18, T19 | M | Reload restores gold, upgrades, alert, ruins, discovered places, a landed dragon and a dragon inside the cave; a phase 1 save migrates; corrupt v2 handled like v1 |
+| T21 | Texts and tips: landing, smell and compass, cave stations, raiding, alert and altar tips, EN + CS, touch wording pass, intro note for the Farmlands | T20 | M | Every new visible string from `i18n.js`; touch texts name buttons; all Phase 2 flows playable on a phone end to end |
+| T22 | `test/raid.test.js` scripted raid bot + balancing pass | T20 | M | Seeded bot: Drake raids the outpost and banks a strongbox in 6-12 simulated min with at least 20% HP left at full hunger; alert reaches 3 after 3 raids and drops a level after 5 quiet min; numbers changed in `data.js` only |
+| T23 | README campaign section update, controls table, mark Phase 2 done in `000_spec.md` | T22 | S | README lists landing, the compass and smell, the cave, raiding, alert and the altar for phone and desktop |
 
-Suggested order: T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21.
+Suggested order: T01 to T23 in number order. T05 (walking) and T08 (cave) are the two feel checkpoints: Pavel validates them on a phone before later tasks build on them.
 
 ## 8. Testing
 
 | Level | What | How |
 | --- | --- | --- |
-| Unit | walk, settlement, perception, defenders, alert, loot, upgrades, clock, save v2 | `node campaign/test/run.js`, seeded `mulberry` RNG |
+| Unit | walk, cave, nav (smell, discovery), settlement, perception, defenders, alert, loot, upgrades, clock, save v2 | `node campaign/test/run.js`, seeded `mulberry` RNG |
 | Simulation | Raid bot: fly to the outpost, land, take the strongbox, escape, bank; invariants (projectiles bounded, gold never negative, heat 0..maxHeat, dragon never inside a solid) | `test/raid.test.js` |
 | Regression | Phase 1 tests and the 30 min growth sim still pass; duel and co-op unaffected | both test runs + T03 screenshots |
-| Manual | Phone first: land, walk, raid, bank, buy, night raid, reload; then desktop | Checklist in each PR, phone steps first |
+| Manual | Phone first: land, walk, follow a scent, raid, carry into the cave, bank, buy at the altar, night raid, reload inside the cave; then desktop | Checklist in each PR, phone steps first |
 
 ## 9. Performance budget
 
@@ -379,6 +443,7 @@ Suggested order: T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13
 | Defenders | 30 active max per region, full AI within 400 of the dragon, 4 Hz beyond |
 | Projectiles | 60 max, pooled |
 | Fire lights | 2 dynamic lights max; other fires are particles only |
+| Cave | 60+ fps on a mid phone (one hall, region scene hidden), at most 800 coin instances, enter / leave under 0.5 s |
 | New JS | under 150 KB unminified for this phase |
 
 ## 10. Risks
@@ -386,7 +451,10 @@ Suggested order: T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13
 | Risk | Mitigation |
 | --- | --- |
 | Walking a 2.4x scale drake feels stiff on a phone | Tank steering with generous turn rate, ground camera tuned in T05; Pavel validates T05 before the kingdom tasks build on it |
-| Archer chip damage plus hunger makes raids frustrating | Iron scales, balancing in T20 against the HP target, arrows dodgeable at speed |
+| Camera in an enclosed cave clips through walls or loses the dragon | Camera distance clamped to the dome radius, lower and closer than outside; tested with an Elder-sized debug dragon in T08 |
+| Walking between stations is slower than tapping a menu | Hall kept small, stations within a few seconds' walk; the nest is in front of the tunnel path; Action slot works from the station ring, not only when touching |
+| Smell markers make hunting too easy | Blur far away, only the strongest 3 scents, no type without prey sense; tuned in T22 |
+| Archer chip damage plus hunger makes raids frustrating | Iron scales, balancing in T22 against the HP target, arrows dodgeable at speed |
 | Too many buttons on a phone | Context slots only (section 6); no new fixed button in this phase |
 | 5 settlements + fire particles hurt phones | Quality tiers from T02, instancing, 2 dynamic lights, far AI at 4 Hz |
 | T03 touches duel and co-op code | Screenshot comparison and the mp tests; no behaviour changes beyond swapping the model source |
@@ -398,5 +466,7 @@ Suggested order: T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13
 - Farmlands gated until Drake? Default: yes; hatchlings raid the small Wildwood outpost.
 - Burning civilian buildings: only alert for now, Renown later? Default: yes, counted in `stats` for Phase 4.
 - Walking steering on touch: tank (up = forward, sides = turn) or stick direction relative to the camera? Default: tank, it fits the chase camera.
-- Hoard pile: panel picture now, 3D lair scene later? Default: panel picture.
+- Cave entry: flying into the mouth cuts straight to the dragon standing in the tunnel inside (default), or a short landing and walk-in animation? Default: the cut, it is faster on a phone.
+- Smell: livestock smell too, with its own icon? Default: yes, it makes the farm tempting and raising alert a real choice.
+- Compass at the top (default) or a small round radar in a corner? Default: the strip; a round radar would compete with the stick and buttons for corner space.
 - Destroyed buildings and taken loot come back after 10 min of game time? Default: yes (`fire.rebuild`, 600 s).

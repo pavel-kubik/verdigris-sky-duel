@@ -71,6 +71,8 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 | Landing | The dragon lands and walks on the ground (no hopping); takeoff is an explicit action (decided 2026-10-29) |
 | Renown | Deferred to Phase 4; Phase 2-3 only count civilian damage and livestock taken in the save (decided 2026-10-29) |
 | Hoard | Gold, the hoard pile and the first upgrades arrive in Phase 2 together with the kingdom, so raiding pays off from the start (decided 2026-10-29) |
+| Lair interior | A walkable 3D cave from Phase 2, not a menu; later phases add stations to it (decided 2026-10-29) |
+| Navigation | Compass strip with the dragon's sense of smell in Phase 2, map screen with fast travel in Phase 3 (decided 2026-10-29) |
 
 ## 2. Story
 
@@ -119,7 +121,7 @@ Stage-up is a moment: it only happens while resting in the lair, with a short gr
 | --- | --- | --- |
 | Breath | Hotter fire, long cone, fireball volley, frost or acid breath (late) | Damage, range, alternative breath types |
 | Body | Iron scales, wing muscles, strong claws | Arrow resistance, stamina and dive speed, carry capacity |
-| Senses | Prey sense, guard sight, night vision | Highlights prey, shows guard vision cones, darker nights playable |
+| Senses | Prey sense, guard sight, night vision | Longer and sharper smell with prey types on the compass + prey highlight, shows guard vision cones, darker nights playable |
 | Abilities | Roar, tail sweep, silent glide, ground slam | Stun, close defense, stealth approach, area damage (elder only) |
 
 Some upgrades require a stage (ground slam needs Elder) so the tree opens up as the dragon grows.
@@ -268,15 +270,30 @@ The world is six regions radiating from the volcano, each a seamless map loaded 
 
 ### Volcano lair
 
-| Feature | Purpose |
-| --- | --- |
-| Rest nest | Save, heal, pass time to day or night, triggers stage-up |
-| Hoard pile | Grows visibly with banked gold (instanced coins) |
-| Larder | Food storage for a few carcasses |
-| Upgrade altar | Spend hoard on upgrades |
-| Trophy wall | Shows recovered relics and story progress |
-| Mission board | Pick the next mission, shows briefing and time limit |
-| Lava vents | Hazards that hurt intruders in lair-defense missions |
+Flying into the cave mouth loads the lair interior: one walkable cave hall lit by lava, sized so even an Elder fits. The dragon walks between stations; walking up to one shows its action in the Action slot and opens a small panel. Leaving through the tunnel puts the dragon back in the air in front of the mouth. Hunger is paused inside, and a dead dragon wakes on the nest.
+
+| Station | Purpose | Phase |
+| --- | --- | --- |
+| Rest nest | Save, heal, sleep until dusk or dawn, triggers stage-up | 2 |
+| Larder | Stored carcasses lie there visibly; eat them | 2 |
+| Hoard pile | Grows visibly with banked gold (instanced coins) | 2 |
+| Upgrade altar | Spend hoard on upgrades | 2 |
+| Exit tunnel | Back outside | 2 |
+| Trophy wall | Shows recovered relics and story progress | 3 |
+| Mission board | Pick the next mission, shows briefing and time limit | 3 |
+| Map stone | Opens the map screen, fast travel to discovered aeries | 3 |
+| Lava vents | Hazards that hurt intruders in lair-defense missions | 5 |
+
+### Navigation
+
+Phones have no room for a minimap, so navigation is a thin compass strip at the top of the screen, plus a full map screen from Phase 3.
+
+| Tool | Shows | Phase |
+| --- | --- | --- |
+| Compass strip | Heading with markers: the lair (always, with distance), region exits (name, greyed out when the dragon is too small), discovered settlements (with the region's alert colour) | 2 |
+| Smell | Scent markers on the compass toward nearby herds: fuzzy far away, sharp up close; a hungry dragon smells further. Livestock smell different from wild prey | 2 |
+| Prey sense upgrade | Longer smell range, prey type on the marker, prey highlighted in the world | 2 |
+| Map screen | Region graph, discovered settlements and aeries, alert per region, fast travel | 3 |
 
 ### Day and night
 
@@ -303,7 +320,8 @@ Campaign is a separate mode built from small, data-driven systems on top of the 
 | WorldClock | Day and night cycle, sleep until dusk or dawn | CampaignState |
 | MissionSystem | Accept, timer, objectives, success / fail, rewards | CampaignState, RegionLoader |
 | RegionLoader | Load / unload region scenes, edge transitions, aeries | Asset cache |
-| LairScene | Hub UI: rest, altar, larder, mission board, hoard pile | All of the above |
+| LairScene | Walkable cave interior with stations: nest, larder, hoard pile, altar (Phase 2), trophy wall, mission board, map stone (Phase 3) | All of the above |
+| Navigation | Compass markers, smell, discovery; map screen from Phase 3 | Regions, settlements, prey |
 | SaveService | Versioned save, autosave, migrations | - |
 
 ### Save state (target shape, all phases)
@@ -333,15 +351,15 @@ Stored in `localStorage` (IndexedDB if it grows), autosaved on rest, mission end
 
 ## 9. Roadmap
 
-Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard and upgrades moved from Phase 3 to Phase 2, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
+Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard, upgrades, the walkable cave interior and the compass with smell moved into Phase 2, map screen in Phase 3, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
 
 | Phase | Task file | Scope | Exit criteria |
 | --- | --- | --- | --- |
 | 1 - Survival MVP | `001_task_survival.md` | Ash Wastes + Wildwood, lair (rest, save, larder), hunger, goat / deer / boar, grab and eat, growth Hatchling to Drake, save v1 | A new player can hunt, starve, recover and reach Drake in about 30 min; save survives reload |
-| 2 - Kingdom + hoard | `002_task_kingdom.md` | Foundation first (touch action layout, phone perf baseline, shared dragon model, landing + walking), then River Farmlands, hamlet + village + outpost (a small outpost in Wildwood), archers + ballista, building fire, Perception, alert 0-3, livestock, gold loot, hoard pile + upgrade altar (4 upgrades), day / night, save v2 | On a phone a Drake lands at an outpost, walks in, steals the strongbox, escapes the archers and the ballista, banks the gold and buys an upgrade; raids raise alert to 3 with visible changes and lying low lowers it |
-| 3 - Missions | `003_task_missions.md` | Mission board, timer, steal + destroy + intercept types, relics and mission carry rules, aeries + fast travel, freeing a village (Order garrison destroyed: tribute starts), Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified |
+| 2 - Kingdom + hoard | `002_task_kingdom.md` | Foundation first (touch action layout, phone perf baseline, shared dragon model, landing + walking), walkable cave interior (nest, larder, hoard pile, altar), compass strip with smell, then River Farmlands, hamlet + village + outpost (a small outpost in Wildwood), archers + ballista, building fire, Perception, alert 0-3, livestock, gold loot, 5 upgrades incl. prey sense, day / night, save v2 | On a phone a Drake follows the compass to the Farmlands, lands outside the Order outpost, walks in, picks up the strongbox, takes off under archer and ballista fire, carries it into the cave, sees the hoard pile grow and buys an upgrade at the altar; raids raise alert to 3 with visible changes and lying low lowers it |
+| 3 - Missions | `003_task_missions.md` | Mission board and trophy wall in the cave, timer, steal + destroy + intercept types, relics and mission carry rules, aeries, map screen + fast travel, freeing a village (Order garrison destroyed: tribute starts), Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified; the map shows discovered places and fast travel works |
 | 4 - Highlands | `004_task_highlands.md` | Highland Pass, Wyrm stage + stage visuals, knights, net launchers, caravans, Renown | A Wyrm intercepts a caravan and survives the knights; Renown changes how villages treat the dragon |
-| 5 - Lowlands | `005_task_lowlands.md` | Royal Lowlands, frost mages, mangonels, first named slayer, alert 4-5, lair defense, Act 3 | Act 3 playable end to end |
+| 5 - Lowlands | `005_task_lowlands.md` | Royal Lowlands, frost mages, mangonels, first named slayer, alert 4-5, lair defense inside the cave (lava vents), Act 3 | Act 3 playable end to end |
 | 6 - Endgame | `006_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
 | 7 - Co-op campaign | `007_task_coop.md` | Two dragons, shared lair and hoard, sync on the persistent multiplayer backend | Two players finish a mission together |
 
