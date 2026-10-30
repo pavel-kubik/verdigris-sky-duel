@@ -384,7 +384,7 @@ Inside the cave, `state.step` runs `walk.step` with the cave floor and station s
 
 | Element | Implementation |
 | --- | --- |
-| Touch layout | 3 fixed buttons (Breath, Boost, Roll) + Action (hold) + Move (tap) context slots; labels from i18n, icon + text; Roll hidden on the ground |
+| Touch layout | 3 fixed buttons (Breath, Boost, Roll) + Action (hold) + Move (tap) context slots; labels from i18n, icon + text; Roll hidden on the ground. Slot logic in `core/controls.js` (`slots(cs)`); the Action kind is latched at the press (a grab hold that catches a prey does not start eating). Move offers "Enter cave" within `lair.enterRange` (80) of the mouth while heading toward it (built in T01) |
 | Dragon on the ground | Legs extend on landing, 4-leg walk cycle tied to ground speed, wings folded, body pitch follows the slope; ground camera lower (height 6 x scale) and closer |
 | Buildings | `InstancedMesh` per building type and per state (whole, ruin); fire = shared particle pool + flicker light for the nearest 2 fires; smoke columns |
 | Defenders | Low-poly figures, one `InstancedMesh` per type; arrows as instanced thin boxes; bolts as a mesh; ballista aim line as a red fading line; awareness `?` (amber) / `!` (red) sprites |

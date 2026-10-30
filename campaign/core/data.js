@@ -64,8 +64,9 @@
     // inside an exit arc the flight soft boundary narrows to softEdge (120 elsewhere) so the dragon can reach the exit
     travel: { edgeBand: 90, outwardCos: 0.2, promptHold: 3, entryInset: 220, entryAlt: 45, softEdge: 45 },
 
-    // lair: larder slots, 1 food lost per spoilEvery s, the "fly into the cave" prompt within nearRange of the mouth
-    lair: { larderSize: 3, spoilEvery: 30, nearRange: 140, respawnHp: 0.5, respawnHunger: 40 },
+    // lair: larder slots, 1 food lost per spoilEvery s, the "fly into the cave" prompt within nearRange of the mouth,
+    // the Move slot "Enter cave" (touch) within enterRange of the mouth while heading toward it
+    lair: { larderSize: 3, spoilEvery: 30, nearRange: 140, enterRange: 80, respawnHp: 0.5, respawnHunger: 40 },
 
     regions: {
       ash: {
