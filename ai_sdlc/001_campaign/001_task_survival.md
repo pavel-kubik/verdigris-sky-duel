@@ -1,6 +1,6 @@
 # Phase 1 - Survival MVP: Implementation Spec
 
-Status: ready for implementation, 2026-10-28. Branch: `campaign-phase-1`. Parent spec: [`000_spec.md`](000_spec.md).
+Status: done, 2026-10-29 (T01-T17; spec written 2026-10-28). Branch: `campaign-phase-1`. Parent spec: [`000_spec.md`](000_spec.md).
 
 ## 1. Goal
 
