@@ -76,6 +76,20 @@
     preyAi: { fullRange: 600, farTickHz: 4, maxActive: 40 },
 
     flight: { minAlt: 5, edgeMargin: 60, baseTurn: 1.55 },
+
+    /* Landing and walking (Phase 2 T06, core/walk.js; 002_task_kingdom.md 4.1). Pilot modes: air, landing, ground, takeoff.
+       land: allowed within maxAlt of the surface, at maxSpeed or slower (cruise lands, boost does not), on a slope
+       (rise / run) under maxSlope, not over water or lava, not on a roof; the touchdown takes `time` s; noise = hearing
+       range of the touchdown (perception, T14).
+       walk: tank steering (stick up = forward, down = slow back, sides = turn on the spot), Boost = run (runSt
+       stamina / s); speeds x (1 + sizeSpeed x (scale - 1)); slopes over land.maxSlope cannot be climbed (the dragon
+       slides along them); stepUp x scale = the highest ledge (building solids, T12) it steps onto; stand x scale = body
+       height over the surface; accel = speed response per s.
+       takeoff: `time` s in which it cannot breathe or grab, costs st stamina, climbs to minAlt + climb over the surface. */
+    land: { maxAlt: 14, maxSpeed: 36, maxSlope: 0.45, time: 0.8, noise: 60 },
+    walk: { speed: 7, run: 13, back: 3, turn: 1.8, stepUp: 1.2, runSt: 12, sizeSpeed: 0.35, stand: 1.6, accel: 6 },
+    takeoff: { time: 1.0, st: 15, climb: 10, vulnerable: true },
+    ground: { reach: 6, reachCone: 0.7, eatTime: 2.5, breathPitch: -0.15 },
     // region travel: the exit prompt shows within edgeBand of the radius while heading outward (cos of the angle
     // between heading and the outward direction >= outwardCos) and stays promptHold s after the dragon turns back;
     // a traveller appears entryInset inside the new region's radius, about entryAlt above the ground;
