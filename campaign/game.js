@@ -16,16 +16,21 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't101.1 2026-10-30 touch action layout';
+  const BUILD = 't102.1 2026-10-30 perf readout and quality tiers';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
   const canvas = $('#c');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const scene = new THREE.Scene();
-  const FOG = { near: 400, far: 950 };
-  scene.fog = new THREE.Fog(0x7d6a58, FOG.near, FOG.far);
+  const FOG = { near: 400, far: 950 };                         // high tier; quality.settings scales it per tier
+  /* Quality tier (T102): ?q=low|mid|high|auto, else the stored choice, else touch measures fps in the first play seconds. */
+  const QL = C.need('quality');
+  const qPick = QL.pick({ param: params.get('q'), stored: store(D.quality.storeKey), isTouch });
+  let qTier = qPick.tier, qSource = qPick.source, qSet = QL.settings(qTier, window.devicePixelRatio, FOG);
+  let qSampler = qPick.auto ? QL.sampler() : null;
+  renderer.setPixelRatio(qSet.pixelRatio);
+  scene.fog = new THREE.Fog(0x7d6a58, qSet.fogNear, qSet.fogFar);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);
   const sunDir = new V3(-0.55, 0.16, -0.82).normalize();
   const sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 16), new THREE.ShaderMaterial({
@@ -59,7 +64,7 @@
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     regionId = id;
-    region = VRender.terrain.build(id, { isTouch, far: FOG.far });
+    region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
     scene.add(region.group);
     if (cs.region !== id || !cs.field) ST.enterRegion(cs, id);
     preyView = VRender.prey.build();
@@ -83,6 +88,31 @@
   }
   const fadeEl = $('#fade');
   let lastSwapMs = 0;
+
+  /* ---------- quality tier changes (T102): auto tier after the touch fps sample, debug cycle ---------- */
+  if (qSource === 'url') store(D.quality.storeKey, qTier);         // ?q=low|mid|high sticks for the next visits
+  let qAutoFps = null;                                           // fps the auto tier was picked from (debug panel)
+  /** Switches to `tier`, stores it and rebuilds the region (flora, view distance) behind a short fade. */
+  function applyQuality(tier, src) {
+    const old = qSet;
+    qTier = tier; qSource = src; qSet = QL.settings(tier, window.devicePixelRatio, FOG);
+    store(D.quality.storeKey, tier);
+    renderer.setPixelRatio(qSet.pixelRatio); resize();
+    scene.fog.near = qSet.fogNear; scene.fog.far = qSet.fogFar;
+    if (old.flora === qSet.flora && old.fogFar === qSet.fogFar) return;
+    fadeEl.classList.add('now');
+    loadRegion(regionId);
+    region.update(camera.position, time);
+    requestAnimationFrame(() => fadeEl.classList.remove('now'));
+  }
+  /** Touch auto tier: real frame times (not the clamped sim dt) during play only. */
+  function sampleQuality(rawDt) {
+    if (!qSampler || state !== 'play') return;
+    const tier = QL.sample(qSampler, Math.min(rawDt, 0.5));
+    if (!tier) return;
+    qAutoFps = qSampler.fps;
+    if (tier !== qTier) applyQuality(tier, 'auto'); else { qSource = 'auto'; store(D.quality.storeKey, tier); }
+  }
 
   /* ---------- the hatchling ---------- */
   const hero = VDragon.makeDragon(VDragon.GREEN);
@@ -126,7 +156,7 @@
     const c = Math.cos(p.pitch), aim = cs.breath && cs.breath.dir;       // follow the aimed cone from core
     const dx = aim ? aim[0] : Math.sin(p.yaw) * c, dy = aim ? aim[1] : Math.sin(p.pitch), dz = aim ? aim[2] : Math.cos(p.yaw) * c;
     const sp = 55 * Math.sqrt(heroScale), spread = 0.22;
-    pAcc += dt * 190;
+    pAcc += dt * 190 * qSet.particles;
     while (pAcc >= 1) {
       pAcc--;
       const jx = (Math.random() - 0.5) * spread, jy = (Math.random() - 0.5) * spread, jz = (Math.random() - 0.5) * spread;
@@ -626,10 +656,12 @@
     ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
+    ['G', 'graphics quality low / mid / high (saved)', 'KeyG', 'quality'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
+    if (code === 'KeyG') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
@@ -674,7 +706,8 @@
   let last = performance.now(), time = 0;
   function frame(now) {
     requestAnimationFrame(frame);
-    let dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const rawDt = (now - last) / 1000;
+    let dt = Math.min(0.05, rawDt); last = now;
     if (state === 'paused') dt = 0;
     time += reduceMotion ? dt * 0.3 : dt;
     if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
@@ -707,6 +740,7 @@
     preyView.update(cs.field, time, carryPose());
     targetRing();
     renderer.render(scene, camera);
+    sampleQuality(rawDt);
     if (debug) debugHud(dt);
   }
 
@@ -764,6 +798,8 @@
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
     L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');
+    L.push('QUALITY ' + qTier + ' (' + qSource + (qAutoFps != null ? ' ' + Math.round(qAutoFps) + ' fps' : '') + (qSampler && !qSampler.done ? ', measuring ' + Math.round(qSampler.time) + '/' + D.quality.auto.sample + ' s' : '') + ')' +
+      '  px ' + f2(renderer.getPixelRatio()) + '  flora x' + f2(qSet.flora) + '  fog ' + Math.round(qSet.fogFar));
     if (pilot) {
       const st = D.stages[dragon.stage], next = D.stages[dragon.stage + 1];
       const ready = G.readyStage(dragon.foodXp, dragon.stage), e = HN.effects(dragon.hunger);
@@ -796,5 +832,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
+  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

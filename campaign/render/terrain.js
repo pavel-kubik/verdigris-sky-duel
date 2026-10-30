@@ -3,7 +3,7 @@
  * Meshes core terrain.heightAt on the core GRID in CHUNK-sized pieces, with exactly the triangle
  * split terrain.surfaceAt assumes (diagonal 10-01 per cell), so the simulation collides with what
  * is drawn. Adds water, the volcano's lava and the lair cave mouth, and culls far chunks.
- *   VRender.terrain.build(regionId, { isTouch }) -> { group, fog, update(cameraPos), dispose(), info }
+ *   VRender.terrain.build(regionId, { isTouch, flora, far }) -> { group, fog, update(cameraPos), dispose(), info }
  */
 (function (root) {
   'use strict';
@@ -140,7 +140,7 @@
     }
     const lavaFx = crater(id, group);
     const mouth = R.lair ? lairMouth(id, group) : null;
-    const flora = VR.flora ? VR.flora.build(id, { isTouch: !!opts.isTouch }) : null;
+    const flora = VR.flora ? VR.flora.build(id, { isTouch: !!opts.isTouch, flora: opts.flora }) : null;
     if (flora) group.add(flora.group);
 
     let visible = chunks.length;
