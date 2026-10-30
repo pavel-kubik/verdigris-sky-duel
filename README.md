@@ -37,7 +37,39 @@ Nothing can hurt the dragon during the tutorial. Each lesson opens with a paused
 | Barrel roll (dodge) | Q / E | Roll |
 | Pause | Esc | II |
 
+The campaign adds **Grab** (G / Grab button, hold) and **Eat** (X / Eat button, hold) and uses the same flight controls - see [Campaign](#campaign-alpha-campaign) below.
+
 Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
+
+## Campaign (alpha, `/campaign/`)
+
+- **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/ (or **Campaign (alpha)** on the home screen)
+
+A single-player survival campaign in its own page. Phase 1 (Survival MVP) is done: a hatchling hatches in a volcano lair, hunts goats, deer and boar across the **Ash Wastes** and **Wildwood**, keeps itself fed, grows visibly while it eats and becomes a **Drake** after resting in the lair once it has 1000 food. A new player reaches Drake in about 30 minutes. Later phases (landing, the kingdom, raids, missions) are planned in [`ai_sdlc/001_campaign/000_spec.md`](ai_sdlc/001_campaign/000_spec.md).
+
+- **Hunting:** fly low over a herd and hold Grab to swoop and grab prey, then hold Eat to eat it in flight. A hatchling can lift goats and deer; a boar is too heavy and fights back - roast it with fire breath and eat the roast chunks (half the food).
+- **Hunger:** drains over time and faster when boosting or breathing fire. Fed regenerates vitality, Hungry slows fire regen, Starving makes the dragon slow, without fire and slowly losing vitality.
+- **Lair:** fly into the cave on the volcano to open the lair panel: Rest (heals, rekindles fire, saves and grows to the next stage when ready), store carried prey in the larder and eat it later (it spoils over time), Leave.
+- **Regions:** at the edge of a region a travel prompt appears - press Enter or tap the travel button to fly to the other region.
+- **Death:** the dragon wakes in the lair with half vitality; prey in its claws is lost.
+- **Save:** progress is saved in `localStorage` (`vsd-campaign`) on rest, region change, death and every minute; **Continue** on the start screen resumes it.
+
+| Action | Keyboard / mouse | Touch |
+|---|---|---|
+| Turn, climb, dive | A / D, W / S | Left stick |
+| Fire breath (hold) | Space / left mouse | Breath |
+| Boost | Shift | Boost |
+| Barrel roll | Q / E | Roll |
+| Grab / swoop (hold) | G | Grab |
+| Eat (hold) | X | Eat |
+| Travel to the next region | Enter | Travel button at the region edge |
+| Lair: rest, eat, leave | Panel buttons | Panel buttons |
+
+**Code layout.** Rules live in `campaign/core/` as pure UMD modules (no DOM, no Three.js) that run in the browser (`window.VCamp`) and in Node; all tunables are in `campaign/core/data.js`. Rendering is in `campaign/render/` and `campaign/game.js`; the dragon model is `shared/dragon.js`. Phase specs and task tables are in [`ai_sdlc/001_campaign/`](ai_sdlc/001_campaign/).
+
+**Tests.** `node campaign/test/run.js` runs every campaign test (unit tests, save and death rules, a seeded hunter bot that must reach Drake in 25-35 simulated minutes; about 20 s). `node mp/sim.test.js` tests the co-op simulation.
+
+**Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, dragon parameters) and one button per debug action (feed, hunger, damage, die, to lair, to herd, to exit, save, wipe save, reset); on desktop the same actions have hotkeys listed in the panel. `?region=wild` starts in Wildwood, and `window.__vcamp` exposes the game state.
 
 ## Languages
 
