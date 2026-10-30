@@ -85,10 +85,18 @@
        stamina / s); speeds x (1 + sizeSpeed x (scale - 1)); slopes over land.maxSlope cannot be climbed (the dragon
        slides along them); stepUp x scale = the highest ledge (building solids, T12) it steps onto; stand x scale = body
        height over the surface; accel = speed response per s.
-       takeoff: `time` s in which it cannot breathe or grab, costs st stamina, climbs to minAlt + climb over the surface. */
+       takeoff: `time` s in which it cannot breathe or grab, costs st stamina, climbs to minAlt + climb over the surface.
+       pose (T07, walk.pose -> shared/dragon.js anim): gaitLen x scale = ground covered per walk cycle (feet slip a
+       little, so the legs do not blur at run speed), turnGait = cycles per s while turning on the spot, legRate = how fast
+       the legs extend / tuck outside the scripted transitions (per s); during landing the legs reach down from legsAt of
+       the touchdown and the wings fold from foldAt; during takeoff the legs are tucked by tuckAt. groundCam: chase
+       camera on the ground (x scale ^ 0.75: back, height over the dragon, look = how far ahead it looks), blended in
+       with the legs. */
     land: { maxAlt: 14, maxSpeed: 36, maxSlope: 0.45, time: 0.8, noise: 60 },
     walk: { speed: 7, run: 13, back: 3, turn: 1.8, stepUp: 1.2, runSt: 12, sizeSpeed: 0.35, stand: 1.6, accel: 6 },
     takeoff: { time: 1.0, st: 15, climb: 10, vulnerable: true },
+    pose: { gaitLen: 3, turnGait: 1.4, legRate: 4, legsAt: 0.25, foldAt: 0.55, tuckAt: 0.6 },
+    groundCam: { back: 18, height: 6, look: 10 },
     ground: { reach: 6, reachCone: 0.7, eatTime: 2.5, breathPitch: -0.15 },
     // region travel: the exit prompt shows within edgeBand of the radius while heading outward (cos of the angle
     // between heading and the outward direction >= outwardCos) and stays promptHold s after the dragon turns back;

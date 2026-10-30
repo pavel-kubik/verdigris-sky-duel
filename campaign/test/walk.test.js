@@ -211,3 +211,70 @@ function grounded(region, xz, scale) {
   S.step(cs, { sx: 0, sy: 0 }, dt);
   ok(cs.dragon.pilot.mode === 'air' && !cs.dragon.pilot.tr, 'respawn resets the pilot mode');
 }
+
+// 6. Render pose (T07, walk.pose): legs and wings follow the mode, the walk cycle follows the ground speed
+{
+  const P = D.pose;
+  // air: legs tucked, wings out, no walk cycle
+  const air = lowPilot('wild', flat, 30, 30);
+  let a = W.pose(null, air, dt, 1);
+  ok(a.ground === 0 && a.fold === 0 && a.stride === 0 && a.gait === 0, 'in the air: tucked legs, open wings, no gait');
+  // landing: legs reach down after legsAt, wings flare first and fold from foldAt, all down at touchdown
+  const p = lowPilot('wild', flat, 8, 30);
+  W.startLanding(p);
+  const seen = { flare: 0, legsEarly: 0, foldEarly: 0 };
+  while (p.mode === 'landing') {
+    W.blend(p, dt, { regionId: 'wild', scale: 1 });
+    if (p.mode !== 'landing') break;
+    W.pose(a, p, dt, 1);
+    const k = p.tr.t / p.tr.dur;
+    seen.flare = Math.max(seen.flare, a.flare);
+    if (k < P.legsAt) seen.legsEarly = Math.max(seen.legsEarly, a.ground);
+    if (k < P.foldAt) seen.foldEarly = Math.max(seen.foldEarly, a.fold);
+    ok(a.ground >= 0 && a.ground <= 1 && a.fold >= 0 && a.fold <= 1, 'pose values stay in 0..1');
+  }
+  ok(seen.flare > 0.9, 'landing flares the wings (max ' + seen.flare.toFixed(2) + ')');
+  ok(seen.legsEarly === 0 && seen.foldEarly === 0, 'legs and fold wait for their share of the touchdown');
+  W.pose(a, p, dt, 1);
+  ok(near1(a.ground) && near1(a.fold) && a.flare === 0, 'on the ground: standing legs, folded wings');
+  function near1(x) { return Math.abs(x - 1) < 0.15; }
+  for (let i = 0; i < 30; i++) W.pose(a, p, dt, 1);
+  ok(a.ground > 0.999 && a.fold > 0.999, 'standing settles fully');
+  // standing still: no steps; walking: the cycle advances with the speed; running steps faster; backing reverses
+  const g0 = a.gait;
+  for (let i = 0; i < 30; i++) W.pose(a, p, dt, 1);
+  ok(a.gait === g0 && a.stride < 0.01, 'standing still does not step');
+  const cyclesPerSec = (speed, scale, sx) => {
+    const q = Object.assign({}, p, { speed, sx: sx || 0 }), b = W.pose(null, Object.assign({}, p, { speed: 0 }), dt, scale);
+    for (let i = 0; i < 60; i++) W.pose(b, q, dt, scale);             // settle the stride
+    let tot = 0, last = b.gait;
+    for (let i = 0; i < 120; i++) { W.pose(b, q, dt, scale); let d = b.gait - last; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; tot += d; last = b.gait; }
+    return { c: tot / (2 * Math.PI) / 2, stride: b.stride };
+  };
+  const walk = cyclesPerSec(D.walk.speed, 1), run = cyclesPerSec(D.walk.run, 1), back = cyclesPerSec(-D.walk.back, 1);
+  near(walk.c, D.walk.speed / P.gaitLen, 1e-6, 'walk cycles per s = speed / gaitLen');
+  ok(run.c > walk.c * 1.5 && run.stride >= walk.stride, 'running steps faster and longer');
+  ok(back.c < 0, 'backing off runs the cycle backwards');
+  const big = cyclesPerSec(D.walk.speed * (1 + D.walk.sizeSpeed * 1.4), 2.4);
+  ok(big.c < walk.c, 'a bigger dragon takes slower, longer steps (' + big.c.toFixed(2) + ' vs ' + walk.c.toFixed(2) + ' /s)');
+  near(big.stride, walk.stride, 1e-6, 'same stride share at the same relative speed');
+  const turn = cyclesPerSec(0, 1, 1);
+  ok(turn.c > 0.5 && turn.stride > 0.3, 'turning on the spot steps');
+  // takeoff: legs tucked by tuckAt, wings open at once; in the air the legs stay tucked
+  const t = grounded('wild', flat);
+  const b = W.pose(null, t, dt, 1);
+  for (let i = 0; i < 30; i++) W.pose(b, t, dt, 1);
+  ok(W.startTakeoff(t, stats).ok, 'takes off');
+  W.pose(b, t, dt, 1);
+  ok(b.fold === 0, 'takeoff opens the wings at once');
+  let tucked = null;
+  while (t.mode === 'takeoff') {
+    W.blend(t, dt, { regionId: 'wild', scale: 1 });
+    if (t.mode !== 'takeoff') break;
+    W.pose(b, t, dt, 1);
+    if (tucked == null && b.ground === 0) tucked = t.tr.t / t.tr.dur;
+  }
+  ok(tucked != null && tucked <= P.tuckAt + 0.02, 'legs tucked by tuckAt of the takeoff (' + tucked + ')');
+  for (let i = 0; i < 10; i++) W.pose(b, t, dt, 1);
+  ok(t.mode === 'air' && b.ground === 0 && b.stride < 0.2, 'airborne: legs stay tucked');
+}
