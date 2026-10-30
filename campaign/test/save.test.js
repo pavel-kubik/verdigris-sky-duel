@@ -150,3 +150,22 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
   const s2 = mem();
   ok(SV.store(s2, cs) && SV.load(s2).data.world.region === 'wild', 'the region-change save holds the new region');
 }
+
+// Story (T104): the hatching scene hands over to the mother; her lesson state survives a reload; old saves have no teacher
+{
+  const cs = S.create({ regionId: 'ash', rng: mulberry(21) });
+  SV.apply(cs, SV.migrate(SV.blank()));
+  ok(cs.story && cs.story.act === 1 && cs.story.mother === null, 'blank run: act 1, no mother yet (the hatching scene comes first)');
+  LR.hatch(cs);
+  cs.story.mother.lesson = 2;
+  const st = mem();
+  ok(SV.store(st, cs), 'store after hatch');
+  const raw = JSON.parse(st.m[D.saveKey]);
+  ok(raw.story.act === 1 && raw.story.mother.lesson === 2 && raw.story.mother.at === 'lair', 'story.mother serialised');
+  const back = SV.deserialise(SV.load(st).data, mulberry(3));
+  ok(back.story.mother && back.story.mother.lesson === 2 && back.story.mother.at === 'lair', 'mother lesson restored');
+  const old = JSON.parse(st.m[D.saveKey]); old.story = { act: 1 };
+  ok(SV.deserialise(SV.migrate(old), mulberry(3)).story.mother === null, 'a phase 1 save (story without mother) keeps playing without a teacher');
+  const v0 = SV.deserialise(SV.migrate({ stage: 0, xp: 10, hp: 30, hunger: 50, region: 'ash', pos: [0, 120, 0] }), mulberry(3));
+  ok(v0.story.act === 1 && v0.story.mother === null, 'v0 migration fills the story');
+}
