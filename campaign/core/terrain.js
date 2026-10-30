@@ -116,5 +116,26 @@
     return surfaceAt(id, f.x, f.z) + 3;
   }
 
-  M.define('terrain', { GRID, CHUNK, heightAt, surfaceAt, slopeAt, clampToRegion, lairPos, lavaLevel, region, noise });
+  /**
+   * Liquid at (x, z): 'lava' in a crater below the lava level, 'water' inside a region water disc
+   * (region.water: [{ x, z, r }], rivers come with the River Farmlands in T11), else null. Not landable.
+   */
+  function liquidAt(id, x, z) {
+    const R = region(id);
+    for (const f of R.terrain.features) {
+      if (f.type !== 'cone' || !f.crater) continue;
+      if (Math.hypot(x - f.x, z - f.z) < f.crater.r && surfaceAt(id, x, z) < lavaLevel(id)) return 'lava';
+    }
+    for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return 'water';
+    return null;
+  }
+
+  /** Slope (rise / run) of the drawn surface, from central differences over half a grid cell. */
+  function surfaceSlope(id, x, z) {
+    const e = GRID / 2;
+    const dx = surfaceAt(id, x + e, z) - surfaceAt(id, x - e, z), dz = surfaceAt(id, x, z + e) - surfaceAt(id, x, z - e);
+    return Math.hypot(dx, dz) / (2 * e);
+  }
+
+  M.define('terrain', { GRID, CHUNK, heightAt, surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
 })(typeof self !== 'undefined' ? self : this);

@@ -6,14 +6,17 @@
  *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
  *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
  *                                                 then the mother (core/mother.js, T05) reads the frame's events
- * input: { sx, sy, breath, boost, grab, eat, confirm, enter } (sx / sy in -1..1, the rest booleans;
- *        confirm = travel through the offered exit, enter = the Move slot's "Enter cave").
+ * input: { sx, sy, breath, boost, grab, eat, confirm, enter, land } (sx / sy in -1..1, the rest booleans;
+ *        confirm = travel through the offered exit, enter = the Move slot's "Enter cave",
+ *        land = one-shot Land / Fly (F or the Move slot): lands when walk.canLand allows it, takes off on the ground).
+ * Locomotion (T06): pilot.mode air -> flight.step, ground -> walk.step, landing / takeoff -> walk.blend.
+ *        On the ground there is no swoop, grab (pick up comes in T08), roll or region travel.
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -40,7 +43,8 @@
       fire: null,                    // fire target { id, inRange, cook 0..1, kept? } (orange ring, roast progress), or null
       fireMem: null,                 // id of the last prey that got heat: stays the fire target while warm (kept: true)
       exit: null,                    // the region exit on offer (prompt "Fly to ..."), or null
-      exitT: 0,                      // seconds the offer stays after the dragon turns back from the edge
+      exitT: 0,
+      landOk: false,                 // landing allowed right now (walk.canLand), the Move slot offers Land                      // seconds the offer stays after the dragon turns back from the edge
       saveT: 0,                      // seconds since the last autosave
       rng: (opts && opts.rng) || Math.random,
       bus: createBus(),
@@ -95,9 +99,14 @@
     const eating = !!carried && !!inp.eat;
     cs.stats.played += dt;
 
+    // locomotion mode (T06): Land / Fly one-shot, then the mode decides what moves the dragon
+    if (!p.mode) p.mode = 'air';
+    if (inp.land) landToggle(cs, p, stats, eff, ev);
+    const air = p.mode === 'air';
+
     // swoop: holding grab with liftable prey ahead steers the dive onto it (aim assist for the claws)
     let fly = inp;
-    const target = !carried ? PR.swoopTarget(cs.field, p, stats, eff, scale) : null;
+    const target = !carried && air ? PR.swoopTarget(cs.field, p, stats, eff, scale) : null;
     cs.target = target ? target.id : null;
     cs.swoop = inp.grab && target ? target.id : null;
     if (cs.swoop != null) {
@@ -108,7 +117,16 @@
       fly = Object.assign({}, inp, { sx: clamp(-turn * Sw.steer, -1, 1), sy: clamp(pitchWant / 0.75, -1, 1), boost: false });
     }
 
-    F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating, softEdge: RG.softEdgeAt(cs.region, p.pos, F.SOFT_EDGE) });
+    if (air) F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating, softEdge: RG.softEdgeAt(cs.region, p.pos, F.SOFT_EDGE) });
+    else {
+      const wctx = { regionId: cs.region, stats, effects: eff, eating, scale };
+      if (p.mode === 'ground') WK.step(p, inp, dt, wctx);
+      else {
+        const done = WK.blend(p, dt, wctx);
+        if (done === 'landed') emit(cs, ev, { e: 'dragon:landed', pos: p.pos.slice(), noise: D.land.noise });
+        if (done === 'airborne') emit(cs, ev, { e: 'dragon:airborne' });
+      }
+    }
 
     const hs = HN.step(d, dt, { boosting: p.boosting, breathing: p.breathing });
     if (hs) emit(cs, ev, { e: 'hunger:state', state: hs });
@@ -153,8 +171,8 @@
 
     // grab
     cs.flags.heavyT = Math.max(0, cs.flags.heavyT - dt);
-    const r = PR.reach(cs.field, p, stats, eff, scale);
-    if (!carried && inp.grab) {
+    const r = air ? PR.reach(cs.field, p, stats, eff, scale) : { best: null };
+    if (!carried && inp.grab && air) {
       const g = PR.tryGrab(cs.field, p, stats, eff, scale);
       if (g.prey) { d.carried = g.prey.id; carried = g.prey; emit(cs, ev, { e: 'prey:grabbed', type: g.prey.type, id: g.prey.id }); }
       else if (g.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: g.heavy.type }); }
@@ -182,7 +200,7 @@
     }
 
     // region edge: offer the exit while near it heading outward (and a moment after); confirm travels
-    const ex = RG.exitAt(cs.region, p.pos, p.yaw);
+    const ex = air ? RG.exitAt(cs.region, p.pos, p.yaw) : null;
     if (ex) {
       if (!cs.exit || cs.exit.to !== ex.to) emit(cs, ev, { e: 'region:exit', from: cs.region, to: ex.to });
       cs.exit = ex; cs.exitT = D.travel.promptHold;
@@ -193,8 +211,23 @@
       carried = carriedPrey(cs);
     }
 
-    cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : null;
+    cs.landOk = air && WK.canLand(p, cs.region).ok;                // the Move slot offers Land (controls.slots)
+    if (!air) cs.hint = carried ? 'eat' : p.mode === 'ground' ? 'walk' : null;
+    else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
+  }
+
+  /** Land / Fly one-shot: lands when allowed (else says why), takes off on the ground (else says why). */
+  function landToggle(cs, p, stats, eff, ev) {
+    if (p.mode === 'air') {
+      const c = WK.canLand(p, cs.region);
+      if (c.ok) { WK.startLanding(p); cs.swoop = null; emit(cs, ev, { e: 'dragon:landing', noise: D.land.noise }); }
+      else emit(cs, ev, { e: 'land:refused', why: c.why });
+    } else if (p.mode === 'ground') {
+      const c = WK.startTakeoff(p, stats, eff);
+      if (c.ok) emit(cs, ev, { e: 'dragon:takeoff' });
+      else emit(cs, ev, { e: 'takeoff:refused', why: c.why });
+    }
   }
 
   /** Death: hand over to lair.respawn (carried prey lost, wake in the lair) and end this step. */

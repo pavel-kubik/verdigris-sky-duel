@@ -24,6 +24,7 @@
       yaw: yaw || 0, pitch: 0, roll: 0, rollX: 0, sx: 0,
       speed: speed || 30, st: 100, rollT: 0, rollDir: 1, inv: 0,
       boosting: false, breathing: false,
+      mode: 'air', tr: null,         // pilot mode (core/walk.js, T06): air | landing | ground | takeoff; tr = transition state
     };
   }
 
@@ -86,7 +87,7 @@
   }
 
   function tryRoll(p, dir) {
-    if (p.rollT > 0 || p.st < ROLL_COST) return false;
+    if ((p.mode && p.mode !== 'air') || p.rollT > 0 || p.st < ROLL_COST) return false;   // no barrel roll on the ground
     p.st -= ROLL_COST; p.rollT = ROLL_TIME; p.rollDir = dir < 0 ? -1 : 1; p.inv = ROLL_INV;
     return true;
   }
