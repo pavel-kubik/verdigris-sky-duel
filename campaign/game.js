@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't105.1 2026-10-30 mother dragon teaches the hatchling';
+  const BUILD = 't105.2 2026-10-30 arrow to the mother, she holds the boar still';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -203,6 +203,29 @@
     momEl.hidden = !tk;
     if (tk) { momText.textContent = t(tk); momEl.classList.toggle('good', tk.indexOf('.good.') > 0 || tk === 'c.mother.visit'); }
     if (tk) $('#hint').hidden = true;                             // she replaces the old hunting tip
+  }
+  /** Arrow at the screen edge pointing to the mother while she is out of view (behind the camera too). */
+  const momArrow = $('#momArrow'), projV = new V3();
+  function motherArrow() {
+    const m = cs.mom, on = state === 'play' && !!(m && m.pos && !m.hidden) && !cs.inLair && !!pilot;
+    let show = false;
+    if (on) {
+      projV.set(m.pos[0], m.pos[1] + 2, m.pos[2]).project(camera);
+      const behind = projV.z > 1, W = innerWidth, H = innerHeight;
+      let x = behind ? -projV.x : projV.x, y = behind ? -projV.y : projV.y;
+      if (behind || Math.abs(x) > 0.94 || Math.abs(y) > 0.92) {
+        let px = x * W / 2, py = -y * H / 2;
+        if (Math.hypot(px, py) < 1) py = 1;                      // straight behind: point down
+        const land = isTouch && W > H && H < 560;               // keep clear of the HUD, the caption and the controls
+        const top = land ? 70 : isTouch ? 190 : 140, bot = land ? 30 : isTouch ? 250 : 90, side = land ? 210 : 30;
+        const minX = -W / 2 + side, maxX = W / 2 - side, minY = -H / 2 + top, maxY = H / 2 - bot;
+        const kx = px > 0 ? maxX / px : px < 0 ? minX / px : Infinity, ky = py > 0 ? maxY / py : py < 0 ? minY / py : Infinity;
+        const k = Math.min(kx, ky);
+        momArrow.style.transform = 'translate(' + (W / 2 + px * k).toFixed(1) + 'px,' + (H / 2 + py * k).toFixed(1) + 'px) rotate(' + Math.atan2(py, px).toFixed(3) + 'rad)';
+        show = true;
+      }
+    }
+    if (momArrow.hidden === show) momArrow.hidden = !show;
   }
   function embers(pos, n) {
     for (let k = 0; k < n; k++) {
@@ -784,6 +807,7 @@
     if (dt > 0) updateParticles(dt);
     if (state === 'intro' || !pilot) mom.root.visible = false;
     motherHud();
+    motherArrow();
     preyView.update(cs.field, time, carryPose());
     targetRing();
     renderer.render(scene, camera);

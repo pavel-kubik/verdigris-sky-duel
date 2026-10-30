@@ -173,6 +173,10 @@
         return [x, Math.max(p.pos[1] + 4, ground(x, z) + MO.alt), z];
       }
     }
+    if ((m.phase === 'show' || m.phase === 'wait') && L && L.show === 'breath' && g.prey != null) {
+      const q = PR.byId(cs.field, g.prey);
+      if (q) q.held = MO.hold;                                 // she holds the heavy prey still for the hatchling's fire
+    }
     if (m.phase === 'show') {
       const u = m.t / MO.showTime;
       if (u >= 1) { m.shown = true; m.phase = 'wait'; m.t = 0; }

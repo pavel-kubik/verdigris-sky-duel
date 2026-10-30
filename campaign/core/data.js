@@ -61,7 +61,7 @@
               charge: { range: 14, maxAboveGround: 7, damage: 8, cooldown: 3 } },
     },
     // A burned prey leaves ceil(food * foodMult / chunkFood) chunks; the roast food is split evenly.
-    roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11.5, cookTime: 1.2, cool: 0.5, scatter: 2.5, life: 120 },
+    roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11.5, cookTime: 1.2, cool: 0.2, scatter: 2.5, life: 120 },
     // fire breath reach: a cone from the mouth (range x dragon scale); prey inside it heat up toward cookTime
     breath: { range: 30, cone: 0.42, mouth: 2.8, assist: 0.75 },   // assist: the stream bends toward prey this far off the heading
     // grab reach: horizontal radius x dragon scale, height over the prey's back (+ the claw drop at this scale),
@@ -121,13 +121,15 @@
        the claws are empty. done: { event: [...] } completes on any of those core events, { follow: s } after s
        seconds within followRange of her, { dive: s } after s seconds pitched below divePitch.
        After the lessons (and between lessons while the dragon is a Drake) she leaves and visits now and then:
+       While she shows or waits over a heavy prey (roast lesson) she holds it still: it cannot move or charge
+       for `hold` s after each frame she is there (prey.held).
        visit[0] for a hatchling, visit[1] for a Drake (away longer, stays shorter). danger: zones per region she
        never enters (defenders add theirs through ctx.danger from T15 on). */
     mother: {
       scale: 3.1, speed: 70, gain: 1.6, accel: 2.5, minAlt: 10, alt: 22, ahead: 40, side: 22, spawnAhead: 14,
       followRange: 60, divePitch: -0.32, showRange: 110, arrive: 60, loseRange: 320, showTime: 4.5, skim: 4,
       breathStand: 22, breathAlt: 9, circleR: 30, circleAlt: 34, circleRate: 0.45, praiseTime: 3.5,
-      exitInset: 130, dangerPad: 40, teleport: 650, leaveFade: 5, drakeGap: 90,
+      exitInset: 130, dangerPad: 40, hold: 0.5, teleport: 650, leaveFade: 5, drakeGap: 90,
       visit: [{ away: 150, stay: 40 }, { away: 420, stay: 25 }],
       lessons: [
         { id: 'fly',   goal: 'self',  done: { follow: 6 } },

@@ -110,6 +110,7 @@
   function stepOne(field, p, dragon, dt, ctx, ev) {
     const def = D.prey[p.type], rng = ctx.rng, herd = field.herds.find(h => h.id === p.herd);
     p.t += dt; p.cd = Math.max(0, p.cd - dt);
+    if (p.held > 0) { p.held -= dt; p.speed = 0; if (p.state === 'charge') p.state = 'flee'; return; }   // the mother holds it still (T05)
     const th = threat(field, p, dragon, ctx.stats);
     const inRange = th.low && th.d < th.range;
     const away = Math.atan2(p.pos[0] - dragon.pos[0], p.pos[2] - dragon.pos[2]);
