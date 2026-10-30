@@ -108,6 +108,15 @@
     // the Move slot "Enter cave" (touch) within enterRange of the mouth while heading toward it
     lair: { larderSize: 3, spoilEvery: 30, nearRange: 140, enterRange: 80, respawnHp: 0.5, respawnHunger: 40 },
 
+    /* Compass and smell (Phase 2 T09, core/nav.js, render/compass.js; 002_task_kingdom.md 4.7).
+       nav: at most `markers` markers on the strip, which spans `fov` rad around the heading (markers outside it stick
+       to the edges as arrows); a tapped marker shows its name and distance for `tagTime` s.
+       smell: range x stage spot ^ 0.5, x hungryMult when hungry or starving, x starveMult more when starving;
+       inside `sharp` the scent points exactly at the herd, beyond it the marker drifts up to `blur` rad off at full
+       range (smooth, no jitter); scents are re-read every `update` s, the strongest `max` (herd size x closeness) shown. */
+    nav: { markers: 7, fov: 2.4, tagTime: 3 },
+    smell: { range: 380, hungryMult: 1.4, starveMult: 1.3, sharp: 120, blur: 0.7, update: 0.5, max: 3 },
+
     regions: {
       ash: {
         nameKey: 'c.region.ash', radius: 1100, seed: 11, ceiling: 320,
