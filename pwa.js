@@ -4,6 +4,7 @@
  * "Install app" buttons (.installBtn) and hint text (.installHint).
  * Chrome/Edge/Android: uses the browser's install prompt.
  * iOS/iPadOS: there is no prompt, so the button explains Share > Add to Home Screen.
+ * Also blocks pinch and double-tap page zoom on phones (all pages load this file).
  */
 (function () {
   'use strict';
@@ -15,6 +16,19 @@
       navigator.serviceWorker.register(new URL('sw.js', here)).catch(err => console.warn('Service worker not registered', err));
     });
   }
+
+  /* No page zoom on phones (games need every touch): iOS Safari ignores user-scalable=no, so pinch (gesture* events,
+     two-finger touchmove) and double-tap zoom are blocked here. Panels still scroll with one finger. */
+  document.documentElement.style.touchAction = 'manipulation';
+  const stop = e => { if (e.cancelable) e.preventDefault(); };
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, stop, { passive: false });
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1 || (e.scale !== undefined && e.scale !== 1)) stop(e); }, { passive: false });
+  let lastTap = 0;
+  document.addEventListener('touchend', e => {                      // double tap outside buttons and inputs
+    const now = Date.now();
+    if (now - lastTap < 300 && e.cancelable && !e.target.closest('button, input, select, a, label')) e.preventDefault();
+    lastTap = now;
+  }, { passive: false });
 
   const installed = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
