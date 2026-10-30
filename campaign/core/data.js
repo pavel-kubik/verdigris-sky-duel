@@ -114,6 +114,32 @@
     },
     startRegion: 'ash',
 
+    /* The mother dragon (Phase 2 T05, core/mother.js). She flies ahead toward the lesson's goal, demonstrates
+       (show) once the hatchling is within showRange of it, then circles over it (wait) until the hatchling copies her.
+       goal: 'self' (fly ahead of the hatchling), 'herd' (nearest prey it can lift), 'heavy' (nearest prey too big
+       to lift), 'lair' (the cave mouth); a goal in another region leads to that exit. needPrey: lead to a herd while
+       the claws are empty. done: { event: [...] } completes on any of those core events, { follow: s } after s
+       seconds within followRange of her, { dive: s } after s seconds pitched below divePitch.
+       After the lessons (and between lessons while the dragon is a Drake) she leaves and visits now and then:
+       visit[0] for a hatchling, visit[1] for a Drake (away longer, stays shorter). danger: zones per region she
+       never enters (defenders add theirs through ctx.danger from T15 on). */
+    mother: {
+      scale: 3.1, speed: 70, gain: 1.6, accel: 2.5, minAlt: 10, alt: 22, ahead: 40, side: 14, behind: 18,
+      followRange: 60, divePitch: -0.32, showRange: 110, arrive: 60, loseRange: 320, showTime: 4.5, skim: 4,
+      breathStand: 22, breathAlt: 9, circleR: 30, circleAlt: 34, circleRate: 0.45, praiseTime: 3.5,
+      exitInset: 130, dangerPad: 40, teleport: 650, leaveFade: 5, drakeGap: 90,
+      visit: [{ away: 150, stay: 40 }, { away: 420, stay: 25 }],
+      lessons: [
+        { id: 'fly',   goal: 'self',  done: { follow: 6 } },
+        { id: 'dive',  goal: 'herd',  show: 'dive',   done: { dive: 0.8 } },
+        { id: 'grab',  goal: 'herd',  show: 'grab',   done: { event: ['prey:grabbed'] } },
+        { id: 'eat',   goal: 'self',  needPrey: true, done: { event: ['prey:eaten'] } },
+        { id: 'roast', goal: 'heavy', show: 'breath', done: { event: ['prey:roasted'] } },
+        { id: 'carry', goal: 'lair',  needPrey: true, done: { event: ['lair:stored', 'lair:full'] } },
+        { id: 'rest',  goal: 'lair',  done: { event: ['lair:rest'] } },
+      ],
+    },
+
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter' },
   };
 

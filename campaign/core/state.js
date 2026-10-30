@@ -5,6 +5,7 @@
  *   step(cs, input, dt) -> events[]               flight -> hunger -> prey -> grab -> eat -> lair -> region
  *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
  *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
+ *                                                 then the mother (core/mother.js, T05) reads the frame's events
  * input: { sx, sy, breath, boost, grab, eat, confirm, enter } (sx / sy in -1..1, the rest booleans;
  *        confirm = travel through the offered exit, enter = the Move slot's "Enter cave").
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
@@ -12,7 +13,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -63,6 +64,7 @@
     const ev = [];
     if (!cs.dragon.pilot) return ev;
     run(cs, inp, dt, ev);
+    for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);
   }
 
@@ -191,7 +193,7 @@
   }
 
   /** Lair panel actions (game.js buttons); each returns events and emits them on the bus. */
-  const relay = (cs, list) => { const ev = []; for (const e of list) emit(cs, ev, e); return ev; };
+  const relay = (cs, list) => { const ev = []; for (const e of list) emit(cs, ev, e); for (const e of MO.step(cs, ev, 0)) emit(cs, ev, e); return ev; };
   const lairRest = cs => autosave(cs, relay(cs, LR.rest(cs).events), 0);
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
