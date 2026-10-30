@@ -1,10 +1,14 @@
 /*
- * Verdigris Sky Duel - procedural low-poly dragon, shared by pages that load it (campaign).
- * Extracted from the solo page (index.html) without changes to the model, plus a `claws`
- * anchor for carried prey. Needs THREE (r128) loaded first. Exposes window.VDragon:
- *   makeDragon(palette) -> { root, body, neck, tail, jaw, head, mouth, wings, claws, mats, meshes, flash, anim(time, dt, o) }
+ * Verdigris Sky Duel - procedural low-poly dragon, the one model used by every page:
+ * solo duel and tutorial (index.html), co-op (mp/) and the campaign. Needs THREE (r128)
+ * loaded first. Exposes window.VDragon:
+ *   makeDragon(palette, opts) -> { root, body, neck, tail, jaw, head, mouth, wings, claws, mats, meshes, flash,
+ *                                  anim(time, dt, o), dispose() }
+ *     opts.toes (default true): claw cones on the feet. Co-op passes false to keep its lighter model.
+ *     dispose(): removes root from its parent and frees its geometries and materials (the shared
+ *     segment geometry stays).
  *   GREEN, CRIMSON palettes
- * The solo and co-op pages still carry their own copies; deduplication is planned before campaign phase 2.
+ * Campaign phase 2 adds legs and a walk cycle here (T07); the flight pose must stay unchanged.
  */
 (function(root){
 "use strict";
@@ -24,7 +28,8 @@ function membrane(tris,mat){
 function spike(parent,x,y,z,s,mat,tilt){
   const m=new THREE.Mesh(new THREE.ConeGeometry(s*0.45,s,4),mat);m.position.set(x,y,z);m.rotation.x=tilt==null?-0.55:tilt;parent.add(m);return m;
 }
-function makeDragon(c){
+function makeDragon(c,opts){
+  const toes=!opts||opts.toes!==false;
   if(!segGeo)segGeo=new THREE.IcosahedronGeometry(1,1);
   const M=(col,o)=>new THREE.MeshStandardMaterial(Object.assign({color:col,flatShading:true,roughness:.55,metalness:.12},o||{}));
   const mBody=M(c.body),mDark=M(c.dark),mBelly=M(c.belly,{roughness:.8}),mWing=M(c.wing,{side:THREE.DoubleSide,roughness:.85,metalness:0}),mHorn=M(c.horn,{roughness:.35}),mEye=new THREE.MeshBasicMaterial({color:c.eye});
@@ -75,10 +80,10 @@ function makeDragon(c){
     const thigh=new THREE.Mesh(segGeo,mBody);thigh.scale.set(0.42,0.58,0.62);thigh.position.set(s*0.72,-0.38,-0.95);body.add(thigh);
     body.add(bone(new V3(s*0.82,-0.75,-1.05),new V3(s*0.78,-1.15,-1.75),0.17,0.12,mDark));
     body.add(bone(new V3(s*0.78,-1.15,-1.75),new V3(s*0.75,-1.05,-2.25),0.11,0.08,mDark));
-    for(let k=-1;k<=1;k++){const cl=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.28,4),mHorn);cl.position.set(s*0.75+k*0.09,-1.08,-2.35);cl.rotation.x=-1.9;body.add(cl);}
+    if(toes)for(let k=-1;k<=1;k++){const cl=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.28,4),mHorn);cl.position.set(s*0.75+k*0.09,-1.08,-2.35);cl.rotation.x=-1.9;body.add(cl);}
     body.add(bone(new V3(s*0.6,-0.45,1.15),new V3(s*0.7,-0.98,1.3),0.13,0.09,mBody));
     body.add(bone(new V3(s*0.7,-0.98,1.3),new V3(s*0.66,-1.05,0.85),0.09,0.07,mDark));
-    for(let k=-1;k<=1;k++){const cl=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.2,4),mHorn);cl.position.set(s*0.66+k*0.07,-1.07,0.75);cl.rotation.x=-1.9;body.add(cl);}
+    if(toes)for(let k=-1;k<=1;k++){const cl=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.2,4),mHorn);cl.position.set(s*0.66+k*0.07,-1.07,0.75);cl.rotation.x=-1.9;body.add(cl);}
   });
 
   // wings
@@ -116,6 +121,12 @@ function makeDragon(c){
     jaw.rotation.x+=((o.mouth?0.65:0.04)-jaw.rotation.x)*Math.min(1,dt*12);
     if(d.flash>0){d.flash=Math.max(0,d.flash-dt*4);}
     const f=d.flash;mats.forEach(m=>m.emissive.setRGB(f*0.9,f*0.45,f*0.15));
+  };
+  d.dispose=function(){
+    if(root.parent)root.parent.remove(root);
+    const ms=new Set();
+    root.traverse(o=>{if(o.isMesh){if(o.geometry!==segGeo)o.geometry.dispose();ms.add(o.material);}});
+    ms.forEach(m=>m.dispose());
   };
   return d;
 }
