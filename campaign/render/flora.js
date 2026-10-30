@@ -2,7 +2,8 @@
  * Verdigris campaign - instanced trees and rocks for a region.
  * One InstancedMesh per part (trunk, crown, rock), seeded from the region so the forest is the
  * same every visit. Trees avoid water, steep ground, the volcano and the region rim.
- *   VRender.flora.build(regionId, { isTouch }) -> { group, count: { trees, rocks }, trees: [[x, z, r]], dispose() }
+ *   VRender.flora.build(regionId, { flora }) ->  (flora = share of the region's trees, quality tier; isTouch = 0.5 kept as fallback)
+ *     -> { group, count: { trees, rocks }, trees: [[x, z, r]], dispose() }
  */
 (function (root) {
   'use strict';
@@ -38,7 +39,8 @@
     const R = T.region(id), pal = R.palette, rng = Mth.mulberry(R.seed * 7919 + 3);
     const group = new THREE.Group(); group.name = 'flora:' + id;
     const cone = R.terrain.features.find(f => f.type === 'cone');
-    const nTrees = Math.round(R.flora.trees * (opts && opts.isTouch ? 0.5 : 1));
+    const share = opts && opts.flora != null ? opts.flora : opts && opts.isTouch ? 0.5 : 1;
+    const nTrees = Math.round(R.flora.trees * share);
     const treeOk = (x, z) => {
       const h = T.surfaceAt(id, x, z);
       if (h < 2.2) return false;
