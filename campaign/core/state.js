@@ -5,7 +5,8 @@
  *   step(cs, input, dt) -> events[]               flight -> hunger -> prey -> grab -> eat -> lair -> region
  *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
  *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
- * input: { sx, sy, breath, boost, grab, eat, confirm } (sx / sy in -1..1, the rest booleans).
+ * input: { sx, sy, breath, boost, grab, eat, confirm, enter } (sx / sy in -1..1, the rest booleans;
+ *        confirm = travel through the offered exit, enter = the Move slot's "Enter cave").
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
@@ -158,8 +159,8 @@
       }
     } else d.eatT = 0;
 
-    // lair: flying into the cave mouth enters it (a carried prey goes into the larder)
-    if (LR.inMouth(cs)) {
+    // lair: flying into the cave mouth enters it (a carried prey goes into the larder); so does the Move slot close by
+    if (LR.inMouth(cs) || (inp.enter && LR.canEnter(cs))) {
       for (const e of LR.enter(cs)) emit(cs, ev, e);
       cs.exit = null; cs.exitT = 0;
       return ev;

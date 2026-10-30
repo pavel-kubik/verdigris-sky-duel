@@ -4,6 +4,7 @@
  *   mouthPos(regionId) -> [x, y, z] | null    centre of the cave mouth (only regions with a lair)
  *   inMouth(cs) -> boolean                    dragon inside the mouth sphere (radius grows a little with scale)
  *   near(cs) -> boolean                       dragon close to the mouth (for the "fly into the cave" prompt)
+ *   canEnter(cs) -> boolean                   near() and within enterRange: the Move slot offers "Enter cave"
  *   enter(cs) -> events[]                     stores a carried prey if there is room, cs.inLair = true
  *   rest(cs) -> { grew, from, to, events }    HP and fire to max, stage-up if food XP is ready
  *   eatFromLarder(cs, index) -> events[]      feeds the stored item's current food
@@ -40,6 +41,11 @@
     if (cs.inLair || !(distToMouth(cs) < L.nearRange)) return false;
     const m = mouthPos(cs.region), p = cs.dragon.pilot;
     return Math.cos(Math.atan2(m[0] - p.pos[0], m[2] - p.pos[2]) - p.yaw) > 0.3;
+  }
+
+  /** Close enough for the Move slot's "Enter cave" (a shortcut for the last few seconds of the approach). */
+  function canEnter(cs) {
+    return near(cs) && distToMouth(cs) < L.enterRange;
   }
 
   function enter(cs) {
@@ -158,5 +164,5 @@
     return wake(cs, [], { hatch: true });
   }
 
-  M.define('lair', { mouthPos, distToMouth, inMouth, near, enter, rest, eatFromLarder, leave, spoil, home, respawn, hatch });
+  M.define('lair', { mouthPos, distToMouth, inMouth, near, canEnter, enter, rest, eatFromLarder, leave, spoil, home, respawn, hatch });
 })(typeof self !== 'undefined' ? self : this);
