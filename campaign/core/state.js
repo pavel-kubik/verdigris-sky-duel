@@ -11,6 +11,7 @@
  *        land = one-shot Land / Fly (F or the Move slot): lands when walk.canLand allows it, takes off on the ground).
  * Locomotion (T06): pilot.mode air -> flight.step, ground -> walk.step, landing / takeoff -> walk.blend.
  *        On the ground there is no swoop, roll or region travel.
+ * Breath pressed while no fire is possible emits breath:blocked { why: 'starving' | 'tired' } once per press (T08).
  * Ground actions (T08): Grab picks up the prey or roast in front (walk.inFront, ground.reach), carried in the jaws;
  *        Eat on the ground takes ground.eatTime and stands still (a boar's hit cancels it); the breath aims
  *        ground.breathPitch lower so it sweeps the ground in front.
@@ -105,6 +106,12 @@
     // locomotion mode (T06): Land / Fly one-shot, then the mode decides what moves the dragon
     if (!p.mode) p.mode = 'air';
     if (inp.land) landToggle(cs, p, stats, eff, ev);
+    // Breath pressed but no fire (T08 feedback): say why once per press - starving (hunger.starving.breath) or the fire bar is empty
+    if (inp.breath && !cs.breathHeld && (p.mode || 'air') !== 'landing' && p.mode !== 'takeoff') {
+      if (!eff.canBreath) emit(cs, ev, { e: 'breath:blocked', why: 'starving' });
+      else if (p.st <= 8) emit(cs, ev, { e: 'breath:blocked', why: 'tired' });
+    }
+    cs.breathHeld = !!inp.breath;
     const air = p.mode === 'air';
 
     // swoop: holding grab with liftable prey ahead steers the dive onto it (aim assist for the claws)

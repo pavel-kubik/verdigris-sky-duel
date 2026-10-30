@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't108.1 2026-10-30 ground actions: pick up, eat and breath on the ground, debug goat here';
+  const BUILD = 't108.2 2026-10-30 no-fire message when starving or out of fire, dim Breath button';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -300,7 +300,8 @@
   $('#bRoll').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') F.tryRoll(pilot, touch.x < -0.2 ? -1 : 1); });
   /* context slots (T101, core/controls.js): Action (hold) = Grab / Eat, Move (tap) = Fly to <region> / Enter cave.
      The Action kind is latched at the press, so a grab hold that catches a prey does not start eating it. */
-  const bAction = $('#bAction'), bMove = $('#bMove'), bRoll = $('#bRoll');
+  const bAction = $('#bAction'), bMove = $('#bMove'), bRoll = $('#bRoll'), bBreath = $('#bBreath');
+  let breathDim = false;
   let slotNow = { action: null, move: null, roll: true }, actionKind = null;
   bAction.addEventListener('pointerdown', e => {
     e.preventDefault();
@@ -592,6 +593,7 @@
       else if (e.e === 'prey:grabbed') flashPrompt(null);
       else if (e.e === 'land:refused') flashPrompt(t('c.land.' + e.why), 1.8);
       else if (e.e === 'takeoff:refused') flashPrompt(t('c.takeoff.' + e.why), 1.8);
+      else if (e.e === 'breath:blocked') flashPrompt(t('c.breath.' + e.why), 2.2);
       else if (e.e === 'dragon:landed') shake = Math.max(shake, 0.25 * heroScale);
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
       else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
@@ -635,6 +637,8 @@
       bMove.classList.toggle('off', !mk); moveShown = mk;
     }
     bRoll.classList.toggle('off', !slotNow.roll);
+    const noFire = !HN.effects(dragon.hunger).canBreath;            // starving: the Breath button dims (T08 feedback)
+    if (noFire !== breathDim) { bBreath.classList.toggle('dim', noFire); breathDim = noFire; }
   }
   function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }
   function promptHud(dt) {
