@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't107.1 2026-10-30 legs, walk cycle, folded wings, ground camera';
+  const BUILD = 't108.1 2026-10-30 ground actions: pick up, eat and breath on the ground';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -498,7 +498,7 @@
   const ringMesh = new THREE.Mesh(new THREE.RingGeometry(2.6, 3.3, 28), ringMat);
   ringMesh.rotation.x = -Math.PI / 2; ringMesh.renderOrder = 5; ringMesh.visible = false; scene.add(ringMesh);
   function targetRing() {
-    const id = state === 'play' && pilot ? (cs.swoop != null ? cs.swoop : cs.hint === 'swoop' ? cs.target : null) : null;
+    const id = state === 'play' && pilot ? (cs.swoop != null ? cs.swoop : cs.hint === 'swoop' || (cs.hint === 'grab' && pilot.mode === 'ground') ? cs.target : null) : null;   // T08: also what Grab picks up on the ground
     const q = id != null ? PR.byId(cs.field, id) : null;
     ringMesh.visible = !!q;
     if (!q) return;
@@ -524,13 +524,14 @@
     fireMat.opacity = hot ? 0.95 : f.inRange ? 0.6 : 0.3;
   }
 
-  /** Where the carried prey hangs: at the claw anchor, facing with the dragon. */
+  /** Where the carried prey hangs: at the claw anchor, facing with the dragon; on the ground in the jaws (T08). */
   const clawW = new V3();
   function carryPose() {
     const p = pilot && ST.carriedPrey(cs);
     if (!p) return null;
-    hero.claws.getWorldPosition(clawW);
-    return { id: p.id, pos: clawW, yaw: pilot.yaw, pitch: pilot.pitch };
+    const jaws = (heroPose.ground || 0) > 0.5;
+    (jaws ? hero.mouth : hero.claws).getWorldPosition(clawW);
+    return { id: p.id, pos: clawW, yaw: pilot.yaw, pitch: pilot.pitch, jaws };
   }
 
   function poseHero(dt) {
@@ -645,15 +646,15 @@
     else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
     else if (cs.inLair) text = '';
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
-    else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / D.eat.time; }
-    else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
+    else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / ST.eatTime(cs); }
+    else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / ST.eatTime(cs); }
     else if (cs.fire && dragon.carried == null && (pilot.breathing || cs.fire.cook > 0) && PR.byId(cs.field, cs.fire.id)) {   // roast progress
       const q = PR.byId(cs.field, cs.fire.id);
       text = cs.fire.kept ? t('c.prompt.turnBack', { prey: t('c.prey.' + q.type) }) : !cs.fire.inRange ? (cs.fire.cook > 0 ? t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire') : t('c.prompt.fireFar'))
         : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
       bar = cs.fire.cook;
     }
-    else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
+    else if (cs.hint === 'grab') text = pilot.mode === 'ground' ? t(isTouch ? 'c.prompt.pickupTouch' : 'c.prompt.pickup', { prey: t('c.prey.' + ((PR.byId(cs.field, cs.target) || {}).type || 'goat')) }) : t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
     else if (cs.hint === 'heavy') text = t(isTouch ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
     else if (cs.hint === 'near') text = t('c.prompt.near');
@@ -928,7 +929,7 @@
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
-      L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + D.eat.time);
+      L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE' : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
