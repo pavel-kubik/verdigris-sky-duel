@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't106.2 2026-10-30 land, walk and take off (F / Move slot Land, Fly)';
+  const BUILD = 't107.1 2026-10-30 legs, walk cycle, folded wings, ground camera';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -123,6 +123,7 @@
   let momPhase = 0, momAcc = 0;
   let stats = G.statsOf(0), heroScale = 1;
   let pilot = null, phase = 0;
+  const heroPose = {};                                          // T07 legs / wings / walk cycle state (walk.pose)
   function refreshStage() {
     stats = G.statsOf(dragon.stage);
     heroScale = G.scaleOf(dragon.foodXp, dragon.stage);
@@ -484,8 +485,9 @@
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
   function camDesired(out) {
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
-    const k = Math.pow(heroScale, 0.75), back = 22 * k;        // a bigger dragon needs the camera further back
-    out.set(p[0] - bx * back, p[1] + (7 - pilot.pitch * 6) * k, p[2] - bz * back);
+    const k = Math.pow(heroScale, 0.75), gc = D.groundCam, gb = heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back
+    const back = lerp(22, gc.back, gb) * k, up = lerp(7 - pilot.pitch * 6, gc.height, gb) * k;   // T07: lower and closer on the ground
+    out.set(p[0] - bx * back, p[1] + up, p[2] - bz * back);
     out.y = Math.max(out.y, TR.surfaceAt(regionId, out.x, out.z) + 3);
     return out;
   }
@@ -536,10 +538,12 @@
     hero.root.position.set(p.pos[0], p.pos[1], p.pos[2]);
     hero.root.rotation.set(-p.pitch, p.yaw, p.roll + p.rollX, 'YXZ');
     const glide = p.pitch < -0.25 && !p.boosting, mode = p.mode || 'air';
-    // T06: on the ground the wings hold almost still (legs and the walk cycle come in T07); takeoff flaps hard
-    const ground = mode === 'ground' || mode === 'landing';
-    phase += dt * (ground ? 2 : mode === 'takeoff' ? 10 : p.boosting ? 9 : glide ? 3 : 6.2);
-    hero.anim(time, dt, { phase, amp: ground ? 0.12 : mode === 'takeoff' ? 1.2 : glide ? 0.35 : p.boosting ? 1.1 : 1, mouth: p.breathing, turn: -p.sx, look: 0 });
+    // T07: legs stand and walk (walk.pose), wings fold on the ground, flare wide while landing, beat hard on takeoff
+    WK.pose(heroPose, p, dt, heroScale);
+    const hp = heroPose, ground = mode === 'ground';
+    phase += dt * (ground ? 1.5 : mode === 'landing' ? 3.2 : mode === 'takeoff' ? 10 : p.boosting ? 9 : glide ? 3 : 6.2);
+    const amp = ground ? 0.12 : mode === 'landing' ? 0.5 + 0.9 * hp.flare : mode === 'takeoff' ? 1.25 : glide ? 0.35 : p.boosting ? 1.1 : 1;
+    hero.anim(time, dt, { phase, amp, mouth: p.breathing, turn: -p.sx, look: 0, ground: hp.ground, fold: hp.fold, gait: hp.gait, stride: hp.stride });
     hero.root.updateMatrixWorld(true);
     if (dt > 0) breathParticles(dt, p);
   }
@@ -827,7 +831,8 @@
       camDesired(tmpV);
       if (dt > 0) camPos.lerp(tmpV, 1 - Math.exp(-dt * 4.5));
       fwdV.set(Math.sin(pilot.yaw) * Math.cos(pilot.pitch), Math.sin(pilot.pitch), Math.cos(pilot.yaw) * Math.cos(pilot.pitch));
-      camLook.set(pilot.pos[0], pilot.pos[1] + 2, pilot.pos[2]).addScaledVector(fwdV, 12);
+      const gb = heroPose.ground || 0, kc = Math.pow(heroScale, 0.75);   // T07: on the ground look a little ahead of the head
+      camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       camera.position.copy(camPos);
       if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
       shake = Math.max(0, shake - dt * 1.5);
@@ -918,7 +923,7 @@
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
       const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId) : null;
-      L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])));
+      L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);

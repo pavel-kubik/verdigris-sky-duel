@@ -10,6 +10,8 @@
  *   inFront(p, scale, items) -> item | null           nearest item within ground.reach x scale inside reachCone (T08 pick up)
  *   groundAt(ctx, x, z) -> height                     surface, or a building roof (solids) when higher
  *   standY(ctx, x, z, scale) -> body height over (x, z) for a standing dragon
+ *   pose(a, p, dt, scale) -> a                        render pose (T07) for shared/dragon.js anim: a = { ground, fold,
+ *                                                     gait, stride, flare } advanced from the pilot mode and ground speed
  *
  * ctx: { regionId, scale, stats?, effects?, eating?, surface?(x, z), solidAt?(x, z) -> roof height | null }
  * surface defaults to terrain.surfaceAt of the region, so the same code walks in the cave (T10) with another floor.
@@ -195,5 +197,35 @@
     return best;
   }
 
-  M.define('walk', { canLand, startLanding, startTakeoff, step, blend, inFront, groundAt, standY, passable });
+  /**
+   * Render pose (T07), advanced each frame from the pilot: how far the legs stand (ground 0..1), the wing fold
+   * (fold 0..1), the walk cycle phase (gait, rad) and step size (stride 0..1), and the landing flare (flare 0..1:
+   * wings spread wide and beat slowly while braking). Pure, so the walk cycle is testable without Three.js.
+   */
+  function pose(a, p, dt, scale) {
+    const P = D.pose, W = D.walk, mode = (p && p.mode) || 'air', sc = scale || 1;
+    a = a || {};
+    if (a.gait == null) Object.assign(a, { ground: 0, fold: 0, gait: 0, stride: 0, flare: 0 });
+    const k = p && p.tr ? clamp(p.tr.t / p.tr.dur, 0, 1) : 0, rate = Math.min(1, dt * P.legRate);
+    let g, f, fl = 0;
+    if (mode === 'ground') { g = 1; f = 1; }
+    else if (mode === 'landing') {
+      g = ease(clamp((k - P.legsAt) / (1 - P.legsAt), 0, 1));
+      f = ease(clamp((k - P.foldAt) / (1 - P.foldAt), 0, 1));
+      fl = Math.sin(Math.PI * Math.min(1, k / P.foldAt)) * (1 - f);
+    } else if (mode === 'takeoff') { g = 1 - ease(clamp(k / P.tuckAt, 0, 1)); f = 0; }
+    else { g = 0; f = 0; }
+    if (mode === 'ground' || mode === 'air') { a.ground += (g - a.ground) * rate; a.fold += (f - a.fold) * rate; }
+    else { a.ground = g; a.fold = f; }
+    a.flare = fl;
+    const v = mode === 'ground' ? (p.speed || 0) : 0, turning = mode === 'ground' ? Math.abs(p.sx || 0) : 0;
+    const sizeK = 1 + W.sizeSpeed * (sc - 1);
+    const want = mode === 'ground' ? clamp(Math.max(Math.abs(v) / (W.speed * sizeK) * 0.8, turning * 0.45), 0, 1) : 0;
+    a.stride += (want - a.stride) * Math.min(1, dt * 8);
+    const cyc = Math.abs(v) / (P.gaitLen * sc) + turning * P.turnGait;   // walk cycles per second
+    if (a.stride > 0.01) a.gait = wrap(a.gait + (v < -0.05 ? -1 : 1) * cyc * 2 * Math.PI * dt);
+    return a;
+  }
+
+  M.define('walk', { canLand, startLanding, startTakeoff, step, blend, inFront, groundAt, standY, passable, pose });
 })(typeof self !== 'undefined' ? self : this);
