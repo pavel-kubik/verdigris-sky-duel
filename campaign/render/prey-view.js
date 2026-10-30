@@ -79,8 +79,8 @@
         let gait = Math.min(1, p.speed / 6) * 0.7, ph = p.t * (4 + p.speed * 0.9);
         if (p.state === 'carried' && carry && carry.id === p.id) {
           // hang the animal below the claws: back up, legs kicking, tilted with the dragon's pitch;
-          // on the ground (T08) it is held across the jaws, a little below the mouth
-          pos.set(carry.pos.x, carry.pos.y - (carry.jaws ? 0.9 : 1.9) * VIS * 0.55, carry.pos.z);
+          // on the ground (T08) it is held across the jaws (body centre a little below the mouth)
+          pos.set(carry.pos.x, carry.pos.y - (carry.jaws ? 2.1 : 1.9) * VIS * 0.55, carry.pos.z);
           q.setFromEuler(eul.set(carry.jaws ? 0 : -carry.pitch, carry.yaw + (carry.jaws ? Math.PI / 2 : 0), 0, 'YXZ'));
           gait = carry.jaws ? 0.4 : 0.9; ph = time * (carry.jaws ? 8 : 14);
         } else {

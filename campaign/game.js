@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't108.1 2026-10-30 ground actions: pick up, eat and breath on the ground';
+  const BUILD = 't108.1 2026-10-30 ground actions: pick up, eat and breath on the ground, debug goat here';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -760,15 +760,23 @@
     ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
-    ['G', 'graphics quality low / mid / high (saved)', 'KeyG', 'quality'],
+    ['Y', 'graphics quality low / mid / high (saved)', 'KeyY', 'quality'],
+    ['I', 'put the nearest goat in front of the dragon', 'KeyI', 'goat here'],
     ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
-    if (code === 'KeyG') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
+    if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
+    if (code === 'KeyI') {                                        // T08: a grazing goat 4 m (x scale) in front, to test the ground pick up
+      const g = cs.field.list.filter(q => q.type === 'goat' && q.state !== 'carried').sort((a, b) => Math.hypot(a.pos[0] - pilot.pos[0], a.pos[2] - pilot.pos[2]) - Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]))[0];
+      if (g) {
+        const f = 4 * heroScale, x = pilot.pos[0] + Math.sin(pilot.yaw) * f, z = pilot.pos[2] + Math.cos(pilot.yaw) * f;
+        Object.assign(g, { pos: [x, TR.surfaceAt(regionId, x, z), z], state: 'graze', calm: 0, goal: null, pause: 3, speed: 0, cook: 0, held: 4 });   // held: stands still 4 s (as the mother holds prey)
+      }
+    }
     if (code === 'KeyM') { onEvents(MO.skip(cs)); const mo = cs.story && cs.story.mother; flashPrompt(t('c.dbg.mother', { n: mo ? mo.lesson : '-' }), 1.5); }
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
