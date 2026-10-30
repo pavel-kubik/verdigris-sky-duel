@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't105.3 2026-10-30 no pinch or double-tap zoom on phones';
+  const BUILD = 't105.4 2026-10-30 fire target ring and roast progress bar';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -502,6 +502,22 @@
     ringMesh.scale.setScalar(k);
     ringMat.opacity = cs.swoop != null ? 0.9 : 0.45;
   }
+  /* fire ring: the prey the breath is aimed at (cs.fire): shown while breathing, while it is heating up, or when it is
+     too heavy to lift (the natural fire target); bright and pulsing while the fire reaches it, dim when out of reach */
+  const fireMat = new THREE.MeshBasicMaterial({ color: 0xff8a3a, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  const fireRing = new THREE.Mesh(new THREE.RingGeometry(2.9, 3.7, 28), fireMat);
+  fireRing.rotation.x = -Math.PI / 2; fireRing.renderOrder = 5; fireRing.visible = false; scene.add(fireRing);
+  function fireTargetRing() {
+    const f = state === 'play' && pilot && !cs.inLair ? cs.fire : null, q = f ? PR.byId(cs.field, f.id) : null;
+    const heavy = q && q.size > Math.min(stats.carry, HN.effects(dragon.hunger).carryMax);
+    const on = !!q && (pilot.breathing || f.cook > 0 || heavy) && !(ringMesh.visible && ringMesh.position.x === q.pos[0]);
+    fireRing.visible = on;
+    if (!on) return;
+    const hot = pilot.breathing && f.inRange;
+    fireRing.position.set(q.pos[0], q.pos[1] + 0.5, q.pos[2]);
+    fireRing.scale.setScalar(VRender.prey.VIS * (q.size > 1 ? 1.3 : 1) * (hot ? 1 + 0.14 * Math.sin(time * 14) : 1));
+    fireMat.opacity = hot ? 0.95 : f.inRange ? 0.6 : 0.3;
+  }
 
   /** Where the carried prey hangs: at the claw anchor, facing with the dragon. */
   const clawW = new V3();
@@ -617,6 +633,11 @@
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
     else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
+    else if (cs.fire && dragon.carried == null && (pilot.breathing || cs.fire.cook > 0) && PR.byId(cs.field, cs.fire.id)) {   // roast progress
+      const q = PR.byId(cs.field, cs.fire.id);
+      text = !cs.fire.inRange ? t('c.prompt.fireFar') : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
+      bar = cs.fire.cook;
+    }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
     else if (cs.hint === 'heavy') text = t(isTouch ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
@@ -810,6 +831,7 @@
     motherArrow();
     preyView.update(cs.field, time, carryPose());
     targetRing();
+    fireTargetRing();
     renderer.render(scene, camera);
     sampleQuality(rawDt);
     if (debug) debugHud(dt);

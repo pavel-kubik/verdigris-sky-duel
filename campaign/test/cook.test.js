@@ -115,3 +115,38 @@ function P_ok(q) { return PR.groundOk('wild', q.pos[0], q.pos[2]) && Math.abs(q.
   const side = F.newPilot([p.pos[0] - 25, p.pos[1] + 9, p.pos[2]], 0, 30);          // prey 90 degrees to the side
   ok(PR.breathCone(side, 1, PR.spawnRegion('wild', mulberry(3))).target !== p.id, 'no assist toward prey far off the heading');
 }
+
+// 7. Fire target (T05 feedback): picked up ahead (range x preview), kept while valid, the stream bends onto it,
+//    progress = cook / cookTime; state.step keeps cs.fire current
+{
+  const { f, p } = field1('boar', 5);
+  const B = D.breath;
+  const q = Object.assign({}, p, { id: 9001, pos: [p.pos[0] + 6, p.pos[1], p.pos[2] + 4], cook: 0 });   // a second boar, a bit further
+  f.list = [p, q];
+  const far = F.newPilot([p.pos[0], p.pos[1] + 6, p.pos[2] - B.range * 1.5], 0, 30);
+  const t0 = PR.fireTarget(f, far, 1, null);
+  ok(t0 && t0.id === p.id && !t0.inRange, 'ahead but beyond the fire reach: target shown, not in range');
+  ok(PR.fireTarget(f, F.newPilot([p.pos[0], p.pos[1] + 6, p.pos[2] - B.range * B.preview - 10], 0, 30), 1, null) === null, 'beyond the preview distance: no target');
+  const near = F.newPilot([p.pos[0], p.pos[1] + 6, p.pos[2] - 15], 0, 30);
+  ok(PR.fireTarget(f, near, 1, q.id).id === q.id, 'the previous target is kept while it stays a candidate');
+  const cone = PR.breathCone(near, 1, f, q.id);
+  ok(cone.target === q.id && PR.inCone(cone, q), 'the stream bends onto the preferred target, not the nearest');
+  q.cook = R.cookTime / 2;
+  ok(Math.abs(PR.fireTarget(f, near, 1, null).cook - 0.5) < 1e-9 && PR.fireTarget(f, near, 1, null).id === q.id, 'a prey that is heating up wins; progress 0.5');
+  ok(PR.fireTarget(f, F.newPilot([p.pos[0] - 40, p.pos[1] + 6, p.pos[2]], 0, 30), 1, null) === null, 'prey off to the side is not a target');
+}
+{
+  const cs = S.create({ regionId: 'wild', rng: mulberry(4) });
+  const p = cs.field.list.find(q => q.type === 'boar');
+  cs.field.list = [p]; p.held = 99;                             // keep it still for the test
+  cs.dragon.pilot = aimAt(p, 16, 6);
+  let maxCook = 0, roasted = false;
+  for (let i = 0; i < 3 / dt && !roasted; i++) {
+    const pl = cs.dragon.pilot; pl.pos = aimAt(p, 16, 6).pos; pl.yaw = 0; pl.vel = [0, 0, 0];
+    const ev = S.step(cs, { sx: 0, sy: 0, breath: true }, dt);
+    if (cs.fire) maxCook = Math.max(maxCook, cs.fire.cook);
+    if (ev.some(e => e.e === 'prey:roasted')) roasted = true;
+  }
+  ok(maxCook > 0.5 && roasted, 'state.step: cs.fire progress rises while breathing until the boar roasts');
+  ok(cs.fire === null || cs.fire.id !== p.id, 'a roasted prey is no longer the fire target');
+}
