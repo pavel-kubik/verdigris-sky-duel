@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't105.7 2026-10-30 roast progress kept on screen, the mother holds the warm boar';
+  const BUILD = 't106.1 2026-10-30 land, walk and take off (F / Move slot Land, Fly)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -257,9 +257,10 @@
   let mouseBreath = false, invert = store('vsd-invert') === '1';
   $('#invertBox').checked = invert;
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
-  let confirmQ = false, enterQ = false;                          // one-shots: Enter / Move slot (travel), Move slot (enter cave)
+  let confirmQ = false, enterQ = false, landQ = false;          // one-shots: Enter / Move slot (travel), Move slot (enter cave), F / Move slot (land, fly)
   addEventListener('keydown', e => {
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
+    if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
@@ -311,23 +312,25 @@
   bMove.addEventListener('pointerdown', e => {
     e.preventDefault();
     if (state !== 'play' || !slotNow.move) return;
-    const mi = CT.moveInput(slotNow.move); if (mi.confirm) confirmQ = true; if (mi.enter) enterQ = true;
+    const mi = CT.moveInput(slotNow.move); if (mi.confirm) confirmQ = true; if (mi.enter) enterQ = true; if (mi.land) landQ = true;
   });
   const takeConfirm = () => { const c = confirmQ; confirmQ = false; return c; };
   const takeEnter = () => { const c = enterQ; enterQ = false; return c; };
+  const takeLand = () => { const c = landQ; landQ = false; return c; };
   const clamp1 = v => Math.max(-1, Math.min(1, v));
   function readInput() {
     if (state !== 'play') return { sx: 0, sy: 0, breath: false, boost: false };
     const sy = clamp1(((keys.KeyW || keys.ArrowUp) ? 1 : 0) - ((keys.KeyS || keys.ArrowDown) ? 1 : 0) + touch.y);
     return {
       sx: clamp1(((keys.KeyD || keys.ArrowRight) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft) ? 1 : 0) + touch.x),
-      sy: invert ? -sy : sy,
+      sy: invert && !(pilot && pilot.mode && pilot.mode !== 'air') ? -sy : sy,   // invert is for flight pitch only: stick up always walks forward
       breath: !!(keys.Space || mouseBreath || touch.breath),
       boost: !!(keys.ShiftLeft || keys.ShiftRight || touch.boost),
       grab: !!(keys[D.controls.grab] || touch.grab),
       eat: !!(keys[D.controls.eat] || touch.eat),
       confirm: takeConfirm(),
       enter: takeEnter(),
+      land: takeLand(),
     };
   }
 
@@ -371,7 +374,7 @@
     if (s === 'intro' || s === 'hatch') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
     if (s === 'intro') introUi();
     if (s !== 'hatch' && hatchScene) endHatchScene();
-    mouseBreath = false; confirmQ = enterQ = false; actionKind = null; touch.breath = touch.boost = touch.grab = touch.eat = false;
+    mouseBreath = false; confirmQ = enterQ = landQ = false; actionKind = null; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
   /** Writes the run to localStorage (unless saving is off) and keeps it in memory for Continue. Needs a dragon in the air or lair. */
@@ -532,9 +535,11 @@
     const p = pilot;
     hero.root.position.set(p.pos[0], p.pos[1], p.pos[2]);
     hero.root.rotation.set(-p.pitch, p.yaw, p.roll + p.rollX, 'YXZ');
-    const glide = p.pitch < -0.25 && !p.boosting;
-    phase += dt * (p.boosting ? 9 : glide ? 3 : 6.2);
-    hero.anim(time, dt, { phase, amp: glide ? 0.35 : p.boosting ? 1.1 : 1, mouth: p.breathing, turn: -p.sx, look: 0 });
+    const glide = p.pitch < -0.25 && !p.boosting, mode = p.mode || 'air';
+    // T06: on the ground the wings hold almost still (legs and the walk cycle come in T07); takeoff flaps hard
+    const ground = mode === 'ground' || mode === 'landing';
+    phase += dt * (ground ? 2 : mode === 'takeoff' ? 10 : p.boosting ? 9 : glide ? 3 : 6.2);
+    hero.anim(time, dt, { phase, amp: ground ? 0.12 : mode === 'takeoff' ? 1.2 : glide ? 0.35 : p.boosting ? 1.1 : 1, mouth: p.breathing, turn: -p.sx, look: 0 });
     hero.root.updateMatrixWorld(true);
     if (dt > 0) breathParticles(dt, p);
   }
@@ -580,6 +585,9 @@
       else if (e.e === 'hunger:state' && e.state === 'hungry') toast(t('c.toast.hungry'), t('c.toast.hungrySub'));
       else if (e.e === 'hunger:state' && e.state === 'starving') toast(t('c.toast.starving'), t('c.toast.starvingSub'));
       else if (e.e === 'prey:grabbed') flashPrompt(null);
+      else if (e.e === 'land:refused') flashPrompt(t('c.land.' + e.why), 1.8);
+      else if (e.e === 'takeoff:refused') flashPrompt(t('c.takeoff.' + e.why), 1.8);
+      else if (e.e === 'dragon:landed') shake = Math.max(shake, 0.25 * heroScale);
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
       else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
       else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
@@ -606,6 +614,8 @@
     eat: '<path d="M4 12a8 8 0 0 0 16 0zM8 12l2-3 2 3 2-3 2 3"/>',
     travel: '<path d="M4 12h14M13 6l6 6-6 6"/>',
     cave: '<path d="M3 20c0-9 4-15 9-15s9 6 9 15M9 20c0-4 1.5-7 3-7s3 3 3 7"/>',
+    land: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
+    fly: '<path d="M12 20V8M7 13l5-5 5 5M4 4h16"/>',
   };
   const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
   function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
@@ -614,7 +624,7 @@
     slotNow = state === 'play' && isTouch ? CT.slots(cs) : { action: null, move: null, roll: true };
     const ak = actionKind || slotNow.action || '';
     if (ak !== actionShown) { if (ak) slotSet(bAction, ak, t('c.btn.' + ak)); bAction.classList.toggle('off', !ak); actionShown = ak; }
-    const mv = slotNow.move, mk = mv ? (mv.kind === 'travel' ? 'c.btn.travel.' + mv.to : 'c.btn.cave') : '';
+    const mv = slotNow.move, mk = mv ? (mv.kind === 'travel' ? 'c.btn.travel.' + mv.to : 'c.btn.' + mv.kind) : '';
     if (mk !== moveShown) {
       if (mk) { slotSet(bMove, mv.kind, t(mk)); bMove.classList.remove('new'); void bMove.offsetWidth; bMove.classList.add('new'); }
       bMove.classList.toggle('off', !mk); moveShown = mk;
@@ -643,6 +653,8 @@
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
     else if (cs.hint === 'heavy') text = t(isTouch ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
     else if (cs.hint === 'near') text = t('c.prompt.near');
+    else if (cs.hint === 'land') text = t(isTouch ? 'c.prompt.landTouch' : 'c.prompt.land');
+    else if (cs.hint === 'walk') text = t(isTouch ? 'c.prompt.walkTouch' : 'c.prompt.walk');
     if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
     promptBar.hidden = bar < 0;
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
@@ -905,6 +917,8 @@
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
+      const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId) : null;
+      L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);

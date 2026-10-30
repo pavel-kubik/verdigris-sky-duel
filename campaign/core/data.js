@@ -158,7 +158,7 @@
       ],
     },
 
-    controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter' },
+    controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
   };
 
   M.define('data', data);
