@@ -61,9 +61,9 @@
               charge: { range: 14, maxAboveGround: 7, damage: 8, cooldown: 3 } },
     },
     // A burned prey leaves ceil(food * foodMult / chunkFood) chunks; the roast food is split evenly.
-    roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11.5, cookTime: 1.2, cool: 0.2, scatter: 2.5, life: 120 },
+    roast: { foodMult: 0.5, chunkSize: 1, chunkFood: 11.5, cookTime: 0.9, cool: 0.02, scatter: 2.5, life: 120 },
     // fire breath reach: a cone from the mouth (range x dragon scale); prey inside it heat up toward cookTime
-    breath: { range: 30, cone: 0.42, mouth: 2.8, assist: 0.75, preview: 1.8 },   // assist: the stream bends toward prey this far off the heading;
+    breath: { range: 36, cone: 0.42, mouth: 2.8, assist: 0.75, preview: 1.8 },   // assist: the stream bends toward prey this far off the heading;
     // preview: the fire target (orange ring, roast progress) is picked up to range x preview ahead, and kept while it stays there
     // grab reach: horizontal radius x dragon scale, height over the prey's back (+ the claw drop at this scale),
     // and not climbing harder than maxPitch (the floor pull-up rules out a strict dive-only grab)
