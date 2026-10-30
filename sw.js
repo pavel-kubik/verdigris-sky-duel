@@ -7,14 +7,14 @@
  * - Everything else (PeerJS signalling for co-op) goes straight to the network.
  * Bump VERSION only when the list of precached files changes.
  */
-const VERSION = 'vsd-v6';
+const VERSION = 'vsd-v7';
 const NET_TIMEOUT = 4000;
 const SHELL = [
   './', 'index.html', 'i18n.js', 'pwa.js', 'manifest.webmanifest',
   'mp/', 'mp/index.html', 'mp/game.js', 'mp/sim.js',
   'campaign/', 'campaign/index.html', 'campaign/game.js', 'shared/dragon.js',
   'campaign/core/umd.js', 'campaign/core/math.js', 'campaign/core/events.js', 'campaign/core/data.js',
-  'campaign/core/terrain.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/flight.js', 'campaign/core/prey.js', 'campaign/core/region.js', 'campaign/core/lair.js', 'campaign/core/state.js', 'campaign/core/save.js',
+  'campaign/core/terrain.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/flight.js', 'campaign/core/prey.js', 'campaign/core/region.js', 'campaign/core/lair.js', 'campaign/core/state.js', 'campaign/core/save.js', 'campaign/core/controls.js',
   'campaign/render/flora.js', 'campaign/render/terrain.js', 'campaign/render/prey-view.js', 'campaign/render/hatch-scene.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'icons/icon-maskable-192.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',

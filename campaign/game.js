@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't017.1 2026-10-29 readme, phase 1 done';
+  const BUILD = 't101.1 2026-10-30 touch action layout';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -164,7 +164,7 @@
   let mouseBreath = false, invert = store('vsd-invert') === '1';
   $('#invertBox').checked = invert;
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
-  let confirmQ = false;                                          // one-shot: Enter or the travel button
+  let confirmQ = false, enterQ = false;                          // one-shots: Enter / Move slot (travel), Move slot (enter cave)
   addEventListener('keydown', e => {
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
@@ -201,10 +201,27 @@
     const off = () => { touch[prop] = false; b.classList.remove('on'); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
   }
-  holdBtn('#bBreath', 'breath'); holdBtn('#bBoost', 'boost'); holdBtn('#bGrab', 'grab'); holdBtn('#bEat', 'eat');
+  holdBtn('#bBreath', 'breath'); holdBtn('#bBoost', 'boost');
   $('#bRoll').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') F.tryRoll(pilot, touch.x < -0.2 ? -1 : 1); });
+  /* context slots (T101, core/controls.js): Action (hold) = Grab / Eat, Move (tap) = Fly to <region> / Enter cave.
+     The Action kind is latched at the press, so a grab hold that catches a prey does not start eating it. */
+  const bAction = $('#bAction'), bMove = $('#bMove'), bRoll = $('#bRoll');
+  let slotNow = { action: null, move: null, roll: true }, actionKind = null;
+  bAction.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (state !== 'play' || !slotNow.action) return;
+    actionKind = slotNow.action; Object.assign(touch, CT.input(actionKind, true)); bAction.classList.add('on');
+    try { bAction.setPointerCapture(e.pointerId); } catch (_) { }
+  });
+  const actionOff = () => { actionKind = null; touch.grab = touch.eat = false; bAction.classList.remove('on'); };
+  bAction.addEventListener('pointerup', actionOff); bAction.addEventListener('pointercancel', actionOff); bAction.addEventListener('lostpointercapture', actionOff);
+  bMove.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (state !== 'play' || !slotNow.move) return;
+    const mi = CT.moveInput(slotNow.move); if (mi.confirm) confirmQ = true; if (mi.enter) enterQ = true;
+  });
   const takeConfirm = () => { const c = confirmQ; confirmQ = false; return c; };
-  $('#travelBtn').addEventListener('click', e => { e.preventDefault(); if (state === 'play') confirmQ = true; });
+  const takeEnter = () => { const c = enterQ; enterQ = false; return c; };
   const clamp1 = v => Math.max(-1, Math.min(1, v));
   function readInput() {
     if (state !== 'play') return { sx: 0, sy: 0, breath: false, boost: false };
@@ -217,6 +234,7 @@
       grab: !!(keys[D.controls.grab] || touch.grab),
       eat: !!(keys[D.controls.eat] || touch.eat),
       confirm: takeConfirm(),
+      enter: takeEnter(),
     };
   }
 
@@ -260,7 +278,7 @@
     if (s === 'intro' || s === 'hatch') { pilot = cs.dragon.pilot = null; hero.root.scale.setScalar(1); }
     if (s === 'intro') introUi();
     if (s !== 'hatch' && hatchScene) endHatchScene();
-    mouseBreath = false; confirmQ = false; touch.breath = touch.boost = touch.grab = touch.eat = false;
+    mouseBreath = false; confirmQ = enterQ = false; actionKind = null; touch.breath = touch.boost = touch.grab = touch.eat = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
   }
   /** Writes the run to localStorage (unless saving is off) and keeps it in memory for Continue. Needs a dragon in the air or lair. */
@@ -471,18 +489,38 @@
   }
   /* bottom prompt: what the claws can do right now (+ eat progress) */
   const promptEl = $('#prompt'), promptText = $('#promptText'), promptBar = $('#promptBar');
-  let promptFlash = null, promptFlashT = 0, promptShown = '', travelShown = '';
-  const travelBtn = $('#travelBtn');
+  let promptFlash = null, promptFlashT = 0, promptShown = '', actionShown = '', moveShown = '';
+  const ICON = {   // small stroke icons for the context slots (currentColor)
+    grab: '<path d="M6 4c0 7 2 11 6 14M12 3c0 7 1 11 2 15M18 4c0 7-2 11-6 14"/>',
+    eat: '<path d="M4 12a8 8 0 0 0 16 0zM8 12l2-3 2 3 2-3 2 3"/>',
+    travel: '<path d="M4 12h14M13 6l6 6-6 6"/>',
+    cave: '<path d="M3 20c0-9 4-15 9-15s9 6 9 15M9 20c0-4 1.5-7 3-7s3 3 3 7"/>',
+  };
+  const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
+  function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
+  /** Context slots follow core/controls.js; a held Action keeps its latched kind and stays visible until released. */
+  function slotsHud() {
+    slotNow = state === 'play' && isTouch ? CT.slots(cs) : { action: null, move: null, roll: true };
+    const ak = actionKind || slotNow.action || '';
+    if (ak !== actionShown) { if (ak) slotSet(bAction, ak, t('c.btn.' + ak)); bAction.classList.toggle('off', !ak); actionShown = ak; }
+    const mv = slotNow.move, mk = mv ? (mv.kind === 'travel' ? 'c.btn.travel.' + mv.to : 'c.btn.cave') : '';
+    if (mk !== moveShown) {
+      if (mk) { slotSet(bMove, mv.kind, t(mk)); bMove.classList.remove('new'); void bMove.offsetWidth; bMove.classList.add('new'); }
+      bMove.classList.toggle('off', !mk); moveShown = mk;
+    }
+    bRoll.classList.toggle('off', !slotNow.roll);
+  }
   function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }
   function promptHud(dt) {
     promptFlashT = Math.max(0, promptFlashT - dt);
+    slotsHud();
     let text = '', bar = -1;
     const ex = state === 'play' && cs.exit;
     if (promptFlashT > 0 && promptFlash) text = promptFlash;
     else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
     else if (cs.inLair) text = '';
-    else if (cs.hint === 'lair') text = t('c.prompt.lair');
-    else if (cs.hint === 'lairStore') { text = t(isTouch ? 'c.prompt.lairStoreTouch' : 'c.prompt.lairStore'); if (dragon.eatT > 0) bar = dragon.eatT / D.eat.time; }
+    else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
+    else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
@@ -491,9 +529,6 @@
     if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
     promptBar.hidden = bar < 0;
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
-    const tb = ex && isTouch ? 'c.btn.travel.' + ex.to : '';          // touch: a tappable button (desktop: Enter)
-    if (tb !== travelShown) { travelBtn.hidden = !tb; if (tb) travelBtn.textContent = t(tb); travelShown = tb; }
-    $('#bGrab').classList.toggle('hot', cs.hint === 'grab' || cs.hint === 'swoop'); $('#bEat').classList.toggle('hot', cs.hint === 'eat' || cs.hint === 'lairStore');
   }
   function toast(title, sub, secs) {
     toastEl.innerHTML = '';
@@ -557,7 +592,7 @@
     lairShown = ''; renderLair();
     lairEl.hidden = false;
     $('#touch').hidden = true; $('#legend').hidden = true; $('#hint').hidden = true;
-    touch.breath = touch.boost = touch.grab = touch.eat = false; mouseBreath = false;
+    touch.breath = touch.boost = touch.grab = touch.eat = false; mouseBreath = false; actionKind = null; enterQ = confirmQ = false;
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
     setTimeout(() => $('#restBtn').focus({ preventScroll: true }), 0);
   }
@@ -759,7 +794,7 @@
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); travelShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
+  if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
   if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; } };
 })();
