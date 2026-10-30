@@ -150,3 +150,25 @@ function P_ok(q) { return PR.groundOk('wild', q.pos[0], q.pos[2]) && Math.abs(q.
   ok(maxCook > 0.5 && roasted, 'state.step: cs.fire progress rises while breathing until the boar roasts');
   ok(cs.fire === null || cs.fire.id !== p.id, 'a roasted prey is no longer the fire target');
 }
+
+// 8. Roast memory on screen (T05 feedback): a half-roasted prey stays the fire target (kept) while the dragon turns away,
+//    its heat stays, and the next pass finishes it
+{
+  const cs = S.create({ regionId: 'wild', rng: mulberry(6) });
+  const p = cs.field.list.find(q => q.type === 'boar');
+  cs.field.list = [p]; p.held = 1e9;
+  cs.dragon.pilot = aimAt(p, 16, 6);
+  const fix = () => { const pl = cs.dragon.pilot, a = aimAt(p, 16, 6); pl.pos = a.pos; pl.yaw = 0; pl.pitch = a.pitch; };
+  for (let i = 0; i < (R.cookTime * 0.4) / dt; i++) { fix(); S.step(cs, { sx: 0, sy: 0, breath: true }, dt); }
+  const half = p.cook;
+  ok(half > 0 && cs.fire && cs.fire.id === p.id, 'partly roasted');
+  cs.dragon.pilot.yaw = Math.PI; cs.dragon.pilot.pos = [p.pos[0], p.pos[1] + 30, p.pos[2] + 60];   // turned away, flying off
+  for (let i = 0; i < 8 / dt; i++) S.step(cs, { sx: 0, sy: 0 }, dt);
+  ok(cs.fire && cs.fire.id === p.id && cs.fire.kept && cs.fire.cook > 0, 'out of view: still the fire target (kept), progress shown');
+  ok(Math.abs(p.cook - half) < 1e-9, 'the heat stays while away (' + p.cook.toFixed(2) + ' of ' + half.toFixed(2) + ')');
+  let roasted = false;
+  for (let i = 0; i < R.cookTime / dt && !roasted; i++) { fix(); if (S.step(cs, { sx: 0, sy: 0, breath: true }, dt).some(e => e.e === 'prey:roasted')) roasted = true; }
+  ok(roasted, 'the next pass finishes it (cook ' + p.cook.toFixed(2) + ')');
+  S.step(cs, { sx: 0, sy: 0 }, dt);
+  ok(cs.fireMem === null && cs.fire === null, 'memory cleared after the roast');
+}

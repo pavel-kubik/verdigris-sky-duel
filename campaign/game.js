@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't105.6 2026-10-30 faster roasting, heat is kept between passes';
+  const BUILD = 't105.7 2026-10-30 roast progress kept on screen, the mother holds the warm boar';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -635,7 +635,8 @@
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
     else if (cs.fire && dragon.carried == null && (pilot.breathing || cs.fire.cook > 0) && PR.byId(cs.field, cs.fire.id)) {   // roast progress
       const q = PR.byId(cs.field, cs.fire.id);
-      text = !cs.fire.inRange ? t('c.prompt.fireFar') : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
+      text = cs.fire.kept ? t('c.prompt.turnBack', { prey: t('c.prey.' + q.type) }) : !cs.fire.inRange ? (cs.fire.cook > 0 ? t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire') : t('c.prompt.fireFar'))
+        : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
       bar = cs.fire.cook;
     }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');

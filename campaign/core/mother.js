@@ -49,14 +49,15 @@
     return null;
   }
 
-  /** Nearest prey that passes test, outside every danger zone (she never leads into defender range). */
+  /** Nearest prey that passes test, outside every danger zone (she never leads into defender range).
+   *  A prey that is already heating up always wins, so she keeps holding the one the hatchling started roasting. */
   function nearestPrey(cs, zones, test) {
     const p = cs.dragon.pilot;
     let best = null, bd = Infinity;
     for (const q of cs.field.list) {
       if (q.type === 'roast' || q.state === 'carried' || !test(q)) continue;
       if (inZone(zones, q.pos[0], q.pos[2], MO.dangerPad)) continue;
-      const d = Math.hypot(q.pos[0] - p.pos[0], q.pos[2] - p.pos[2]);
+      const d = Math.hypot(q.pos[0] - p.pos[0], q.pos[2] - p.pos[2]) - (q.cook > 0 ? 1e6 : 0);
       if (d < bd) { bd = d; best = q; }
     }
     return best;

@@ -37,7 +37,8 @@
       swoop: null,                   // id of the prey a held grab is diving at
       target: null,                  // id of the prey a grab would swoop at (for the target ring)
       breath: null,                  // the breath cone this frame (aimed), or null
-      fire: null,                    // fire target { id, inRange, cook 0..1 } (orange ring, roast progress), or null
+      fire: null,                    // fire target { id, inRange, cook 0..1, kept? } (orange ring, roast progress), or null
+      fireMem: null,                 // id of the last prey that got heat: stays the fire target while warm (kept: true)
       exit: null,                    // the region exit on offer (prompt "Fly to ..."), or null
       exitT: 0,                      // seconds the offer stays after the dragon turns back from the edge
       saveT: 0,                      // seconds since the last autosave
@@ -127,11 +128,17 @@
 
     // fire: the breath cone cooks prey into roast chunks
     // fire target (orange ring + roast progress in the renderer): the stream bends onto it while it is in range
+    // memory: the last prey that got heat stays the target (bar and ring) while it is still warm, even out of view
     const ft = PR.fireTarget(cs.field, p, scale, cs.fire ? cs.fire.id : null);
-    cs.fire = ft && (!carried || ft.id !== carried.id) ? ft : null;
+    const warm = cs.fireMem != null ? PR.byId(cs.field, cs.fireMem) : null;
+    if (!warm || !(warm.cook > 0) || warm.state === 'roast') cs.fireMem = null;
+    if (ft && (!carried || ft.id !== carried.id)) cs.fire = ft;
+    else if (cs.fireMem != null && !carried) cs.fire = { id: cs.fireMem, inRange: false, cook: 0, kept: true };
+    else cs.fire = null;
     cs.breath = p.breathing ? PR.breathCone(p, scale, cs.field, cs.fire ? cs.fire.id : null) : null;   // the renderer aims the stream along cs.breath.dir
     for (const e of PR.cook(cs.field, cs.breath, dt, cs.rng)) emit(cs, ev, e);
     if (cs.fire) { const q = PR.byId(cs.field, cs.fire.id); if (q && q.state !== 'roast') cs.fire.cook = Math.min(1, q.cook / D.roast.cookTime); else cs.fire = null; }
+    if (cs.fire && cs.fire.cook > 0 && cs.fire.cook < 1) cs.fireMem = cs.fire.id;
 
     // starving claws cannot hold anything bigger than small prey
     const limit = Math.min(stats.carry, HN.effects(d.hunger).carryMax);
@@ -193,7 +200,7 @@
   /** Death: hand over to lair.respawn (carried prey lost, wake in the lair) and end this step. */
   function die(cs, ev, cause) {
     for (const e of LR.respawn(cs, cause)) emit(cs, ev, e);
-    cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.hint = null;
+    cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
     return ev;
   }
 
