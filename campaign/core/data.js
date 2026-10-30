@@ -15,6 +15,22 @@
     // autosave: every `every` s of play, plus on rest, region change and death (core emits a 'save' event)
     save: { every: 60 },
 
+    /* Graphics quality tiers (Phase 2 T02). flora = share of the region's trees, pixelRatio = cap on
+       devicePixelRatio, far = fog and chunk view distance multiplier, particles = breath particle rate.
+       Touch devices without a stored choice measure fps for `auto.sample` s of play (after `warmup` s)
+       and pick low below `auto.low` fps, high at `auto.high` or more, mid in between. ?q=low|mid|high|auto. */
+    quality: {
+      tiers: {
+        low:  { flora: 0.25, pixelRatio: 1,   far: 0.8, particles: 0.5 },
+        mid:  { flora: 0.5,  pixelRatio: 1.5, far: 1,   particles: 1 },
+        high: { flora: 1,    pixelRatio: 2,   far: 1,   particles: 1 },
+      },
+      order: ['low', 'mid', 'high'],
+      defaultTouch: 'mid', defaultDesktop: 'high',
+      auto: { warmup: 2, sample: 10, low: 28, high: 50 },
+      storeKey: 'vsd-campaign-quality',
+    },
+
     /* Growth stages. carry = max prey size class (1 small, 2 medium, 3 large, 4 huge).
        Visual scale grows from scaleFrom to scaleTo with food XP inside a stage;
        the stage itself changes only when resting in the lair. */
