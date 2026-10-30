@@ -15,7 +15,7 @@ const SHELL = [
   'campaign/', 'campaign/index.html', 'campaign/game.js', 'shared/dragon.js',
   'campaign/core/umd.js', 'campaign/core/math.js', 'campaign/core/events.js', 'campaign/core/data.js',
   'campaign/core/terrain.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/flight.js', 'campaign/core/walk.js', 'campaign/core/prey.js', 'campaign/core/region.js', 'campaign/core/lair.js', 'campaign/core/mother.js', 'campaign/core/nav.js', 'campaign/core/state.js', 'campaign/core/save.js', 'campaign/core/controls.js', 'campaign/core/quality.js',
-  'campaign/render/flora.js', 'campaign/render/terrain.js', 'campaign/render/prey-view.js', 'campaign/render/hatch-scene.js',
+  'campaign/render/flora.js', 'campaign/render/terrain.js', 'campaign/render/prey-view.js', 'campaign/render/compass.js', 'campaign/render/hatch-scene.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'icons/icon-maskable-192.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
 ];
