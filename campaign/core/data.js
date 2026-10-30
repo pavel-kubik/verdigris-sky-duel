@@ -124,7 +124,7 @@
        visit[0] for a hatchling, visit[1] for a Drake (away longer, stays shorter). danger: zones per region she
        never enters (defenders add theirs through ctx.danger from T15 on). */
     mother: {
-      scale: 3.1, speed: 70, gain: 1.6, accel: 2.5, minAlt: 10, alt: 22, ahead: 40, side: 14, behind: 18,
+      scale: 3.1, speed: 70, gain: 1.6, accel: 2.5, minAlt: 10, alt: 22, ahead: 40, side: 22, spawnAhead: 14,
       followRange: 60, divePitch: -0.32, showRange: 110, arrive: 60, loseRange: 320, showTime: 4.5, skim: 4,
       breathStand: 22, breathAlt: 9, circleR: 30, circleAlt: 34, circleRate: 0.45, praiseTime: 3.5,
       exitInset: 130, dangerPad: 40, teleport: 650, leaveFade: 5, drakeGap: 90,

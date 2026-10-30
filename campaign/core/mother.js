@@ -88,11 +88,11 @@
   }
   const goalPos = (cs, ctx) => { const g = goal(cs, ctx); return g ? g.pos : null; };
 
-  /** Puts her beside and a little behind the dragon (lair exit, region change, return from away). */
+  /** Puts her beside and a little ahead of the dragon, in the chase camera's view (lair exit, region change, return). */
   function placeBeside(cs, phase) {
     const p = cs.dragon.pilot, k = Math.max(1, scaleOf(cs));
     const bx = Math.sin(p.yaw), bz = Math.cos(p.yaw), rx = -bz, rz = bx;
-    const x = p.pos[0] - bx * MO.behind * k + rx * MO.side * k, z = p.pos[2] - bz * MO.behind * k + rz * MO.side * k;
+    const x = p.pos[0] + bx * MO.spawnAhead * k + rx * MO.side * k, z = p.pos[2] + bz * MO.spawnAhead * k + rz * MO.side * k;
     const y = Math.max(p.pos[1] + 4, T.surfaceAt(cs.region, x, z) + MO.minAlt);
     cs.mom = { pos: [x, y, z], vel: [bx * 25, 0, bz * 25], yaw: p.yaw, pitch: 0, phase: phase || 'lead', t: 0, prog: 0,
                shown: false, from: null, circle: 0, praise: null, praiseT: 0, breath: false, hidden: false };
@@ -130,7 +130,7 @@
   function desired(cs, ctx, dt) {
     const m = cs.mom, p = cs.dragon.pilot, L = lesson(cs), k = Math.max(1, scaleOf(cs));
     const bx = Math.sin(p.yaw), bz = Math.cos(p.yaw), rx = -bz, rz = bx;
-    const beside = () => [p.pos[0] + rx * MO.side * k + bx * 4, p.pos[1] + 3, p.pos[2] + rz * MO.side * k + bz * 4];
+    const beside = () => [p.pos[0] + rx * MO.side * k + bx * MO.spawnAhead * k, p.pos[1] + 3, p.pos[2] + rz * MO.side * k + bz * MO.spawnAhead * k];
     m.t += dt; m.breath = false;
     if (m.praiseT > 0) m.praiseT -= dt;
     if (m.phase === 'praise') {
