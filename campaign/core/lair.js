@@ -63,7 +63,7 @@
     }
     d.eatT = 0;
     cs.inLair = true;
-    cs.swoop = null; cs.target = null; cs.breath = null; cs.hint = null;
+    cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
     if (d.pilot) { d.pilot.breathing = false; d.pilot.boosting = false; }
     ev.unshift({ e: 'lair:enter' });
     return ev;

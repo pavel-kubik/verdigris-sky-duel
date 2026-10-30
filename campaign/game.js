@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't104.1 2026-10-30 hatching scene hands over to the mother';
+  const BUILD = 't105.7 2026-10-30 roast progress kept on screen, the mother holds the warm boar';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -117,6 +117,10 @@
   /* ---------- the hatchling ---------- */
   const hero = VDragon.makeDragon(VDragon.GREEN);
   scene.add(hero.root);
+  /* the mother (T05, core/mother.js): same model, older bronze-green scales (as in the hatching scene), much bigger */
+  const mom = VDragon.makeDragon({ body: 0x2c6450, dark: 0x173a30, belly: 0xb09c66, wing: 0x346e5a, horn: 0xd8c9a8, eye: 0xffb43a });
+  mom.root.scale.setScalar(D.mother.scale); mom.root.visible = false; scene.add(mom.root);
+  let momPhase = 0, momAcc = 0;
   let stats = G.statsOf(0), heroScale = 1;
   let pilot = null, phase = 0;
   function refreshStage() {
@@ -163,6 +167,65 @@
       const k = sp * (0.85 + Math.random() * 0.3);
       spawnP(mouthW.x, mouthW.y, mouthW.z, (dx + jx) * k + p.vel[0] * 0.85, (dy + jy) * k + p.vel[1] * 0.85, (dz + jz) * k + p.vel[2] * 0.85, 0.42 + Math.random() * 0.18, 0);
     }
+  }
+  /** The mother: pose from cs.mom (core/mother.js), wing beat from her speed, fire when she demonstrates roasting. */
+  const momMouth = new V3();
+  function poseMother(dt) {
+    const m = cs.mom, on = !!(m && m.pos && !m.hidden && !cs.inLair && state !== 'intro' && pilot);
+    mom.root.visible = on;
+    if (!on) { momAcc = 0; return; }
+    const sp = Math.hypot(m.vel[0], m.vel[1], m.vel[2]), turn = 0;
+    mom.root.position.set(m.pos[0], m.pos[1], m.pos[2]);
+    const bank = m.phase === 'wait' ? 0.35 : 0;
+    mom.root.rotation.set(-m.pitch, m.yaw, bank, 'YXZ');
+    const glide = m.pitch < -0.2 || m.phase === 'wait';
+    momPhase += dt * (glide ? 2.4 : sp > 50 ? 5.5 : 4.2);
+    mom.anim(time, dt, { phase: momPhase, amp: glide ? 0.4 : 0.9, mouth: m.breath, turn: turn - bank, look: 0 });
+    mom.root.updateMatrixWorld(true);
+    if (!m.breath || dt <= 0) { momAcc = 0; return; }
+    mom.mouth.getWorldPosition(momMouth);
+    const c = Math.cos(m.pitch - 0.25), dx = Math.sin(m.yaw) * c, dy = Math.sin(m.pitch - 0.25), dz = Math.cos(m.yaw) * c;
+    momAcc += dt * 140 * qSet.particles;
+    while (momAcc >= 1) {
+      momAcc--;
+      const k = 70 * (0.85 + Math.random() * 0.3), j = () => (Math.random() - 0.5) * 0.24;
+      spawnP(momMouth.x, momMouth.y, momMouth.z, (dx + j()) * k, (dy + j()) * k, (dz + j()) * k, 0.45 + Math.random() * 0.2, 0);
+    }
+  }
+  /** Her caption: the lesson line (touch variant when there is one), green while she praises. */
+  const momEl = $('#mother'), momText = $('#motherText');
+  let momShown = '';
+  function motherHud() {
+    const key = state === 'play' ? MO.line(cs) : null;
+    const tk = key && isTouch && window.I18N && I18N.t(key + 'Touch') !== key + 'Touch' ? key + 'Touch' : key;
+    if (tk === momShown) return;
+    momShown = tk;
+    momEl.hidden = !tk;
+    if (tk) { momText.textContent = t(tk); momEl.classList.toggle('good', tk.indexOf('.good.') > 0 || tk === 'c.mother.visit'); }
+    if (tk) $('#hint').hidden = true;                             // she replaces the old hunting tip
+  }
+  /** Arrow at the screen edge pointing to the mother while she is out of view (behind the camera too). */
+  const momArrow = $('#momArrow'), projV = new V3();
+  function motherArrow() {
+    const m = cs.mom, on = state === 'play' && !!(m && m.pos && !m.hidden) && !cs.inLair && !!pilot;
+    let show = false;
+    if (on) {
+      projV.set(m.pos[0], m.pos[1] + 2, m.pos[2]).project(camera);
+      const behind = projV.z > 1, W = innerWidth, H = innerHeight;
+      let x = behind ? -projV.x : projV.x, y = behind ? -projV.y : projV.y;
+      if (behind || Math.abs(x) > 0.94 || Math.abs(y) > 0.92) {
+        let px = x * W / 2, py = -y * H / 2;
+        if (Math.hypot(px, py) < 1) py = 1;                      // straight behind: point down
+        const land = isTouch && W > H && H < 560;               // keep clear of the HUD, the caption and the controls
+        const top = land ? 70 : isTouch ? 190 : 140, bot = land ? 30 : isTouch ? 250 : 90, side = land ? 210 : 30;
+        const minX = -W / 2 + side, maxX = W / 2 - side, minY = -H / 2 + top, maxY = H / 2 - bot;
+        const kx = px > 0 ? maxX / px : px < 0 ? minX / px : Infinity, ky = py > 0 ? maxY / py : py < 0 ? minY / py : Infinity;
+        const k = Math.min(kx, ky);
+        momArrow.style.transform = 'translate(' + (W / 2 + px * k).toFixed(1) + 'px,' + (H / 2 + py * k).toFixed(1) + 'px) rotate(' + Math.atan2(py, px).toFixed(3) + 'rad)';
+        show = true;
+      }
+    }
+    if (momArrow.hidden === show) momArrow.hidden = !show;
   }
   function embers(pos, n) {
     for (let k = 0; k < n; k++) {
@@ -439,6 +502,22 @@
     ringMesh.scale.setScalar(k);
     ringMat.opacity = cs.swoop != null ? 0.9 : 0.45;
   }
+  /* fire ring: the prey the breath is aimed at (cs.fire): shown while breathing, while it is heating up, or when it is
+     too heavy to lift (the natural fire target); bright and pulsing while the fire reaches it, dim when out of reach */
+  const fireMat = new THREE.MeshBasicMaterial({ color: 0xff8a3a, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  const fireRing = new THREE.Mesh(new THREE.RingGeometry(2.9, 3.7, 28), fireMat);
+  fireRing.rotation.x = -Math.PI / 2; fireRing.renderOrder = 5; fireRing.visible = false; scene.add(fireRing);
+  function fireTargetRing() {
+    const f = state === 'play' && pilot && !cs.inLair ? cs.fire : null, q = f ? PR.byId(cs.field, f.id) : null;
+    const heavy = q && q.size > Math.min(stats.carry, HN.effects(dragon.hunger).carryMax);
+    const on = !!q && (pilot.breathing || f.cook > 0 || heavy) && !(ringMesh.visible && ringMesh.position.x === q.pos[0]);
+    fireRing.visible = on;
+    if (!on) return;
+    const hot = pilot.breathing && f.inRange;
+    fireRing.position.set(q.pos[0], q.pos[1] + 0.5, q.pos[2]);
+    fireRing.scale.setScalar(VRender.prey.VIS * (q.size > 1 ? 1.3 : 1) * (hot ? 1 + 0.14 * Math.sin(time * 14) : 1));
+    fireMat.opacity = hot ? 0.95 : f.inRange ? 0.6 : 0.3;
+  }
 
   /** Where the carried prey hangs: at the claw anchor, facing with the dragon. */
   const clawW = new V3();
@@ -513,7 +592,8 @@
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
-      else if (e.e === 'lair:leave') { closeLair(); if (!cs.stats.eaten) showTip(12); }   // first hunt: how to grab and eat
+      else if (e.e === 'lair:leave') { closeLair(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
+      else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
       else if (e.e === 'growth:ready' && !cs.inLair) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
     }
@@ -553,6 +633,12 @@
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
     else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / D.eat.time; }
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / D.eat.time; }
+    else if (cs.fire && dragon.carried == null && (pilot.breathing || cs.fire.cook > 0) && PR.byId(cs.field, cs.fire.id)) {   // roast progress
+      const q = PR.byId(cs.field, cs.fire.id);
+      text = cs.fire.kept ? t('c.prompt.turnBack', { prey: t('c.prey.' + q.type) }) : !cs.fire.inRange ? (cs.fire.cook > 0 ? t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire') : t('c.prompt.fireFar'))
+        : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
+      bar = cs.fire.cook;
+    }
     else if (cs.hint === 'grab') text = t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
     else if (cs.hint === 'heavy') text = t(isTouch ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
@@ -658,6 +744,7 @@
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
     ['G', 'graphics quality low / mid / high (saved)', 'KeyG', 'quality'],
+    ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
@@ -665,6 +752,7 @@
     if (code === 'KeyG') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
+    if (code === 'KeyM') { onEvents(MO.skip(cs)); const mo = cs.story && cs.story.mother; flashPrompt(t('c.dbg.mother', { n: mo ? mo.lesson : '-' }), 1.5); }
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK' && !cs.inLair) { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
@@ -723,6 +811,7 @@
         survive(dt);
       }
       poseHero(dt);
+      poseMother(dt);
       camDesired(tmpV);
       if (dt > 0) camPos.lerp(tmpV, 1 - Math.exp(-dt * 4.5));
       fwdV.set(Math.sin(pilot.yaw) * Math.cos(pilot.pitch), Math.sin(pilot.pitch), Math.cos(pilot.yaw) * Math.cos(pilot.pitch));
@@ -738,8 +827,12 @@
     sky.position.copy(camera.position);
     region.update(camera.position, time);
     if (dt > 0) updateParticles(dt);
+    if (state === 'intro' || !pilot) mom.root.visible = false;
+    motherHud();
+    motherArrow();
     preyView.update(cs.field, time, carryPose());
     targetRing();
+    fireTargetRing();
     renderer.render(scene, camera);
     sampleQuality(rawDt);
     if (debug) debugHud(dt);
@@ -797,7 +890,8 @@
     const L = [];
     L.push('BUILD   ' + BUILD + (params.get('v') ? '  (v=' + params.get('v') + ')' : ''));
     const mo = cs.story && cs.story.mother;
-    L.push('STORY   act ' + ((cs.story && cs.story.act) || 1) + '  mother ' + (mo ? 'lesson ' + mo.lesson + ' (' + mo.at + ')' : '-'));
+    const ml = MO.lesson(cs), mm = cs.mom;
+    L.push('STORY   act ' + ((cs.story && cs.story.act) || 1) + '  mother ' + (mo ? 'lesson ' + mo.lesson + (ml ? ' ' + ml.id : '') + ' (' + mo.at + ')' + (mm ? ' ' + mm.phase + (mm.hidden ? ' hidden' : '') + ' prog ' + mm.prog.toFixed(1) : '') : '-'));
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
     L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');
@@ -835,5 +929,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

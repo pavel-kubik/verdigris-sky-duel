@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title data-i18n="c.title">Verdigris Campaign</title>
 <meta name="description" content="Raise a hatchling dragon: hunt to survive, grow and return to your volcano lair." data-i18n-attr="content:c.desc">
 <meta name="theme-color" content="#0d1411">
@@ -72,6 +72,11 @@ p{margin:0;color:var(--mute);line-height:1.45}
 #growRing{width:14px;height:14px;border-radius:50%;--p:0;background:conic-gradient(var(--verd) calc(var(--p) * 1turn),rgba(233,225,204,.16) 0);box-shadow:0 0 0 1px var(--line)}
 #growRing.ready{background:var(--verd);box-shadow:0 0 8px var(--verd)}
 #vignette{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(229,72,79,.55) 100%)}
+#mother{position:fixed;left:50%;top:calc(118px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(440px,calc(100% - 32px));text-align:center;font-size:14px;line-height:1.35;color:var(--bone);background:var(--panel);border:1px solid var(--line);border-left:3px solid #c9a35a;border-radius:4px;padding:6px 12px 8px;pointer-events:none;z-index:6;transition:opacity .3s}
+#momArrow{position:fixed;left:0;top:0;width:36px;height:36px;margin:-18px 0 0 -18px;color:#e0b865;pointer-events:none;z-index:6;filter:drop-shadow(0 1px 3px rgba(0,0,0,.7))}
+#momArrow svg{width:100%;height:100%;fill:currentColor;stroke:#2a1d08;stroke-width:1;stroke-linejoin:round}
+#mother b{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#d9b46a;margin-bottom:2px}
+#mother.good{border-left-color:var(--verd)}
 #toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-family:var(--f-display);font-size:clamp(28px,5vw,46px);text-shadow:0 2px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s;padding-inline:16px;width:min(720px,100%)}
 #toast small{display:block;font-family:var(--f-ui);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-top:6px}
 #regionName{text-align:center;font-family:var(--f-display);font-size:26px;line-height:1;text-shadow:0 2px 12px rgba(0,0,0,.5)}
@@ -102,6 +107,7 @@ kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);bor
 @media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
   #prompt{bottom:calc(24px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 2 * (190px + env(safe-area-inset-right,0px)))}
   #hint{bottom:auto;top:calc(114px + env(safe-area-inset-top,0px));white-space:normal;width:min(480px,calc(100% - 2 * (190px + env(safe-area-inset-right,0px))));text-align:center}
+  #mother{top:calc(112px + env(safe-area-inset-top,0px));width:min(480px,calc(100% - 2 * (190px + env(safe-area-inset-right,0px))));font-size:13px;padding:4px 10px 6px}
 }
 #fade{position:fixed;inset:0;background:#06090a;opacity:0;pointer-events:none;transition:opacity .6s ease-out}
 #fade.now{transition:none;opacity:1}
@@ -173,6 +179,8 @@ h2{font-size:42px}
 </div>
 <div id="prompt" hidden><div id="promptText"></div><div id="promptBar" hidden><i></i></div></div>
 <div id="fade"></div>
+<div id="momArrow" hidden aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5l18 7-18 7 4.5-7z"/></svg></div>
+<div id="mother" hidden aria-live="polite"><b data-i18n="c.mother.name">Mother</b><span id="motherText"></span></div>
 <div id="hint" hidden data-i18n="c.tip.hunt">Hunt: fly low over a herd and hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).</div>
 <div id="touch" hidden>
   <div id="stick"><div id="nub"></div></div>
@@ -223,7 +231,7 @@ h2{font-size:42px}
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js',
-     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/lair.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
+     'core/flight.js', 'core/prey.js', 'core/region.js', 'core/lair.js', 'core/mother.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
      'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();

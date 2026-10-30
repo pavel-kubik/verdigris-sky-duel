@@ -88,7 +88,7 @@
       p.pos = at.pos; p.yaw = at.yaw; p.pitch = 0; p.roll = 0; p.rollT = 0; p.rollX = 0;
       p.vel = [0, 0, 0];
     }
-    cs.exit = null; cs.exitT = 0; cs.swoop = null; cs.target = null; cs.breath = null;
+    cs.exit = null; cs.exitT = 0; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null;
     return [{ e: 'region:enter', region: toId, from: fromId }];
   }
 

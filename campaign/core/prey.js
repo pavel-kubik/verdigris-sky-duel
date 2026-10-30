@@ -110,6 +110,7 @@
   function stepOne(field, p, dragon, dt, ctx, ev) {
     const def = D.prey[p.type], rng = ctx.rng, herd = field.herds.find(h => h.id === p.herd);
     p.t += dt; p.cd = Math.max(0, p.cd - dt);
+    if (p.held > 0) { p.held -= dt; p.speed = 0; if (p.state === 'charge') p.state = 'flee'; return; }   // the mother holds it still (T05)
     const th = threat(field, p, dragon, ctx.stats);
     const inRange = th.low && th.d < th.range;
     const away = Math.atan2(p.pos[0] - dragon.pos[0], p.pos[2] - dragon.pos[2]);
@@ -272,8 +273,34 @@
   }
 
   /* ---------- fire (T10) ---------- */
-  /** The breath cone of a pilot: origin at the mouth, along the heading, scaled with the dragon. */
-  function breathCone(pilot, scale, field) {
+  /**
+   * The prey the breath is aimed at (T05 feedback): inside the assist angle and within range x preview of the mouth.
+   * The previous target is kept while it stays a candidate (no flicker between herd mates); otherwise a prey that is
+   * already heating up wins, then the nearest. Returns { id, inRange, cook (0..1) } or null.
+   */
+  function fireTarget(field, pilot, scale, prevId) {
+    const B = D.breath, s = Math.max(1, scale || 1), c = Math.cos(pilot.pitch);
+    const dir = [Math.sin(pilot.yaw) * c, Math.sin(pilot.pitch), Math.cos(pilot.yaw) * c];
+    const o = [pilot.pos[0] + dir[0] * B.mouth * s, pilot.pos[1] + dir[1] * B.mouth * s, pilot.pos[2] + dir[2] * B.mouth * s];
+    const range = B.range * s, ca = Math.cos(B.assist);
+    let best = null, bs = Infinity, keep = null;
+    for (const p of field.list) {
+      if (!ACTIVE[p.state]) continue;
+      const v = [p.pos[0] - o[0], p.pos[1] + 0.8 - o[1], p.pos[2] - o[2]], d = Math.hypot(v[0], v[1], v[2]);
+      if (d > range * B.preview || d < 1e-6) continue;
+      if ((v[0] * dir[0] + v[1] * dir[1] + v[2] * dir[2]) / d < ca) continue;
+      const hit = { p, d };
+      if (p.id === prevId) keep = hit;
+      const score = d - (p.cook > 0 ? range : 0);
+      if (score < bs) { bs = score; best = hit; }
+    }
+    const h = keep || best;
+    return h ? { id: h.p.id, inRange: h.d <= range, cook: Math.min(1, (h.p.cook || 0) / D.roast.cookTime) } : null;
+  }
+
+  /** The breath cone of a pilot: origin at the mouth, along the heading, scaled with the dragon.
+   *  With a field the stream bends toward a prey inside the assist angle and range: preferId (the fire target) first. */
+  function breathCone(pilot, scale, field, preferId) {
     const B = D.breath, s = Math.max(1, scale || 1), c = Math.cos(pilot.pitch);
     let dir = [Math.sin(pilot.yaw) * c, Math.sin(pilot.pitch), Math.cos(pilot.yaw) * c];
     const o = [pilot.pos[0] + dir[0] * B.mouth * s, pilot.pos[1] + dir[1] * B.mouth * s, pilot.pos[2] + dir[2] * B.mouth * s];
@@ -288,6 +315,13 @@
         if (d > cone.range || d < 1e-6) continue;
         if ((v[0] * dir[0] + v[1] * dir[1] + v[2] * dir[2]) / d < ca) continue;
         if (d < bd) { bd = d; best = { p, v, d }; }
+      }
+      if (preferId != null) {
+        const q = byId(field, preferId);
+        if (q && ACTIVE[q.state]) {
+          const v = [q.pos[0] - o[0], q.pos[1] + 0.8 - o[1], q.pos[2] - o[2]], d = Math.hypot(v[0], v[1], v[2]);
+          if (d <= cone.range && d > 1e-6 && (v[0] * dir[0] + v[1] * dir[1] + v[2] * dir[2]) / d >= ca) best = { p: q, v, d };
+        }
       }
       if (best) { dir = [best.v[0] / best.d, best.v[1] / best.d, best.v[2] / best.d]; cone.dir = dir; cone.target = best.p.id; }
     }
@@ -353,5 +387,5 @@
     return c;
   }
 
-  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, swoopTarget, tryGrab, release, byId, breathCone, inCone, cook, HERD_R, ALARM_ALT, CHARGE_ALT });
+  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, swoopTarget, tryGrab, release, byId, fireTarget, breathCone, inCone, cook, HERD_R, ALARM_ALT, CHARGE_ALT });
 })(typeof self !== 'undefined' ? self : this);
