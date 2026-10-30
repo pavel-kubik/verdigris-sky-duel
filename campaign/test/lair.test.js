@@ -153,6 +153,9 @@ ok(mouth[1] > T.surfaceAt('ash', mouth[0], mouth[2]) + D.flight.minAlt, 'mouth c
     ok(le && le.hatch && !le.respawn, start + ': lair:enter tagged hatch');
     ok(ev.some(e => e.e === 'region:enter') === (start !== LR.home()), start + ': region:enter only when the start region differs');
     ok(!ev.some(e => e.e === 'dragon:died'), start + ': no death');
+    const mh = ev.find(e => e.e === 'mother:handover');
+    ok(mh && mh.lesson === 0 && mh.at === 'lair' && ev.indexOf(mh) > ev.indexOf(le), start + ': mother:handover after lair:enter (T104)');
+    ok(cs.story.mother && cs.story.mother.lesson === 0 && cs.story.mother.at === 'lair', start + ': the mother is with the hatchling in the lair');
     ok(cs.dragon.stage === 0 && cs.dragon.hp === D.stages[0].hp && cs.dragon.deaths === 0, start + ': full HP hatchling, no deaths');
     const m = LR.mouthPos(LR.home());
     ok(Math.hypot(cs.dragon.pilot.pos[0] - m[0], cs.dragon.pilot.pos[2] - m[2]) < 1, start + ': pilot at the cave mouth');

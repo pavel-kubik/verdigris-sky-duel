@@ -22,6 +22,12 @@
   const round = (v, k) => Math.round(v * k) / k;
   function fail(code, why) { const e = new Error(code + (why ? ': ' + why : '')); e.code = code; throw e; }
 
+  /** The story part of the save: the act and the mother's lesson state (null = no teacher, e.g. a phase 1 run). */
+  function storyOf(st) {
+    const m = st && st.mother;
+    return { act: (st && st.act) || 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null };
+  }
+
   function serialise(cs) {
     const d = cs.dragon, p = d.pilot;
     return {
@@ -35,7 +41,7 @@
       renown: 0,
       regions: Object.keys(D.regions).reduce((o, id) => { o[id] = {}; return o; }, {}),
       missions: { completed: [], active: null },
-      story: { act: 1 },
+      story: storyOf(cs.story),
       world: {
         region: cs.region,
         pos: p ? p.pos.map(v => round(v, 100)) : null,
@@ -106,6 +112,7 @@
     cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0 };
     const s = o.stats || {};
     cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0 };
+    cs.story = storyOf(o.story);
     cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.exit = null; cs.exitT = 0; cs.saveT = 0;
 
     const pos = region === w.region && w.pos ? T.clampToRegion(region, w.pos.slice(), D.flight.minAlt) : null;
@@ -127,7 +134,7 @@
 
   function blank() {
     const cs = { dragon: { pilot: null, stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start, deaths: 0 },
-      larder: [], region: D.startRegion, inLair: false, flags: {}, stats: { played: 0, eaten: 0, food: 0 } };
+      larder: [], region: D.startRegion, inLair: false, flags: {}, stats: { played: 0, eaten: 0, food: 0 }, story: null };
     return serialise(cs);
   }
 

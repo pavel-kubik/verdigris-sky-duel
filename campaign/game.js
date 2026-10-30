@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't103.1 2026-10-30 one shared dragon model';
+  const BUILD = 't104.1 2026-10-30 hatching scene hands over to the mother';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -322,7 +322,8 @@
   }
   /**
    * Start / Continue: a saved run is applied into cs (same objects) and play resumes. A new run (Hatch, New hatchling)
-   * first shows the hatching card; its button wakes the hatchling inside the lair (lair.hatch) with the panel open.
+   * first plays the hatching scene and its card; the card button wakes the hatchling inside the lair (lair.hatch) with
+   * the panel open and hands over to the mother (cs.story.mother, her lessons come with core/mother.js in T05).
    */
   function startRun(fresh) {
     if (fresh || !saved) {
@@ -795,6 +796,8 @@
     const i = region.info, r = renderer.info.render;
     const L = [];
     L.push('BUILD   ' + BUILD + (params.get('v') ? '  (v=' + params.get('v') + ')' : ''));
+    const mo = cs.story && cs.story.mother;
+    L.push('STORY   act ' + ((cs.story && cs.story.act) || 1) + '  mother ' + (mo ? 'lesson ' + mo.lesson + ' (' + mo.at + ')' : '-'));
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
     L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');

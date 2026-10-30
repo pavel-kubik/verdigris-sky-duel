@@ -13,7 +13,9 @@
  *   home() -> regionId                        the region with the lair (where a dead dragon wakes)
  *   respawn(cs, cause) -> events[]            after death: carried prey lost, back in the lair region, HP respawnHp x max,
  *                                             hunger at least respawnHunger, cs.inLair = true (the panel opens)
- *   hatch(cs) -> events[]                     new hatchling: wakes inside the lair of home() (intro card -> lair panel)
+ *   hatch(cs) -> events[]                     new hatchling: wakes inside the lair of home() (intro card -> lair panel);
+ *                                             the hatching scene hands over to the mother: cs.story.mother = { lesson: 0, at: 'lair' }
+ *                                             and a mother:handover event (her lessons are driven by core/mother.js, T05)
  * While cs.inLair, state.step only runs spoil (hunger and prey are paused).
  */
 (function (root) {
@@ -158,10 +160,17 @@
     return ev;
   }
 
-  /** New hatchling (first start): the egg breaks inside the lair, the panel opens. Events: [region:enter,] lair:enter (hatch: true). */
+  /**
+   * New hatchling (first start): the egg breaks inside the lair, the panel opens, and the mother is there with it.
+   * Events: [region:enter,] lair:enter (hatch: true), mother:handover (lesson 0, at 'lair').
+   */
   function hatch(cs) {
     cs.dragon.carried = null; cs.dragon.eatT = 0;
-    return wake(cs, [], { hatch: true });
+    const ev = wake(cs, [], { hatch: true });
+    cs.story = cs.story || { act: 1 };
+    cs.story.mother = { lesson: 0, at: 'lair' };
+    ev.push({ e: 'mother:handover', lesson: 0, at: 'lair' });
+    return ev;
   }
 
   M.define('lair', { mouthPos, distToMouth, inMouth, near, canEnter, enter, rest, eatFromLarder, leave, spoil, home, respawn, hatch });
