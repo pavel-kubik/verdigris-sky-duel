@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't108.2 2026-10-30 no-fire message when starving or out of fire, dim Breath button';
+  const BUILD = 't109.1 2026-10-31 compass strip with lair, exits and smell markers';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -218,7 +218,7 @@
         let px = x * W / 2, py = -y * H / 2;
         if (Math.hypot(px, py) < 1) py = 1;                      // straight behind: point down
         const land = isTouch && W > H && H < 560;               // keep clear of the HUD, the caption and the controls
-        const top = land ? 70 : isTouch ? 190 : 140, bot = land ? 30 : isTouch ? 250 : 90, side = land ? 210 : 30;
+        const top = land ? 150 : isTouch ? 204 : 150, bot = land ? 30 : isTouch ? 250 : 90, side = land ? 210 : 30;
         const minX = -W / 2 + side, maxX = W / 2 - side, minY = -H / 2 + top, maxY = H / 2 - bot;
         const kx = px > 0 ? maxX / px : px < 0 ? minX / px : Infinity, ky = py > 0 ? maxY / py : py < 0 ? minY / py : Infinity;
         const k = Math.min(kx, ky);
@@ -228,6 +228,33 @@
     }
     if (momArrow.hidden === show) momArrow.hidden = !show;
   }
+  /* ---------- compass strip (T109): markers from core/nav.js; tap a marker for its name and distance ---------- */
+  const compassEl = $('#compass'), compassTag = $('#compassTag');
+  const compass = VRender.compass.build(compassEl, { t, fov: D.nav.fov });
+  let compassOn = false, tagT = 0, tagKey = null;
+  function markerName(m) {
+    const L = m.label || {}, p = {};
+    for (const k in L.p || {}) p[k] = t(L.p[k]);
+    return t(L.key, p);
+  }
+  function compassHud(dt) {
+    const on = state === 'play' && !!pilot && !cs.inLair;
+    if (on !== compassOn) { compassEl.hidden = !on; compassOn = on; if (!on) { compassTag.hidden = true; tagT = 0; } }
+    if (!on) return;
+    const list = NV.markers(cs);
+    compass.update(list, pilot.yaw, dt);
+    if (tagT > 0) {
+      tagT -= dt;
+      const m = list.find(q => q.key === tagKey);
+      if (!m || tagT <= 0) { tagT = 0; compassTag.hidden = true; compass.select(null); }
+      else { const txt = markerName(m) + ' - ' + t('c.nav.dist', { d: Math.round(m.dist / 10) * 10 }); if (compassTag.textContent !== txt) compassTag.textContent = txt; }
+    }
+  }
+  compassEl.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    const m = compass.tap(e.clientX);
+    tagKey = m ? m.key : null; tagT = m ? D.nav.tagTime : 0; compassTag.hidden = !m;
+  });
   function embers(pos, n) {
     for (let k = 0; k < n; k++) {
       const a = Math.random() * Math.PI * 2, s = 4 + Math.random() * 9;
@@ -763,6 +790,7 @@
     ['Z', 'die now (wake in the lair)', 'KeyZ', 'die'],
     ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
+    ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
     ['Y', 'graphics quality low / mid / high (saved)', 'KeyY', 'quality'],
     ['I', 'put the nearest goat in front of the dragon', 'KeyI', 'goat here'],
@@ -802,6 +830,19 @@
         const a = Math.atan2(pilot.pos[0] - best.centre[0], pilot.pos[2] - best.centre[1]);
         const x = best.centre[0] + Math.sin(a) * 160, z = best.centre[1] + Math.cos(a) * 160;
         pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 30, z]; pilot.yaw = a + Math.PI; pilot.pitch = 0; snapCam();
+      }
+    }
+    if (code === 'KeyO' && (pilot.mode || 'air') === 'air') {       // T09: the herd out of sight behind the dragon, the scent on the compass
+      const src = NV.sources(cs.field);
+      let best = null, bd = Infinity;
+      for (const h of src) { const d = Math.hypot(h.x - pilot.pos[0], h.z - pilot.pos[2]); if (d < bd) { bd = d; best = h; } }
+      if (best) {
+        const a = Math.atan2(pilot.pos[0] - best.x, pilot.pos[2] - best.z);
+        let x = best.x + Math.sin(a) * 340, z = best.z + Math.cos(a) * 340;
+        const R = TR.region(regionId).radius - 150, r = Math.hypot(x, z);
+        if (r > R) { x *= R / r; z *= R / r; }
+        pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 40, z]; pilot.yaw = Math.atan2(x - best.x, z - best.z); pilot.pitch = 0; snapCam();
+        if (cs.nav) cs.nav.next = 0;
       }
     }
     if (code === 'KeyT') {                                        // 200 inside the edge, mid exit arc, heading out
@@ -860,6 +901,7 @@
     if (state === 'intro' || !pilot) mom.root.visible = false;
     motherHud();
     motherArrow();
+    compassHud(dt);
     preyView.update(cs.field, time, carryPose());
     targetRing();
     fireTargetRing();
@@ -943,6 +985,7 @@
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE' : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
+      { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');

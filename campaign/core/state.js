@@ -6,6 +6,7 @@
  *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
  *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
  *                                                 then the mother (core/mother.js, T05) reads the frame's events
+ *                                                 and nav.step (T09) re-reads the scents for the compass (cs.nav)
  * input: { sx, sy, breath, boost, grab, eat, confirm, enter, land } (sx / sy in -1..1, the rest booleans;
  *        confirm = travel through the offered exit, enter = the Move slot's "Enter cave",
  *        land = one-shot Land / Fly (F or the Move slot): lands when walk.canLand allows it, takes off on the ground).
@@ -20,7 +21,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -39,6 +40,7 @@
       inLair: false,
       flags: { introSeen: false, heavyT: 0 },
       stats: { played: 0, eaten: 0, food: 0 },
+      nav: null,                     // compass and smell (core/nav.js, T09): { t, next, scents, range }, not saved
       story: { act: 1, mother: null }, // mother: { lesson, at } once the hatching scene hands over to her (T04), driven by core/mother.js (T05)
       hint: null,                    // 'swoop' | 'grab' | 'heavy' | 'eat' | 'near' | null, for the HUD prompt
       swoop: null,                   // id of the prey a held grab is diving at
@@ -74,6 +76,7 @@
     const ev = [];
     if (!cs.dragon.pilot) return ev;
     run(cs, inp, dt, ev);
+    NV.step(cs, dt);                                            // smell: scent markers for the compass (T09)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);
   }
