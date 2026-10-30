@@ -10,7 +10,11 @@
  *        confirm = travel through the offered exit, enter = the Move slot's "Enter cave",
  *        land = one-shot Land / Fly (F or the Move slot): lands when walk.canLand allows it, takes off on the ground).
  * Locomotion (T06): pilot.mode air -> flight.step, ground -> walk.step, landing / takeoff -> walk.blend.
- *        On the ground there is no swoop, grab (pick up comes in T08), roll or region travel.
+ *        On the ground there is no swoop, roll or region travel.
+ * Breath pressed while no fire is possible emits breath:blocked { why: 'starving' | 'tired' } once per press (T08).
+ * Ground actions (T08): Grab picks up the prey or roast in front (walk.inFront, ground.reach), carried in the jaws;
+ *        Eat on the ground takes ground.eatTime and stands still (a boar's hit cancels it); the breath aims
+ *        ground.breathPitch lower so it sweeps the ground in front.
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
@@ -102,6 +106,12 @@
     // locomotion mode (T06): Land / Fly one-shot, then the mode decides what moves the dragon
     if (!p.mode) p.mode = 'air';
     if (inp.land) landToggle(cs, p, stats, eff, ev);
+    // Breath pressed but no fire (T08 feedback): say why once per press - starving (hunger.starving.breath) or the fire bar is empty
+    if (inp.breath && !cs.breathHeld && (p.mode || 'air') !== 'landing' && p.mode !== 'takeoff') {
+      if (!eff.canBreath) emit(cs, ev, { e: 'breath:blocked', why: 'starving' });
+      else if (p.st <= 8) emit(cs, ev, { e: 'breath:blocked', why: 'tired' });
+    }
+    cs.breathHeld = !!inp.breath;
     const air = p.mode === 'air';
 
     // swoop: holding grab with liftable prey ahead steers the dive onto it (aim assist for the claws)
@@ -147,13 +157,14 @@
     // fire: the breath cone cooks prey into roast chunks
     // fire target (orange ring + roast progress in the renderer): the stream bends onto it while it is in range
     // memory: the last prey that got heat stays the target (bar and ring) while it is still warm, even out of view
-    const ft = PR.fireTarget(cs.field, p, scale, cs.fire ? cs.fire.id : null);
+    const aim = p.mode === 'ground' ? Object.assign({}, p, { pitch: p.pitch + D.ground.breathPitch }) : p;   // T08: fire along the ground
+    const ft = PR.fireTarget(cs.field, aim, scale, cs.fire ? cs.fire.id : null);
     const warm = cs.fireMem != null ? PR.byId(cs.field, cs.fireMem) : null;
     if (!warm || !(warm.cook > 0) || warm.state === 'roast') cs.fireMem = null;
     if (ft && (!carried || ft.id !== carried.id)) cs.fire = ft;
     else if (cs.fireMem != null && !carried) cs.fire = { id: cs.fireMem, inRange: false, cook: 0, kept: true };
     else cs.fire = null;
-    cs.breath = p.breathing ? PR.breathCone(p, scale, cs.field, cs.fire ? cs.fire.id : null) : null;   // the renderer aims the stream along cs.breath.dir
+    cs.breath = p.breathing ? PR.breathCone(aim, scale, cs.field, cs.fire ? cs.fire.id : null) : null;   // the renderer aims the stream along cs.breath.dir
     for (const e of PR.cook(cs.field, cs.breath, dt, cs.rng)) emit(cs, ev, e);
     if (cs.fire) { const q = PR.byId(cs.field, cs.fire.id); if (q && q.state !== 'roast') cs.fire.cook = Math.min(1, q.cook / D.roast.cookTime); else cs.fire = null; }
     if (cs.fire && cs.fire.cook > 0 && cs.fire.cook < 1) cs.fireMem = cs.fire.id;
@@ -166,8 +177,8 @@
       d.carried = null; d.eatT = 0; carried = null;
     }
 
-    // carried prey hangs under the claws (the renderer draws it at the claw anchor)
-    if (carried) carried.pos = [p.pos[0], p.pos[1] - D.grab.clawDrop * scale - 1, p.pos[2]];
+    // carried prey hangs under the claws in the air, in the jaws on the ground (the renderer draws it at the anchor)
+    if (carried) carried.pos = air ? [p.pos[0], p.pos[1] - D.grab.clawDrop * scale - 1, p.pos[2]] : jawPos(p, scale);
 
     // grab
     cs.flags.heavyT = Math.max(0, cs.flags.heavyT - dt);
@@ -177,11 +188,21 @@
       if (g.prey) { d.carried = g.prey.id; carried = g.prey; emit(cs, ev, { e: 'prey:grabbed', type: g.prey.type, id: g.prey.id }); }
       else if (g.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: g.heavy.type }); }
     }
+    // pick up (T08): on the ground Grab takes the prey or roast in front of the head
+    const front = !carried && p.mode === 'ground' ? PR.inFront(cs.field, items => WK.inFront(p, scale, items), stats, eff) : { best: null };
+    if (!carried && inp.grab && p.mode === 'ground') {
+      if (front.best) {
+        carried = PR.lift(cs.field, front.best); d.carried = carried.id; carried.pos = jawPos(p, scale);
+        emit(cs, ev, { e: 'prey:grabbed', type: carried.type, id: carried.id, ground: true });
+        front.best = null;
+      } else if (front.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: front.heavy.type }); }
+    }
+    if (!air) cs.target = front.best ? front.best.id : null;      // the green ring marks what Grab would pick up
 
-    // eat: hold for eat.time while carrying; releasing restarts the meal
-    if (carried && inp.eat && !hit) {
+    // eat: hold for eat.time (ground.eatTime on the ground) while carrying; releasing restarts the meal
+    if (carried && inp.eat && !hit && p.mode !== 'takeoff') {
       d.eatT += dt;
-      if (d.eatT >= D.eat.time) {
+      if (d.eatT >= eatTime(cs)) {
         const food = carried.food;
         const ready = HN.feed(d, food);
         PR.remove(cs.field, carried.id);
@@ -212,9 +233,21 @@
     }
 
     cs.landOk = air && WK.canLand(p, cs.region).ok;                // the Move slot offers Land (controls.slots)
-    if (!air) cs.hint = carried ? 'eat' : p.mode === 'ground' ? 'walk' : null;
+    if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
     else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
+  }
+
+  /** Seconds of holding Eat for one meal: eat.time in the air, ground.eatTime on the ground (T08). */
+  function eatTime(cs) {
+    const p = cs.dragon.pilot;
+    return p && p.mode && p.mode !== 'air' ? D.ground.eatTime : D.eat.time;
+  }
+
+  /** Where a prey held in the jaws is (the head is about ground.reach / 2 in front of a standing dragon). */
+  function jawPos(p, scale) {
+    const f = D.ground.reach * 0.5 * scale;
+    return [p.pos[0] + Math.sin(p.yaw) * f, p.pos[1] - D.walk.stand * scale * 0.5, p.pos[2] + Math.cos(p.yaw) * f];
   }
 
   /** Land / Fly one-shot: lands when allowed (else says why), takes off on the ground (else says why). */
@@ -243,5 +276,5 @@
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
 
-  M.define('state', { create, enterRegion, step, autosave, scaleOf, carriedPrey, lairRest, lairEat, lairLeave });
+  M.define('state', { create, enterRegion, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave });
 })(typeof self !== 'undefined' ? self : this);

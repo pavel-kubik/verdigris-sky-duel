@@ -257,11 +257,26 @@
   function tryGrab(field, dragon, stats, effects, scale) {
     const r = reach(field, dragon, stats, effects, scale);
     if (!r.best) return r.heavy ? { heavy: r.heavy } : {};
-    const p = r.best;
-    p.state = 'carried'; p.speed = 0; p.goal = null; p.calm = 0;
-    // the rest of the herd bolts
+    return { prey: lift(field, r.best) };
+  }
+
+  /** Takes a prey into the claws (or jaws on the ground): state carried, the rest of its herd bolts. */
+  function lift(field, p) {
+    p.state = 'carried'; p.speed = 0; p.goal = null; p.calm = 0; p.held = 0;
     for (const q of field.list) if (q !== p && q.herd === p.herd && (q.state === 'graze')) { q.state = 'flee'; q.calm = 0; }
-    return { prey: p };
+    return p;
+  }
+
+  /**
+   * Ground pick up (Phase 2 T08): what lies in front of a standing dragon. pick(items) is walk.inFront bound to the
+   * pilot (nearest within ground.reach x scale inside ground.reachCone). Returns { best, heavy }: the liftable prey
+   * (alive or roast) the jaws reach, else the too-heavy one there (for the prompt and the "too heavy" toast).
+   */
+  function inFront(field, pick, stats, effects) {
+    const limit = Math.min(stats.carry, effects && effects.carryMax != null ? effects.carryMax : Infinity);
+    const can = field.list.filter(p => GRABBABLE[p.state]);
+    const best = pick(can.filter(p => p.size <= limit));
+    return { best, heavy: best ? null : pick(can.filter(p => p.size > limit)) };
   }
 
   /** Lets a carried prey go (dropped alive): it lands below the dragon and runs. */
@@ -387,5 +402,5 @@
     return c;
   }
 
-  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, swoopTarget, tryGrab, release, byId, fireTarget, breathCone, inCone, cook, HERD_R, ALARM_ALT, CHARGE_ALT });
+  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, swoopTarget, tryGrab, lift, inFront, release, byId, fireTarget, breathCone, inCone, cook, HERD_R, ALARM_ALT, CHARGE_ALT });
 })(typeof self !== 'undefined' ? self : this);
