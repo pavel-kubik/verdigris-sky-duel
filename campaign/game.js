@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't123.1 2026-10-31 one-time tips (landing, compass, cave, raid, alert, night, altar, Farmlands), intro note, debug \\ tips reset';
+  const BUILD = 't124.1 2026-10-31 raid bot balancing: Drake hunger x1.1, arrows 2 dmg, loot heat 1.5';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
