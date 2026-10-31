@@ -4,20 +4,21 @@ Status: draft, 2026-10-31. Refines `000_spec.md` for Phase 3. Built on `campaign
 
 Revised by Pavel, 2026-10-31:
 - **Visual form comes first.** The phase opens with the first Order castle as a showpiece, before the mission systems.
-- **The castle gets its own land.** A new region, the **Vltava Bend** (working title), is built on the landscape of Prague with the iconic shape of the Vltava: the river comes from the south past a rock, runs north through the old city, turns east under a plateau, loops around a peninsula and turns back west and north. The castle stands on the rock in the south, where Vyšehrad stands: **Vyšehrad Castle** (working title).
-- **New regions follow Prague's landscape.** The Vltava Bend is the first; the river runs through the later ones too.
+- **The castle gets its own land.** A new region, the **Veltava Bend**, is built on the real terrain of Prague (a LiDAR terrain model, section 4.2) with the iconic shape of the Vltava: the river comes from the south past a rock, runs north through the old city, turns east under a plateau, loops around a peninsula and turns back west and north. The castle stands on the rock where Vyšehrad stands: **Vyshgard Castle**.
+- **Fantasy names that are easy to guess** (Veltava, Vyshgard, Hradchan, Petrovel, Lethna, Holeshwick, Troyvale, Staromark, Karlsbridge; table in 4.2).
+- **New regions follow Prague's landscape.** The Veltava Bend is the first; the river runs through the later ones too, built the same way from real terrain.
 - The map screen stays in this phase and becomes a drawn, explorable map, not only a region graph.
 
 ## 1. Goal
 
-The dragon gets a new land to fly over, a real enemy stronghold to raid, a map to find its way around the world and its first timed missions. A Drake flies from the Farmlands into the Vltava Bend, follows the river north and sees Vyšehrad Castle on its rock above the water. It flies over the walls under archer and ballista fire, burns wooden roofs, steals the Ember Chalice from the twin-spired chapel against the clock and banks it in an aerie. The cave gets the mission board, the trophy wall and the map stone.
+The dragon gets a new land to fly over, a real enemy stronghold to raid, a map to find its way around the world and its first timed missions. A Drake flies from the Farmlands into the Veltava Bend, follows the river north and sees Vyshgard Castle on its rock above the water. It flies over the walls under archer and ballista fire, burns wooden roofs, steals the Ember Chalice from the twin-spired chapel against the clock and banks it in an aerie. The cave gets the mission board, the trophy wall and the map stone.
 
 The phase starts with the castle block (castle look in a preview page, the new region, the castle in it, its defenders and fire; checked by Pavel on a phone), then the map and aeries, then missions, story cards and the freed village.
 
 **Exit criteria**
 
-- On a phone, the Vltava Bend reads as Prague's river from above: on the map and from high flight, the river shape (south run, bend under the plateau, loop around the peninsula, turn back north-west) is recognisable, with its islands, hills and a stone bridge.
-- Vyšehrad Castle reads as a castle on its rock from at least 600 units away (rock cliff over the river, walls and bastions, towers, keep, twin spires, banners) and is the strongest image of the region by day and by night (torches, lit windows).
+- On a phone, the Veltava Bend reads as Prague's river from above: on the map and from high flight, the river shape (south run, bend under the plateau, loop around the peninsula, turn back north-west) is recognisable, with its islands, hills and a stone bridge.
+- Vyshgard Castle reads as a castle on its rock from at least 600 units away (rock cliff over the river, walls and bastions, towers, keep, twin spires, banners) and is the strongest image of the region by day and by night (torches, lit windows).
 - A Drake lands in the castle courtyard or on a wall walk, walks between the buildings, and the castle fights back (archers on towers and walls, ballistae on bastions, the gate closes on alarm); wooden roofs burn, stone stays standing but charred.
 - The map screen shows the world with discovered regions, settlements, castles, aeries, the lair and the dragon; unexplored ground stays fogged until the dragon has flown over it.
 - Fast travel from the map stone in the cave to a discovered aerie and back works.
@@ -30,16 +31,16 @@ The phase starts with the castle block (castle look in a preview page, the new r
 
 | Area | Phase 3 content |
 | --- | --- |
-| New region | Vltava Bend: terrain built on Prague's landscape (section 4.2): the Vltava with its islands, the Vyšehrad rock, the Petřín and Hradčany ridge on the west bank, the Letná plateau over the bend, the Vítkov ridge in the east, the Holešovice peninsula inside the loop, the Troja slopes in the north; a stone bridge with gate towers; the old royal city as burned ruins; entered from the Farmlands, gated at Drake |
-| Settlements | Vyšehrad Castle (rock, south), Order outpost on the Letná plateau, village on the Holešovice peninsula, hamlet at Troja, Order watch tower on Petřín |
-| Castle | Vyšehrad Castle: rock spur with a cliff over the river, curtain walls with bastions following the rock edge, gatehouse, towers, keep, twin-spired chapel, round rotunda, great hall, siege workshop, stables, well; banners |
+| New region | Veltava Bend: real Prague terrain from a LiDAR model (section 4.2): the Veltava with its islands, the Vyshgard rock, the Petrovel and Hradchan ridge on the west bank, the Lethna Heights over the bend, the Vitkar Ridge in the east, the Holeshwick peninsula inside the loop, the Troyvale slopes in the north; Karlsbridge, a stone bridge with gate towers; Staromark, the burned royal city; entered from the Farmlands, gated at Drake |
+| Settlements | Vyshgard Castle (rock, south), Order outpost on the Lethna Heights, village on the Holeshwick peninsula, hamlet at Troyvale, Order watch tower on Petrovel |
+| Castle | Vyshgard Castle: rock spur with a cliff over the river, curtain walls with bastions following the rock edge, gatehouse, towers, keep, twin-spired chapel, round rotunda, great hall, siege workshop, stables, well; banners |
 | Castle look | Modular castle kit (`render/castle-kit.js`), standalone preview page first, LOD (full model near, silhouette far), torches and lit windows at night, smoke from chimneys, waving banners, charred stone after fire |
 | Castle play | Solids for walls, towers and buildings; landing allowed in the courtyard and on wall walks; archers on towers and wall walks, ballistae on bastions, gate closes on alarm, castle horn alerts the region |
 | Map | Map screen with a drawn world view (regions around the volcano) and a region view (top-down terrain image with rivers, roads, fields, places); fog of war from exploration; markers for lair, aeries, settlements, castle, mission target, dragon |
-| Aeries | One small cliff cave per region outside the Ash Wastes (Wildwood, Farmlands, Vltava Bend): discover, bank loot, end missions, rest |
+| Aeries | One small cliff cave per region outside the Ash Wastes (Wildwood, Farmlands, Veltava Bend): discover, bank loot, end missions, rest |
 | Fast travel | Map stone station in the cave; from the lair to a discovered aerie and from an aerie to the lair |
 | Missions | `core/missions.js`: catalogue in data, accept at the board, timer, objectives, success / fail, time bonus, retry after rest |
-| Mission types | Steal (Ember Chalice from the castle chapel), destroy (castle siege workshop), intercept (tithe wagon crossing the stone bridge to the castle) |
+| Mission types | Steal (Ember Chalice from the castle chapel), destroy (castle siege workshop), intercept (tithe wagon crossing Karlsbridge to the castle) |
 | Relics | Relic items with mission carry rules (speed -20%, no breath), lost on death or timeout, shown on the trophy wall |
 | Cave stations | Mission board, trophy wall, map stone |
 | Freed village | Destroying the Farmlands village's Order garrison (tax house, tower and its archers) frees it; food tribute to the larder |
@@ -49,22 +50,22 @@ The phase starts with the castle block (castle look in a preview page, the new r
 
 ### Out of scope (later phases)
 
-Renown (Phase 4; tribute in this phase depends only on the village being freed), knights, nets, frost mages, mangonels (Phases 4-5), breaching stone walls (Phase 4, Wyrm), hunt / rescue / defend / boss missions, alert 4-5, slayers, lair defense, the mother's death scene (Phase 4), the Highland Pass, towns (the Old Town stays ruins in this phase), more castles (the later castles reuse the kit), boats on the river.
+Renown (Phase 4; tribute in this phase depends only on the village being freed), knights, nets, frost mages, mangonels (Phases 4-5), breaching stone walls (Phase 4, Wyrm), hunt / rescue / defend / boss missions, alert 4-5, slayers, lair defense, the mother's death scene (Phase 4), the Highland Pass, towns (Staromark stays ruins in this phase), more castles (the later castles reuse the kit), boats on the river.
 
 ## 2. Constraints from the current code
 
 | Fact | Consequence for Phase 3 |
 | --- | --- |
-| Regions are discs of `radius` 1100 with features road, river, plateau over seeded noise (`core/terrain.js`) | The Vltava Bend has radius 1200 and new features: `hill` (raised area with a flank), `ridge` (hill along a polyline), `cliff` (a hill with one steep side facing a direction), `island` (dry ground inside a river channel), `bridge` (dry deck across a river), `ruins` (flattened ground for rubble scenery). Base noise stays low (`amp` 0.4) so the river shape reads |
-| `river` is one polyline with width, depth and a flat valley floor of 34 | The Vltava is a polyline with `width` 40 and a wide `valley` (80) so the old-city lowland, the embankments and the peninsula are flat; islands sit inside its channel |
-| Exits are arcs on the region edge with `minStage` | The Farmlands get a second exit on their +Z side to the Vltava Bend (`minStage: 1`); the Bend's entry from the Farmlands is on its south edge, so the dragon arrives along the river with Vyšehrad ahead |
+| Regions are discs of `radius` 1100 with features road, river, plateau over seeded noise (`core/terrain.js`) | The Veltava Bend (radius 1200) takes its base heights and its river from the baked real terrain (`terrain.dem`, `water: 'mask'`) instead of noise and a polyline channel; Phase 2 features (plateau, road) work on top; new overlays `cliff`, `ruins`, `bridge` |
+| `river` is a polyline channel with one water level per region (`waterLevel`) | The Bend's river level falls about 15 m from south to north, so water comes from the mask, and the water mesh follows the river level; the compass, the map and fields use `demBend.river` as the centre line |
+| Exits are arcs on the region edge with `minStage` | The Farmlands get a second exit on their +Z side to the Veltava Bend (`minStage: 1`); the Bend's entry from the Farmlands is on its south edge, so the dragon arrives along the river with Vyšehrad ahead |
 | Settlements are templates of single round buildings plus an optional round palisade (`data.settlements`, `settlement.build`) | The castle is a settlement type with a `walls` polygon (wall segments between towers and bastions) and a gate, not a `ring`; segments become capsule solids like palisade pieces, but taller and with a walkable top |
 | `settlement.solidAt` gives one roof height; landing on a roof is refused with 'roof' | Buildings get a `walkTop` flag: a wall walk and the courtyard are landable and walkable, keep, spire and tower roofs stay refused. The wall top is a solid the dragon can stand on (`walk.step` already takes ground from `ctx.surface`) |
-| Settlements sit on `plateau` features that level the ground | The castle sits on the `cliff` feature of the Vyšehrad rock, which has a flat top for all footprints and a steep side to the river |
+| Settlements sit on `plateau` features that level the ground | Same in the Bend: plateaus on the real terrain; the castle plateau sits on the real Vyshgard rock top, the `cliff` overlay sharpens its face to the river |
 | Buildings render as one vertex-coloured `InstancedMesh` per type (about 11 draw calls) | The castle kit follows the same pattern: one geometry per piece type, instanced; the whole castle stays under 24 draw calls on the high tier |
 | Fire turns a building into rubble (`ruins`) | Castle stone pieces have `stone: true`: fire burns their wooden parts (roof, hoardings) and leaves a charred stone shell that is still a solid; archers on a burned-out tower die as before |
 | Defender posts are tied to building types (`tower` = archer, `platform` = ballista) | Castle towers and wall segments get post lists (`posts`), so several archers stand on one wall; bastions carry a ballista |
-| The bell alerts one settlement; `alert.js` keeps heat per region | The castle horn is a bell with `range` covering the whole region: every settlement of the Vltava Bend goes to alert when it sounds |
+| The bell alerts one settlement; `alert.js` keeps heat per region | The castle horn is a bell with `range` covering the whole region: every settlement of the Veltava Bend goes to alert when it sounds |
 | `nav.markers` gives compass markers; discovery is per settlement (`cs.discovered`) | The map reads the same discovered set, plus explored cells (`cs.explored`, a coarse grid per region); the castle and aeries are discoverable places |
 | The cave has reserved positions: trophy [-40, 20], board [40, 20], mapStone [0, 30] (`data.cave.stations` comment) | The three new stations use them; station panels and the Action slot work as in Phase 2 |
 | Loot (`core/loot.js`): one carried item in the claws, banked on lair enter, lost on death | Relics are loot kinds with `mission: true`; banking also happens at an aerie; timeout loses mission loot only |
@@ -81,6 +82,7 @@ campaign/
   preview/
     castle.html         standalone castle preview: orbit / touch drag + pinch, day / night, quality tier, LOD toggle
   core/
+    dem-bend.js         GENERATED baked real terrain of the Bend (heights, river mask, river line), in this plan PR
     castle.js           castle layout from data: wall polygon -> segments, bastions, gate, inner buildings, walk tops, posts
     map.js              explored grid, map model (regions, places, markers), fast travel rules
     aerie.js            aerie sites, discovery, enter / leave, bank, rest
@@ -114,7 +116,7 @@ All numbers are starting values for tuning. `version` becomes 3.
 
 ### 4.1 Castle
 
-The castle layout is an original design with nods to Vyšehrad: a rock spur with a cliff on the river side, walls with pointed bastions following the rock edge, a gatehouse on the land side (east), a twin-spired chapel as the landmark (the steal mission target), a small round rotunda.
+The castle layout is an original design with nods to the real Vyšehrad: a rock spur with a cliff on the river side, walls with pointed bastions following the rock edge, a gatehouse on the land side (east), a twin-spired chapel as the landmark (the steal mission target), a small round rotunda.
 
 ```js
 buildings: {
@@ -150,62 +152,68 @@ settlements: {
 },
 ```
 
-### 4.2 Vltava Bend (Prague landscape)
+### 4.2 Veltava Bend (real Prague terrain)
 
-Coordinates come from real Prague: lon / lat projected around 14.4325 E, 50.0905 N at 3.6 m per unit, +Z = north, +X = east, rounded to 5. Heights are game heights (exaggerated about 1.3x so the hills read from the air). If the compass in the game shows east on -X, mirror every x (one sign flip in data) so the river is not drawn mirrored; `bend.test.js` checks the bend turns east.
+The terrain is **real Prague**, not noise: `core/dem-bend.js` holds a 241 x 241 height grid (every 10 units, radius 1200) and a river mask, baked by `ai_sdlc/001_campaign/tools/bake_bend_dem.py` from Sonny's LiDAR DTM Europe (1 arc second, tile N50E014, based on the ČÚZK DMR 5G). Projection around 14.4325 E, 50.0905 N at 3.6 m per unit, +X = east, +Z = north. The river and its islands come from the terrain itself (least-cost path along the valley floor + cells at river level), so its shape is the real Vltava: north past the rock, east under the plateau, around the peninsula, back west and north-west. Checked heights: Vyshgard rock 236 m, Petrovel 326 m, Lethna 229 m, Vitkar 253 m, river 175-190 m.
 
-| Landmark | Real place | At (x, z) | Feature |
+![Veltava Bend terrain](img/bend-terrain.png)
+
+**Names** are fantasy names that sound like the real places, so a Czech player guesses them at once:
+
+| Game name (EN) | CS | Real place | At (x, z) |
 | --- | --- | --- | --- |
-| River | Vltava from Podolí to Troja | polyline below | `river`, width 40, depth 8, valley 80 |
-| Castle rock | Vyšehrad | -260, -805 | `cliff` r 85, h 34, steep side west (toward the river) |
-| West ridge | Petřín and Hradčany | [-745, -330] -> [-745, -230] -> [-645, 0] -> [-600, 120] | `ridge` width 160, h 48 |
-| Plateau over the bend | Letná | -190, 230 | `cliff` r 150, h 30, steep side south (toward the river) |
-| East ridge | Vítkov | [200, -40] -> [345, -45] -> [520, -20] | `ridge` width 110, h 36 |
-| North slopes | Troja | -260, 1000 | `hill` r 160, h 44, flank 120 |
-| Old city lowland | Old Town and New Town | -230, -200 | `ruins` r 150 (flat, rubble scenery) |
-| Peninsula | Holešovice | 250, 450 | flat in the loop (valley floor) |
-| Islands | Střelecký, Kampa, Štvanice, Císařský | [-445, -280] r 22; [-470, -150] r 18; [90, 215] r 20; [-345, 695] r 40 | `island` |
-| Stone bridge | Charles Bridge | across the river at -415, -125, east-west (yaw PI / 2), len 70 | `bridge` with gate towers at both ends |
-| Wooden bridge | (Hlávka bridge area) | 150, 240, len 60 | `bridge` kind 'wood', the road to the peninsula village |
+| Veltava Bend (region) | Ohyb Veltavy | Prague basin, Vltava | - |
+| Veltava (river) | Veltava | Vltava | `demBend.river` |
+| Vyshgard Castle | hrad Vyšegrad | Vyšehrad | -220, -815 (rock top) |
+| Hradchan ruins | zřícenina Hradčín | Hradčany, Prague Castle | -645, 0 |
+| Petrovel (hill, Order watch tower) | Petrovel | Petřín | -745, -230 |
+| Lethna Heights (Order outpost) | Letenské výšiny | Letná | -190, 250 |
+| Vitkar Ridge | hřbet Vítkar | Vítkov | 345, -45 |
+| Holeshwick (village) | Holešín | Holešovice | 250, 450 |
+| Troyvale (hamlet, aerie) | Troyvaleny | Troyvale | -230, 930 |
+| Staromark (the burned royal city) | Staroměst | Staré Město | -230, -200 |
+| Karlsbridge (stone bridge) | Karlomost | Charles Bridge | -410, -125 |
+| Archer's Isle | Střelčí ostrov | Střelecký ostrov | island at -430, -300 |
+| Prahold (the Order's capital, Phase 6 proposal) | Prahold | Prague | later region |
+
+**Overlays** on the baked heights (`terrain.features`, applied after the grid): settlement `plateau`s flatten footprints (castle top, outpost, village, hamlet, watch tower), the `cliff` sharpens the Vyshgard rock face toward the river (the 36 m grid smooths it), `ruins` marks Staromark, `bridge` decks cross the river, roads are painted and levelled.
 
 ```js
 regions.bend: {
-  nameKey: 'c.region.bend', radius: 1200, seed: 53, ceiling: 320, waterLevel: 0, palette: 'bend',
-  terrain: { amp: 0.4, base: 14, features: [
-    { type: 'river', width: 40, depth: 8, valley: 80, points: [[-375, -1300], [-375, -1125], [-355, -790], [-395, -540],
-      [-425, -295], [-415, -125], [-345, 0], [-230, 95], [-70, 95], [90, 185], [310, 310], [585, 415], [745, 540],
-      [585, 650], [250, 710], [-50, 755], [-290, 820], [-545, 1005], [-640, 1120]] },
-    { type: 'island', x: -445, z: -280, r: 22 }, { type: 'island', x: -470, z: -150, r: 18 },
-    { type: 'island', x: 90, z: 215, r: 20 }, { type: 'island', x: -345, z: 695, r: 40 },
-    { type: 'cliff', x: -260, z: -805, r: 85, h: 34, face: -PI / 2, flank: 60 },                 // Vyšehrad rock
-    { type: 'ridge', points: [[-745, -330], [-745, -230], [-645, 0], [-600, 120]], width: 160, h: 48 },
-    { type: 'cliff', x: -190, z: 230, r: 150, h: 30, face: PI, flank: 120 },                     // Letná
-    { type: 'ridge', points: [[200, -40], [345, -45], [520, -20]], width: 110, h: 36 },            // Vítkov
-    { type: 'hill', x: -260, z: 1000, r: 160, h: 44, flank: 120 },                                // Troja
-    { type: 'ruins', x: -230, z: -200, r: 150 },                                                  // the burned royal city
-    { type: 'road', width: 8, points: [[-375, -1200], [-300, -1000], [-200, -860]] },            // south entry -> castle gate
-    { type: 'road', width: 7, points: [[-640, 40], [-470, -125], [-360, -125], [-260, -300], [-230, -600], [-200, -860]] },
-    { type: 'road', width: 7, points: [[-260, -300], [-120, 0], [100, 300], [250, 450]] },       // to the peninsula village
-    { type: 'bridge', x: -415, z: -125, yaw: PI / 2, len: 70, width: 10, towers: true },          // stone, east-west
-    { type: 'bridge', x: 150, z: 240, yaw: 0.63, len: 60, width: 7, kind: 'wood' },              // road to the peninsula
-  ] },
-  flora: { trees: 700, rocks: 90, fields: 14, vines: 'troja' },
+  nameKey: 'c.region.bend', radius: 1200, seed: 53, ceiling: 340, palette: 'bend',
+  terrain: {
+    dem: 'demBend', exag: 1.6, offset: 4,           // height = (metres above base) / metresPerUnit x exag + offset
+    water: 'mask',                                  // liquidAt from the mask (river level falls downstream), no waterLevel
+    features: [
+      { type: 'plateau', x: -220, z: -815, r: 80 },                                                 // Vyshgard top
+      { type: 'cliff', x: -220, z: -815, r: 80, face: -PI / 2, drop: 12 },                          // rock face west
+      { type: 'plateau', x: -190, z: 250, r: 34 }, { type: 'plateau', x: 250, z: 450, r: 60 },
+      { type: 'plateau', x: -230, z: 930, r: 34 }, { type: 'plateau', x: -745, z: -230, r: 24 },
+      { type: 'ruins', x: -230, z: -200, r: 150 },
+      { type: 'road', width: 8, points: [[-320, -1190], [-290, -1000], [-230, -870]] },             // south entry -> gate
+      { type: 'road', width: 7, points: [[-640, 40], [-460, -125], [-360, -125], [-280, -300], [-250, -600], [-230, -870]] },
+      { type: 'road', width: 7, points: [[-280, -300], [-100, 20], [150, 212], [250, 450]] },        // to Holeshwick
+      { type: 'bridge', x: -410, z: -125, yaw: PI / 2, len: 80, width: 10, towers: true },          // Karlsbridge
+      { type: 'bridge', x: 150, z: 212, yaw: 0.5, len: 60, width: 7, kind: 'wood' },
+    ],
+  },
+  flora: { trees: 700, rocks: 90, fields: 14, vines: 'troyvale' },
   herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
   settlements: [
-    { type: 'castle',  x: -240, z: -805, yaw: 0, name: 'vysehrad' },
-    { type: 'outpost', x: -190, z: 260, yaw: PI, name: 'letna' },
-    { type: 'village', x: 250, z: 470, yaw: 0.6, name: 'holesovice' },
-    { type: 'hamlet',  x: -230, z: 930, yaw: 2.2, name: 'troja' },
-    { type: 'outpostS', x: -745, z: -230, yaw: 1.4, name: 'petrin' },                            // watch tower on the ridge
+    { type: 'castle',   x: -220, z: -815, yaw: 0, name: 'vyshgard' },
+    { type: 'outpost',  x: -190, z: 250, yaw: PI, name: 'lethna' },
+    { type: 'village',  x: 250, z: 450, yaw: 0.6, name: 'holeshwick' },
+    { type: 'hamlet',   x: -230, z: 930, yaw: 2.2, name: 'troyvale' },
+    { type: 'outpostS', x: -745, z: -230, yaw: 1.4, name: 'petrovel' },
   ],
   exits: [{ to: 'farm', angleFrom: PI - 0.5, angleTo: PI + 0.5 }],
-  entries: { farm: { angle: PI + 0.3 } },                                                         // arrive over the river, south
+  entries: { farm: { angle: PI + 0.27 } },                                                          // over the river, south
 },
 regions.farm.exits += [{ to: 'bend', angleFrom: -0.5, angleTo: 0.5, minStage: 1 }],
 regions.farm.entries.bend = { angle: 0 },
 ```
 
-Palette `bend`: greener river meadows, limestone grey on the cliffs, vineyard rows on the Troja slopes, dark charred ground in the ruins, slate blue water.
+Palette `bend`: river meadows on the valley floor, limestone grey on steep slopes (slope-based), vineyard rows on the Troyvale slopes, charred ground in Staromark, slate blue water. Heights outside the circle are not used; the region edge fades into fog as elsewhere.
 
 ### 4.3 Map and exploration
 
@@ -226,7 +234,7 @@ map: {
 aeries: {
   wild: { x: -620, z: -480, facing: 1.9 },
   farm: { x: 720, z: 560, facing: -2.4 },
-  bend: { x: -120, z: 1010, facing: PI },          // a cleft in the Troja rocks, facing the river
+  bend: { x: -120, z: 1010, facing: PI },          // a cleft in the Troyvale rocks, facing the river
   discover: 200, enterRange: 40, room: { r: 22, h: 14 },
 },
 ```
@@ -248,7 +256,7 @@ relics: {
 },
 loot: { relic: { carry: { speed: 0.8, breath: false }, mission: true } },
 caravan: {
-  // road 1 of the Bend: from the Hradčany side across the stone bridge, along the east bank to the castle gate
+  // road 1 of the Bend: from the Hradchan side across Karlsbridge, along the east bank to the castle gate
   tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'strongbox', wagonHp: 120 },
 },
 tribute: { every: 300, food: 40, max: 3 },          // a freed village leaves food in the larder every `every` s of play
@@ -259,16 +267,15 @@ Mission times are longer than in the first draft because the Bend is one region 
 
 ## 5. System interfaces (`core/`)
 
-### 5.1 Terrain features (`terrain`)
+### 5.1 Terrain (`terrain`)
 
-- `hill { x, z, r, h, flank }`: flat top of radius `r` at `h` over the base, smooth flank of width `flank`.
-- `ridge { points, width, h }`: a hill along a polyline (height falls off with the distance to the line).
-- `cliff { x, z, r, h, face, flank }`: a hill whose side facing `face` (radians, 0 = +Z) is steep (over `walk.maxSlope`, not walkable) and whose other sides have a `flank`.
-- `island { x, z, r }`: dry ground above `waterLevel` inside a river channel.
-- `bridge { x, z, yaw, len, width, towers }`: a dry, walkable and landable deck over the river; `liquidAt` is false on it; the renderer draws arches and gate towers.
-- `ruins { x, z, r }`: flattens the ground (like a plateau at the local height) and marks the area for rubble scenery (`terrain.ruinsAt`).
-- Features apply in this order: hill / ridge / cliff, road, river, island, plateau / ruins, bridge (the river carves through the hills, so a hill never fills the channel).
-- `bridge` yaw is the deck's direction (0 = +Z); `kind` 'stone' (default, arches and towers) or 'wood' (plain deck on piles).
+- `terrain.demHeight(dem, x, z)`: bilinear height from the baked grid (`dem-bend.js`, decoded once), x `exag` / `metresPerUnit` + `offset`; a region with `terrain.dem` uses it instead of the noise base. Detail noise of amplitude 0.6 is added on top so close-up ground is not glassy.
+- `terrain.liquidAt` for `water: 'mask'`: bilinear mask > 0.5 (so the bank is smooth), except on a bridge deck. The water surface is a mesh over the mask cells at the smoothed river level + 0.3 (it steps down gently downstream).
+- `plateau { x, z, r }`: as in Phase 2, flattens to the mean height over its rim.
+- `cliff { x, z, r, face, drop }`: lowers the ground just outside the rim on the `face` side by `drop` with a steep edge (over `walk.maxSlope`), so the rock face toward the river reads as a cliff.
+- `ruins { x, z, r }`: marks the area for rubble scenery (`terrain.ruinsAt`), keeps the real heights.
+- `bridge { x, z, yaw, len, width, towers, kind }`: a dry, walkable and landable deck over the river; `yaw` is the deck's direction (0 = +Z); `kind` 'stone' (default, arches and gate towers) or 'wood' (plain deck on piles).
+- Order: dem base, plateau, cliff, road, bridge. Other regions are unchanged.
 
 ### 5.2 `castle`
 
@@ -338,13 +345,13 @@ v2 -> v3: empty missions, no relics, nothing explored except the cells around di
 | Fire and char | Wooden roofs and hoardings burn with the Phase 2 flame pool; a burned stone piece swaps its instance colour to `char.tint` and loses its roof part (separate instanced roof mesh, hidden when burned) |
 | River | Water plane per river segment (as in the Farmlands), wider; embankment stones along the old city stretch; islands with trees |
 | Stone bridge | 14 low arches, a deck with a parapet, a gate tower at each end (instanced pieces; under 4 draw calls) |
-| Ruins | The burned royal city: instanced rubble heaps, wall stumps and a few standing tower shells on charred ground (3 draw calls), seen from the air as a dark patch on the east bank; on the west ridge a ruined old castle silhouette over Hradčany |
+| Ruins | Staromark, the burned royal city: instanced rubble heaps, wall stumps and a few standing tower shells on charred ground (3 draw calls), seen from the air as a dark patch on the east bank; on the west ridge a ruined old castle silhouette, Hradchan |
 | Map screen | Full screen panel: world view (painted region shapes around the volcano, names, locks with the stage needed, alert colour) and region view (the terrain image from heights + palette with rivers, roads, fields; settlements, castle, aeries, lair as icons; dragon arrow; mission target ring); fog = dark parchment over unexplored cells; pinch to zoom, drag to pan; tap an icon for its name; Close button. Opened by a map button next to pause (touch) or Tab (desktop) |
 | Map stone | Station panel with the map in travel mode: discovered aeries and the lair are tappable with "Fly there" |
 | Mission board | Wooden board with parchment notes in the cave; panel lists missions (locked ones greyed with the reason), briefing, time limit, reward, Accept |
 | Trophy wall | Rock wall with niches; each recovered relic sits in its niche with a glow; panel names it and its story line |
 | Mission HUD | Timer under the compass, centred, 28 px; amber at 60 s, red and pulsing at 20 s; one objective line; mission target marker on the compass in gold |
-| Story cards | Act cards: full screen panel drawn with the game's own render (Act 2: Vyšehrad over the river at dusk) with 2-4 lines and Continue; briefings as a bottom sheet over the board panel |
+| Story cards | Act cards: full screen panel drawn with the game's own render (Act 2: Vyshgard over the river at dusk) with 2-4 lines and Continue; briefings as a bottom sheet over the board panel |
 | Aerie | Outside: a dark cleft in a cliff with a ledge and bones; inside: a small round cave with a nest of branches |
 
 ## 7. Task breakdown
@@ -353,26 +360,26 @@ Each task ends with both test runs passing and the browser check from the agent 
 
 | ID | Task | Depends on | Size | Acceptance |
 | --- | --- | --- | --- | --- |
-| T01 | Castle kit + preview page: `render/castle-kit.js` (all pieces of section 6) and `campaign/preview/castle.html` showing Vyšehrad Castle from `data.settlements.castle` on a stand-in rock with a cliff side, orbit camera (touch drag, pinch), day / dusk / night switch, quality tier switch, LOD switch, draw call and triangle readout | - | L | **Feel checkpoint for Pavel on a phone** (the look is approved before the castle goes into the game). Preview runs at 390 x 844 with no page errors; full castle under 24 draw calls, under 70k triangles on high, 35k on low; silhouette under 2k; screenshots: from the river below the cliff, the gate, three-quarter from above, courtyard, night |
-| T02 | Vltava Bend region: terrain features `hill`, `ridge`, `cliff`, `island`, `bridge`, `ruins` (section 5.1), the region data of 4.2, palette `bend`, water, embankments, stone bridge mesh, ruins scenery, Troja vineyards; Farmlands exit to the Bend (Drake) | - | L | Tests (`bend.test.js`): the river turns east after the bridge and loops back west (shape check on the polyline and on `liquidAt` samples), islands and the bridge deck are dry, the Vyšehrad and Letná cliff sides are not walkable, the castle and settlement footprints are flat, a hatchling is too small for the exit. Region loads under 1.5 s on a mid laptop, under 300 draw calls; **feel checkpoint for Pavel on a phone**: the river shape reads as Prague from high flight; screenshots: high view of the whole bend, the bridge, the Vyšehrad rock from the river |
+| T01 | Castle kit + preview page: `render/castle-kit.js` (all pieces of section 6) and `campaign/preview/castle.html` showing Vyshgard Castle from `data.settlements.castle` on a stand-in rock with a cliff side, orbit camera (touch drag, pinch), day / dusk / night switch, quality tier switch, LOD switch, draw call and triangle readout | - | L | **Feel checkpoint for Pavel on a phone** (the look is approved before the castle goes into the game). Preview runs at 390 x 844 with no page errors; full castle under 24 draw calls, under 70k triangles on high, 35k on low; silhouette under 2k; screenshots: from the river below the cliff, the gate, three-quarter from above, courtyard, night |
+| T02 | Veltava Bend region from real terrain: `terrain.demHeight` and the mask water from `core/dem-bend.js` (already baked in this plan PR), water mesh following the river level, overlays `cliff`, `ruins`, `bridge` (5.1), the region data of 4.2, palette `bend` (slope-based rock), Karlsbridge and the wooden bridge, Staromark ruins scenery, Hradchan ruins, Troyvale vineyards; Farmlands exit to the Bend (Drake) | - | L | Tests (`bend.test.js`): heights at the checked landmarks match the bake (Vyshgard top, Petrovel, river), the river turns east after Karlsbridge and loops back west (mask samples), bridge decks are dry, the Vyshgard face is not walkable, every settlement footprint is flat, a hatchling is too small for the exit, `dem-bend.js` decodes to 241 x 241. Region loads under 1.5 s on a mid laptop, under 300 draw calls; **feel checkpoint for Pavel on a phone**: the landscape reads as Prague from high flight; screenshots: high view of the whole bend, Karlsbridge, the Vyshgard rock from the river |
 | T03 | `core/castle.js` + castle settlement type: wall polygon, bastions, gate, walk tops, solids; landing in the courtyard and on wall walks | T01, T02 | L | Tests: layout from the polygon, solids block walking and flying, wall walk and bastion top landable, keep and spire roofs refused ('roof'), gate gap walkable when open and solid when closed; every castle footprint is on the flat top of the rock |
-| T04 | Castle and settlements in the Bend: `render/castle-view.js` with LOD, night torches and windows, banners, chimney smoke; the Letná outpost, Holešovice village, Troja hamlet and Petřín watch tower; discovery with a castle icon on the compass | T03 | M | Region still under 300 draw calls; the castle is visible from the Farmlands entry over the river at 600+ units; no geometry leak after 5 round trips; screenshots: arriving from the south along the river, from the bridge, night over the walls |
+| T04 | Castle and settlements in the Bend: `render/castle-view.js` with LOD, night torches and windows, banners, chimney smoke; the Lethna outpost, Holeshwick village, Troyvale hamlet and Petrovel watch tower; discovery with a castle icon on the compass | T03 | M | Region still under 300 draw calls; the castle is visible from the Farmlands entry over the river at 600+ units; no geometry leak after 5 round trips; screenshots: arriving from the south along the river, from the bridge, night over the walls |
 | T05 | Castle defenders: archers on towers, wall walks and the gatehouse (post lists), ballistae on the bastions, gate closes on alarm and opens after the search, the keep's horn alerts every settlement of the region, signal fire | T04 | M | Tests: post placement on walls, horn alerts the whole region once per `horn.cool`, gate state follows the alarm, the gate never closes on a dragon in the gap; in game a low pass along the wall draws volleys from the wall walk and a bolt from a bastion |
 | T06 | Castle fire and char: wooden roofs, hoardings, workshop, stables burn and become ruins; stone pieces lose their roof part and turn charred but stay solid; archers on a burned-out tower die; rebuild after `fire.rebuild` | T05 | M | Tests: a stone piece never becomes a non-solid ruin, char state saved with ruins, rebuild restores colour and roof. **Feel checkpoint for Pavel on a phone**: a Drake raids the castle, burns roofs, survives the defenders and the castle still looks like a castle afterwards |
 | T07 | `core/map.js` exploration grid + `render/map-view.js` map screen (world view, region view with the terrain image, fog, icons, dragon arrow, pan / zoom); map button on touch, Tab on desktop | T04 | L | Tests: cells explored around the dragon scale with stage and altitude, model lists only discovered places, locked regions report their stage; on a phone the map opens and closes, pinch and drag work, icons are at least 36 px to tap, the map never shows an undiscovered place, the Bend's river shape is recognisable on the map; terrain image drawn once per region (under 150 ms on a mid laptop) |
-| T08 | `core/aerie.js` + `render/aerie-view.js`: aeries in Wildwood, the Farmlands and the Bend, discovery, enter, bank loot, Rest (save, heal), Leave; aeries on the compass and the map | T07 | M | Tests: banking at an aerie, death after banking keeps the gold, rest saves; on a phone a Drake finds the Troja aerie, flies in, banks a strongbox and leaves |
+| T08 | `core/aerie.js` + `render/aerie-view.js`: aeries in Wildwood, the Farmlands and the Bend, discovery, enter, bank loot, Rest (save, heal), Leave; aeries on the compass and the map | T07 | M | Tests: banking at an aerie, death after banking keeps the gold, rest saves; on a phone a Drake finds the Troyvale aerie, flies in, banks a strongbox and leaves |
 | T09 | Map stone station in the cave + fast travel: lair <-> discovered aeries, fade and region swap, blocked with an active mission or mission loot (says why) | T08 | S | Tests: `canTravel` rules; on a phone the map stone opens the map in travel mode and "Fly there" lands the dragon in front of the aerie; travel back to the lair from the aerie |
 | T10 | `core/missions.js`: catalogue, states, timer start / pause rules, objective events, success / fail, time bonus, retry after rest; debug buttons to accept, finish and fail a mission | T08 | M | Tests: timer starts on leaving the lair region or an aerie, pauses during loading and inside, timeout fails and loses mission loot only, death fails, bonus math, retry needs a rest, region heat +1 on fail |
 | T11 | Mission board station + briefing panel + mission HUD (timer, objective line, gold target marker on the compass and the map) | T10 | M | On a phone: walk to the board, read a briefing, accept, the timer appears when leaving the cave, turns amber at 60 s and red at 20 s; at 390 x 844 the timer does not cover the compass, bars or buttons |
 | T12 | `core/relics.js` + trophy wall station: relic loot kind with carry rules, lost on death or timeout, banked relic shown in its niche | T10 | S | Tests: speed x0.8 and no breath while carrying a relic; relic lost on death; trophy wall shows the banked chalice |
-| T13 | Steal mission: Ember Chalice in the twin-spired chapel; pick up inside the chapel door area after landing in the courtyard; escape to the Troja aerie or the lair | T06, T11, T12 | M | Mission bot (seeded) completes it in its time band on average; on a phone the full flow from board to banked chalice works and the trophy wall shows it |
+| T13 | Steal mission: Ember Chalice in the twin-spired chapel; pick up inside the chapel door area after landing in the courtyard; escape to the Troyvale aerie or the lair | T06, T11, T12 | M | Mission bot (seeded) completes it in its time band on average; on a phone the full flow from board to banked chalice works and the trophy wall shows it |
 | T14 | Destroy mission: the castle siege workshop; burning it to a ruin is the objective, then fly to an aerie or the lair | T06, T11 | S | Mission bot completes it in its time band; the workshop stays a ruin until the mission is over even if `fire.rebuild` passes |
-| T15 | `core/caravan.js` + `render/caravan-view.js` + intercept mission: a tithe wagon with oxen and 3 escort archers drives from the Hradčany side across the stone bridge and along the east bank to the castle gate; stop it, take the chest, bank it | T11 | M | Tests: wagon follows the road and the bridge deck, stops at 0 hp, drops the chest, reaching the gate fails the mission; mission bot completes it in its time band; on a phone the wagon is easy to find with the gold compass marker |
+| T15 | `core/caravan.js` + `render/caravan-view.js` + intercept mission: a tithe wagon with oxen and 3 escort archers drives from the Hradchan side across Karlsbridge and along the east bank to the castle gate; stop it, take the chest, bank it | T11 | M | Tests: wagon follows the road and the bridge deck, stops at 0 hp, drops the chest, reaching the gate fails the mission; mission bot completes it in its time band; on a phone the wagon is easy to find with the gold compass marker |
 | T16 | Freed village + tribute (Farmlands village): freeing rule, falling Order flag, no Order rebuild or archers, peasants calm, food tribute in the larder; freed state on the map | T10 | M | Tests: freed only when all Order buildings are ruins and the archers dead; tribute every `tribute.every` s up to `max`; freed state survives a reload |
 | T17 | `core/story.js` + `render/story-card.js`: Act 1 and Act 2 cards, briefings and outcome lines for the three missions, the mother on the first castle mission and her line over the burned city, EN + CS | T13, T14, T15 | M | Each card shows once; Skip / Continue work on a phone; the mother joins the first castle mission and stays out of the danger zones (test) |
 | T18 | Save v3 + migration v2 -> v3: missions, relics, aeries, freed villages, explored cells (bitset), castle gate and char state, story | T16, T17 | M | Reload restores all of it, also a dragon saved in the Bend; a v2 save migrates; corrupt v3 handled like v2; the save stays under 32 KB with every region fully explored |
 | T19 | Texts and tips (castle, the Bend, map, aeries, fast travel, mission board, timer, relics, freed village; touch wording pass) + `test/mission.bot.test.js` mission bot for the three missions + balancing pass (mission times, castle defender numbers, rewards) | T18 | M | Every new visible string from `i18n.js` in EN and CS; touch texts name buttons; seeded bot: each mission succeeds within 5-10 min on average, with at least 20% HP left at full hunger start; numbers changed in `data.js` only |
-| T20 | README campaign section update (the Bend, castle, map, aeries, missions), controls table, mark Phase 3 done in `000_spec.md` | T19 | S | README lists the Vltava Bend, the castle, the map, fast travel, the mission board and the three missions for phone and desktop |
+| T20 | README campaign section update (the Bend, castle, map, aeries, missions), controls table, mark Phase 3 done in `000_spec.md` | T19 | S | README lists the Veltava Bend, the castle, the map, fast travel, the mission board and the three missions for phone and desktop |
 
 ## 8. Testing
 
@@ -403,21 +410,22 @@ Each task ends with both test runs passing and the browser check from the agent 
 | Risk | Mitigation |
 | --- | --- |
 | The castle looks like grey boxes | Preview page first (T01) with Pavel's approval before anything builds on it; silhouette rules (tall keep, twin spires, varied tower heights, roofs, banners, the cliff), weathering in vertex colour, night lights |
-| The river shape does not read as Prague | Coordinates from real lon / lat (4.2), low base noise, a wide flat valley; Pavel checks the high view and the map in T02 / T07; a mirrored map is caught by `bend.test.js` |
+| The landscape does not read as Prague | Real LiDAR terrain and the real river (4.2), height exaggerated 1.6x so hills read on a phone; Pavel checks the high view and the map in T02 / T07 |
+| Terrain data licence | Sonny's DTM is derived from ČÚZK open data (CC BY 4.0); credit it in the README and the game's About text (T20); the bake script keeps the source and steps |
 | A castle plus a bigger region cost too much on a phone | Instanced kit, LOD silhouette, no real lights, quality tiers; draw call and triangle readout in the preview and the DBG panel; ruins and bridge as instanced pieces |
 | Walking on walls and landing in a small courtyard feel fiddly | Wide wall walks (landable band), courtyard sized for a Drake; Pavel checks in T06 |
 | A closed gate traps a dragon inside | The courtyard is open to the sky: takeoff always works; the gate never closes on the dragon (it waits while the dragon is in the gap) |
 | The map shows too much and kills exploration | Fog of war from real flight; only discovered places; no prey on the map |
 | Fast travel makes missions trivial | No fast travel with a mission active or mission loot carried |
-| The Bend is far from the lair, so missions run out of time | Timer starts on leaving the lair region or an aerie; the Troja aerie lets missions end close to the castle; times tuned in T19 |
+| The Bend is far from the lair, so missions run out of time | Timer starts on leaving the lair region or an aerie; the Troyvale aerie lets missions end close to the castle; times tuned in T19 |
 | The intercept wagon is hard to find on a phone | Gold mission marker on the compass and the map ring; the route is the visible road and the bridge |
 | Save grows with explored cells | Bitset per region (48 x 48 bits = 288 bytes, base64) |
 
 ## 11. Open design questions (recommended defaults)
 
-1. Names: region "Vltava Bend" and castle "Vyšehrad Castle", or fantasy names for both in the game (Prague only as the model)? Default: keep the real names, the Czech version reads naturally.
-2. The burned old city: the King's city that the mother burned years ago (ruins in this phase, ties into the backstory), with a ruined old royal castle on the Hradčany ridge (default)? Or a living Order town (towns are a later phase)?
-3. The Capital (Phase 6): the Hradčany ridge rebuilt by the Order as its seat, in a later region further along the Vltava (default), or a separate place?
+1. Names: region "Veltava Bend" and castle "Vyshgard Castle", or fantasy names for both in the game (Prague only as the model)? Default: keep the real names, the Czech version reads naturally.
+2. Staromark: the King's city the mother burned years ago (ruins in this phase, ties into the backstory), with the ruined royal castle Hradchan on the ridge (default)? Or a living Order town (towns are a later phase)?
+3. The Capital (Phase 6): Prahold, Hradchan rebuilt by the Order as its seat, in a later region along the Veltava (default), or a separate place?
 4. Can the dragon break stone walls? Default: not in Phase 3: wood burns, stone chars; breaching comes with the Wyrm in Phase 4.
 5. Landing inside the castle: courtyard, wall walks and bastion tops landable, keep, spire and tower roofs not (default)?
 6. Map outside the cave: open anywhere (read only), fast travel only at the map stone or an aerie (default)?
