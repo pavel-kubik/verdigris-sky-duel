@@ -25,7 +25,7 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
   const st = mem();
   ok(SV.store(st, cs), 'store returns true');
   const raw = JSON.parse(st.m[D.saveKey]);
-  ok(raw.version === 1 && raw.world.region === 'wild' && raw.world.location === 'field', 'v1 shape with region and location');
+  ok(raw.version === 2 && raw.world.region === 'wild' && raw.world.location === 'field' && raw.world.mode === 'air', 'v2 shape with region, location and mode');
   ok(!('field' in raw) && !('prey' in raw) && !('pilot' in raw.dragon) && raw.world.pos.length === 3, 'no prey, pilot reduced to pos + yaw');
   ok(raw.larder[0].prey === 'deer' && raw.hoard && raw.missions && raw.story && raw.regions.ash, 'larder as {prey, food} + room for later phases');
 
@@ -95,7 +95,7 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
 {
   const v0 = { xp: 300, stage: 0, hunger: 55, hp: 70, region: 'wild', pos: [10, 90, 20], yaw: 0.5, larder: [{ type: 'boar', food: 30 }] };
   const o = SV.migrate(v0);
-  ok(o.version === 1 && o.dragon.foodXp === 300 && o.world.region === 'wild' && o.larder[0].prey === 'boar', 'v0 migrated to v1');
+  ok(o.version === 2 && o.dragon.foodXp === 300 && o.world.region === 'wild' && o.larder[0].prey === 'boar', 'v0 migrated through v1 to v2');
   const cs = SV.deserialise(v0, mulberry(5));
   ok(cs.region === 'wild' && cs.dragon.foodXp === 300 && cs.dragon.hunger === 55 && Math.abs(cs.dragon.pilot.pos[0] - 10) < 1e-9 && cs.larder[0].type === 'boar', 'v0 save plays');
   ok(JSON.stringify(SV.migrate(JSON.parse(JSON.stringify(o)))) === JSON.stringify(o), 'v1 migrate is identity');

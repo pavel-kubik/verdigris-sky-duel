@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't121.1 2026-10-31 day and night: 20 min clock, night sky and moon, guards see half as far, sleep until dusk / dawn (debug 8 time, / fast time)';
+  const BUILD = 't122.1 2026-10-31 save v2: gold, upgrades, alert, ruins, clock, landed and cave restore; v1 migrates (debug X save + reload)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -459,6 +459,8 @@
     cs.field = PR.spawnRegion(cs.region, rng, cs.dragon.pilot ? cs.dragon.pilot.pos : null);
     if (!cs.dragon.pilot && !cs.flags.introSeen) { startHatchScene(); return; }
     cs.flags.introSeen = true;
+    const onGround = !!cs.dragon.pilot && cs.dragon.pilot.mode === 'ground';   // T22: a landed save wakes standing, legs out, wings folded
+    Object.assign(heroPose, { ground: onGround ? 1 : 0, fold: onGround ? 1 : 0, flare: 0, gait: 0, stride: 0 });
     setState('play');
     saveNow('start');
   }
@@ -516,6 +518,9 @@
     note.innerHTML = '';
     if (d) note.append(Object.assign(document.createElement('b'), { textContent: t('c.save.summary', {
       stage: stageName(d.stage), region: t(TR.region(D.regions[w.region] ? w.region : D.startRegion).nameKey), food: Math.floor(d.foodXp) }) }));
+    if (d && w && w.pos) note.append(document.createElement('br'), t('c.save.detail', {   // T22: where, time of day and the hoard
+      where: t('c.save.where.' + (w.location === 'cave' ? 'cave' : w.mode === 'ground' ? 'ground' : 'air')),
+      time: CK.hours(typeof w.clock === 'number' ? w.clock : D.clock.start), gold: (saved.hoard && saved.hoard.gold) || 0 }));
     if (saveOff && !saveBad) { if (d) note.append(document.createElement('br')); note.append(t('c.save.off')); }
   }
   $('#startBtn').onclick = () => { if (!saveBad) startRun(false); };
@@ -958,6 +963,7 @@
     ['C', 'become a Drake now (Farmlands test)', 'KeyC', 'drake now'],
     ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
+    ['X', 'save now, then reload the page (save v2 test: Continue restores it)', 'KeyX', 'save + reload'],
     ['Y', 'graphics quality low / mid / high (saved)', 'KeyY', 'quality'],
     ['I', 'put the nearest goat in front of the dragon', 'KeyI', 'goat here'],
     ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
@@ -1154,6 +1160,7 @@
     }
     if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(t(okS ? 'c.dbg.saved' : saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); }
     if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
+    if (code === 'KeyX') { if (saveNow('debug')) location.reload(); else flashPrompt(t(saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); return; }   // T22
     if (code === 'KeyR') {
       Object.assign(dragon, { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start });
       refreshStage(); pilot.st = 100;

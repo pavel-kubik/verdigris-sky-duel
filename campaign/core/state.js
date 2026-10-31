@@ -170,7 +170,7 @@
    * Autosave triggers (5.9): rest, region change, death (wake in the lair), a discovered settlement (T12) and every save.every s of play.
    * Core only emits { e: 'save', why }; game.js writes it to localStorage (and on visibilitychange to hidden).
    */
-  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade' };   // T12: a new place, T20: a bought upgrade
+  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade', 'dragon:landed': 'landed', 'lair:enter': 'cave' };   // T12: a new place, T20: a bought upgrade, T22: landed / in the cave (save v2 keeps both)
   function autosave(cs, ev, dt) {
     cs.saveT = (cs.saveT || 0) + dt;
     let why = null;

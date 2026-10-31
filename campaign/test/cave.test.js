@@ -105,7 +105,7 @@ function walkTo(cs, id, secs) {
   ok(ev.some(e => e.e === 'dragon:died') && cs.inLair && cs.station === 'nest', 'death: wakes on the nest');
   const o = JSON.parse(JSON.stringify(SV.serialise(cs)));
   const m = LR.mouthPos('ash');
-  ok(o.world.location === 'lair' && Math.hypot(o.world.pos[0] - m[0], o.world.pos[2] - m[2]) < 1, 'saved inside: location lair, position at the mouth (not cave coordinates)');
+  ok(o.world.location === 'cave' && o.world.mode === 'air' && Math.hypot(o.world.pos[0] - m[0], o.world.pos[2] - m[2]) < 1, 'saved inside: location cave (v2), position at the mouth (not cave coordinates)');
   const back = SV.deserialise(o, mulberry(2));
   ok(back.inLair && back.station === 'nest' && back.dragon.pilot.mode === 'ground', 'a save inside restores in the cave on the nest');
   SV.apply(back, SV.migrate(SV.blank()));

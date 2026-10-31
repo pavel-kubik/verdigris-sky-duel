@@ -1,6 +1,9 @@
 /*
  * Verdigris campaign - the save: serialise / deserialise / migrate, and a storage adapter.
- * See 001_task_survival.md 5.9.
+ * See 001_task_survival.md 5.9 (v1) and 002_task_kingdom.md 5.9 (v2, T22).
+ * v2 adds to world: mode ('air' | 'ground'; landing saves as ground, takeoff as air), location 'field' | 'cave'
+ * (v1 wrote 'lair'), clock (time of day 0..1) and now (= stats.played, the stamp for ruins, loot and heat).
+ * A ground save restores standing on the ground (on a roof when it stood on one); a cave save restores on the nest.
  *   serialise(cs) -> object              durable fields only (no prey field, pilot reduced to pos + yaw)
  *   migrate(obj) -> obj                  version chain up to data.version; throws 'newer' / 'corrupt'
  *   apply(cs, obj)                       writes a (migrated, checked) save INTO an existing cs (keeps object identity:
@@ -16,7 +19,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), F = M.need('flight'), PR = M.need('prey'), S = M.need('state'), LR = M.need('lair'), CV = M.need('cave');
+  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), F = M.need('flight'), PR = M.need('prey'), S = M.need('state'), LR = M.need('lair'), CV = M.need('cave'), CK = M.need('clock'), WK = M.need('walk');
 
   const num = v => typeof v === 'number' && Number.isFinite(v);
   const round = (v, k) => Math.round(v * k) / k;
@@ -65,7 +68,10 @@
         pos: p ? (cs.inLair && LR.mouthPos(cs.region) || p.pos).map(v => round(v, 100)) : null,   // inside: the mouth (cave coordinates are local)
         yaw: p ? round(p.yaw, 1e4) : 0,
         st: p ? round(p.st, 10) : 100,
-        location: cs.inLair ? 'lair' : 'field',
+        location: cs.inLair ? 'cave' : 'field',
+        mode: p && !cs.inLair && (p.mode === 'ground' || p.mode === 'landing') ? 'ground' : 'air',   // T22: a landing ends on the ground
+        clock: round(cs.clock ? cs.clock.t : CK.create().t, 1e5),          // T22: time of day
+        now: round(cs.stats.played, 10),                                   // T22: the stamp of ruins, loot and heat (= stats.played)
       },
       flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0 },
       stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
@@ -85,6 +91,18 @@
       world: { region: o.region, pos: o.pos || null, yaw: o.yaw || 0, location: 'field' },
       flags: { introSeen: true }, stats: { played: 0, eaten: 0, food: 0 },
     }),
+    /* v1 -> v2 (T22): the cave is 'cave', a v1 run restores in the air in the morning; everything else is already in the
+       v2 shape (T12 - T20 wrote discovered, ruins, lootTaken, heat, hoard, upgrades and the carried loot into v1) */
+    1: o => {
+      const w = Object.assign({}, o.world || {});
+      w.location = w.location === 'lair' ? 'cave' : 'field';
+      w.mode = 'air';
+      w.clock = CK.create().t;
+      w.now = num(o.stats && o.stats.played) ? o.stats.played : 0;
+      const d = Object.assign({ upgrades: [] }, o.dragon || {});
+      const h = o.hoard && typeof o.hoard === 'object' ? o.hoard : { gold: 0, relics: [] };
+      return Object.assign({}, o, { version: 2, dragon: d, hoard: h, regions: o.regions && typeof o.regions === 'object' ? o.regions : {}, world: w });
+    },
   };
 
   function migrate(obj) {
@@ -110,6 +128,14 @@
     if (!Array.isArray(o.larder || [])) fail('corrupt', 'larder');
     const w = o.world || {};
     if (w.pos != null && !(Array.isArray(w.pos) && w.pos.length === 3 && w.pos.every(num))) fail('corrupt', 'world.pos');
+    if (o.version >= 2) {                                        // T22: the v2 world fields, written by every v2 save
+      if (w.mode !== 'air' && w.mode !== 'ground') fail('corrupt', 'world.mode');
+      if (w.location !== 'field' && w.location !== 'cave') fail('corrupt', 'world.location');
+      if (!num(w.clock) || w.clock < 0 || w.clock > 1) fail('corrupt', 'world.clock');
+      if (w.now != null && !num(w.now)) fail('corrupt', 'world.now');
+      if (o.hoard != null && (typeof o.hoard !== 'object' || (o.hoard.gold != null && !num(o.hoard.gold)))) fail('corrupt', 'hoard');
+      if (o.regions != null && (typeof o.regions !== 'object' || Array.isArray(o.regions))) fail('corrupt', 'regions');
+    }
     return o;
   }
 
@@ -172,14 +198,27 @@
     const pos = region === w.region && w.pos ? T.clampToRegion(region, w.pos.slice(), D.flight.minAlt) : null;
     cs.region = region;
     cs.field = PR.spawnRegion(region, cs.rng, pos);              // fresh prey field (prey is never saved), herds away from the dragon
-    cs.inLair = !!pos && w.location === 'lair' && !!T.region(region).lair;
+    cs.inLair = !!pos && (w.location === 'cave' || w.location === 'lair') && !!T.region(region).lair;
+    cs.clock = CK.create(num(w.clock) ? w.clock : null);         // T22: time of day (a v1 save starts in the morning)
+    cs.light = CK.sight(cs.clock.t);
     if (pos) {
       const np = F.newPilot(pos, num(w.yaw) ? w.yaw : 0, st.cruise);
       if (num(w.st)) np.st = Math.max(0, Math.min(100, w.st));
       if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;   // same object: the renderer keeps its reference
       if (cs.inLair) CV.place(cs, 'nest');                       // T10: a save inside the lair restores in the cave, on the nest
+      else if (w.mode === 'ground') standOn(cs, d.pilot);        // T22: a landed dragon wakes standing where it was
     } else d.pilot = null;
     return cs;
+  }
+
+  /** T22: put a restored pilot on the ground (terrain or a roof under it); over water it stays in the air. */
+  function standOn(cs, p) {
+    if (T.liquidAt(cs.region, p.pos[0], p.pos[2])) return false;
+    const scale = S.scaleOf(cs), sol = S.solids(cs, scale);     // builds cs.town with the loaded ruins (and the alert catch-up)
+    const ctx = { regionId: cs.region, solidAt: sol.solidAt, solidHit: sol.solidHit };
+    Object.assign(p, { mode: 'ground', tr: null, speed: 0, vel: [0, 0, 0], pitch: 0, roll: 0, rollX: 0, sx: 0, boosting: false, breathing: false });
+    p.pos[1] = WK.standY(ctx, p.pos[0], p.pos[2], scale);
+    return true;
   }
 
   function deserialise(obj, rng) {
