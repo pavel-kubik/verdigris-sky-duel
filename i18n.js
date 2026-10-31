@@ -229,7 +229,7 @@
       'c.mother.good.rest': 'You can hunt on your own now. I will look in on you.',
       'c.mother.visit': 'I am proud of you. Keep hunting, keep growing.',
       'c.mother.done': 'Lessons learned', 'c.mother.doneSub': 'Your mother will look in on you now and then',
-      'c.dbg.mother': 'Mother: lesson {n}', 'c.dbg.scale': 'Dragon scale {s}', 'c.dbg.drake': 'Now a Drake', 'c.dbg.exit': 'Exit to {region}',
+      'c.dbg.mother': 'Mother: lesson {n}', 'c.dbg.scale': 'Dragon scale {s}', 'c.dbg.drake': 'Now a Drake', 'c.dbg.exit': 'Exit to {region}', 'c.dbg.region': 'Jumped to {region}',
 
       /* co-op */
       'mp.title': 'Verdigris Co-op',
@@ -489,7 +489,7 @@
       'c.mother.good.rest': 'Teď už umíš lovit sám. Občas se na tebe podívám.',
       'c.mother.visit': 'Jsem na tebe pyšná. Lov a rosť dál.',
       'c.mother.done': 'Lekce zvládnuty', 'c.mother.doneSub': 'Matka se na tebe občas přiletí podívat',
-      'c.dbg.mother': 'Matka: lekce {n}', 'c.dbg.scale': 'Velikost draka {s}', 'c.dbg.drake': 'Teď drak', 'c.dbg.exit': 'Východ: {region}',
+      'c.dbg.mother': 'Matka: lekce {n}', 'c.dbg.scale': 'Velikost draka {s}', 'c.dbg.drake': 'Teď drak', 'c.dbg.exit': 'Východ: {region}', 'c.dbg.region': 'Skok do: {region}',
 
       'mp.title': 'Verdigris Co-op',
       'mp.desc': 'Leťte společně se zelenými draky proti vlnám karmínových wyveren. Kooperace v prohlížeči, spojení peer-to-peer.',

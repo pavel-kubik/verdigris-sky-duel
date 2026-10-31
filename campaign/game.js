@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't113.1 2026-10-31 building fire: ignite, burn, spread, ruins, rebuild';
+  const BUILD = 't113.2 2026-10-31 debug: jump to any region (4 / 5 / 6)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -856,6 +856,7 @@
     ['1', 'fly to the next settlement of this region (low, 150 out, facing it)', 'Digit1', 'to town'],
     ['2', 'set the nearest building alight (fire test)', 'Digit2', 'fire here'],
     ['3', 'rebuild every ruin of this region now', 'Digit3', 'rebuild'],
+    ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
@@ -941,6 +942,14 @@
       const rs = cs.regionStates && cs.regionStates[cs.region];
       if (rs && rs.ruins) for (const r of rs.ruins) r.at = cs.stats.played - D.fire.rebuild - 1;
       flashPrompt(t('c.dbg.rebuilt', { n }), 1.5);
+    }
+    const dbgRegion = /^Digit\d$/.test(code) ? Object.keys(D.regions)[+code.slice(5) - 4] : null;
+    if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
+      if (cs.inLair) onEvents(ST.lairLeave(cs));
+      if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
+      if (dbgRegion !== cs.region) onEvents(RG.enter(cs, dbgRegion, cs.region));
+      else { const at = RG.entryPoint(dbgRegion, null, null); Object.assign(pilot, { pos: at.pos, yaw: at.yaw, pitch: 0 }); snapCam(); }
+      flashPrompt(t('c.dbg.region', { region: t(TR.region(dbgRegion).nameKey) }), 1.5);
     }
     if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(t(okS ? 'c.dbg.saved' : saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); }
     if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
