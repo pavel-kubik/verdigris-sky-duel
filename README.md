@@ -37,7 +37,7 @@ Nothing can hurt the dragon during the tutorial. Each lesson opens with a paused
 | Barrel roll (dodge) | Q / E | Roll |
 | Pause | Esc | II |
 
-The campaign adds **Grab** (G / Grab button, hold) and **Eat** (X / Eat button, hold) and uses the same flight controls - see [Campaign](#campaign-alpha-campaign) below.
+The campaign adds **Grab** (G / Grab button, hold), **Eat** (X / Eat button, hold), **Land / take off** (F / Land button) and walking, and uses the same flight controls - see [Campaign](#campaign-alpha-campaign) below.
 
 Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 
@@ -45,31 +45,46 @@ Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 
 - **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/ (or **Campaign (alpha)** on the home screen)
 
-A single-player survival campaign in its own page. Phase 1 (Survival MVP) is done: a hatchling hatches in a volcano lair, hunts goats, deer and boar across the **Ash Wastes** and **Wildwood**, keeps itself fed, grows visibly while it eats and becomes a **Drake** after resting in the lair once it has 1000 food. A new player reaches Drake in about 30 minutes. Later phases (landing, the kingdom, raids, missions) are planned in [`ai_sdlc/001_campaign/000_spec.md`](ai_sdlc/001_campaign/000_spec.md).
+A single-player dragon campaign in its own page, built mobile first: everything plays on a touch phone, and every keyboard action has a touch button. **Phase 1 (Survival MVP)** and **Phase 2 (Kingdom + hoard)** are done. A hatchling hatches next to its mother, learns to fly and hunt from her, grows into a **Drake** in the **Ash Wastes** and **Wildwood**, then raids the Order's settlements in the **River Farmlands** for gold, carries it home into its cave and spends it on upgrades. Later phases (missions, Highlands, Lowlands, endgame) are planned in [`ai_sdlc/001_campaign/000_spec.md`](ai_sdlc/001_campaign/000_spec.md).
 
+- **Mother:** she flies with the hatchling, leads it to a herd and teaches each skill once (a caption at the top); after the lessons she flies off and comes back to visit now and then.
 - **Hunting:** fly low over a herd and hold Grab to swoop and grab prey, then hold Eat to eat it in flight. A hatchling can lift goats and deer; a boar is too heavy and fights back - roast it with fire breath and eat the roast chunks (half the food).
 - **Hunger:** drains over time and faster when boosting or breathing fire. Fed regenerates vitality, Hungry slows fire regen, Starving makes the dragon slow, without fire and slowly losing vitality.
-- **Lair:** fly into the cave on the volcano to open the lair panel: Rest (heals, rekindles fire, saves and grows to the next stage when ready), store carried prey in the larder and eat it later (it spoils over time), Leave.
-- **Regions:** at the edge of a region a travel prompt appears - press Enter or tap the travel button to fly to the other region.
-- **Death:** the dragon wakes in the lair with half vitality; prey in its claws is lost.
-- **Save:** progress is saved in `localStorage` (`vsd-campaign`) on rest, region change, death and every minute; **Continue** on the start screen resumes it.
+- **Landing and walking:** press F / tap Land over flat ground (not too high, too fast or too steep, not on water, lava or roofs). On foot the dragon walks (Shift / Boost runs), picks up prey or loot in front of it with Grab and eats with Eat - but it is vulnerable, and guards hear it land. F / Fly takes off.
+- **Compass and smell:** the strip at the top shows the cave, the region exits, discovered places and, when hungry, where prey smells. Click or tap a mark to see its name.
+- **The cave:** fly into the mouth on the volcano (or tap Enter cave) to walk around the cave hall. Walk up to a station and press E / tap its button: the **nest** (rest, heal, grow, sleep until dusk or dawn), the **larder** (stored prey, spoils over time), the **hoard** (your gold as a growing pile) and the **altar** (upgrades). The tunnel leads back out.
+- **The kingdom:** a Drake can fly from Wildwood into the River Farmlands (Wildwood also has a hamlet and a small Order outpost). Hamlets, a village and the Order outpost have archers on posts and bells, a ballista with a visible aim line, sheep and cows in pens and barns, and wooden buildings that catch fire, burn, spread and rebuild as ruins after a while.
+- **Raiding:** tithe chests and strongboxes hold gold. Burn the guards or come at night, grab the chest (in flight or on foot), take off under fire and fly it into the cave: the gold goes on the hoard. Carrying loot slows the dragon.
+- **Perception and alert:** guards see in cones (shorter at night, blocked by hills and buildings) and hear landings; a guard first wonders (?) then raises the alarm (!). Raids raise the Order's **alert** from 0 to 3: more archers, then patrols on the roads, then a ballista in the village. A few quiet minutes away lower it one level.
+- **Upgrades** (altar, bought once each with hoard gold): Prey sense (longer smell, names the prey, rings around animals), Iron scales (less arrow and bolt damage), Wing muscles (stamina), Hotter fire (faster cooking and burning), Guard sight (shows the guards' sight cones).
+- **Day and night:** a full day takes 20 minutes; at night guards see about half as far.
+- **Tips:** one-time hints for landing, the compass, the cave, raiding, alert, night, the altar and the Farmlands; touch tips name buttons.
+- **Regions:** at the edge of a region a travel prompt appears - press Enter or tap the travel button to fly to the other region. The Farmlands open once the dragon is a Drake.
+- **Death:** the dragon wakes in the cave with half vitality; prey and loot in its claws are lost.
+- **Save:** progress is saved in `localStorage` (`vsd-campaign`, save v2; a phase 1 save migrates) on rest, region change, landing, entering the cave, buying an upgrade, death and every minute. It keeps the hoard, upgrades, alert, ruins, discovered places, the time of day and whether the dragon is flying, on the ground or in the cave. **Continue** on the start screen resumes it.
 
 | Action | Keyboard / mouse | Touch |
 |---|---|---|
 | Turn, climb, dive | A / D, W / S | Left stick |
 | Fire breath (hold) | Space / left mouse | Breath |
-| Boost | Shift | Boost |
+| Boost (on foot: run) | Shift | Boost |
 | Barrel roll | Q / E | Roll |
-| Grab / swoop (hold) | G | Grab |
+| Grab / swoop, pick up on foot (hold) | G | Grab |
 | Eat (hold) | X | Eat |
+| Land / take off | F | Land / Fly |
+| Walk on foot and in the cave | W A S D | Left stick |
+| Use a cave station (nest, larder, hoard, altar, tunnel) | E or Enter | The station's button |
+| Enter the cave | Fly into the mouth | Enter cave button or fly into the mouth |
+| Name of a compass mark | Click the mark | Tap the mark |
 | Travel to the next region | Enter | Travel button at the region edge |
-| Lair: rest, eat, leave | Panel buttons | Panel buttons |
+| Panel buttons (Rest, Sleep, Eat, Buy) | Click or Enter on the focused button | Tap |
+| Close a panel / pause | Esc | II |
 
 **Code layout.** Rules live in `campaign/core/` as pure UMD modules (no DOM, no Three.js) that run in the browser (`window.VCamp`) and in Node; all tunables are in `campaign/core/data.js`. Rendering is in `campaign/render/` and `campaign/game.js`; the dragon model is `shared/dragon.js`. Phase specs and task tables are in [`ai_sdlc/001_campaign/`](ai_sdlc/001_campaign/).
 
-**Tests.** `node campaign/test/run.js` runs every campaign test (unit tests, save and death rules, a seeded hunter bot that must reach Drake in 25-35 simulated minutes; about 20 s). `node mp/sim.test.js` tests the co-op simulation.
+**Tests.** `node campaign/test/run.js` runs every campaign test (unit tests, save v1 / v2 and death rules, a seeded hunter bot that must reach Drake in 25-35 simulated minutes and a seeded raid bot that must bank a strongbox from the outpost; about 40 s). `node mp/sim.test.js` tests the co-op simulation.
 
-**Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, dragon parameters) and one button per debug action (feed, hunger, damage, die, to lair, to herd, to exit, save, wipe save, reset); on desktop the same actions have hotkeys listed in the panel. `?region=wild` starts in Wildwood, and `window.__vcamp` exposes the game state.
+**Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, dragon parameters) and one button per debug action (feed, hunger, damage, die, to lair, to herd, to exit, Drake, alert, calm, to a ballista / loot / pen / town, ignite, gold, upgrades, next day phase, fast time, tips reset, save + reload, wipe save, reset); on desktop the same actions have hotkeys listed in the panel. The panel also shows fps, draw calls and the quality tier. `?region=wild` starts in Wildwood, `?region=farm` in the River Farmlands, and `window.__vcamp` exposes the game state.
 
 ## Languages
 
