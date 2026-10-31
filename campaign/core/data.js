@@ -401,8 +401,45 @@
         herds: [{ type: 'deer', count: 2, ring: [700, 1000] }],
         settlements: [{ type: 'village', x: 380, z: 260, yaw: 0 }, { type: 'hamlet', x: -420, z: -460, yaw: 1.2 },
                       { type: 'outpost', x: 640, z: -520, yaw: -0.8 }],
-        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],
-        entries: { wild: { angle: PI } },
+        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }, { to: 'bend', angleFrom: -0.5, angleTo: 0.5, minStage: 1 }],
+        entries: { wild: { angle: PI }, bend: { angle: 0 } },
+      },
+      /* Veltava Bend (Phase 3 T02, 003_task_missions.md 4.2): real Prague terrain baked into core/dem-bend.js
+         (tools/terrain). terrain.dem: base heights from that grid (metres above its base / metresPerUnit x exag +
+         offset, plus detail noise); water: 'mask' = the baked river mask, its level falling downstream (terrain.waterY).
+         Overlays: plateau (settlement ground), cliff (the Vyshgard rock face toward the river), ruins (Staromark, the
+         burned royal city: scenery only), road, bridge (a dry deck at bank height: Karlsbridge in stone, a wooden one
+         to Holeshwick). Vyshgard Castle itself joins the settlements in T03 / T04 (its plateau is already here). */
+      bend: {
+        nameKey: 'c.region.bend', radius: 1200, seed: 53, ceiling: 340,
+        terrain: {
+          dem: 'demBend', exag: 1.6, offset: 4, water: 'mask',
+          features: [
+            { type: 'plateau', x: -220, z: -815, r: 80, edge: 20, level: 'top' },                        // Vyshgard top
+            { type: 'cliff', x: -220, z: -815, r: 80, face: -PI / 2, drop: 12, width: 60 },              // rock face west, to the river
+            { type: 'plateau', x: -190, z: 250, r: 34 }, { type: 'plateau', x: 250, z: 450, r: 60 },
+            { type: 'plateau', x: -230, z: 930, r: 34 }, { type: 'plateau', x: -745, z: -230, r: 24 },
+            { type: 'ruins', x: -230, z: -200, r: 150 },                                                 // Staromark
+            { type: 'ruins', x: -645, z: 0, r: 50, kind: 'castle' },                                     // Hradchan
+            { type: 'road', width: 8, points: [[-255, -1190], [-245, -1000], [-230, -870]] },            // south entry on the east bank -> gate
+            { type: 'road', width: 7, points: [[-640, 40], [-460, -125], [-360, -125], [-280, -300], [-250, -600], [-230, -870]] },
+            { type: 'road', width: 7, points: [[-280, -300], [-100, 20], [150, 212], [250, 450]] },       // to Holeshwick
+            { type: 'bridge', x: -418, z: -125, yaw: PI / 2, len: 104, width: 10, towers: true },        // Karlsbridge, bank to bank
+            { type: 'bridge', x: 150, z: 212, yaw: 0.5, len: 60, width: 7, kind: 'wood' },
+          ],
+        },
+        palette: 'bend',
+        flora: { trees: 700, rocks: 90, fields: 14, vines: 'troyvale' },
+        vines: { x: -230, z: 880, r: 110, rows: 9 },                                                     // Troyvale vineyard slopes
+        herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
+        settlements: [
+          { type: 'outpost',  x: -190, z: 250, yaw: PI, name: 'lethna' },
+          { type: 'village',  x: 250, z: 450, yaw: 0.6, name: 'holeshwick' },
+          { type: 'hamlet',   x: -230, z: 930, yaw: 2.2, name: 'troyvale' },
+          { type: 'outpostS', x: -745, z: -230, yaw: 1.4, name: 'petrovel' },
+        ],
+        exits: [{ to: 'farm', angleFrom: PI - 0.5, angleTo: PI + 0.5 }],
+        entries: { farm: { angle: PI + 0.27 } },                                                         // over the river, south
       },
     },
     startRegion: 'ash',

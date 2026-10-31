@@ -35,6 +35,8 @@ for (const id of ids) {
   let worst = 0;
   for (let i = 0; i < 5000; i++) {
     const x = (rng() * 2 - 1) * 1000, z = (rng() * 2 - 1) * 1000;
+    // a cliff face (Bend, T02) is steeper than a mesh cell can follow; its band is checked in bend.test.js
+    if (T.deckAt(id, x, z, 2) || D.regions[id].terrain.features.some(f => f.type === 'cliff' && Math.abs(Math.hypot(x - f.x, z - f.z) - f.r - 4) < 12)) continue;   // and a bridge deck is not mesh
     worst = Math.max(worst, Math.abs(T.surfaceAt(id, x, z) - T.heightAt(id, x, z)));
   }
   ok(worst < 4, 'mesh within 4 units of the height function: ' + id + ' worst ' + worst.toFixed(2));

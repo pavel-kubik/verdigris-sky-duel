@@ -63,9 +63,113 @@
   const CHANNEL = 1.4, BANK_UP = 2, VALLEY = 34, ROAD_EDGE = 5, ROAD_K = 0.85, PLATEAU_EDGE = 32;
   const riverLevel = (R, f) => (f.level != null ? f.level : R.terrain.base - 1);
 
+  /*
+   * Baked real terrain (Phase 3 T02): a region with terrain.dem = '<module>' (e.g. 'demBend', core/dem-bend.js from
+   * tools/terrain/bake.py) takes its base heights from that grid instead of the noise:
+   *   height = (metres above dem.base) / dem.metresPerUnit x terrain.exag + terrain.offset, plus detail noise of DETAIL.
+   * terrain.water = 'mask': the river is the baked water bitset, not a polyline channel. Its level falls downstream:
+   * along dem.river (the centre line in flow direction) the level is the lowest wet ground near each sample, kept
+   * falling and smoothed; every grid point takes the level of its nearest centre line point. The ground under wet
+   * cells is carved CARVE below the surface, dry cells near the river are kept at least LEVEE above it, so the shore
+   * line is the terrain meeting the flat water mesh (render/terrain.js) at waterY = level + WATER_UP.
+   */
+  const DETAIL = 0.6, CARVE = 3.2, LEVEE = 1.4, WATER_UP = 0.3, NEAR_RIVER = 260;
+  const demCache = new Map();
+  function demModule(name) {
+    if (M.mods[name]) return M.mods[name];
+    if (typeof module === 'object' && module.exports) {             // Node: 'demBend' lives in dem-bend.js
+      require('./' + name.replace(/[A-Z]/g, c => '-' + c.toLowerCase()) + '.js');
+    }
+    return M.need(name);
+  }
+  function b64(s) {
+    if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(s, 'base64'));
+    const bin = atob(s), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  /** Decoded grid of a region with terrain.dem: { n, cell, radius, h (units, before detail), wet (0 / 1), lvl (units), near } */
+  function demGrid(id) {
+    let g = demCache.get(id);
+    if (g) return g;
+    const T = region(id).terrain, B = demModule(T.dem), n = B.size, hb = b64(B.h), wb = b64(B.water);
+    const k = (T.exag != null ? T.exag : 1) / B.metresPerUnit, off = T.offset || 0;
+    const h = new Float32Array(n * n), wet = new Float32Array(n * n), lvl = new Float32Array(n * n), near = new Uint8Array(n * n);
+    for (let i = 0; i < n * n; i++) { h[i] = hb[i] * k + off; wet[i] = (wb[i >> 3] >> (7 - (i & 7))) & 1; }
+    const at = (x, z) => {
+      const ix = clamp(Math.round((x + B.radius) / B.cell), 0, n - 1), iz = clamp(Math.round((z + B.radius) / B.cell), 0, n - 1);
+      return iz * n + ix;
+    };
+    // river level along the centre line: samples every STEP units, lowest wet ground within SEARCH, falling, smoothed
+    const STEP = 20, SEARCH = 60, line = [];
+    for (let i = 0; i + 1 < B.river.length; i++) {
+      const a = B.river[i], b = B.river[i + 1], m = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / STEP));
+      for (let j = 0; j < m; j++) line.push([a[0] + (b[0] - a[0]) * j / m, a[1] + (b[1] - a[1]) * j / m]);
+    }
+    line.push(B.river[B.river.length - 1]);
+    let lv = line.map(([x, z]) => {
+      let lo = Infinity;
+      for (let dz = -SEARCH; dz <= SEARCH; dz += B.cell) for (let dx = -SEARCH; dx <= SEARCH; dx += B.cell) {
+        const i = at(x + dx, z + dz);
+        if (wet[i] && h[i] < lo) lo = h[i];
+      }
+      return lo;
+    });
+    let last = lv.find(v => v < Infinity);
+    lv = lv.map(v => (last = Math.min(last, v < Infinity ? v : last)));                    // never rises downstream
+    for (let pass = 0; pass < 4; pass++) lv = lv.map((v, i) => (lv[Math.max(0, i - 1)] + 2 * v + lv[Math.min(lv.length - 1, i + 1)]) / 4);
+    for (let iz = 0; iz < n; iz++) for (let ix = 0; ix < n; ix++) {
+      const x = -B.radius + ix * B.cell, z = -B.radius + iz * B.cell;
+      let bd = Infinity, bi = 0;
+      for (let i = 0; i < line.length; i++) { const d = (line[i][0] - x) ** 2 + (line[i][1] - z) ** 2; if (d < bd) { bd = d; bi = i; } }
+      lvl[iz * n + ix] = lv[bi]; near[iz * n + ix] = Math.sqrt(bd) < NEAR_RIVER ? 1 : 0;
+    }
+    g = { n, cell: B.cell, radius: B.radius, h, wet, lvl, near, line, lineLevel: lv, src: B };
+    demCache.set(id, g);
+    return g;
+  }
+  /** Bilinear sample of one grid array at (x, z), clamped to the grid. */
+  function sample(g, arr, x, z) {
+    const fx = clamp((x + g.radius) / g.cell, 0, g.n - 1.0001), fz = clamp((z + g.radius) / g.cell, 0, g.n - 1.0001);
+    const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz, i = iz * g.n + ix;
+    return (arr[i] * (1 - u) + arr[i + 1] * u) * (1 - v) + (arr[i + g.n] * (1 - u) + arr[i + g.n + 1] * u) * v;
+  }
+  /** Raw baked height (units) at (x, z), bilinear, without detail noise or the river carve. */
+  function demHeight(id, x, z) { return sample(demGrid(id), demGrid(id).h, x, z); }
+  /** Water mask (0..1, bilinear) of a 'mask' region; > 0.5 = river. */
+  function maskAt(id, x, z) { return sample(demGrid(id), demGrid(id).wet, x, z); }
+  /** Water surface height of a 'mask' region's river near (x, z) (it steps down gently downstream). */
+  function waterY(id, x, z) { return sample(demGrid(id), demGrid(id).lvl, x, z) + WATER_UP; }
+  const detail = (x, z, seed) => DETAIL * (0.6 * Math.sin(x * 0.071 + z * 0.053 + seed) + 0.4 * Math.sin(x * 0.17 - z * 0.13 + seed * 1.7));
+  /** Real-terrain base: baked height + detail, carved under the river, kept above the water on the dry shore. */
+  function demBase(id, R, x, z) {
+    const g = demGrid(id);
+    let h = sample(g, g.h, x, z) + detail(x, z, R.seed);
+    if (R.terrain.water !== 'mask' || sample(g, g.near, x, z) <= 0) return h;
+    const m = sample(g, g.wet, x, z), top = sample(g, g.lvl, x, z) + WATER_UP;
+    if (m >= 0.5) return Math.min(h, top - CARVE * smooth(clamp((m - 0.5) / 0.35, 0, 1)));
+    return Math.max(h, top + LEVEE * smooth(clamp((0.5 - m) / 0.3, 0, 1)));
+  }
+
+  /* Overlays on real terrain (T02): cliff { x, z, r, face, drop (, width) } lowers the ground just outside the rim on the
+     `face` side (0 = +Z), fading out over `width`, so the rock face reads as a cliff: by `drop`, or over a river mask
+     down to the shore (LEVEE above the water, at most 3 x drop); ruins { x, z, r } only
+     marks scenery (ruinsAt); bridge { x, z, yaw, len, width } is a dry deck (deckAt) over the river at bank height. */
+  const CLIFF_W = 34, CLIFF_SPREAD = 1.25, DECK_UP = 1.5;
+  function cliffDrop(f, x, z) {
+    const d = Math.hypot(x - f.x, z - f.z), w = f.width || CLIFF_W;
+    if (d <= f.r || d >= f.r + w) return 0;
+    const a = Math.cos(Math.atan2(x - f.x, z - f.z) - f.face);
+    if (a <= Math.cos(CLIFF_SPREAD)) return 0;
+    const ang = smooth(clamp((a - Math.cos(CLIFF_SPREAD)) / (1 - Math.cos(CLIFF_SPREAD)) * 1.6, 0, 1));
+    const inner = smooth(clamp((d - f.r) / 3, 0, 1)), outer = 1 - smooth(clamp((d - f.r - 6) / (w - 6), 0, 1));
+    return ang * inner * outer;                  // weight 0..1
+  }
+
   /** Noise, volcano cones and the flatten ring: the ground before roads, rivers and plateaus. */
   function baseHeight(id, x, z) {
     const R = region(id), T = R.terrain;
+    if (T.dem) return demBase(id, R, x, z);
     let n = noise(x, z, R.seed) * T.amp;
     let add = 0;
     for (const f of T.features) {
@@ -92,6 +196,10 @@
       let sum = baseHeight(id, f.x, f.z);
       for (let k = 0; k < 12; k++) sum += baseHeight(id, f.x + Math.sin(k * Math.PI / 6) * f.r, f.z + Math.cos(k * Math.PI / 6) * f.r);
       y = f.y != null ? f.y : Math.max(sum / 13, (R.waterLevel != null ? R.waterLevel : -Infinity) + 3);
+      if (f.level === 'top') {                   // T02: a rock top (Vyshgard) - level with its highest ground, not its foot
+        y = baseHeight(id, f.x, f.z);
+        for (let k = 0; k < 12; k++) y = Math.max(y, baseHeight(id, f.x + Math.sin(k * Math.PI / 6) * f.r * 0.5, f.z + Math.cos(k * Math.PI / 6) * f.r * 0.5));
+      }
       plateauY.set(key, y);
     }
     return y;
@@ -129,6 +237,14 @@
       const y = plateauHeight(id, R, f, i);
       h = d <= f.r ? y : h + (y - h) * smooth(1 - (d - f.r) / edge);
     }
+    for (let i = 0; i < F.length; i++) {
+      if (F[i].type !== 'cliff') continue;
+      const w = cliffDrop(F[i], x, z);
+      if (w <= 0) continue;
+      // over a river (mask) the face drops down to the shore, LEVEE above the water, never below it; elsewhere by drop
+      const target = R.terrain.water === 'mask' ? Math.max(waterY(id, x, z) + LEVEE, h - F[i].drop * 3) : h - F[i].drop;
+      if (target < h) h += (target - h) * w;
+    }
     const r = Math.hypot(x, z);
     if (r > R.radius - RIM_START) {
       // boundary ridge: rises over RIM_WIDTH to RIM_HEIGHT, with its own rugged noise so the skyline is not flat
@@ -148,6 +264,7 @@
   /** The river whose channel holds (x, z): { f, level } or null. */
   function riverAt(id, x, z) {
     const R = region(id);
+    if (R.terrain.water === 'mask') return maskAt(id, x, z) > 0.5 && !deckAt(id, x, z) ? { f: null, level: waterY(id, x, z) } : null;
     for (const f of R.terrain.features) {
       if (f.type !== 'river') continue;
       if (nearestOn(f.points, x, z).d < f.width / 2 * CHANNEL) return { f, level: riverLevel(R, f) };
@@ -161,12 +278,44 @@
     return null;
   }
 
+  /** The ruins overlay (burned city scenery) under (x, z), or null. */
+  function ruinsAt(id, x, z, pad) {
+    for (const f of region(id).terrain.features) if (f.type === 'ruins' && Math.hypot(x - f.x, z - f.z) < f.r + (pad || 0)) return f;
+    return null;
+  }
+
+  /** Bridge deck at (x, z): { f, y, u, v } (u across in -0.5..0.5, v along in -0.5..0.5) or null. The deck lies at the
+      higher bank's ground + DECK_UP, level from end to end. */
+  const deckY = new Map();
+  function bridgeY(id, f, i) {
+    const key = id + ':' + i;
+    let y = deckY.get(key);
+    if (y == null) {
+      const sx = Math.sin(f.yaw) * f.len / 2, sz = Math.cos(f.yaw) * f.len / 2;
+      y = Math.max(heightAt(id, f.x - sx, f.z - sz), heightAt(id, f.x + sx, f.z + sz)) + DECK_UP;
+      deckY.set(key, y);
+    }
+    return y;
+  }
+  function deckAt(id, x, z, pad) {
+    const F = region(id).terrain.features;
+    pad = pad || 0;
+    for (let i = 0; i < F.length; i++) {
+      const f = F[i];
+      if (f.type !== 'bridge') continue;
+      const dx = x - f.x, dz = z - f.z, s = Math.sin(f.yaw), c = Math.cos(f.yaw);
+      const v = dx * s + dz * c, u = dx * c - dz * s;
+      if (Math.abs(u) < f.width / 2 + pad && Math.abs(v) < f.len / 2 + pad) return { f, y: bridgeY(id, f, i), u: u / f.width, v: v / f.len };
+    }
+    return null;
+  }
+
   /**
    * Height of the drawn surface: heightAt sampled on the GRID corners and interpolated over the same
    * two triangles per cell the renderer uses (split along the cell's 10-01 diagonal).
    * Collision and placement use this, so nothing floats above or sinks into the visible mesh.
    */
-  function surfaceAt(id, x, z) {
+  function meshAt(id, x, z) {
     const i = Math.floor(x / GRID), j = Math.floor(z / GRID);
     const x0 = i * GRID, z0 = j * GRID, u = (x - x0) / GRID, v = (z - z0) / GRID;
     if (u + v <= 1) {
@@ -175,6 +324,19 @@
     }
     const h11 = heightAt(id, x0 + GRID, z0 + GRID);
     return h11 + (heightAt(id, x0, z0 + GRID) - h11) * (1 - u) + (heightAt(id, x0 + GRID, z0) - h11) * (1 - v);
+  }
+  /** As meshAt, but a bridge deck (T02) is ground too: walk, land and collide on it (render/bridge-view.js draws it). */
+  function surfaceAt(id, x, z) {
+    const h = meshAt(id, x, z);
+    if (!hasBridges(id)) return h;
+    const b = deckAt(id, x, z);
+    return b ? Math.max(h, b.y) : h;
+  }
+  const bridgeFlag = new Map();
+  function hasBridges(id) {
+    let b = bridgeFlag.get(id);
+    if (b == null) { b = region(id).terrain.features.some(f => f.type === 'bridge'); bridgeFlag.set(id, b); }
+    return b;
   }
 
   /** Approximate slope (rise per unit) from central differences. */
@@ -222,7 +384,7 @@
     }
     for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return 'water';
     const rv = riverAt(id, x, z);
-    if (rv && surfaceAt(id, x, z) < rv.level) return 'water';
+    if (rv && (R.terrain.water === 'mask' || surfaceAt(id, x, z) < rv.level)) return 'water';   // riverAt is null on a deck
     if (R.waterLevel != null && surfaceAt(id, x, z) < R.waterLevel) return 'water';
     return null;
   }
@@ -232,6 +394,10 @@
   function dryAt(id, x, z) {
     const R = region(id), h = surfaceAt(id, x, z);
     if (R.waterLevel != null && h < R.waterLevel + SHORE) return false;
+    if (R.terrain.water === 'mask') {
+      if (deckAt(id, x, z)) return true;
+      return maskAt(id, x, z) < 0.3 && h >= waterY(id, x, z) + SHORE * 0.5;
+    }
     const rv = riverAt(id, x, z);
     if (rv && h < rv.level + SHORE) return false;
     for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return false;
@@ -304,5 +470,5 @@
     return null;
   }
 
-  M.define('terrain', { GRID, CHUNK, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
+  M.define('terrain', { GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
 })(typeof self !== 'undefined' ? self : this);
