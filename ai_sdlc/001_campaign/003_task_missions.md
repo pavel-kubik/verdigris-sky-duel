@@ -161,11 +161,12 @@ Coordinates come from real Prague: lon / lat projected around 14.4325 E, 50.0905
 | West ridge | Petřín and Hradčany | [-745, -330] -> [-745, -230] -> [-645, 0] -> [-600, 120] | `ridge` width 160, h 48 |
 | Plateau over the bend | Letná | -190, 230 | `cliff` r 150, h 30, steep side south (toward the river) |
 | East ridge | Vítkov | [200, -40] -> [345, -45] -> [520, -20] | `ridge` width 110, h 36 |
-| North slopes | Troja | -290, 960 | `hill` r 220, h 44, flank 160 |
+| North slopes | Troja | -260, 1000 | `hill` r 160, h 44, flank 120 |
 | Old city lowland | Old Town and New Town | -230, -200 | `ruins` r 150 (flat, rubble scenery) |
 | Peninsula | Holešovice | 250, 450 | flat in the loop (valley floor) |
 | Islands | Střelecký, Kampa, Štvanice, Císařský | [-445, -280] r 22; [-470, -150] r 18; [90, 215] r 20; [-345, 695] r 40 | `island` |
-| Stone bridge | Charles Bridge | across the river at -415, -125, yaw 0 (east-west), len 70 | `bridge` with gate towers at both ends |
+| Stone bridge | Charles Bridge | across the river at -415, -125, east-west (yaw PI / 2), len 70 | `bridge` with gate towers at both ends |
+| Wooden bridge | (Hlávka bridge area) | 150, 240, len 60 | `bridge` kind 'wood', the road to the peninsula village |
 
 ```js
 regions.bend: {
@@ -180,12 +181,13 @@ regions.bend: {
     { type: 'ridge', points: [[-745, -330], [-745, -230], [-645, 0], [-600, 120]], width: 160, h: 48 },
     { type: 'cliff', x: -190, z: 230, r: 150, h: 30, face: PI, flank: 120 },                     // Letná
     { type: 'ridge', points: [[200, -40], [345, -45], [520, -20]], width: 110, h: 36 },            // Vítkov
-    { type: 'hill', x: -290, z: 960, r: 220, h: 44, flank: 160 },                                 // Troja
+    { type: 'hill', x: -260, z: 1000, r: 160, h: 44, flank: 120 },                                // Troja
     { type: 'ruins', x: -230, z: -200, r: 150 },                                                  // the burned royal city
     { type: 'road', width: 8, points: [[-375, -1200], [-300, -1000], [-200, -860]] },            // south entry -> castle gate
     { type: 'road', width: 7, points: [[-640, 40], [-470, -125], [-360, -125], [-260, -300], [-230, -600], [-200, -860]] },
     { type: 'road', width: 7, points: [[-260, -300], [-120, 0], [100, 300], [250, 450]] },       // to the peninsula village
-    { type: 'bridge', x: -415, z: -125, yaw: 0, len: 70, width: 10, towers: true },
+    { type: 'bridge', x: -415, z: -125, yaw: PI / 2, len: 70, width: 10, towers: true },          // stone, east-west
+    { type: 'bridge', x: 150, z: 240, yaw: 0.63, len: 60, width: 7, kind: 'wood' },              // road to the peninsula
   ] },
   flora: { trees: 700, rocks: 90, fields: 14, vines: 'troja' },
   herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
@@ -265,7 +267,8 @@ Mission times are longer than in the first draft because the Bend is one region 
 - `island { x, z, r }`: dry ground above `waterLevel` inside a river channel.
 - `bridge { x, z, yaw, len, width, towers }`: a dry, walkable and landable deck over the river; `liquidAt` is false on it; the renderer draws arches and gate towers.
 - `ruins { x, z, r }`: flattens the ground (like a plateau at the local height) and marks the area for rubble scenery (`terrain.ruinsAt`).
-- Features apply in this order: road, river, island, hill / ridge / cliff, plateau / ruins, bridge.
+- Features apply in this order: hill / ridge / cliff, road, river, island, plateau / ruins, bridge (the river carves through the hills, so a hill never fills the channel).
+- `bridge` yaw is the deck's direction (0 = +Z); `kind` 'stone' (default, arches and towers) or 'wood' (plain deck on piles).
 
 ### 5.2 `castle`
 
