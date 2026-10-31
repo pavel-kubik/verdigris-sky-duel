@@ -27,6 +27,13 @@
       road: 0x9c8660, roadEdge: 0x7f7a4a, bank: 0x8b7d58, plateau: 0x7b8a4c,
       crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a], [0x6a5a3a, 0x4f6a2c]],   // corn: soil between the stalk rows
     },
+    bend: {   // Phase 3 T02: the Veltava Bend - river meadows, limestone on steep slopes, Troyvale vineyards, charred Staromark
+      fog: 0x9aa6a8, sky: { top: 0x1d4266, mid: 0x7f9fae, bot: 0xe2b98a },
+      low: 0x6b8c45, mid: 0x557a3c, high: 0x4f6b3a, steep: 0xb4ae9e, strata: 0x8e887a, water: 0x3f6f8c,
+      meadow: 0x7c9a4a, bank: 0x8a7f62, road: 0x9c8a66, roadEdge: 0x7f7a50, plateau: 0x82905a,
+      char: 0x3a332e, charLight: 0x5a5048, vine: [0x5d7a33, 0x7a6a44],
+      crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a], [0x6a5a3a, 0x4f6a2c]],
+    },
   };
   const EXTENT = 1500;                     // build chunks out to here (past the rim, hidden by fog)
 
@@ -63,6 +70,31 @@
         if (rd < rw) c.set(pal.road);
         else if (rd < rw + 3) c.lerp(b.set(pal.roadEdge), 0.6);
         if (slope > 0.6) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.6) * 2.5));
+      } else if (R.palette === 'bend') {
+        a.set(pal.low); b.set(pal.mid);
+        c.copy(a).lerp(b, 0.2 + 0.6 * (Math.sin(x * 0.012 + Math.cos(z * 0.01) * 1.6) * Math.cos(z * 0.013 - x * 0.005) + 1) / 2);
+        const wy = T.waterY(id, x, z);
+        if (h < wy + 5) c.lerp(b.set(pal.meadow), 0.55 * (1 - Math.max(0, h - wy) / 5));             // river meadows
+        if (h > 40) c.lerp(b.set(pal.high), Math.min(1, (h - 40) / 25));
+        const vn = R.vines;
+        if (vn && Math.hypot(x - vn.x, z - vn.z) < vn.r && slope > 0.08 && !T.plateauAt(id, x, z, 4)) {   // vineyard rows
+          c.set(pal.vine[Math.sin(x * 0.9) > 0.2 ? 0 : 1]);
+        }
+        const fd = T.fieldAt(id, x, z);
+        if (fd) c.set(pal.crops[fd.f.crop][Math.sin(fd.u * fd.f.w * 1.1) > 0 ? 0 : 1]);
+        const ru = T.ruinsAt(id, x, z);
+        if (ru) {                                                // the burned royal city: charred ground, ash streets
+          const k = 1 - Math.hypot(x - ru.x, z - ru.z) / ru.r;
+          c.lerp(b.set(Math.sin(x * 0.21) * Math.sin(z * 0.19) > 0.6 ? pal.charLight : pal.char), Math.min(0.9, k * 2.2));
+        }
+        if (T.plateauAt(id, x, z)) c.lerp(b.set(pal.plateau), 0.3);
+        if (T.maskAt(id, x, z) > 0.15 || h < wy + 0.9) c.set(pal.bank);                               // banks and the river bed
+        const rd = T.lineDist(id, 'road', x, z);
+        if (rd < 3.6) c.set(pal.road);
+        else if (rd < 6.5) c.lerp(b.set(pal.roadEdge), 0.6);
+        if (slope > 0.45) {                                      // limestone on steep slopes (the Vyshgard face), with strata
+          c.lerp(b.set(Math.sin(h * 1.3) > 0.3 ? pal.strata : pal.steep), Math.min(1, (slope - 0.45) * 3));
+        }
       } else {
         if (h < 2.2) c.set(pal.sand);
         else {
@@ -172,6 +204,39 @@
     }
   }
 
+  /** River water of a 'mask' region (T02): a grid mesh over the wet cells (dilated, so the banks hide its edge) at
+      terrain.waterY, which steps down gently downstream. One draw call. */
+  function maskWater(id, group, pal) {
+    const g = T.demGrid(id), n = g.n, DIL = 2, near = new Uint8Array(n * n);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      if (!g.wet[j * n + i]) continue;
+      for (let dj = -DIL; dj <= DIL; dj++) for (let di = -DIL; di <= DIL; di++) {
+        const ii = i + di, jj = j + dj;
+        if (ii >= 0 && jj >= 0 && ii < n && jj < n) near[jj * n + ii] = 1;
+      }
+    }
+    const pos = [], idx = [], vid = new Int32Array(n * n).fill(-1);
+    const vert = (i, j) => {
+      const k = j * n + i;
+      if (vid[k] < 0) {
+        const x = -g.radius + i * g.cell, z = -g.radius + j * g.cell;
+        vid[k] = pos.length / 3; pos.push(x, T.waterY(id, x, z), z);
+      }
+      return vid[k];
+    };
+    for (let j = 0; j + 1 < n; j++) for (let i = 0; i + 1 < n; i++) {
+      if (!near[j * n + i] && !near[j * n + i + 1] && !near[(j + 1) * n + i] && !near[(j + 1) * n + i + 1]) continue;
+      const a = vert(i, j), b = vert(i + 1, j), c = vert(i, j + 1), d = vert(i + 1, j + 1);
+      idx.push(a, c, b, d, b, c);                                // counter-clockwise seen from above
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: pal.water, roughness: 0.2, metalness: 0.25, transparent: true, opacity: 0.9 }));
+    mesh.name = 'river'; group.add(mesh);
+    return mesh;
+  }
+
   function build(id, opts) {
     opts = opts || {};
     const R = T.region(id), pal = PALETTES[R.palette];
@@ -190,6 +255,11 @@
       water.rotation.x = -Math.PI / 2; water.position.y = R.waterLevel; group.add(water);
     }
     rivers(id, group, pal);
+    if (R.terrain.water === 'mask') maskWater(id, group, pal);
+    const bridges = VR.bridges ? VR.bridges.build(id) : null;           // T02: Karlsbridge and the wooden bridge
+    if (bridges) group.add(bridges.group);
+    const ruins = VR.ruins ? VR.ruins.build(id, { density: opts.flora }) : null;   // T02: Staromark and Hradchan
+    if (ruins) group.add(ruins.group);
     const lavaFx = crater(id, group);
     const mouth = R.lair ? lairMouth(id, group) : null;
     const flora = VR.flora ? VR.flora.build(id, { isTouch: !!opts.isTouch, flora: opts.flora }) : null;
