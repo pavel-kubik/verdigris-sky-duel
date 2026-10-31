@@ -4,17 +4,23 @@
  *       archers: the template's `archers` of each settlement, spread over its towers (round robin), on the tower top;
  *       the archers of a ruined tower are not there (they come back when it is rebuilt);
  *       peasants: the template's `peasants`, each with a home building (houses first) to wander around;
- *       ballista platforms: a watcher on each (kind 'ballista', aims and fires with T16).
+ *       ballista platforms: a ballista with its crew on each (kind 'ballista', T16); hp = the crew's, the platform
+ *       burns as a building (its hp in data.buildings); a ruined platform has no ballista until it is rebuilt.
  *       def = { id, kind, place, building, post, home, pos (eye), base, yaw, sight, fov, hp, alive, aware, state,
  *               focus, seen, heard, search, phase, aim, cool, shots, gap, target, hidden, hideT, ring, burnT }
  *   step(cs, ev, dt, { scale, spot, inside }) -> events[]   perception (core/perception.js) for every live defender,
  *       states idle -> suspicious -> alert -> search (last seen spot, perception.searchTime) -> idle; archers volley
  *       at a dragon they see within `range` and turn to it; peasants run to the bell of their settlement (one rings it),
  *       then hide in the building furthest from the dragon until searchTime has passed; arrows fly (pooled, max
- *       projectiles.max, gravity) and hit the dragon (damage x upgrades later), stick in the ground or roofs.
+ *       projectiles.max, gravity) and hit the dragon (damage x upgrades later), stick in the ground or roofs;
+ *       a ballista (T16) turns slowly (`turn`), aims for `aimTime` (d.aimAt = the lead point, shown as the aim line),
+ *       the last `lock` s of it the point is frozen, then one bolt flies straight at it (`bolt` speed, no gravity),
+ *       `reload` s until the next aim; a dragon that changes course during the lock is missed.
  *       Events: 'aware:state' { id, kind, state, from }, 'arrow:fired', 'arrow:hit' { damage, pos }, 'bell:ring'
- *       { place, pos }, 'defender:killed' { id, kind, place, cause: 'fire' | 'fall' }, 'defender:back' (rebuilt tower).
- *   burn(squad, cone, dt) -> events[]   the breath cone: archers in it burn (defenders.burn hp/s, 'defender:killed'),
+ *       { place, pos }, 'defender:killed' { id, kind, place, cause: 'fire' | 'fall' }, 'defender:back' (rebuilt tower),
+ *       'bolt:aim' { id, pos, at } (aim starts), 'bolt:fire' { id }, 'bolt:hit' { damage, pos, from }.
+ *   burn(squad, cone, dt) -> events[]   the breath cone: archers and ballista crews in it burn (defense.burn hp/s,
+ *       'defender:killed'),
  *       peasants in it panic (alert at once, they flee) - they do not die
  *   zones(squad) -> [{ x, z, r }]  per settlement with live archers: where they can shoot (the mother keeps out)
  *   calm(squad) -> squad           debug: everybody forgets the dragon, the dead stand again
@@ -50,7 +56,7 @@
   function spawn(town, rng) {
     rng = rng || Math.random;
     const list = [], E = D.defense;
-    if (!town) return { town, list, arrows: [], t: 0, rung: {}, kills: 0 };
+    if (!town) return { town, list, arrows: [], bolts: [], t: 0, rung: {}, kills: 0 };
     for (const pl of town.places) {
       const tpl = D.settlements[pl.type] || {}, own = town.buildings.filter(b => b.place === pl.id);
       const towers = own.filter(b => D.buildings[b.type].post === 'archer');
@@ -79,7 +85,7 @@
         list.push(mk('peasant', pl.id + '.peasant' + (i + 1), pl.id, pos, a, { homeB: hb ? hb.id : null, wanderT: rng() * 3 }));
       }
     }
-    return { town, list, arrows: [], t: 0, rung: {}, kills: 0, rng };
+    return { town, list, arrows: [], bolts: [], t: 0, rung: {}, kills: 0, rng };
   }
 
   function byId(town, id) { return id ? town.buildings.find(b => b.id === id) : null; }
@@ -94,7 +100,7 @@
 
   function kill(sq, d, cause, out) {
     if (!d.alive) return;
-    d.alive = false; d.hidden = false; d.seen = 0; d.heard = null; d.target = null; d.state = 'idle'; d.aware = 0; d.shots = 0; d.aim = 0;
+    d.alive = false; d.hidden = false; d.seen = 0; d.heard = null; d.target = null; d.state = 'idle'; d.aware = 0; d.shots = 0; d.aim = 0; d.aimAt = null;
     sq.kills++;
     out.push({ e: 'defender:killed', id: d.id, kind: d.kind, place: d.place, cause, pos: d.pos.slice() });
   }
@@ -104,7 +110,7 @@
     if (!sq || !cone) return out;
     const E = D.defense, rid = sq.town && sq.town.region;
     for (const d of sq.list) {
-      if (!d.alive || d.hidden || d.kind === 'ballista') continue;
+      if (!d.alive || d.hidden) continue;
       if (!inCone(cone, d.pos, rid)) continue;
       d.burnT = 0.35;
       if (d.kind === 'peasant') {                       // peasants panic and run, they do not burn (5.4)
@@ -128,13 +134,39 @@
     return { v: [dx / l * speed, dy / l * speed + 0.5 * g * tt, dz / l * speed], t: tt };
   }
 
+  /** Arrows and bolts share the pool (projectiles.max): when it is full, drop the oldest stuck one; false = hold fire. */
+  function room(sq) {
+    const P = D.projectiles, bolts = sq.bolts || (sq.bolts = []);
+    if (sq.arrows.length + bolts.length < P.max) return true;
+    let i = sq.arrows.findIndex(a => a.stuck > 0);
+    if (i >= 0) { sq.arrows.splice(i, 1); return true; }
+    i = bolts.findIndex(a => a.stuck > 0);
+    if (i >= 0) { bolts.splice(i, 1); return true; }
+    return false;
+  }
+
+  /** Squared distance from c to the segment a -> b. */
+  function segDist2(a, b, c) {
+    const s = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l2 = s[0] * s[0] + s[1] * s[1] + s[2] * s[2] || 1;
+    const k = clamp(((c[0] - a[0]) * s[0] + (c[1] - a[1]) * s[1] + (c[2] - a[2]) * s[2]) / l2, 0, 1);
+    const x = a[0] + s[0] * k - c[0], y = a[1] + s[1] * k - c[1], z = a[2] + s[2] * k - c[2];
+    return x * x + y * y + z * z;
+  }
+
+  /** A projectile reached the ground or a roof: stick there (the renderer keeps its last direction). */
+  function landed(sq, a, rid) {
+    const ground = T.surfaceAt(rid, a.pos[0], a.pos[2]), roof = sq.town ? SE.solidAt(sq.town, a.pos[0], a.pos[2], 0) : null;
+    const floor = roof != null && roof > ground && a.prev[1] >= roof - 0.5 ? roof : ground;
+    if (a.pos[1] > floor) return false;
+    const l = Math.hypot(a.vel[0], a.vel[1], a.vel[2]) || 1;
+    a.dir = [a.vel[0] / l, a.vel[1] / l, a.vel[2] / l];
+    a.pos[1] = floor + 0.2; a.stuck = D.projectiles.stick;
+    return true;
+  }
+
   function fire(sq, d, p, out) {
     const A = D.defenders.archer, P = D.projectiles, rng = sq.rng || Math.random;
-    if (sq.arrows.length >= P.max) {                   // the pool is full: drop the oldest stuck arrow, else hold fire
-      const i = sq.arrows.findIndex(a => a.stuck > 0);
-      if (i < 0) return;
-      sq.arrows.splice(i, 1);
-    }
+    if (!room(sq)) return;
     const q = [p.pos[0], p.pos[1], p.pos[2]], a = aimArrow(d.pos, q, p.vel || [0, 0, 0], A.speed, P.gravity);
     const n = A.spread * A.speed;
     const v = [a.v[0] + (rng() * 2 - 1) * n, a.v[1] + (rng() * 2 - 1) * n, a.v[2] + (rng() * 2 - 1) * n];
@@ -153,26 +185,55 @@
       a.vel[1] -= P.gravity * dt;
       for (let k = 0; k < 3; k++) a.pos[k] += a.vel[k] * dt;
       a.t += dt;
-      if (target) {
-        const s = [a.pos[0] - a.prev[0], a.pos[1] - a.prev[1], a.pos[2] - a.prev[2]], l2 = s[0] * s[0] + s[1] * s[1] + s[2] * s[2] || 1;
-        let k = ((target[0] - a.prev[0]) * s[0] + (target[1] - a.prev[1]) * s[1] + (target[2] - a.prev[2]) * s[2]) / l2;
-        k = clamp(k, 0, 1);
-        const cx = a.prev[0] + s[0] * k - target[0], cy = a.prev[1] + s[1] * k - target[1], cz = a.prev[2] + s[2] * k - target[2];
-        if (cx * cx + cy * cy + cz * cz <= hitR * hitR) {
-          out.push({ e: 'arrow:hit', damage: D.defenders.archer.damage, pos: a.pos.slice(), from: a.from });
-          sq.arrows.splice(i, 1);
-          continue;
-        }
+      if (target && segDist2(a.prev, a.pos, target) <= hitR * hitR) {
+        out.push({ e: 'arrow:hit', damage: D.defenders.archer.damage, pos: a.pos.slice(), from: a.from });
+        sq.arrows.splice(i, 1);
+        continue;
       }
-      const ground = T.surfaceAt(rid, a.pos[0], a.pos[2]), roof = sq.town ? SE.solidAt(sq.town, a.pos[0], a.pos[2], 0) : null;
-      const floor = roof != null && roof > ground && a.prev[1] >= roof - 0.5 ? roof : ground;
-      if (a.pos[1] <= floor) {
-        const l = Math.hypot(a.vel[0], a.vel[1], a.vel[2]) || 1;
-        a.dir = [a.vel[0] / l, a.vel[1] / l, a.vel[2] / l];   // the renderer keeps a stuck arrow's last direction
-        a.pos[1] = floor + 0.2; a.stuck = P.stick; continue;
-      }
+      if (landed(sq, a, rid)) continue;
       if (a.t > P.life) sq.arrows.splice(i, 1);
     }
+    // bolts (T16): straight, no gravity; a bigger hit radius; stick like arrows
+    const B = D.defenders.ballista, bolts = sq.bolts || (sq.bolts = []), boltR = B.hit * Math.max(1, scale || 1);
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      const a = bolts[i];
+      if (a.stuck > 0) { if ((a.stuck -= dt) <= 0) bolts.splice(i, 1); continue; }
+      a.prev = a.pos.slice();
+      for (let k = 0; k < 3; k++) a.pos[k] += a.vel[k] * dt;
+      a.t += dt;
+      if (target && segDist2(a.prev, a.pos, target) <= boltR * boltR) {
+        out.push({ e: 'bolt:hit', damage: B.damage, pos: a.pos.slice(), from: a.from });
+        bolts.splice(i, 1);
+        continue;
+      }
+      if (landed(sq, a, rid)) continue;
+      if (a.t > B.life) bolts.splice(i, 1);
+    }
+  }
+
+  /** Ballista (T16): aim `aimTime` at the lead point (frozen for the last `lock` s), one straight bolt, `reload` s. */
+  function ballista(sq, d, cs, dt, out) {
+    const B = D.defenders.ballista, p = cs.dragon.pilot;
+    const dist = p ? Math.hypot(p.pos[0] - d.pos[0], p.pos[1] - d.pos[1], p.pos[2] - d.pos[2]) : Infinity;
+    const facing = p ? Math.abs(wrap(Math.atan2(p.pos[0] - d.pos[0], p.pos[2] - d.pos[2]) - d.yaw)) < D.defense.aimCone : false;
+    const can = d.state === 'alert' && d.seen > 0 && dist <= B.range && facing && !cs.inLair;
+    const locked = d.aim > 0 && d.aim >= B.aimTime - B.lock;
+    if (!locked) {
+      if (!can || d.cool > 0) { d.aim = 0; d.aimAt = null; d.target = null; return; }
+      const v = p.vel || [0, 0, 0], rem = Math.max(0, B.aimTime - d.aim);   // where it will be when the bolt leaves ...
+      const a = aimArrow(d.pos, [p.pos[0] + v[0] * rem, p.pos[1] + v[1] * rem, p.pos[2] + v[2] * rem], v, B.bolt, 0);   // ... and meets it
+      d.aimAt = [d.pos[0] + a.v[0] * a.t, d.pos[1] + a.v[1] * a.t, d.pos[2] + a.v[2] * a.t];   // the lead point
+      if (d.aim === 0) out.push({ e: 'bolt:aim', id: d.id, pos: d.pos.slice(), at: d.aimAt.slice() });
+    }
+    d.target = d.aimAt;
+    d.aim += dt;
+    if (d.aim < B.aimTime) return;
+    d.aim = 0; d.cool = B.reload;
+    const at = d.aimAt; d.aimAt = null; d.target = null;
+    if (!at || !room(sq)) return;
+    const dx = at[0] - d.pos[0], dy = at[1] - d.pos[1], dz = at[2] - d.pos[2], l = Math.hypot(dx, dy, dz) || 1;
+    sq.bolts.push({ pos: d.pos.slice(), prev: d.pos.slice(), vel: [dx / l * B.bolt, dy / l * B.bolt, dz / l * B.bolt], t: 0, stuck: 0, from: d.id });
+    out.push({ e: 'bolt:fire', id: d.id, pos: d.pos.slice() });
   }
 
   /** Move a peasant on the ground toward (x, z); true when within `near` of it. Slides around building solids. */
@@ -261,7 +322,7 @@
   function archer(sq, d, cs, dt, out) {
     const A = D.defenders[d.kind], p = cs.dragon.pilot;
     d.cool = Math.max(0, d.cool - dt);
-    if (d.kind !== 'archer') return;                    // the ballista watches only until T16
+    if (d.kind === 'ballista') { ballista(sq, d, cs, dt, out); return; }
     const dist = p ? Math.hypot(p.pos[0] - d.pos[0], p.pos[1] - d.pos[1], p.pos[2] - d.pos[2]) : Infinity;
     const facing = p ? Math.abs(wrap(Math.atan2(p.pos[0] - d.pos[0], p.pos[2] - d.pos[2]) - d.yaw)) < D.defense.aimCone : false;
     const can = d.state === 'alert' && d.seen > 0 && dist <= A.range && facing && !cs.inLair;
@@ -304,7 +365,7 @@
       if (d.post) {
         const want = d.focus && d.state !== 'idle' ? Math.atan2(d.focus[0] - d.pos[0], d.focus[2] - d.pos[2])
           : d.base + W.sweep * Math.sin(sq.t * W.sweepRate + d.phase);
-        const dy = wrap(want - d.yaw), mx = W.turn * dt;
+        const dy = wrap(want - d.yaw), mx = (d.kind === 'ballista' ? D.defenders.ballista.turn : W.turn) * dt;
         d.yaw = wrap(d.yaw + clamp(dy, -mx, mx));
       }
       d.seen = inside ? 0 : PC.seen(d, { pos: p.pos }, ctx);
@@ -330,13 +391,13 @@
     return out;
   }
 
-  /** One zone per settlement with live archers: its centre, radius = the furthest archer's reach (T16 adds the ballista). */
+  /** One zone per settlement with live archers or ballistae: its centre, radius = the furthest shooter's reach. */
   function zones(sq) {
     const by = {}, out = [], town = sq && sq.town;
     for (const d of (sq && sq.list) || []) {
-      if (!d.alive || d.kind !== 'archer') continue;
+      if (!d.alive || (d.kind !== 'archer' && d.kind !== 'ballista')) continue;
       const pl = town && town.places.find(p => p.id === d.place), cx = pl ? pl.x : d.pos[0], cz = pl ? pl.z : d.pos[2];
-      const r = Math.hypot(d.pos[0] - cx, d.pos[2] - cz) + D.defenders.archer.range;
+      const r = Math.hypot(d.pos[0] - cx, d.pos[2] - cz) + D.defenders[d.kind].range;
       if (!by[d.place] || by[d.place].r < r) by[d.place] = { x: cx, z: cz, r };
     }
     for (const k in by) out.push(by[k]);
@@ -346,12 +407,12 @@
   function calm(sq) {
     for (const d of (sq && sq.list) || []) {
       const b = d.post && sq.town ? byId(sq.town, d.building) : null;
-      Object.assign(d, { aware: 0, state: 'idle', focus: null, search: 0, panic: false, hidden: false, rang: false, ringer: false, shots: 0, aim: 0, cool: 0 });
+      Object.assign(d, { aware: 0, state: 'idle', focus: null, search: 0, panic: false, hidden: false, rang: false, ringer: false, shots: 0, aim: 0, cool: 0, aimAt: null, target: null });
       if (!(b && b.ruin)) { d.alive = true; d.down = false; d.hp = D.defenders[d.kind].hp; }
     }
-    if (sq) { sq.arrows.length = 0; sq.rung = {}; }
+    if (sq) { sq.arrows.length = 0; sq.bolts = []; sq.rung = {}; }
     return sq;
   }
 
-  M.define('defenders', { spawn, step, burn, zones, calm, aimArrow, inCone });
+  M.define('defenders', { spawn, step, burn, zones, calm, aimArrow, inCone, segDist2 });
 })(typeof self !== 'undefined' ? self : this);

@@ -159,7 +159,11 @@
        the towers), volley at a dragon they see within `range` and face (defense.aimCone): `aimTime` s of aim, then
        `volley` arrows `gap` s apart, then `cooldown` s; an arrow flies at `speed` (leading the dragon by its velocity,
        gravity compensated) with `spread` noise x speed per axis and hits for `damage` (002 4.3 listed `volley: 3,
-       arrows: 3`; built as one `volley` count). The ballista watches only (T16 adds the bolt).
+       arrows: 3`; built as one `volley` count).
+       ballista (T16): `hp` is its crew's (002 4.3 had 80 = the platform, which burns as a building with its own hp 80);
+       turns at `turn` rad/s, aims `aimTime` s at the lead point (the aim line), frozen for the last `lock` s, then one
+       bolt at `bolt` speed straight (no gravity) for `damage`; hit radius `hit` x scale, `life` s in the air; `reload` s
+       until the next aim. Burning the crew (breath, as archers) or the platform stops it.
        defense: eye height of a peasant, idle wander radius around the home and walk factor, collision pad, bell ring
        time and the s before the same bell rings again, archer spacing on a tower, archers / peasants in the breath:
        archers lose `burn` hp/s (peasants panic instead, they do not die); awareness marks show within `markRange`.
@@ -169,7 +173,8 @@
       peasant:  { hp: 10, speed: 6, sight: 90,  fov: 2.4, flee: true, ringsBell: true },
       archer:   { hp: 18, sight: 130, fov: 1.8, range: 120, volley: 3, gap: 0.18, spread: 0.06,
                   speed: 70, damage: 3, aimTime: 0.6, cooldown: 3 },
-      ballista: { hp: 80, sight: 170, fov: 1.2, range: 220 },
+      ballista: { hp: 18, sight: 170, fov: 1.2, range: 220, aimTime: 2.0, lock: 0.5, bolt: 160, damage: 35, reload: 8,
+                  turn: 0.9, crew: 1, hit: 3, life: 2 },
     },
     defense: { eye: 1.6, wander: 7, stroll: 0.3, pad: 0.6, ringTime: 2, ringCool: 40, towerSpacing: 1.6, aimCone: 0.5, burn: 14, markRange: 120 },
     projectiles: { max: 60, gravity: 30, life: 4, stick: 3, hit: 2.4 },

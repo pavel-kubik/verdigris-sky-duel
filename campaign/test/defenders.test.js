@@ -1,4 +1,4 @@
-// Defenders (Phase 2 T15): spawn on the posts, archer volleys at a low dragon (and none out of range), arrow lead,
+// Defenders (Phase 2 T15, T16 ballista): spawn on the posts, archer volleys at a low dragon (and none out of range), arrow lead,
 // hits and damage, the projectile cap, peasants running to the bell and hiding, burning archers, a burned tower.
 'use strict';
 const { ok, near, core } = require('./harness.js');
@@ -70,12 +70,13 @@ const inFront = (d, dist, alt) => {
   let fired = 0, hits = 0, dmg = 0;
   cs.bus.on('arrow:fired', () => fired++);
   cs.bus.on('arrow:hit', e => { hits++; dmg += e.damage; });
+  cs.bus.on('bolt:hit', e => { dmg += e.damage; });          // the outpost ballistae (T16) may hit the hovering dragon too
   const hp0 = cs.dragon.hp;
   hold(cs, at, 200, 0.05);
   ok(d.state === 'alert', 'the archer is alert');
   ok(fired >= A.volley * 2, 'volleys fired: ' + fired);
   ok(hits > 0 && hits <= fired, 'arrows hit the hovering dragon: ' + hits + ' of ' + fired);
-  near(cs.dragon.hp, hp0 - dmg, 1e-9, 'each hit costs archer.damage HP');
+  near(cs.dragon.hp, hp0 - dmg, 1e-9, 'each hit costs its damage in HP');
   ok(cs.squad.arrows.length <= D.projectiles.max, 'pool bounded');
   // climb: 60 out and 150 up is beyond range (and the altitude makes it hard to see)
   const high = inFront(d, 60, 160);
@@ -196,3 +197,124 @@ const inFront = (d, dist, alt) => {
   ok(died && died.cause === 'arrows', 'died of arrows');
   ok(cs.inLair, 'woke in the lair');
 }
+
+// 10. ballista (T16): turns slowly, shows the aim (bolt:aim) aimTime before each bolt, hits a hovering dragon for
+//     its damage, reloads; a dragon that changes course during the lock is missed
+const B = D.defenders.ballista;
+function ballistaCs(seed) {
+  const cs = farm(seed);
+  for (const d of cs.squad.list) if (d.kind === 'archer') { d.alive = false; }   // archers out of the way
+  const bl = cs.squad.list.find(d => d.kind === 'ballista' && d.place === 'farm.outpost');
+  return { cs, bl };
+}
+/** A still dragon (no flight step, vel 0) in front of the outpost ballista; DF.step only. */
+function stillFake(seed, dist, alt) {
+  const sq = DF.spawn(SE.build('farm'), mulberry(seed));
+  for (const d of sq.list) if (d.kind === 'archer') d.alive = false;
+  const bl = sq.list.find(d => d.kind === 'ballista' && d.place === 'farm.outpost');
+  const at = inFront(bl, dist, alt), pilot = F.newPilot(at, 0, 0);
+  pilot.vel = [0, 0, 0];
+  return { fake: { dragon: { pilot }, town: sq.town, region: 'farm', squad: sq, inLair: false, rng: mulberry(seed + 1) }, bl, sq, at };
+}
+{
+  const { fake, bl, sq, at } = stillFake(19, 150, 30), ev = [];
+  ok(bl.alive && bl.hp === B.hp, 'a crewed ballista on the outpost platform');
+  for (let i = 0; i < 600; i++) {
+    fake.dragon.pilot.pos = at.slice();
+    for (const e of DF.step(fake, [], 0.05, { scale: 1, spot: 1 })) ev.push(Object.assign({ t: sq.t }, e));
+    ok(sq.arrows.length + sq.bolts.length <= D.projectiles.max, 'bolts count in the pool');
+  }
+  const aims = ev.filter(e => e.e === 'bolt:aim' && e.id === bl.id), fires = ev.filter(e => e.e === 'bolt:fire' && e.id === bl.id);
+  const hits = ev.filter(e => e.e === 'bolt:hit' && e.from === bl.id);
+  ok(fires.length >= 2, 'bolts fired at a hovering dragon: ' + fires.length);
+  for (const f of fires) {
+    const a = aims.filter(x => x.t <= f.t).pop();
+    ok(a && f.t - a.t >= B.aimTime - 0.06, 'the aim showed ' + (a ? (f.t - a.t).toFixed(2) : '-') + ' s before the bolt');
+  }
+  const gaps = fires.slice(1).map((f, i) => f.t - fires[i].t);
+  ok(gaps.every(g => g >= B.reload + B.aimTime - 0.1), 'reload between bolts: ' + gaps.map(g => g.toFixed(1)));
+  ok(hits.length >= fires.length - 1 && hits.length > 0, 'bolts hit a still dragon: ' + hits.length + ' of ' + fires.length);
+  ok(hits.every(h => h.damage === B.damage), 'a bolt hits for ballista.damage');
+  ok(sq.list.filter(d => d.kind === 'ballista' && d.place === 'farm.outpost').length === 2, 'two ballistae on the outpost');
+}
+// turn rate: a ballista facing away needs time to come round
+{
+  const { cs, bl } = ballistaCs(21);
+  bl.yaw = bl.base + Math.PI * 0.9; bl.state = 'alert'; bl.aware = 1;
+  const at = inFront(bl, 120, 25);
+  const y0 = bl.yaw;
+  hold(cs, at, 10, 0.05);
+  const turned = Math.abs(((bl.yaw - y0 + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+  ok(turned <= B.turn * 0.5 + 1e-6, 'turned at most turn x t: ' + turned.toFixed(3));
+}
+// dodge: aim at a dragon flying straight, then it turns during the lock -> the bolt misses
+{
+  const { cs, bl } = ballistaCs(23);
+  const side = [Math.cos(bl.base), 0, -Math.sin(bl.base)], c = inFront(bl, 130, 30);
+  let aimT = null, fired = 0, hit = 0;
+  cs.bus.on('bolt:aim', e => { if (e.id === bl.id && aimT == null) aimT = cs.squad.t; });
+  cs.bus.on('bolt:fire', e => { if (e.id === bl.id) fired++; });
+  cs.bus.on('bolt:hit', e => { if (e.from === bl.id) hit++; });
+  bl.state = 'alert'; bl.aware = 1; bl.yaw = Math.atan2(c[0] - bl.pos[0], c[2] - bl.pos[2]);
+  const p = cs.dragon.pilot;
+  Object.assign(p, { pos: [c[0] - side[0] * 40, c[1], c[2] - side[2] * 40], yaw: Math.atan2(side[0], side[2]), pitch: 0, speed: 30, mode: 'air' });
+  let turned = false;
+  for (let i = 0; i < 160 && !fired; i++) {
+    if (aimT != null && !turned && cs.squad.t - aimT >= B.aimTime - B.lock + 0.05) { p.yaw += 1.6; turned = true; }   // hard turn in the lock
+    p.pos[1] = c[1]; p.pitch = 0; S.step(cs, {}, 0.05);
+  }
+  for (let i = 0; i < 40; i++) { p.pos[1] = c[1]; p.pitch = 0; S.step(cs, {}, 0.05); }
+  ok(turned && fired === 1, 'the ballista aimed and fired once (' + fired + ')');
+  ok(hit === 0, 'a hard turn during the lock dodges the bolt');
+}
+// the same flight without the turn is hit (the lead works)
+{
+  const { cs, bl } = ballistaCs(23);
+  const side = [Math.cos(bl.base), 0, -Math.sin(bl.base)], c = inFront(bl, 130, 30);
+  let fired = 0, hit = 0;
+  cs.bus.on('bolt:fire', e => { if (e.id === bl.id) fired++; });
+  cs.bus.on('bolt:hit', e => { if (e.from === bl.id) hit++; });
+  bl.state = 'alert'; bl.aware = 1; bl.yaw = Math.atan2(c[0] - bl.pos[0], c[2] - bl.pos[2]);
+  const p = cs.dragon.pilot;
+  Object.assign(p, { pos: [c[0] - side[0] * 40, c[1], c[2] - side[2] * 40], yaw: Math.atan2(side[0], side[2]), pitch: 0, speed: 30, mode: 'air' });
+  for (let i = 0; i < 200 && !hit; i++) { p.pos[1] = c[1]; p.pitch = 0; S.step(cs, {}, 0.05); }
+  ok(fired >= 1 && hit === 1, 'a straight crossing dragon is hit by the led bolt (' + hit + ' of ' + fired + ')');
+}
+// crew burned or platform burned: the ballista stops
+{
+  const { cs, bl } = ballistaCs(25);
+  const cone = { origin: [bl.pos[0], bl.pos[1] + 0.8, bl.pos[2] - 10], dir: [0, 0, 1], range: 30, cone: 0.3 };
+  const ev = [];
+  let n = 0;
+  for (; n < 100 && bl.alive; n++) for (const e of DF.burn(cs.squad, cone, 0.05)) ev.push(e);
+  ok(!bl.alive && ev.some(e => e.e === 'defender:killed' && e.kind === 'ballista' && e.cause === 'fire'), 'the crew burned');
+  near(n * 0.05, B.hp / D.defense.burn, 0.051, 'crew burns in hp / defense.burn s');
+  let fired = 0;
+  cs.bus.on('bolt:fire', e => { if (e.id === bl.id) fired++; });
+  hold(cs, inFront(bl, 150, 30), 300, 0.05);
+  ok(fired === 0, 'no bolts from a ballista without crew');
+  const other = cs.squad.list.find(d => d.kind === 'ballista' && d !== bl);
+  const pf = cs.town.buildings.find(b => b.id === other.building);
+  pf.ruin = true; pf.ruinAt = cs.stats.played;
+  let fell = null;
+  cs.bus.on('defender:killed', e => { if (e.id === other.id) fell = e; });
+  hold(cs, inFront(bl, 150, 30), 2);
+  ok(!other.alive && fell && fell.cause === 'fall', 'a burned platform takes its ballista down');
+  ok(cs.danger.length === 0, 'no danger zone without archers or crewed ballistae');
+  DF.calm(cs.squad);
+  ok(bl.alive && !other.alive && cs.squad.bolts.length === 0, 'calm: the crew stands again, the ruin stays down, no bolts');
+}
+// a bolt can kill: cause 'bolt' (a dragon crossing in front, real flight)
+{
+  const { cs, bl } = ballistaCs(27);
+  cs.dragon.hp = 10;
+  let died = null;
+  cs.bus.on('dragon:died', e => { died = e; });
+  const side = [Math.cos(bl.base), 0, -Math.sin(bl.base)], c = inFront(bl, 130, 30), p = cs.dragon.pilot;
+  bl.state = 'alert'; bl.aware = 1; bl.yaw = Math.atan2(c[0] - bl.pos[0], c[2] - bl.pos[2]);
+  Object.assign(p, { pos: [c[0] - side[0] * 40, c[1], c[2] - side[2] * 40], yaw: Math.atan2(side[0], side[2]), pitch: 0, speed: 30, mode: 'air' });
+  for (let i = 0; i < 200 && !died; i++) { p.pos[1] = c[1]; p.pitch = 0; S.step(cs, {}, 0.05); }
+  ok(died && died.cause === 'bolt', 'died of a bolt');
+}
+// segDist2
+near(DF.segDist2([0, 0, 0], [10, 0, 0], [5, 3, 0]), 9, 1e-9, 'segment distance');
