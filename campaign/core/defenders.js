@@ -24,6 +24,10 @@
  *       peasants in it panic (alert at once, they flee) - they do not die
  *   zones(squad) -> [{ x, z, r }]  per settlement with live archers: where they can shoot (the mother keeps out)
  *   calm(squad) -> squad           debug: everybody forgets the dragon, the dead stand again
+ * T17 alert responses: spawn(town, rng, { resp, old }) - resp = alert.responses(level): extraArchers on every towered
+ *       settlement, `patrols` archer pairs walking the road (routeOf: the region's road or a line through its settlements;
+ *       d.patrol { s, dir, side, pause }), bellFast (ringTime x alert.bellFast); old = the squad before (same ids keep
+ *       their state). step() respawns the squad when the region's alert level changes ('defenders:reinforced' on a rise).
  * The squad also serves as cs.watch (the T14 debug view and the 'to post' debug jump read cs.watch.list).
  * Pure: no DOM, no THREE.
  */

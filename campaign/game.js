@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't117.1 2026-10-31 region alert (heat, pips, extra archers, patrols, village ballista at 3; debug = alert +1 / calm alert)';
+  const BUILD = 't117.1 2026-10-31 region alert (heat, pips, extra archers, patrols, village ballista at 3; debug ] alert +1 / [ calm alert)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -885,8 +885,8 @@
     ['7', 'show / hide the sight of the watching posts (fans, ? and !)', 'Digit7', 'sight'],
     ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
     ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
-    ['X', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'KeyX', 'alert +1'],
-    ['G', 'alert to 0 in this region', 'KeyG', 'calm alert'],
+    [']', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'BracketRight', 'alert +1'],
+    ['[', 'alert to 0 in this region', 'BracketLeft', 'calm alert'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
@@ -989,9 +989,9 @@
         snapCam(); flashPrompt(t('c.dbg.corn'), 1.5);
       }
     }
-    if (code === 'KeyX' || code === 'KeyG') {                     // T17: alert level test
+    if (code === 'BracketRight' || code === 'BracketLeft') {                     // T17: alert level test
       const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {}, now = cs.stats.played;
-      if (code === 'KeyX') onEvents(AL.add(rs, 'debug', now, Math.min(D.alert.maxHeat, Math.floor(rs.heat || 0) + 1) - (rs.heat || 0)).map(e => Object.assign(e, { region: cs.region })));
+      if (code === 'BracketRight') onEvents(AL.add(rs, 'debug', now, Math.min(D.alert.maxHeat, Math.floor(rs.heat || 0) + 1) - (rs.heat || 0)).map(e => Object.assign(e, { region: cs.region })));
       else { const from = AL.level(rs); rs.heat = 0; rs.lastIncident = now; if (from) onEvents([{ e: 'alert:level', level: 0, from, region: cs.region }]); }
       flashPrompt(t('c.dbg.alert', { n: AL.level(rs) }), 1.5);
     }
