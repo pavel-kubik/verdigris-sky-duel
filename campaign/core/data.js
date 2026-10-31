@@ -168,6 +168,14 @@
       watch: { eye: 2, sweep: 0.7, sweepRate: 0.25, turn: 1.5 },
     },
 
+    /* Corn fields (Pavel's request 2026-10-31, core/crops.js, render/corn-view.js): fields of crop kind `crop` grow stalks
+       `height` tall. The breath on the stalks for `ignite` s sets the field alight (heat cools at `cool` per s); a fire front
+       runs out from that spot at `spread` units/s, a `band` wide ring of popping corn that throws popcorn into the air,
+       leaving charred stubble that grows back after `regrow` s of play. popcorn: renderer pool, kernels per s per unit of
+       front length (`rate`, capped at `maxRate` per field), launch speed up / sideways, gravity, life on the ground (s). */
+    corn: { crop: 4, height: 3.2, ignite: 0.4, cool: 0.5, spread: 5, band: 6, regrow: 600 },
+    popcorn: { pool: 1200, rate: 1.2, maxRate: 160, up: [9, 20], side: 5, gravity: 18, life: 6, size: 1.4 },
+
     /* Settlements and buildings (Phase 2 T12, core/settlement.js, render/settlement-view.js; 002_task_kingdom.md 4.2).
        buildings: footprint radius r and height h (a vertical cylinder solid: the roof height = ground + h), hp for the
        fire (T13), civil / order for stats (Phase 4 Renown), post = a defender post (T15 / T16), loot = items (T19),

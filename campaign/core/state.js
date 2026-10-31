@@ -24,6 +24,8 @@
  *        down building is a ruin until fire.rebuild s of play later (settlement.rebuild, now = stats.played). Ruins are kept
  *        in cs.regionStates[region].ruins [{ id, at }] (saved, so they survive a region change and a reload);
  *        stats.civilBurned / orderBurned count burned buildings (future Renown, alert in T17).
+ * Corn (Pavel's request): cs.crops = crops.build of the region's corn fields; the breath sets them alight, a fire front
+ *        pops the corn (popcorn drawn by render/corn-view.js), burned fields are in cs.regionStates[region].corn (saved).
  * Perception (T14): cs.watch = perception.step's watchers (one per tower / platform post until the defenders of T15),
  *        fed with this frame's noises; cs.light (null = day; T21's clock sets it) scales their sight. 'aware:state'.
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
@@ -31,7 +33,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), PC = M.need('perception'), CV = M.need('cave'), SE = M.need('settlement');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), PC = M.need('perception'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -88,6 +90,11 @@
   function ensureTown(cs) {
     if (!cs.town || cs.town.region !== cs.region) cs.town = SE.build(cs.region, cs.regionStates ? cs.regionStates[cs.region] : null);
     return cs.town;
+  }
+  /** cs.crops for the current region (corn fields, core/crops.js), rebuilt on a region change or a load. */
+  function ensureCrops(cs) {
+    if (!cs.crops || cs.crops.region !== cs.region) cs.crops = CR.build(cs.region, cs.regionStates ? cs.regionStates[cs.region] : null);
+    return cs.crops;
   }
   /** Building solids for a dragon of this scale: { solidAt, solidHit } with the body pad (settlement.pad x scale). */
   function solids(cs, scale) {
@@ -292,6 +299,12 @@
       if (e.order) cs.stats.orderBurned = (cs.stats.orderBurned || 0) + 1;
       rs.ruins = (rs.ruins || []).filter(r => r.id !== e.id).concat([{ id: e.id, at: e.at }]);
     }
+    ensureCrops(cs);                                            // corn fields: burn and pop
+    for (const e of CR.step(cs.crops, cs.breath, dt, now)) {
+      emit(cs, ev, e);
+      if (e.e === 'corn:burned') rs.corn = (rs.corn || []).filter(r => r.id !== e.id).concat([{ id: e.id, at: e.at }]);
+      if (e.e === 'corn:regrown' && rs.corn) rs.corn = rs.corn.filter(r => r.id !== e.id);
+    }
     const blocked = b => SE.sd(b, p.pos[0], p.pos[2]).d < pad;  // never rebuild a house around the dragon
     for (const e of SE.rebuild(town, now, blocked)) {
       emit(cs, ev, e);
@@ -339,5 +352,5 @@
   /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave. */
   const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, ensureTown, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
+  M.define('state', { create, enterRegion, ensureTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
 })(typeof self !== 'undefined' ? self : this);

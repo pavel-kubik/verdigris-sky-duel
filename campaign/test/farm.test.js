@@ -104,7 +104,7 @@ ok((D.regions.wild.settlements || []).length === 2, 'Wildwood has the hamlet and
   for (const f of fs) {
     ok(T.dryAt('farm', f.x, f.z) && !T.plateauAt('farm', f.x, f.z) && T.lineDist('farm', 'road', f.x, f.z) > 6, 'field on dry open ground');
     ok(T.fieldAt('farm', f.x, f.z).f === f, 'fieldAt finds the field at its centre');
-    ok(f.crop >= 0 && f.crop < 4, 'crop kind');
+    ok(f.crop >= 0 && f.crop < 5, 'crop kind (4 = corn)');
   }
   // corners belong to the field, a point well outside does not
   const f = fs[0], s = Math.sin(f.yaw), c = Math.cos(f.yaw), u = f.w / 2 - 1, v = f.l / 2 - 1;
