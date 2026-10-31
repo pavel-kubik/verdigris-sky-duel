@@ -3,7 +3,8 @@
  * One dome mesh with rock vertex colours (open where the tunnel leaves), a flat basalt floor, a lava channel along
  * the back wall (emissive ribbon + one flickering point light), the nest (ash ring + bones), the larder slab with the
  * stored carcasses (the prey models, lying on their side), the exit tunnel with daylight at its end, and a ring on
- * the floor under the station in reach. Hoard and altar arrive with T19 / T20.
+ * the floor under the station in reach. T19: the hoard pile, an InstancedMesh of up to data.cave.maxCoins coins
+ * (loot.coins(gold)) heaped in a cone that widens and rises with loot.tier(gold), round a few chests. The altar arrives with T20.
  *   VRender.cave.build() -> { group, update(cs, time), dispose() }     group starts hidden; game.js shows it inside
  */
 (function (root) {
@@ -148,6 +149,26 @@
     const tunnelLight = new THREE.PointLight(0xffd2a0, 0.9, 60, 1.5);
     tunnelLight.position.set(0, K.floor + K.tunnel.h * 0.6, K.tunnel.len);
     group.add(glow, fill, tunnelLight);
+    // T19: the hoard pile - coins in a heap at the hoard station (tier = width and height), a few chests in it
+    const LT = C.need('loot'), H = K.stations.hoard, NC = K.maxCoins;
+    const coinMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 9),
+      new THREE.MeshStandardMaterial({ color: 0xf2c14e, emissive: 0x4a3000, roughness: 0.35, metalness: 0.85, flatShading: true }), NC);
+    coinMesh.count = 0; group.add(coinMesh);
+    const crnd = MT.mulberry(9001), seeds = [];
+    for (let i = 0; i < NC; i++) seeds.push([crnd(), crnd(), crnd() * Math.PI * 2, (crnd() - 0.5) * 1.2, (crnd() - 0.5) * 1.2]);
+    let coinGold = -1;
+    const cm = new THREE.Matrix4(), cq = new THREE.Quaternion(), ce = new THREE.Euler(), cp = new THREE.Vector3(), c1 = new THREE.Vector3(1, 1, 1);
+    function pile(gold) {
+      const n = LT.coins(gold), tier = LT.tier(gold), R = H[2] * (0.3 + 0.17 * tier), Hh = 0.6 + 1.3 * tier;
+      for (let i = 0; i < n; i++) {
+        const [u, v, a, tx, tz] = seeds[i], r = R * Math.sqrt(u);
+        cp.set(H[0] + Math.sin(a) * r, K.floor + 0.06 + Hh * (1 - r / R) * (0.75 + 0.25 * v), H[1] + Math.cos(a) * r);
+        coinMesh.setMatrixAt(i, cm.compose(cp, cq.setFromEuler(ce.set(tx, a, tz)), c1));
+      }
+      coinMesh.count = n; coinMesh.instanceMatrix.needsUpdate = true;
+      coinGold = gold;
+    }
+    pile(0);
     // station ring (the one in reach)
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x62c48a, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), ringMat);
@@ -160,8 +181,10 @@
       if (s) {
         ring.position.set(s[0], K.floor + 0.12, s[1]);
         ring.scale.setScalar(s[2] + 1.5 + 0.25 * Math.sin(time * 4));
-        ringMat.color.set(st === 'exit' ? 0xffd2a0 : 0x62c48a);
+        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : 0x62c48a);
       }
+      const gold = cs && cs.hoard ? cs.hoard.gold : 0;
+      if (gold !== coinGold) pile(gold);
       // carcasses: one per stored item, side by side across the slab (carcHold local: x = world up, y = across, z = along)
       const items = cs ? cs.larder : [];
       larderField.list.length = 0;

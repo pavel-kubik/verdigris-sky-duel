@@ -27,6 +27,7 @@ for (const id in D.regions) {
 }
 for (const st of D.stages) used.add('c.stage.' + st.id);
 for (const type in D.prey) used.add('c.prey.' + type);
+for (const kind in D.loot) if (D.loot[kind] && D.loot[kind].gold) used.add('c.loot.' + kind);   // T19: tithe chest, strongbox
 used.add('c.prey.roast');
 const hatchSrc = fs.readFileSync(path.join(root, 'campaign', 'render', 'hatch-scene.js'), 'utf8');   // scene captions: LINES [['p1', ...]] -> c.hatch.p1
 for (const m of hatchSrc.matchAll(/\['(p\d)'/g)) used.add('c.hatch.' + m[1]);

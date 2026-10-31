@@ -132,6 +132,20 @@ h2{font-size:42px}
 #lair.station .row{justify-content:flex-start}
 #lair.station h2{font-size:28px}
 #lair[data-station=nest] .larder{display:none}
+#lair .hoardInfo{display:none}
+#lair[data-station=hoard] .hoardInfo{display:block}
+#lair[data-station=hoard] .larder,#lair[data-station=hoard] #lairStage,#lair[data-station=hoard] #lairVitals,#lair[data-station=hoard] .restRow{display:none}
+#hoardGold{font-family:var(--f-ui);font-size:22px;font-weight:700;color:#f2c14e;margin:2px 0}
+#hoardTier{color:var(--bone)}
+.hoardCarry{font-size:13px;color:var(--mute)}
+/* T19: gold under the stage row; the carried chest as a small icon */
+#goldRow{display:flex;width:max-content;margin:4px auto 0;gap:5px;align-items:center}
+#goldRow small{font-family:var(--f-ui);font-size:12px;font-weight:700;letter-spacing:.06em;color:#f2c14e}
+#goldRow .coin{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe08a,#c8901e);box-shadow:0 0 0 1px #6a4a10}
+#goldLoot{width:16px;height:11px;border-radius:2px;background:#7a4a24;box-shadow:inset 0 -3px 0 #d9a63a,0 0 0 1px #2a1d08}
+#goldLoot.strongbox{background:#3b3f45;box-shadow:inset 0 -3px 0 #8a8f96,0 0 0 1px #111}
+#goldRow.pulse small{animation:goldPulse .5s ease-in-out 4}
+@keyframes goldPulse{50%{color:#fff3c4;text-shadow:0 0 8px #f2c14e}}
 #lair[data-station=larder] #lairStage,#lair[data-station=larder] #lairVitals,#lair[data-station=larder] .restRow{display:none}
 @media (pointer:coarse){#lair.station{left:12px;right:12px;width:auto;top:auto;transform:none;bottom:calc(252px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 252px - 130px - env(safe-area-inset-bottom,0px) - env(safe-area-inset-top,0px));padding:12px 14px;gap:8px}#lair.station h2{font-size:22px}}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
@@ -192,7 +206,7 @@ h2{font-size:42px}
     <div class="bar"><span data-i18n="hud.fire">Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
     <div class="bar" id="hgBar"><span data-i18n="c.hud.hunger">Hunger</span><div class="track"><div class="fill" id="hgFill"></div></div></div>
   </div>
-  <div id="regionName"><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span></div>
+  <div id="regionName"><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span><span id="goldRow" hidden aria-label="Gold" data-i18n-attr="aria-label:c.hud.gold"><i class="coin"></i><small id="goldText">0</small><i id="goldLoot" hidden></i></span></div>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
 </div>
 <div id="legend" hidden>
@@ -234,6 +248,7 @@ h2{font-size:42px}
   <p id="lairStage"></p>
   <p id="lairVitals"></p>
   <div class="row restRow"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button></div>
+  <div class="hoardInfo"><p id="hoardGold"></p><p id="hoardTier"></p><p class="hoardCarry" data-i18n="c.hoard.carry">Loot is banked the moment you enter the lair. If you die on the way, it is lost.</p></div>
   <div class="larder"><div class="eyebrow" id="larderHead"></div><ul id="larderList"></ul><p id="larderEmpty" data-i18n="c.lair.empty">Empty - carry prey into the cave to store it</p></div>
   <p id="lairMsg" aria-live="polite"></p>
   <button class="ghost" id="leaveBtn" data-i18n="c.cave.close">Close</button>
@@ -253,9 +268,9 @@ h2{font-size:42px}
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
-     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js', 'core/settlement.js',
+     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js', 'core/settlement.js', 'core/loot.js',
      'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
-     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/hatch-scene.js', 'game.js'
+     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>
