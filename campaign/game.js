@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't115.1 2026-10-31 peasants and archers (volleys, bell, hide; debug - calm)';
+  const BUILD = 't116.1 2026-10-31 ballista (aim line, bolt, reload, crew; debug = to ballista)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -638,7 +638,7 @@
     if (stationOpen && (lairTick -= dt) <= 0) { lairTick = 0.5; renderLair(); }
     if (lairMsgT > 0 && (lairMsgT -= dt) <= 0) $('#lairMsg').textContent = '';
   }
-  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false;
+  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
   function onEvents(ev) {
     for (const e of ev) {
@@ -646,6 +646,9 @@
       else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
       else if (e.e === 'bell:ring') toast(t('c.toast.bell', { place: t('c.place.' + (cs.town.places.find(p => p.id === e.place) || {}).type) }), t('c.toast.bellSub'), 2.8);
       else if (e.e === 'defender:killed' && e.kind === 'archer') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.archerFell' : 'c.prompt.archerBurned'), 1.8);
+      else if (e.e === 'defender:killed' && e.kind === 'ballista') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.ballistaFell' : 'c.prompt.crewBurned'), 2.2);
+      else if (e.e === 'bolt:aim') { flashPrompt(t(boltTip ? 'c.prompt.boltAim' : isTouch ? 'c.prompt.boltAimFirstTouch' : 'c.prompt.boltAimFirst'), boltTip ? 1.6 : 3); boltTip = true; }   // T16: the aim line is the warning
+      else if (e.e === 'bolt:hit') { hero.flash = Math.max(hero.flash || 0, 0.6); hurt = Math.max(hurt, 0.8); shake = Math.max(shake, 0.45); flashPrompt(t('c.prompt.boltHit'), 2); }
       else if (e.e === 'hunger:state' && e.state === 'hungry') toast(t('c.toast.hungry'), t('c.toast.hungrySub'));
       else if (e.e === 'hunger:state' && e.state === 'starving') toast(t('c.toast.starving'), t('c.toast.starvingSub'));
       else if (e.e === 'prey:grabbed') flashPrompt(null);
@@ -866,13 +869,14 @@
     ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
     ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
+    ['=', 'fly to the next ballista (150 out, 30 up, crossing its front): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
   let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
   const LIGHTS = [null, 'dusk', 'night'];                        // T14: debug 8 cycles cs.light (T21's clock sets it later)
-  let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
+  let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1, dbgBal = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
@@ -967,6 +971,17 @@
       }
     }
     if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
+    if (code === 'Equal' && !cs.inLair) {                        // T16: cross the front of the next ballista, already seen
+      const list = ((cs.squad && cs.squad.list) || []).filter(v => v.kind === 'ballista' && v.alive);
+      if (!list.length) flashPrompt(t('c.dbg.noBallista'), 1.5);
+      else {
+        dbgBal = (dbgBal + 1) % list.length;
+        const v = list[dbgBal], x = v.pos[0] + Math.sin(v.base) * 150, z = v.pos[2] + Math.cos(v.base) * 150;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: v.base + Math.PI / 2, pitch: 0, speed: stats.cruise });
+        Object.assign(v, { aware: D.perception.alert, state: 'alert', focus: pilot.pos.slice(), yaw: v.base, cool: 0 });
+        snapCam(); flashPrompt(t('c.dbg.ballista'), 1.5);
+      }
+    }
     if (code === 'Digit7') { watchShow = !watchShow; flashPrompt(t(watchShow ? 'c.dbg.sightOn' : 'c.dbg.sightOff'), 1.5); }
     if (code === 'Digit8') { cs.light = LIGHTS[(LIGHTS.indexOf(cs.light == null ? null : cs.light) + 1) % LIGHTS.length]; flashPrompt(t('c.dbg.light', { l: t('c.light.' + (cs.light || 'day')) }), 1.5); }
     if (code === 'Digit9' && !cs.inLair) {                       // T14: in front of the next post of the region (outward side)
@@ -1148,8 +1163,9 @@
         let wn = null, wd = Infinity;
         for (const v of wl) { const d = Math.hypot(v.pos[0] - pilot.pos[0], v.pos[2] - pilot.pos[2]); if (d < wd) { wd = d; wn = v; } }
         L.push('WATCH   light ' + (cs.light || 'day') + '  posts ' + wl.length + '  alert ' + wl.filter(v => v.state === 'alert').length + '  suspicious ' + wl.filter(v => v.state === 'suspicious').length + (watchShow ? '' : '  (hidden)'));
-        { const sq = cs.squad, al = sq ? sq.list : [], ar = al.filter(v => v.kind === 'archer'), pe = al.filter(v => v.kind === 'peasant');
-          L.push('DEFEND  archers ' + ar.filter(v => v.alive).length + '/' + ar.length + ' (aiming ' + ar.filter(v => v.target).length + ')  peasants ' + pe.length + ' hidden ' + pe.filter(v => v.hidden).length + '  arrows ' + (sq ? sq.arrows.length : 0) + '/' + D.projectiles.max + '  killed ' + (sq ? sq.kills : 0) + '  drawn ' + (defView ? defView.info.drawn : 0)); }
+        { const sq = cs.squad, al = sq ? sq.list : [], ar = al.filter(v => v.kind === 'archer'), pe = al.filter(v => v.kind === 'peasant'), ba = al.filter(v => v.kind === 'ballista');
+          L.push('DEFEND  archers ' + ar.filter(v => v.alive).length + '/' + ar.length + ' (aiming ' + ar.filter(v => v.target).length + ')  peasants ' + pe.length + ' hidden ' + pe.filter(v => v.hidden).length + '  arrows ' + (sq ? sq.arrows.length : 0) + '/' + D.projectiles.max + '  killed ' + (sq ? sq.kills : 0) + '  drawn ' + (defView ? defView.info.drawn : 0));
+          L.push('BALLISTA crewed ' + ba.filter(v => v.alive).length + '/' + ba.length + '  aiming ' + ba.filter(v => v.aimAt).map(v => v.aim.toFixed(1) + 's').join(' ') + '  reload ' + ba.filter(v => v.alive && v.cool > 0).map(v => v.cool.toFixed(0) + 's').join(' ') + '  bolts ' + (sq && sq.bolts ? sq.bolts.length : 0)); }
         if (wn) L.push('        near ' + wn.kind + ' ' + Math.round(wd) + '  range ' + Math.round(PC.range(wn, { spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId) })) + '  seen ' + f2(wn.seen) + '  heard ' + (wn.heard ? wn.heard.kind : '-') + '  aware ' + f2(wn.aware) + ' ' + wn.state); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
