@@ -214,8 +214,13 @@ function decide(bot, dt) {
     const head = bot.spot.pos, dh = Math.hypot(head[0] - p.pos[0], head[2] - p.pos[2]);
     const floor = T.surfaceAt(cs.region, head[0], head[2]);
     const s = steer(p, head, Math.max(ground, floor) + clamp(dh * 0.4, 3, 60));
-    if (dh < LAND_R && !bot.pass) { bot.pass = true; bot.hesitate = bot.rng() < bot.prof.goRound; }
+    if (bot.outT > 0) {                                     // going round: straight out and up, then back in
+      bot.outT -= dt;
+      return { sx: 0, sy: steer(p, p.pos, Math.max(ground, floor) + 45).sy };
+    }
+    if (dh < LAND_R && !bot.pass) { bot.pass = true; bot.passT = 0; bot.hesitate = bot.rng() < bot.prof.goRound; }
     if (dh > LAND_R + 10) bot.pass = false;
+    if (bot.pass && (bot.passT += dt) > (bot.hesitate ? 2.5 : 8)) { bot.pass = false; bot.outT = 5; }   // circling: go round
     const land = bot.pass && !bot.hesitate && WK.canLand(p, cs.region, S.solids(cs, S.scaleOf(cs)).solidAt).ok && pathFree(cs, sp, p.pos[0], p.pos[2]);
     if (land) { bot.walkBest = null; bot.pass = false; setPhase(bot, 'walk'); return { sx: s.sx, sy: s.sy, land: true }; }
     return { sx: s.sx, sy: s.sy };

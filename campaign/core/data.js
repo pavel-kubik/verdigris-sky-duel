@@ -41,6 +41,7 @@
     stages: [
       { id: 'hatchling', foodFrom: 0, growthFrom: 0.00, scaleFrom: 1.0, scaleTo: 1.5,
         hp: 100, turn: 1.00, cruise: 30, boost: 54, hungerMult: 1.0, spot: 1.0, carry: 1 },
+      // T24: drake hungerMult 1.5 -> 1.1 so a full Drake can bring a strongbox home from the Farmlands (test/raid.test.js)
       { id: 'drake', foodFrom: 1000, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
         hp: 220, turn: 0.85, cruise: 32, boost: 56, hungerMult: 1.1, spot: 1.5, carry: 2 },
       // wyrm (foodFrom 2400, growthFrom 0.55) and elder (growthFrom 0.85) arrive in phases 4-5
@@ -183,6 +184,7 @@
        ground / a roof, hit radius around the dragon's centre x scale. */
     defenders: {
       peasant:  { hp: 10, speed: 6, sight: 90,  fov: 2.4, flee: true, ringsBell: true },
+      // T24: archer damage 3 -> 2 (a careful raid keeps 20%+ HP, test/raid.test.js)
       archer:   { hp: 18, sight: 130, fov: 1.8, range: 120, volley: 3, gap: 0.18, spread: 0.06,
                   speed: 70, damage: 2, aimTime: 0.6, cooldown: 3 },
       ballista: { hp: 18, sight: 170, fov: 1.2, range: 220, aimTime: 2.0, lock: 0.5, bolt: 160, damage: 35, reload: 8,
@@ -207,6 +209,7 @@
        higher level overrides the same key): extra archers per tower settlement, patrols = archer pairs walking the roads
        (or between the settlements where a region has no road), the village ballista platform (settlements alert3),
        livestock kept inside (T18), a faster bell (defense.ringTime x bellFast). */
+    // T24 (test/raid.test.js): loot 1.0 -> 1.5 so back-to-back raids lift the alert one level each (1, 2, 3)
     alert: {
       maxLevel: 3, maxHeat: 3.99,
       add: { sighted: 0.2, bell: 0.5, orderBurned: 0.5, civilBurned: 0.75, livestock: 1.0, defenderKilled: 0.25, loot: 1.5 },
