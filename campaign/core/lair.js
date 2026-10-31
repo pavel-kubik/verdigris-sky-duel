@@ -158,7 +158,7 @@
     const np = F.newPilot(m.slice(), s.yaw || 0, st.cruise);
     np.st = stamina;
     if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;      // same object: the renderer keeps its reference
-    cs.exit = null; cs.exitT = 0;
+    cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0;
     ev.push(...enter(cs, 'nest').map(e => (e.e === 'lair:enter' ? Object.assign(e, tag) : e)));
     return ev;
   }

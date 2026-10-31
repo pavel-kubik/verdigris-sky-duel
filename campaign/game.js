@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't110.2 2026-10-31 walkable cave hall: nest, larder, exit tunnel';
+  const BUILD = 't111.2 2026-10-31 River Farmlands terrain: river, road, plateaus, fields';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -700,6 +700,7 @@
     const ex = state === 'play' && cs.exit;
     if (promptFlashT > 0 && promptFlash) text = promptFlash;
     else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
+    else if (state === 'play' && cs.exitSmall && !cs.inLair) text = t('c.prompt.tooSmall.' + cs.exitSmall.to);   // T11: gated exit, phone and desktop
     else if (cs.inLair) text = stationOpen ? '' : cs.station ? t('c.prompt.station.' + cs.station + (isTouch ? 'Touch' : '')) : t(isTouch ? 'c.prompt.caveTouch' : 'c.prompt.cave');
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
     else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / ST.eatTime(cs); }
@@ -837,7 +838,8 @@
     ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],
     ['Z', 'die now (wake in the lair)', 'KeyZ', 'die'],
     ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
-    ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near the region exit', 'KeyT', 'to exit'],
+    ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near a region exit (again: the next exit)', 'KeyT', 'to exit'],
+    ['C', 'become a Drake now (Farmlands test)', 'KeyC', 'drake now'],
     ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
     ['Y', 'graphics quality low / mid / high (saved)', 'KeyY', 'quality'],
@@ -846,6 +848,7 @@
     ['B', 'Elder size (scale 4) on / off: walls and camera test in the cave', 'KeyB', 'elder size'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
+  let dbgExit = 0, dbgExitRegion = null;                         // T: which exit the next press jumps to
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
@@ -860,6 +863,10 @@
     }
     if (code === 'KeyM') { onEvents(MO.skip(cs)); const mo = cs.story && cs.story.mother; flashPrompt(t('c.dbg.mother', { n: mo ? mo.lesson : '-' }), 1.5); }
     if (code === 'KeyB') { cs.debugScale = cs.debugScale ? null : 4; refreshStage(); if (cs.inLair) { CV.clampPos(pilot.pos, ST.scaleOf(cs)); pilot.pos[1] = CV.standY(ST.scaleOf(cs)); } snapCam(); flashPrompt(t('c.dbg.scale', { s: ST.scaleOf(cs).toFixed(2) }), 1.5); }
+    if (code === 'KeyC' && dragon.stage < 1) {                    // T11: skip to the Drake stage (the Farmlands need one)
+      Object.assign(dragon, { stage: 1, foodXp: Math.max(dragon.foodXp, D.stages[1].foodFrom), hp: D.stages[1].hp });
+      refreshStage(); flashPrompt(t('c.dbg.drake'), 1.5);
+    }
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK' && !cs.inLair) { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
@@ -895,9 +902,12 @@
         if (cs.nav) cs.nav.next = 0;
       }
     }
-    if (code === 'KeyT') {                                        // 200 inside the edge, mid exit arc, heading out
-      const ex = (TR.region(regionId).exits || [])[0];
+    if (code === 'KeyT') {                                        // 200 inside the edge, mid exit arc, heading out; again = the next exit
+      const exs = TR.region(regionId).exits || [];
+      dbgExit = dbgExitRegion === regionId ? (dbgExit + 1) % Math.max(1, exs.length) : 0; dbgExitRegion = regionId;
+      const ex = exs[dbgExit];
       if (ex) {
+        flashPrompt(t('c.dbg.exit', { region: t(TR.region(ex.to).nameKey) }), 1.5);
         const mid = RG.arcMid(ex);
         const r = TR.region(regionId).radius - 200, x = Math.sin(mid) * r, z = Math.cos(mid) * r;
         pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 50, z]; pilot.yaw = mid; pilot.pitch = 0; snapCam();

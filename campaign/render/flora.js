@@ -1,7 +1,7 @@
 /*
  * Verdigris campaign - instanced trees and rocks for a region.
  * One InstancedMesh per part (trunk, crown, rock), seeded from the region so the forest is the
- * same every visit. Trees avoid water, steep ground, the volcano and the region rim.
+ * same every visit. Trees avoid water, steep ground, the volcano, the region rim and (T11) roads, fields and plateaus.
  *   VRender.flora.build(regionId, { flora }) ->  (flora = share of the region's trees, quality tier; isTouch = 0.5 kept as fallback)
  *     -> { group, count: { trees, rocks }, trees: [[x, z, r]], dispose() }
  */
@@ -17,11 +17,15 @@
       { id: 'conifer', share: 0.6, trunk: [0.5, 0.9, 4, 0x4a3524], crown: { geo: 'cone', r: 4.2, h: 12, y: 9, col: [0x2c4f2e, 0x3d6a3a] }, scale: [0.8, 1.6] },
       { id: 'broadleaf', share: 0.4, trunk: [0.6, 1.0, 5, 0x5a4029], crown: { geo: 'ico', r: 5.2, h: 0, y: 8.5, col: [0x4f7a3c, 0x6b8f3f] }, scale: [0.8, 1.4] },
     ],
+    farm: [   // T11: hedgerow broadleaves and tall poplars along the roads and the river
+      { id: 'broadleaf', share: 0.7, trunk: [0.6, 1.0, 5, 0x5a4029], crown: { geo: 'ico', r: 5.0, h: 0, y: 8, col: [0x5f8a3c, 0x7a9a45] }, scale: [0.8, 1.3] },
+      { id: 'poplar', share: 0.3, trunk: [0.4, 0.7, 4, 0x5a4632], crown: { geo: 'cone', r: 2.6, h: 15, y: 11, col: [0x4d7a36, 0x63883c] }, scale: [0.9, 1.3] },
+    ],
     ash: [
       { id: 'deadwood', share: 1, trunk: [0.35, 0.8, 7, 0x231c18], crown: null, scale: [0.7, 1.5] },
     ],
   };
-  const ROCK_COL = { forest: [0x6a5f50, 0x7b7364], ash: [0x2a2420, 0x3d3530] };
+  const ROCK_COL = { forest: [0x6a5f50, 0x7b7364], ash: [0x2a2420, 0x3d3530], farm: [0x7a7262, 0x8c8474] };
 
   function place(id, rng, n, ok) {
     const R = T.region(id), out = [];
@@ -42,13 +46,13 @@
     const share = opts && opts.flora != null ? opts.flora : opts && opts.isTouch ? 0.5 : 1;
     const nTrees = Math.round(R.flora.trees * share);
     const treeOk = (x, z) => {
-      const h = T.surfaceAt(id, x, z);
-      if (h < 2.2) return false;
+      if (!T.dryAt(id, x, z)) return false;                    // lakes, rivers and their shores
+      if (T.plateauAt(id, x, z, 10) || T.fieldAt(id, x, z, 3) || T.lineDist(id, 'road', x, z) < 9) return false;   // settlements, crops, roads (T11)
       if (cone && Math.hypot(x - cone.x, z - cone.z) < cone.r * 0.9) return false;
       if (R.lair && Math.hypot(x - R.lair.x, z - R.lair.z) < 45) return false;
       return T.slopeAt(id, x, z, 3) < 0.5;
     };
-    const rockOk = (x, z) => T.surfaceAt(id, x, z) > 0.8 && T.slopeAt(id, x, z, 3) < 1.1;
+    const rockOk = (x, z) => !T.liquidAt(id, x, z) && !T.plateauAt(id, x, z, 6) && !T.fieldAt(id, x, z) && T.lineDist(id, 'road', x, z) > 7 && T.slopeAt(id, x, z, 3) < 1.1;
     const trees = place(id, rng, nTrees, treeOk);
     const rocks = place(id, rng, R.flora.rocks, rockOk);
 

@@ -26,7 +26,7 @@
   function groundOk(regionId, x, z) {
     const R = T.region(regionId);
     if (Math.hypot(x, z) > R.radius - EDGE) return false;
-    if (T.surfaceAt(regionId, x, z) < 2.2) return false;
+    if (!T.dryAt(regionId, x, z)) return false;                   // lakes, rivers and their shores (T11)
     if (T.slopeAt(regionId, x, z, 3) > 0.6) return false;
     for (const f of R.terrain.features) if (f.type === 'cone' && Math.hypot(x - f.x, z - f.z) < f.r * 0.95) return false;
     if (R.lair && Math.hypot(x - R.lair.x, z - R.lair.z) < 80) return false;

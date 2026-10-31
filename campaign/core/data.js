@@ -158,13 +158,39 @@
       },
       wild: {
         nameKey: 'c.region.wild', radius: 1100, seed: 23, ceiling: 280,
-        terrain: { amp: 1.0, base: 12, features: [] },
+        waterLevel: 0.6,                                    // lakes in the hollows (T11: not landable, not walkable)
+        terrain: { amp: 1.0, base: 12, features: [
+          { type: 'plateau', x: 420, z: -300, r: 40 },      // settlement ground (T11), the hamlet and the small outpost come with T12
+          { type: 'plateau', x: -380, z: 520, r: 30 },
+        ] },
         palette: 'forest',
         flora: { trees: 1400, rocks: 120 },
         herds: [{ type: 'deer', count: 5, ring: [200, 1000] }, { type: 'boar', count: 3, ring: [300, 1000] },
                 { type: 'goat', count: 2, ring: [600, 1000] }],
-        exits: [{ to: 'ash', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],
-        entries: { ash: { angle: PI } },
+        settlements: [{ type: 'hamlet', x: 420, z: -300, yaw: 0.4 }, { type: 'outpostS', x: -380, z: 520, yaw: 2.1 }],
+        // minStage: a smaller dragon is told it is too small (prompt, no travel); the Farmlands are for a Drake
+        exits: [{ to: 'ash', angleFrom: PI - 0.6, angleTo: PI + 0.6 }, { to: 'farm', angleFrom: -0.6, angleTo: 0.6, minStage: 1 }],
+        entries: { ash: { angle: PI }, farm: { angle: 0 } },
+      },
+      /* River Farmlands (Phase 2 T11): open farmland, a river across the middle, a road from the Wildwood side up to
+         the village, flat plateaus for the three settlements (T12). river: points, width, depth (+ level, valley);
+         road: points, width; plateau: x, z, r (+ edge, y). flora.fields = crop fields placed near roads and the river. */
+      farm: {
+        nameKey: 'c.region.farm', radius: 1100, seed: 37, ceiling: 300,
+        waterLevel: 0,                                      // ponds in the lowest hollows
+        terrain: { amp: 0.6, base: 12, features: [
+          { type: 'road', points: [[0, -1100], [0, -300], [380, 260], [700, 640]], width: 8 },
+          { type: 'river', points: [[-1100, -200], [-300, 0], [200, 150], [1100, 80]], width: 26, depth: 6 },
+          { type: 'plateau', x: 380, z: 260, r: 70 }, { type: 'plateau', x: -420, z: -460, r: 50 },
+          { type: 'plateau', x: 640, z: -520, r: 90 },
+        ] },
+        palette: 'farm',
+        flora: { trees: 500, rocks: 60, fields: 24 },
+        herds: [{ type: 'deer', count: 2, ring: [700, 1000] }],
+        settlements: [{ type: 'village', x: 380, z: 260, yaw: 0 }, { type: 'hamlet', x: -420, z: -460, yaw: 1.2 },
+                      { type: 'outpost', x: 640, z: -520, yaw: -0.8 }],
+        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],
+        entries: { wild: { angle: PI } },
       },
     },
     startRegion: 'ash',

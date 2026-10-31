@@ -39,10 +39,10 @@
   const inZone = (zones, x, z, pad) => zones.some(q => Math.hypot(x - q.x, z - q.z) < q.r + (pad || 0));
 
   /** A point inside the exit arc toward a region that passes test(regionId), or null. One hop is enough for now. */
-  function exitToward(regionId, test) {
+  function exitToward(regionId, test, stage) {
     const R = T.region(regionId);
     for (const e of R.exits || []) {
-      if (!test(e.to)) continue;
+      if (!test(e.to) || (e.minStage != null && (stage || 0) < e.minStage)) continue;     // never toward a region it is too small for
       const a = RG.arcMid(e), r = R.radius - MO.exitInset, x = Math.sin(a) * r, z = Math.cos(a) * r;
       return { pos: [x, T.surfaceAt(regionId, x, z) + MO.alt, z], route: e.to };
     }
@@ -76,13 +76,13 @@
                                    : q => D.prey[q.type] && D.prey[q.type].size > lim;
       const q = nearestPrey(cs, zones, test);
       if (q) return { pos: q.pos.slice(), kind, prey: q.id };
-      const ex = exitToward(cs.region, to => (D.regions[to].herds || []).some(h => (kind === 'herd' ? D.prey[h.type].size <= lim : D.prey[h.type].size > lim)));
+      const ex = exitToward(cs.region, to => (D.regions[to].herds || []).some(h => (kind === 'herd' ? D.prey[h.type].size <= lim : D.prey[h.type].size > lim)), cs.dragon.stage);
       return ex ? { pos: ex.pos, kind: 'route', route: ex.route } : null;
     }
     if (kind === 'lair') {
       const m = LR.mouthPos(cs.region);
       if (m) return { pos: m.slice(), kind };
-      const ex = exitToward(cs.region, to => to === LR.home());
+      const ex = exitToward(cs.region, to => to === LR.home(), cs.dragon.stage);
       return ex ? { pos: ex.pos, kind: 'route', route: ex.route } : null;
     }
     return null;                                                // 'self': she flies ahead, the hatchling follows
