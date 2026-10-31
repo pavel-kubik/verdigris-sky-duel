@@ -35,8 +35,9 @@
       dragon: {
         growth: round(G.growthValue(d.foodXp), 1e4), stage: d.stage, foodXp: round(d.foodXp, 100),
         hp: round(d.hp, 100), hunger: round(d.hunger, 100), deaths: d.deaths || 0, upgrades: [],
+        loot: cs.carriedLoot ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,   // T19: in the claws
       },
-      hoard: { gold: 0, relics: [] },
+      hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: [] },   // T19
       larder: cs.larder.map(it => ({ prey: it.type, food: round(it.food, 100) })),
       renown: 0,
       regions: Object.keys(D.regions).reduce((o, id) => {              // T12: discovered settlements (the rest of v2 in T22)
@@ -48,6 +49,8 @@
         const corn = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].corn) || []).filter(r => r && typeof r.id === 'string');
         if (corn.length) o[id].corn = corn.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));       // burned corn fields
         const rs = cs.regionStates && cs.regionStates[id];
+        const taken = ((rs && rs.lootTaken) || []).filter(r => r && typeof r.id === 'string');
+        if (taken.length) o[id].lootTaken = taken.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T19 (v2 shape, 5.9)
         if (rs && rs.heat > 0) {                                     // T17: alert heat with its play-time stamps (5.9)
           o[id].heat = round(rs.heat, 1000);
           if (typeof rs.lastIncident === 'number') o[id].lastIncident = round(rs.lastIncident, 10);
@@ -66,7 +69,8 @@
       },
       flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0 },
       stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
-               civilBurned: cs.stats.civilBurned || 0, orderBurned: cs.stats.orderBurned || 0, livestockTaken: cs.stats.livestockTaken || 0 },
+               civilBurned: cs.stats.civilBurned || 0, orderBurned: cs.stats.orderBurned || 0, livestockTaken: cs.stats.livestockTaken || 0,
+               lootBanked: cs.stats.lootBanked || 0 },
     };
   }
 
@@ -129,7 +133,13 @@
     const s = o.stats || {};
     cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0,
                  civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0,
-                 livestockTaken: num(s.livestockTaken) ? s.livestockTaken : 0 };
+                 livestockTaken: num(s.livestockTaken) ? s.livestockTaken : 0, lootBanked: num(s.lootBanked) ? s.lootBanked : 0 };
+    const h = o.hoard || {};                                     // T19: banked gold, never negative
+    cs.hoard = { gold: num(h.gold) ? Math.max(0, Math.floor(h.gold)) : 0, relics: Array.isArray(h.relics) ? h.relics.slice() : [] };
+    const dl = o.dragon.loot;                                    // T19: loot in the claws
+    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && D.regions[dl.region]
+      ? { id: dl.id, kind: dl.kind, gold: D.loot[dl.kind].gold, size: D.loot[dl.kind].size, region: dl.region } : null;
+    cs.lootTarget = null;
     cs.story = storyOf(o.story);
     cs.discovered = {}; cs.regionStates = {};
     for (const id of Object.keys(o.regions || {})) {
@@ -142,6 +152,10 @@
       if (D.regions[id] && r && Array.isArray(r.corn)) {           // burned corn fields, grow back corn.regrow s after `at`
         const corn = r.corn.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
         if (corn.length) (cs.regionStates[id] = cs.regionStates[id] || {}).corn = corn;
+      }
+      if (D.regions[id] && r && Array.isArray(r.lootTaken)) {      // T19: taken loot, back fire.rebuild s after `at`
+        const taken = r.lootTaken.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
+        if (taken.length) (cs.regionStates[id] = cs.regionStates[id] || {}).lootTaken = taken;
       }
       if (D.regions[id] && r && num(r.heat) && r.heat > 0) {        // T17: alert heat; decays from `at` on region load
         const q = cs.regionStates[id] = cs.regionStates[id] || {};

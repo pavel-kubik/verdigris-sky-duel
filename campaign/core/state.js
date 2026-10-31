@@ -37,12 +37,18 @@
  *        ballista with its crew on each platform (T16: aim line, bolt 'bolt:aim' / 'bolt:fire' / 'bolt:hit'); cs.watch is the same object), fed with this frame's noises; cs.light (null =
  *        day; T21's clock sets it) scales their sight. 'aware:state', 'bell:ring', 'arrow:hit' (HP, cancels a meal,
  *        death cause 'arrows'), 'defender:killed'. cs.danger = where archers shoot (the mother keeps out).
+ * Loot (T19, core/loot.js): cs.town.items = the tithe chests and strongboxes lying in front of their buildings; on the
+ *        ground Grab picks one up (cs.carriedLoot, the claw slot shared with prey: no prey while carrying it), carrying it
+ *        slows flight and walking (carry.speedMult) and a strongbox blocks the fire ('breath:blocked' why 'loot');
+ *        'loot:taken' raises the heat (alert.add.loot); lair.enter banks it into cs.hoard ('hoard:banked'), death loses it
+ *        ('loot:lost'); a taken item is back fire.rebuild s later (rs.lootTaken, 'loot:back'). cs.lootTarget = the item
+ *        Grab would pick up (gold ring).
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -77,6 +83,9 @@
       exitT: 0,
       exitSmall: null,               // T11: an exit the dragon is too small for (prompt "Too small for ..."), or null
       exitSmallT: 0,
+      hoard: { gold: 0, relics: [] }, // T19: banked gold (saved), the coin pile in the cave
+      carriedLoot: null,             // T19: { id, kind, gold, size, region } in the claws (shares the slot with prey), or null
+      lootTarget: null,              // T19: id of the loot item Grab would pick up on the ground (gold ring), or null
       landOk: false,                 // landing allowed right now (walk.canLand), the Move slot offers Land                      // seconds the offer stays after the dragon turns back from the edge
       saveT: 0,                      // seconds since the last autosave
       rng: (opts && opts.rng) || Math.random,
@@ -101,6 +110,7 @@
       const rs = cs.regionStates ? cs.regionStates[cs.region] : null;
       if (rs) AL.catchUp(rs, cs.stats.played, { towerDown: AL.towerDown(rs) });   // T17: the decay it missed while the dragon was away
       cs.town = SE.build(cs.region, rs);
+      cs.town.items = LT.place(cs.town, rs, cs.stats.played);    // T19: tithe chests and strongboxes
     }
     return cs.town;
   }
@@ -112,6 +122,7 @@
       const o = was.get(b.id);
       if (o) Object.assign(b, { hp: o.hp, heat: o.heat, fire: o.fire, ruin: o.ruin, ruinAt: o.ruinAt });
     }
+    town.items = old && old.region === cs.region && old.items ? old.items : LT.place(town, cs.regionStates[cs.region], cs.stats.played);   // T19: same items
     cs.town = town;
     return town;
   }
@@ -168,7 +179,8 @@
       return ev;
     }
     if (d.hp <= 0) return die(cs, ev, 'wounds');
-    const stats = G.statsOf(d.stage), eff = HN.effects(d.hunger), scale = scaleOf(cs), sol = solids(cs, scale);
+    const stats = G.statsOf(d.stage), hEff = HN.effects(d.hunger), eff = LT.effects(hEff, cs.carriedLoot), scale = scaleOf(cs), sol = solids(cs, scale);
+    const loaded = !!cs.carriedLoot;                             // T19: loot in the claws - no prey until it is banked
     let carried = carriedPrey(cs);
     if (!carried) d.carried = null;
     const eating = !!carried && !!inp.eat;
@@ -179,7 +191,8 @@
     if (inp.land) landToggle(cs, p, stats, eff, ev, sol);
     // Breath pressed but no fire (T08 feedback): say why once per press - starving (hunger.starving.breath) or the fire bar is empty
     if (inp.breath && !cs.breathHeld && (p.mode || 'air') !== 'landing' && p.mode !== 'takeoff') {
-      if (!eff.canBreath) emit(cs, ev, { e: 'breath:blocked', why: 'starving' });
+      if (!hEff.canBreath) emit(cs, ev, { e: 'breath:blocked', why: 'starving' });
+      else if (!eff.canBreath) emit(cs, ev, { e: 'breath:blocked', why: 'loot' });   // T19: a strongbox in the claws
       else if (p.st <= 8) emit(cs, ev, { e: 'breath:blocked', why: 'tired' });
     }
     cs.breathHeld = !!inp.breath;
@@ -187,7 +200,7 @@
 
     // swoop: holding grab with liftable prey ahead steers the dive onto it (aim assist for the claws)
     let fly = inp;
-    const target = !carried && air ? PR.swoopTarget(cs.field, p, stats, eff, scale) : null;
+    const target = !carried && !loaded && air ? PR.swoopTarget(cs.field, p, stats, eff, scale) : null;
     cs.target = target ? target.id : null;
     cs.swoop = inp.grab && target ? target.id : null;
     if (cs.swoop != null) {
@@ -248,6 +261,9 @@
       emit(cs, ev, { e: 'prey:dropped', type: carried.type });
       d.carried = null; d.eatT = 0; carried = null;
     }
+    if (cs.carriedLoot && cs.carriedLoot.size > limit) {        // T19: starving claws drop a strongbox where the dragon is
+      for (const e of LT.drop(cs, p.pos)) emit(cs, ev, e);
+    }
 
     // carried prey hangs under the claws in the air, in the jaws on the ground (the renderer draws it at the anchor)
     if (carried) carried.pos = air ? [p.pos[0], p.pos[1] - D.grab.clawDrop * scale - 1, p.pos[2]] : jawPos(p, scale);
@@ -255,21 +271,29 @@
     // grab
     cs.flags.heavyT = Math.max(0, cs.flags.heavyT - dt);
     const r = air ? PR.reach(cs.field, p, stats, eff, scale) : { best: null };
-    if (!carried && inp.grab && air) {
+    if (!carried && !loaded && inp.grab && air) {
       const g = PR.tryGrab(cs.field, p, stats, eff, scale);
       if (g.prey) { d.carried = g.prey.id; carried = g.prey; emit(cs, ev, { e: 'prey:grabbed', type: g.prey.type, id: g.prey.id }); }
       else if (g.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: g.heavy.type }); }
     }
     // pick up (T08): on the ground Grab takes the prey or roast in front of the head
-    const front = !carried && p.mode === 'ground' ? PR.inFront(cs.field, items => WK.inFront(p, scale, items), stats, eff) : { best: null };
-    if (!carried && inp.grab && p.mode === 'ground') {
-      if (front.best) {
+    const pick = items => WK.inFront(p, scale, items);
+    const lootFront = !carried && !loaded && p.mode === 'ground' ? LT.inFront(cs.town.items, pick, limit) : { best: null };   // T19: loot first
+    const front = !carried && !loaded && p.mode === 'ground' && !lootFront.best ? PR.inFront(cs.field, pick, stats, eff) : { best: null };
+    if (!carried && !loaded && inp.grab && p.mode === 'ground') {
+      if (lootFront.best) {
+        for (const e of LT.take(cs, lootFront.best, cs.stats.played)) emit(cs, ev, e);
+        lootFront.best = null;
+      } else if (front.best) {
         carried = PR.lift(cs.field, front.best); d.carried = carried.id; carried.pos = jawPos(p, scale);
         emit(cs, ev, { e: 'prey:grabbed', type: carried.type, id: carried.id, ground: true });
         front.best = null;
-      } else if (front.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: front.heavy.type }); }
+      } else if (lootFront.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'loot:tooHeavy', kind: lootFront.heavy.kind }); }
+      else if (front.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: front.heavy.type }); }
     }
     if (!air) cs.target = front.best ? front.best.id : null;      // the green ring marks what Grab would pick up
+    const lootNear = lootFront.best || lootFront.heavy;
+    cs.lootTarget = lootNear ? lootNear.id : null;
 
     // eat: hold for eat.time (ground.eatTime on the ground) while carrying; releasing restarts the meal
     if (carried && inp.eat && !hit && p.mode !== 'takeoff') {
@@ -309,7 +333,8 @@
     }
 
     cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt).ok;                // the Move slot offers Land (controls.slots)
-    if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
+    if (cs.carriedLoot) cs.hint = LR.near(cs) ? 'lairBank' : 'lootCarry';   // T19: take it home
+    else if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : lootFront.best ? 'lootGrab' : lootFront.heavy ? 'lootHeavy' : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
     else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
   }
@@ -339,6 +364,7 @@
       else if (e.e === 'bell:ring') inc('bell');
       else if (e.e === 'building:ruined' && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
       else if (e.e === 'defender:killed') inc('defenderKilled');
+      else if (e.e === 'loot:taken') inc('loot');                // T19: a tithe chest or strongbox taken
       else if ((e.e === 'prey:grabbed' || e.e === 'prey:roasted') && D.prey[e.type] && D.prey[e.type].livestock) {
         // T18: a sheep or cow taken (grabbed, or roasted where it stood) raises the heat once per animal
         const q = e.e === 'prey:grabbed' ? PR.byId(cs.field, e.id) : null;
@@ -386,6 +412,7 @@
       if (e.e === 'corn:burned') rs.corn = (rs.corn || []).filter(r => r.id !== e.id).concat([{ id: e.id, at: e.at }]);
       if (e.e === 'corn:regrown' && rs.corn) rs.corn = rs.corn.filter(r => r.id !== e.id);
     }
+    for (const e of LT.refill(town, rs, now, cs.carriedLoot && cs.carriedLoot.region === cs.region ? cs.carriedLoot.id : null)) emit(cs, ev, e);   // T19
     const blocked = b => SE.sd(b, p.pos[0], p.pos[2]).d < pad;  // never rebuild a house around the dragon
     for (const e of SE.rebuild(town, now, blocked)) {
       emit(cs, ev, e);

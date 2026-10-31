@@ -10,7 +10,7 @@
  *   stationAt(cs) -> id | null     the nearest station in reach (radius + reach x scale ^ 0.5)
  *   step(cs, input, dt) -> events  walk.step on the flat floor, clamp to the walls, cs.station; walking out of the
  *                                  tunnel (z > tunnel.out) leaves the lair (lair.leave, events tagged via: 'tunnel')
- *   act(cs, id, arg) -> events     nest: rest; larder: eat item arg; exit: leave (lair.js does the rules)
+ *   act(cs, id, arg) -> events     nest: rest; larder: eat item arg; exit: leave (lair.js does the rules); hoard (T19): none
  *   inside(p, pad) -> bool         a point inside the dome or the tunnel, pad away from the rock
  *   camera(pos, yaw, scale) -> { pos, look }   chase camera that never leaves the dome / tunnel
  * state.step runs step() while cs.inLair; hunger, prey and the mother are paused, the larder spoils (lair.spoil).
@@ -87,6 +87,7 @@
     if (id === 'nest') return LR.rest(cs).events;
     if (id === 'larder') return LR.eatFromLarder(cs, arg | 0);
     if (id === 'exit') { cs.station = null; return LR.leave(cs); }
+    if (id === 'hoard') return [];                               // T19: the panel only shows the gold (the altar of T20 spends it)
     return [];
   }
 
