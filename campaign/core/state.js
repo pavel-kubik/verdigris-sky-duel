@@ -3,7 +3,8 @@
  *   create({ regionId, rng }) -> cs
  *   enterRegion(cs, regionId, pilotPos?, yaw?)   new prey field (+ pilot placement)
  *   step(cs, input, dt) -> events[]               flight -> hunger -> prey -> grab -> eat -> lair -> region
- *                                                 (inside the lair only the larder spoils; lair.js handles the panel actions)
+ *                                                 (inside the lair the dragon walks in the cave hall, core/cave.js T10, and
+ *                                                 the larder spoils; the station panels call caveAct / lair*)
  *                                                 HP at 0 (a boar's charge, debug damage) -> death: lair.respawn
  *                                                 then the mother (core/mother.js, T05) reads the frame's events
  *                                                 and nav.step (T09) re-reads the scents for the compass (cs.nav)
@@ -21,7 +22,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), CV = M.need('cave');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -37,7 +38,8 @@
       },
       field: null,
       larder: [],                    // stored prey in the lair: { type, food }
-      inLair: false,
+      inLair: false,                 // inside the cave (T10: the dragon walks in the hall, core/cave.js); location reads it
+      station: null,                 // T10: the cave station in reach ('nest' | 'larder' | 'exit'), the Action slot / E
       flags: { introSeen: false, heavyT: 0 },
       stats: { played: 0, eaten: 0, food: 0 },
       nav: null,                     // compass and smell (core/nav.js, T09): { t, next, scents, range }, not saved
@@ -55,6 +57,7 @@
       rng: (opts && opts.rng) || Math.random,
       bus: createBus(),
     };
+    Object.defineProperty(cs, 'location', { get() { return this.inLair ? 'cave' : 'field'; }, enumerable: false });
     enterRegion(cs, regionId);
     return cs;
   }
@@ -66,7 +69,7 @@
     if (pos) cs.dragon.pilot = F.newPilot(pos, yaw || 0, G.statsOf(cs.dragon.stage).cruise);
   }
 
-  const scaleOf = cs => G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);
+  const scaleOf = cs => cs.debugScale || G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);   // debugScale: ?debug B (Elder size test, T10)
   const carriedPrey = cs => (cs.dragon.carried == null ? null : PR.byId(cs.field, cs.dragon.carried));
 
   function emit(cs, ev, e) { ev.push(e); cs.bus.emit(e.e, e); }
@@ -98,7 +101,11 @@
   function run(cs, inp, dt, ev) {
     const d = cs.dragon, p = d.pilot;
     for (const e of LR.spoil(cs, dt)) emit(cs, ev, e);
-    if (cs.inLair) { cs.stats.played += dt; return ev; }       // resting: hunger, prey and flight are paused
+    if (cs.inLair) {                                            // in the cave (T10): walking only; hunger, prey and flight are paused
+      cs.stats.played += dt;
+      for (const e of CV.step(cs, inp, dt)) emit(cs, ev, e);
+      return ev;
+    }
     if (d.hp <= 0) return die(cs, ev, 'wounds');
     const stats = G.statsOf(d.stage), eff = HN.effects(d.hunger), scale = scaleOf(cs);
     let carried = carriedPrey(cs);
@@ -278,6 +285,8 @@
   const lairRest = cs => autosave(cs, relay(cs, LR.rest(cs).events), 0);
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
+  /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave. */
+  const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave });
+  M.define('state', { create, enterRegion, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
 })(typeof self !== 'undefined' ? self : this);

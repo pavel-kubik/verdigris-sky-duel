@@ -46,8 +46,9 @@ ok(D.lair.respawnHp === 0.5 && D.lair.respawnHunger === 40, 'respawn tunables in
   const order = ev.map(e => e.e).filter(e => e === 'dragon:died' || e === 'region:enter' || e === 'lair:enter');
   ok(order.join() === 'dragon:died,region:enter,lair:enter', 'events in order: died, region swap, lair: ' + order.join());
   ok(ev.find(e => e.e === 'region:enter').respawn === true && ev.find(e => e.e === 'lair:enter').respawn === true, 'swap and lair events marked as respawn');
-  const m = LR.mouthPos('ash'), p = d.pilot;
-  ok(Math.hypot(p.pos[0] - m[0], p.pos[1] - m[1], p.pos[2] - m[2]) < 1e-9 && Number.isFinite(p.speed), 'pilot placed at the cave mouth');
+  const nest = D.cave.stations.nest, p = d.pilot;
+  ok(p.mode === 'ground' && Math.hypot(p.pos[0] - nest[0], p.pos[2] - nest[1]) < nest[2] && Number.isFinite(p.speed), 'T10: wakes standing on the nest in the cave');
+  ok(cs.station === 'nest' && cs.location === 'cave', 'the nest station is in reach');
   ok(cs.field.list.every(q => T.region('ash').herds.some(h => h.type === q.type)), 'Ash Wastes prey field after the swap');
 }
 
