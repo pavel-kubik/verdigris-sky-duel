@@ -47,6 +47,12 @@
         if (ruins.length) o[id].ruins = ruins.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T13 (v2 shape, 5.9)
         const corn = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].corn) || []).filter(r => r && typeof r.id === 'string');
         if (corn.length) o[id].corn = corn.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));       // burned corn fields
+        const rs = cs.regionStates && cs.regionStates[id];
+        if (rs && rs.heat > 0) {                                     // T17: alert heat with its play-time stamps (5.9)
+          o[id].heat = round(rs.heat, 1000);
+          if (typeof rs.lastIncident === 'number') o[id].lastIncident = round(rs.lastIncident, 10);
+          if (typeof rs.at === 'number') o[id].at = round(rs.at, 10);
+        }
         return o;
       }, {}),
       missions: { completed: [], active: null },
@@ -135,6 +141,12 @@
       if (D.regions[id] && r && Array.isArray(r.corn)) {           // burned corn fields, grow back corn.regrow s after `at`
         const corn = r.corn.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
         if (corn.length) (cs.regionStates[id] = cs.regionStates[id] || {}).corn = corn;
+      }
+      if (D.regions[id] && r && num(r.heat) && r.heat > 0) {        // T17: alert heat; decays from `at` on region load
+        const q = cs.regionStates[id] = cs.regionStates[id] || {};
+        q.heat = Math.min(D.alert.maxHeat, r.heat);
+        if (num(r.lastIncident)) q.lastIncident = r.lastIncident;
+        if (num(r.at)) q.at = r.at;
       }
     }
     cs.town = null; cs.crops = null;                             // rebuilt with the loaded ruins (state.ensureTown)

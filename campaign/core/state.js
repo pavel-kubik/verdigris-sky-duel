@@ -26,6 +26,10 @@
  *        stats.civilBurned / orderBurned count burned buildings (future Renown, alert in T17).
  * Corn (Pavel's request): cs.crops = crops.build of the region's corn fields; the breath sets them alight, a fire front
  *        pops the corn (popcorn drawn by render/corn-view.js), burned fields are in cs.regionStates[region].corn (saved).
+ * Alert (T17): cs.regionStates[region] { heat, lastIncident, at } (core/alert.js): sightings (once per settlement and
+ *        alarm), bells, burned buildings, killed defenders and taken livestock raise it, quiet lowers it, also while away
+ *        (catch-up in ensureTown); 'alert:level' { level, from, region }; the squad follows the level (extra archers,
+ *        patrols, faster bell; 'defenders:reinforced'), alert 3 adds the village platform (refreshTown).
  * Perception (T14) and defenders (T15): cs.squad = defenders.spawn of the town (peasants, archers on the towers, a
  *        ballista with its crew on each platform (T16: aim line, bolt 'bolt:aim' / 'bolt:fire' / 'bolt:hit'); cs.watch is the same object), fed with this frame's noises; cs.light (null =
  *        day; T21's clock sets it) scales their sight. 'aware:state', 'bell:ring', 'arrow:hit' (HP, cancels a meal,
@@ -35,7 +39,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -90,8 +94,23 @@
 
   /** cs.town for the current region (T12); region.enter and save.apply only switch cs.region. */
   function ensureTown(cs) {
-    if (!cs.town || cs.town.region !== cs.region) cs.town = SE.build(cs.region, cs.regionStates ? cs.regionStates[cs.region] : null);
+    if (!cs.town || cs.town.region !== cs.region) {
+      const rs = cs.regionStates ? cs.regionStates[cs.region] : null;
+      if (rs) AL.catchUp(rs, cs.stats.played, { towerDown: AL.towerDown(rs) });   // T17: the decay it missed while the dragon was away
+      cs.town = SE.build(cs.region, rs);
+    }
     return cs.town;
+  }
+  /** T17: rebuild the town of the current region (alert 3 adds the village platform), keeping fire, hp and ruins. */
+  function refreshTown(cs) {
+    const old = cs.town, town = SE.build(cs.region, cs.regionStates[cs.region]);
+    const was = new Map(((old && old.region === cs.region && old.buildings) || []).map(b => [b.id, b]));
+    for (const b of town.buildings) {
+      const o = was.get(b.id);
+      if (o) Object.assign(b, { hp: o.hp, heat: o.heat, fire: o.fire, ruin: o.ruin, ruinAt: o.ruinAt });
+    }
+    cs.town = town;
+    return town;
   }
   /** cs.crops for the current region (corn fields, core/crops.js), rebuilt on a region change or a load. */
   function ensureCrops(cs) {
@@ -116,6 +135,7 @@
     ensureTown(cs);
     run(cs, inp, dt, ev);
     defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
+    alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
     for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);
@@ -304,6 +324,29 @@
     }
   }
 
+  /** Alert (T17): this frame's incidents -> heat of the current region (alert.add), decay (alert.step), the
+   *  responses follow the level (defenders.step respawns the squad, the village platform at alert 3). */
+  function alertStep(cs, ev, dt) {
+    const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {}, now = cs.stats.played, sq = cs.squad;
+    const out = [];
+    const inc = kind => { for (const e of AL.add(rs, kind, now)) out.push(e); };
+    for (const e of ev) {
+      if (e.e === 'aware:state' && e.state === 'alert' && sq && !sq.alarmed[e.place || '']) { sq.alarmed[e.place || ''] = true; inc('sighted'); }
+      else if (e.e === 'bell:ring') inc('bell');
+      else if (e.e === 'building:ruined' && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
+      else if (e.e === 'defender:killed') inc('defenderKilled');
+      else if (e.e === 'prey:grabbed' && D.prey[e.type] && D.prey[e.type].livestock) inc('livestock');   // T18 brings the sheep and cows
+    }
+    if (sq) {                                                    // a settlement whose defenders are all idle again can be alarmed anew
+      const busy = {};
+      for (const d of sq.list) if (d.alive && d.state !== 'idle') busy[d.place] = true;
+      for (const k in sq.alarmed) if (!busy[k]) delete sq.alarmed[k];
+    }
+    for (const e of AL.step(rs, dt, now, { towerDown: AL.towerDown(cs.town) })) out.push(e);
+    for (const e of out) emit(cs, ev, Object.assign(e, { region: cs.region, heat: rs.heat }));
+    if (cs.town && cs.town.alert3 !== SE.alert3On(rs)) refreshTown(cs);
+  }
+
   /** Building fire (T13): burn under the breath, spread, ruins (stats, region state), rebuild after fire.rebuild. */
   function fireStep(cs, dt, ev, scale) {
     const town = ensureTown(cs), now = cs.stats.played, p = cs.dragon.pilot, pad = D.settlement.pad * (scale || 1);
@@ -368,5 +411,5 @@
   /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave. */
   const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, ensureTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
+  M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
 })(typeof self !== 'undefined' ? self : this);

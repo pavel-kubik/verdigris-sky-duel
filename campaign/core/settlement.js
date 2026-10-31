@@ -5,7 +5,8 @@
  *       town: { region, places: [{ id, type, x, z, yaw, y, r }], buildings: [{ id, place, type, pos, yaw, r, h, hp,
  *               fire, ruin, ruinAt, seg? }], pens: [{ id, place, type, pos, r, count }], posts: [{ kind, building, pos }] }
  *       palisade pieces carry seg [x0, z0, x1, z1] (a capsule of data.palisade.radius); everything else is a cylinder.
- *       regionState (T13 / T22): { ruins: [{ id, at }] } marks those buildings as ruins.
+ *       regionState (T13 / T22): { ruins: [{ id, at }] } marks those buildings as ruins; { heat } (T17): the template's
+ *       alert3 buildings (the village ballista platform) stand only at alert 3 (town.alert3 = true).
  *   solidAt(town, x, z, pad?) -> roofHeight | null   the highest roof whose footprint (+ pad) covers (x, z)
  *   hit(town, x, z, pad?) -> { b, roof, nx, nz, depth } | null   the solid the point is deepest inside: push out along
  *                                           (nx, nz) by depth to stand clear of it (flight and walk collisions)
@@ -68,6 +69,10 @@
         const b = add(type, lx + Math.cos(a) * j, lz + Math.sin(a) * j);
         b.yaw = wrap(b.yaw + (rng() * 2 - 1) * S.jitterYaw);
       }
+      for (const [type, lx, lz] of (tpl.alert3 && tpl.alert3.buildings) || []) {   // T17: built at alert 3 only (build drops them below)
+        const b = add(type, lx, lz, { alert3: true });
+        b.yaw = wrap(b.yaw + (rng() * 2 - 1) * S.jitterYaw);
+      }
       if (tpl.ring) {                            // palisade: pieces round the centre, a gate gap at local +Z
         const [r, gate] = tpl.ring, P = D.palisade, n = Math.max(6, Math.ceil(2 * Math.PI * r / P.piece)), half = gate / 2 / r;
         for (let i = 0; i < n; i++) {
@@ -94,12 +99,23 @@
     return out;
   }
 
+  /** T17: the region's alert level reaches a level whose response has villageBallista (data.alert.responses). */
+  function alert3On(rs) {
+    const A = D.alert, h = rs && typeof rs.heat === 'number' ? rs.heat : 0, lv = Math.min(A.maxLevel, Math.floor(h));
+    for (let i = 1; i <= lv; i++) if (A.responses[i] && A.responses[i].villageBallista) return true;
+    return false;
+  }
+
   function build(regionId, rs) {
     const L = layout(regionId);
     const ruins = {};
     for (const r of (rs && rs.ruins) || []) if (r && r.id) ruins[r.id] = r.at || 0;
-    const buildings = L.buildings.map(b => Object.assign({}, b, {
+    const on = alert3On(rs), keep = L.buildings.map(b => !b.alert3 || on), map = [];
+    let n = 0;
+    keep.forEach((k, i) => { map[i] = k ? n++ : -1; });
+    const buildings = L.buildings.filter((b, i) => keep[i]).map(b => Object.assign({}, b, {
       pos: b.pos.slice(), hp: D.buildings[b.type].hp, heat: 0, fire: 0, ruin: b.id in ruins, ruinAt: b.id in ruins ? ruins[b.id] : null,
+      nb: (b.nb || []).filter(j => keep[j]).map(j => map[j]),
     }));
     const posts = [];
     for (const b of buildings) {
@@ -107,7 +123,7 @@
       if (post) posts.push({ kind: post, building: b.id, pos: [b.pos[0], b.pos[1] + b.h, b.pos[2]] });
     }
     return {
-      region: regionId,
+      region: regionId, alert3: on,
       places: L.places.map(p => Object.assign({}, p)),
       buildings, posts,
       pens: L.pens.map(p => Object.assign({}, p, { pos: p.pos.slice() })),
@@ -239,5 +255,5 @@
     return best;
   }
 
-  M.define('settlement', { build, solidAt, hit, near, layout, placeIds, burn, rebuild, inFire, sd });
+  M.define('settlement', { build, alert3On, solidAt, hit, near, layout, placeIds, burn, rebuild, inFire, sd });
 })(typeof self !== 'undefined' ? self : this);
