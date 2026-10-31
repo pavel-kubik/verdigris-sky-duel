@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't116.1 2026-10-31 ballista (aim line, bolt, reload, crew; debug = to ballista)';
+  const BUILD = 't117.1 2026-10-31 region alert (heat, pips, extra archers, patrols, village ballista at 3; debug = alert +1 / calm alert)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -74,6 +74,7 @@
     preyView = VRender.prey.build();
     scene.add(preyView.group);
     townView = VRender.settlements.build(ST.ensureTown(cs));         // T12: buildings and pens of the region
+    townView.town = cs.town;
     scene.add(townView.group);
     scene.fog.color.set(region.fog); caveOn = null;
     const u = sky.material.uniforms;
@@ -634,9 +635,19 @@
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0) $('#hint').hidden = true; }
     if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
     promptHud(dt);
+    alertHud(dt);
     if (stationOpen && cs.station !== stationOpen) closeStation();   // walked away from the station
     if (stationOpen && (lairTick -= dt) <= 0) { lairTick = 0.5; renderLair(); }
     if (lairMsgT > 0 && (lairMsgT -= dt) <= 0) $('#lairMsg').textContent = '';
+  }
+  /** T17: alert pips under the region name (0-3 lit), shown where the region has settlements or any heat. */
+  const alertRow = $('#alertRow'), alertPips = [...alertRow.querySelectorAll('i')];
+  let alertShown = -1, alertPulse = 0;
+  function alertHud(dt) {
+    const rs = cs.regionStates[cs.region], lv = AL.level(rs), has = !!(cs.town && cs.town.places.length) || lv > 0;
+    alertRow.hidden = !has || state === 'intro';
+    if (lv !== alertShown) { alertPips.forEach((p, i) => p.classList.toggle('on', i < lv)); alertShown = lv; }
+    if (alertPulse > 0) { alertRow.classList.add('pulse'); if ((alertPulse -= dt || 0.016) <= 0) alertRow.classList.remove('pulse'); }
   }
   const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
@@ -644,6 +655,12 @@
     for (const e of ev) {
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
       else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
+      else if (e.e === 'alert:level') {                          // T17: the region's alert level changed
+        const rn = t(TR.region(e.region).nameKey);
+        if (e.level > e.from) toast(t('c.toast.alertUp', { region: rn }), t(['c.toast.alertSub1', 'c.toast.alertSub2', 'c.toast.alertSub3'][Math.min(3, e.level) - 1]), 3.2);
+        else flashPrompt(t(e.level ? 'c.prompt.alertDown' : 'c.prompt.alertCalm', { region: rn, n: e.level }), 2.5);
+        alertPulse = 2;
+      }
       else if (e.e === 'bell:ring') toast(t('c.toast.bell', { place: t('c.place.' + (cs.town.places.find(p => p.id === e.place) || {}).type) }), t('c.toast.bellSub'), 2.8);
       else if (e.e === 'defender:killed' && e.kind === 'archer') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.archerFell' : 'c.prompt.archerBurned'), 1.8);
       else if (e.e === 'defender:killed' && e.kind === 'ballista') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.ballistaFell' : 'c.prompt.crewBurned'), 2.2);
@@ -868,6 +885,8 @@
     ['7', 'show / hide the sight of the watching posts (fans, ? and !)', 'Digit7', 'sight'],
     ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
     ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
+    ['X', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'KeyX', 'alert +1'],
+    ['G', 'alert to 0 in this region', 'KeyG', 'calm alert'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
@@ -970,6 +989,12 @@
         snapCam(); flashPrompt(t('c.dbg.corn'), 1.5);
       }
     }
+    if (code === 'KeyX' || code === 'KeyG') {                     // T17: alert level test
+      const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {}, now = cs.stats.played;
+      if (code === 'KeyX') onEvents(AL.add(rs, 'debug', now, Math.min(D.alert.maxHeat, Math.floor(rs.heat || 0) + 1) - (rs.heat || 0)).map(e => Object.assign(e, { region: cs.region })));
+      else { const from = AL.level(rs); rs.heat = 0; rs.lastIncident = now; if (from) onEvents([{ e: 'alert:level', level: 0, from, region: cs.region }]); }
+      flashPrompt(t('c.dbg.alert', { n: AL.level(rs) }), 1.5);
+    }
     if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
     if (code === 'Equal' && !cs.inLair) {                        // T16: cross the front of the next ballista, already seen
       const list = ((cs.squad && cs.squad.list) || []).filter(v => v.kind === 'ballista' && v.alive);
@@ -1055,6 +1080,10 @@
     motherArrow();
     compassHud(dt);
     preyView.update(cs.field, time, carryPose());
+    if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
+      scene.remove(townView.group); townView.dispose();
+      townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
+    }
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
       if (cornView) { scene.remove(cornView.group); cornView.dispose(); }
@@ -1159,6 +1188,8 @@
           L.push('CORN    fields ' + cl.length + '  burning ' + cl.filter(c => c.burn).length + '  burned ' + cl.filter(c => c.burnedAt != null).length + '  stalks ' + (ci ? ci.stalks : 0) + '  popcorn ' + (ci ? ci.popcorn : 0)); }
         L.push('FIRE    burning ' + (ti ? ti.burning : 0) + '  ruins ' + (ti ? ti.ruins : 0) + '  burned civil ' + (cs.stats.civilBurned || 0) + ' order ' + (cs.stats.orderBurned || 0) + '  lights ' + fireLights.filter(L => L.intensity > 0).length);
         L.push('TOWNS   ' + (ti ? ti.buildings + ' buildings' : '-') + '  near ' + (near ? near.id + ' ' + Math.round(Math.hypot(near.x - pilot.pos[0], near.z - pilot.pos[2])) : '-') + '  found ' + (Object.keys(cs.discovered || {}).join(', ') || '-')); }
+      { const rs = cs.regionStates[cs.region] || {}, r = AL.responses(AL.level(rs)), q = Math.max(0, D.alert.quiet - (cs.stats.played - (rs.lastIncident == null ? -1e9 : rs.lastIncident)));
+        L.push('ALERT   heat ' + f2(rs.heat || 0) + '  level ' + AL.level(rs) + (q > 0 ? '  quiet in ' + Math.ceil(q) + ' s' : '  decaying') + (AL.towerDown(cs.town) ? ' x' + D.alert.towerDownMult + ' (tower down)' : '') + '  +archers ' + r.extraArchers + '  patrols ' + ((cs.squad && cs.squad.list.filter(d => d.patrol && d.alive).length) || 0) + (cs.town && cs.town.alert3 ? '  VILLAGE BALLISTA' : '')); }
       { const wl = (cs.watch && cs.watch.list) || [];
         let wn = null, wd = Infinity;
         for (const v of wl) { const d = Math.hypot(v.pos[0] - pilot.pos[0], v.pos[2] - pilot.pos[2]); if (d < wd) { wd = d; wn = v; } }

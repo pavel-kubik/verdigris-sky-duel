@@ -67,7 +67,7 @@ p{margin:0;color:var(--mute);line-height:1.45}
 .bar.starving #hgFill{background:var(--blood)}
 .bar.starving .track{animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{50%{box-shadow:inset 0 0 0 1px var(--blood),0 0 10px rgba(229,72,79,.6)}}
-#stageRow{display:inline-flex;gap:6px;align-items:center;justify-content:center;margin-top:4px}
+#stageRow{display:flex;width:max-content;margin-inline:auto;gap:6px;align-items:center;justify-content:center;margin-top:4px}
 #stageRow small{font-family:var(--f-ui);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:600}
 #growRing{width:14px;height:14px;border-radius:50%;--p:0;background:conic-gradient(var(--verd) calc(var(--p) * 1turn),rgba(233,225,204,.16) 0);box-shadow:0 0 0 1px var(--line)}
 #growRing.ready{background:var(--verd);box-shadow:0 0 8px var(--verd)}
@@ -83,6 +83,12 @@ p{margin:0;color:var(--mute);line-height:1.45}
 #toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-family:var(--f-display);font-size:clamp(28px,5vw,46px);text-shadow:0 2px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s;padding-inline:16px;width:min(720px,100%)}
 #toast small{display:block;font-family:var(--f-ui);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-top:6px}
 #regionName{text-align:center;font-family:var(--f-display);font-size:26px;line-height:1;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+#alertRow{display:flex;gap:5px;align-items:center;justify-content:center;margin-top:5px}
+#alertRow[hidden]{display:none}
+#alertRow i{width:16px;height:6px;border-radius:2px;border:1px solid rgba(229,72,79,.55);background:rgba(12,19,16,.45)}
+#alertRow i.on{background:var(--blood);border-color:var(--blood);box-shadow:0 0 6px rgba(229,72,79,.55)}
+#alertRow.pulse i.on{animation:alertPulse .5s ease-in-out 4}
+@keyframes alertPulse{50%{transform:scaleY(1.8);box-shadow:0 0 12px rgba(229,72,79,.95)}}
 #pauseBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(620px,70vw);font-size:12px;color:var(--mute);pointer-events:none}
 kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin-right:4px;background:rgba(12,19,16,.5)}
@@ -186,7 +192,7 @@ h2{font-size:42px}
     <div class="bar"><span data-i18n="hud.fire">Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
     <div class="bar" id="hgBar"><span data-i18n="c.hud.hunger">Hunger</span><div class="track"><div class="fill" id="hgFill"></div></div></div>
   </div>
-  <div id="regionName"><span id="regionText">-</span><br><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span></div>
+  <div id="regionName"><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span></div>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
 </div>
 <div id="legend" hidden>
