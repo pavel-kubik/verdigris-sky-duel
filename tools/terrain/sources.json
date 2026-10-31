@@ -1,0 +1,13 @@
+{
+  "N50E014": {
+    "what": "Sonny's LiDAR Digital Terrain Model of Europe, 1 arc second (~30 m), tile N50E014 (50-51 N, 14-15 E), SRTM .hgt format (3601 x 3601 big-endian int16, metres)",
+    "basedOn": "ČÚZK DMR 5G (Czech Office for Surveying, Mapping and Cadastre), open data",
+    "licence": "CC BY 4.0 - credit: 'Terrain: ČÚZK (DMR 5G) via Sonny's LiDAR DTM Europe'",
+    "homepage": "https://sonny.4lima.de/",
+    "url": "https://media.githubusercontent.com/media/pandasoft-zz/CzechTouristMap/main/terrain/sonny/N50E014.zip",
+    "zipSha256": "33bbd3677cd254945cb18ff4886e793f6c053cb6217edce12c6eae8b0c941a0d",
+    "hgt": "N50E014.hgt",
+    "hgtSha256": "b92082e8053d0e28d44aafb4070466a246eaa5c76b08a50f286faa5fd6f013a9",
+    "fetched": "2026-10-31"
+  }
+}
