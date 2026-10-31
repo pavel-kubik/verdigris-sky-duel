@@ -358,7 +358,7 @@
           sq.rung[d.place] = E.ringCool;
           out.push({ e: 'bell:ring', place: d.place, pos: bell.pos.slice(), id: d.id });
           for (const o of sq.list) if (o.alive && o.place === d.place) {
-            o.aware = D.perception.alert; if (o.state !== 'alert') { out.push({ e: 'aware:state', id: o.id, kind: o.kind, state: 'alert', from: o.state }); o.state = 'alert'; }
+            o.aware = D.perception.alert; if (o.state !== 'alert') { out.push({ e: 'aware:state', id: o.id, kind: o.kind, place: o.place, state: 'alert', from: o.state }); o.state = 'alert'; }
             o.search = 0; if (p && !cs.inLair) o.focus = p.pos.slice();
           }
         }
@@ -458,7 +458,7 @@
       if (d.panic && now === 'idle') now = 'search';
       d.state = now;
       if (now === 'idle') d.focus = null;
-      if (now !== was) out.push({ e: 'aware:state', id: d.id, kind: d.kind, state: now, from: was });
+      if (now !== was) out.push({ e: 'aware:state', id: d.id, kind: d.kind, place: d.place, state: now, from: was });
       if (d.patrol) patrolStep(sq, d, dt);
       if (d.kind === 'peasant') peasant(sq, d, cs, dt, out); else archer(sq, d, cs, dt, out);
     }
