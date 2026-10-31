@@ -35,7 +35,7 @@
     for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; dirs.push([Math.sin(a), Math.cos(a)]); }
     if (pl) dirs.sort((u, v) => Math.hypot(b.pos[0] + u[0] * d - pl.x, b.pos[2] + u[1] * d - pl.z) - Math.hypot(b.pos[0] + v[0] * d - pl.x, b.pos[2] + v[1] * d - pl.z));
     cand.push(...dirs);
-    const ok = ([dx, dz]) => SE.solidAt(town, b.pos[0] + dx * d, b.pos[2] + dz * d, L.clear) == null;
+    const ok = ([dx, dz]) => town.buildings.every(o => o === b || SE.sd(o, b.pos[0] + dx * d, b.pos[2] + dz * d).d >= L.clear);   // other solids
     const [dx, dz] = cand.find(ok) || cand[0];
     const x = b.pos[0] + dx * d, z = b.pos[2] + dz * d;
     return [x, T.surfaceAt(town.region, x, z), z];
