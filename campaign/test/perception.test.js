@@ -147,12 +147,12 @@ const viewer = (o) => Object.assign({ pos: [0, 0, 0], yaw: 0, sight: 130, fov: 1
   // night: the same spot at 120 out is beyond sight
   const far = [w.pos[0] + Math.sin(w.base) * 120, 0, w.pos[2] + Math.cos(w.base) * 120];
   far[1] = T.surfaceAt('wild', far[0], far[2]) + 25;
-  cs.light = 'night';
+  core('clock').setPhase(cs, 'night');                         // T21: the clock sets cs.light every step
   for (let i = 0; i < 60; i++) { pilot.pos = far.slice(); pilot.speed = 0; S.step(cs, {}, 0.05); }
   ok(w.seen === 0 && w.state === 'idle', 'at night the post does not see the dragon 120 out');
   // a ruined tower has no watcher eyes
   tw.ruin = true;
-  cs.light = null;
+  core('clock').setPhase(cs, 'day');
   for (let i = 0; i < 20; i++) { pilot.pos = at.slice(); S.step(cs, {}, 0.05); }
   ok(w.state === 'idle' && w.seen === 0 && !w.alive, 'a ruined tower watches nothing (its archers fell)');
 }

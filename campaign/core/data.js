@@ -250,6 +250,24 @@
       guard_sight:    { cost: 300, effect: { showCones: true } },
     },
 
+    /* Day and night (Phase 2 T21, core/clock.js + render/sky.js; 002_task_kingdom.md 4.6). t 0..1, 0 = midnight, 0.5 = noon;
+       a full cycle takes dayLength s of play (20 min). A new run starts at `start` (morning). Light ramps up from nightTo to
+       2 x dawn - nightTo and down from 2 x dusk - nightFrom to nightFrom (dawn and dusk are the middles: 8 min day, 2 min
+       dusk, 8 min night, 2 min dawn). The defenders' sight = perception.night + (1 - perception.night) x light (night
+       0.45: about half the day range). The nest's "Sleep until dusk / dawn" moves t forward to dusk / dawn.
+       look (render/sky.js): night colours of the sky dome (top, mid, bot), the fog, the hemisphere light (sky, ground)
+       and the moon light; dusk tints the horizon and the fog toward `dusk`. Intensities by day come from the scene
+       (hemi 0.85, sun 1.3, rim 0.35); by night hemi x hemiNight, the moon at moon intensity, rim x rimNight, so the
+       terrain and the stick area stay readable on a phone. sunElev: sun height over the horizon at dawn / noon. */
+    clock: {
+      dayLength: 1200, start: 0.3, dusk: 0.75, dawn: 0.25, nightFrom: 0.8, nightTo: 0.2,
+      look: {
+        night: { top: 0x060b18, mid: 0x111b30, bot: 0x223049, fog: 0x172236, hemiSky: 0x6d84b8, hemiGround: 0x1c1a26 },
+        dusk: 0xd2683c, moon: { color: 0xa9bce8, intensity: 0.55 }, hemiNight: 0.62, rimNight: 0.7,
+        sunElev: [0.05, 0.42], stars: 0.9,
+      },
+    },
+
     corn: { crop: 4, height: 3.2, ignite: 0.4, cool: 0.5, spread: 5, band: 6, regrow: 600 },
     popcorn: { pool: 1200, rate: 1.2, maxRate: 160, up: [9, 20], side: 5, gravity: 18, life: 6, size: 1.4 },
 

@@ -46,12 +46,15 @@
  * Upgrades (T20, core/upgrades.js): cs.upgrades (bought at the cave altar, caveAct 'altar' autosaves); upgrades.effects
  *        scales stamina (apply), roasting (prey.cook), building fire (settlement.burn mult), arrow / bolt damage (defend),
  *        smell (nav); the renderer reads preyHighlight and showCones.
+ * Day and night (T21, core/clock.js): cs.clock = { t } runs first in every step (also in the cave) and sets cs.light =
+ *        clock.sight (the defenders' sight multiplier, night about half); 'clock:phase' { phase, from } on a change.
+ *        The nest's Sleep until dusk / dawn = caveAct(cs, 'nest', 'dusk' | 'dawn'): rest, then clock.sleepTo ('clock:slept').
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -92,6 +95,8 @@
       lootTarget: null,              // T19: id of the loot item Grab would pick up on the ground (gold ring), or null
       landOk: false,                 // landing allowed right now (walk.canLand), the Move slot offers Land                      // seconds the offer stays after the dragon turns back from the edge
       saveT: 0,                      // seconds since the last autosave
+      clock: CK.create(),            // T21: time of day { t } (core/clock.js); cs.light follows it
+      light: null,                   // T14 / T21: defenders' sight multiplier from the clock (null = day before the first step)
       rng: (opts && opts.rng) || Math.random,
       bus: createBus(),
     };
@@ -151,6 +156,7 @@
     const ev = [];
     if (!cs.dragon.pilot) return ev;
     ensureTown(cs);
+    for (const e of CK.step(cs, dt)) emit(cs, ev, e);           // T21: time of day first; sets cs.light for the defenders
     run(cs, inp, dt, ev);
     defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
     alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
@@ -461,11 +467,16 @@
 
   /** Lair panel actions (game.js buttons); each returns events and emits them on the bus. */
   const relay = (cs, list) => { const ev = []; for (const e of list) emit(cs, ev, e); for (const e of MO.step(cs, ev, 0)) emit(cs, ev, e); return ev; };
-  const lairRest = cs => autosave(cs, relay(cs, LR.rest(cs).events), 0);
+  /** Rest at the nest; sleep 'dusk' | 'dawn' (T21) also moves the clock forward to it ('clock:slept'). */
+  const lairRest = (cs, sleep) => {
+    const list = LR.rest(cs).events;
+    if (sleep === 'dusk' || sleep === 'dawn') list.push(...CK.sleepTo(cs, sleep).events);
+    return autosave(cs, relay(cs, list), 0);
+  };
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
-  /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave; altar (T20) = buy upgrade arg (autosaves). */
-  const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : id === 'altar' ? autosave(cs, relay(cs, CV.act(cs, id, arg)), 0) : relay(cs, CV.act(cs, id, arg)));
+  /** Cave station action (T10): nest = rest (arg 'dusk' | 'dawn': sleep until then, T21; autosaves), larder = eat item arg, exit = leave; altar (T20) = buy upgrade arg (autosaves). */
+  const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs, arg) : id === 'altar' ? autosave(cs, relay(cs, CV.act(cs, id, arg)), 0) : relay(cs, CV.act(cs, id, arg)));
 
   M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
 })(typeof self !== 'undefined' ? self : this);
