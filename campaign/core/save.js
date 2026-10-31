@@ -34,7 +34,7 @@
       version: D.version,
       dragon: {
         growth: round(G.growthValue(d.foodXp), 1e4), stage: d.stage, foodXp: round(d.foodXp, 100),
-        hp: round(d.hp, 100), hunger: round(d.hunger, 100), deaths: d.deaths || 0, upgrades: [],
+        hp: round(d.hp, 100), hunger: round(d.hunger, 100), deaths: d.deaths || 0, upgrades: (cs.upgrades || []).filter(id => D.upgrades[id]),   // T20
         loot: cs.carriedLoot ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,   // T19: in the claws
       },
       hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: [] },   // T19
@@ -140,6 +140,8 @@
     cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && D.regions[dl.region]
       ? { id: dl.id, kind: dl.kind, gold: D.loot[dl.kind].gold, size: D.loot[dl.kind].size, region: dl.region } : null;
     cs.lootTarget = null;
+    const ups = Array.isArray(o.dragon.upgrades) ? o.dragon.upgrades : [];   // T20: owned upgrades, known ids once each
+    cs.upgrades = ups.filter((id, i) => typeof id === 'string' && D.upgrades[id] && ups.indexOf(id) === i);
     cs.story = storyOf(o.story);
     cs.discovered = {}; cs.regionStates = {};
     for (const id of Object.keys(o.regions || {})) {

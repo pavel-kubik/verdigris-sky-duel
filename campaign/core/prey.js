@@ -468,13 +468,14 @@
    * becomes roast chunks (size 1, food x roast.foodMult split evenly) where it fell; its herd bolts.
    * cone: from breathCone, or null when not breathing. Returns events.
    */
-  function cook(field, cone, dt, rng) {
+  function cook(field, cone, dt, rng, rate) {
+    const k = rate || 1;                                           // T20 hotter fire: upgrades cookRate
     const R = D.roast, ev = [], born = [];
     for (let i = field.list.length - 1; i >= 0; i--) {
       const p = field.list[i];
       if (!ACTIVE[p.state]) continue;
       if (cone && inCone(cone, p)) {
-        p.cook += dt; p.heat = 0.35;
+        p.cook += dt * k; p.heat = 0.35;
         if (p.state === 'graze') { p.state = 'flee'; p.calm = 0; }  // a scorched animal bolts
         if (p.cook >= R.cookTime) {
           field.list.splice(i, 1);

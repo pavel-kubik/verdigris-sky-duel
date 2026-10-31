@@ -71,7 +71,7 @@
     if (ctx.eating) target = Math.min(target, D.eat.speedCap);
     p.speed += (target - p.speed) * Math.min(1, dt * 2.2);
 
-    if (p.boosting) p.st -= 20 * dt;
+    if (p.boosting) p.st -= 20 * (eff.boostSt || 1) * dt;   // T20 wing muscles: boostSt
     if (p.breathing) p.st -= 32 * dt;
     if (!p.boosting && !p.breathing) p.st += 17 * eff.stRegenMult * dt;
     p.st = clamp(p.st, 0, 100);

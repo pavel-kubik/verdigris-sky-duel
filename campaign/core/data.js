@@ -116,7 +116,7 @@
        floor; the dragon walks inside (walk.step) on the circle of radius `bounds` (minus pad x scale) and in the
        tunnel (|x| < tunnel.w / 2, from the hall to z = tunnel.len); walking past tunnel.out leaves the lair.
        stations: [x, z, radius]; in reach within radius + reach x scale ^ 0.5 (the Action slot / E opens it).
-       hoard and altar stations come with T19 / T20 (positions kept here so the layout does not move).
+       hoard (T19) and altar (T20) stations.
        entry: where flying into the mouth puts the dragon (in the tunnel, facing in); death and hatching wake it
        on the nest. camera: chase distance / height (x scale ^ 0.75), clamped inside the dome and the tunnel
        (pad from the walls). light: the lava channel's point light colour, intensity, distance and flicker. */
@@ -128,7 +128,8 @@
         larder: [-30, -8, 8],
         exit:   [0, 56, 4],
         hoard:  [30, -8, 10],                 // T19: the coin pile (hoardTiers), its panel shows the gold
-        // T20 altar [0, 8, 5]; Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
+        altar:  [0, 8, 5],                    // T20: upgrades for hoard gold (core/upgrades.js)
+        // Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
       },
       hoardTiers: [0, 100, 300, 700, 1500],   // T19: coin pile size steps (tier = steps reached - 1); coins = min(maxCoins, gold / 2)
       maxCoins: 800,
@@ -233,6 +234,20 @@
       tithe:     { size: 1, gold: 50,  carry: { speedMult: 0.85, breath: true } },
       strongbox: { size: 2, gold: 150, carry: { speedMult: 0.8,  breath: false } },
       door: 2, clear: 3,
+    },
+
+    /* Upgrades (Phase 2 T20, core/upgrades.js; 002_task_kingdom.md 4.6). Bought with hoard gold at the cave altar, once
+       each (cs.upgrades = owned ids, saved). Altar order = this order. Effects (upgrades.effects merges the owned ones:
+       numbers multiply, flags OR): smellRange x the smell range, smellType names the prey on the compass, preyHighlight
+       a ring under prey within smell range; arrowDamage / boltDamage x the hit damage; stRegen x stamina regen, boostSt
+       x the boost / run stamina cost, takeoffSt x the takeoff cost; cookRate x the roast speed, burnRate x the building
+       fire (heat under the breath and the burn); showCones draws the defenders' sight fans and awareness marks at any range. */
+    upgrades: {
+      prey_sense:     { cost: 120, effect: { smellRange: 1.6, smellType: true, preyHighlight: true } },
+      iron_scales_1:  { cost: 150, effect: { arrowDamage: 0.7, boltDamage: 0.85 } },
+      wing_muscles_1: { cost: 200, effect: { stRegen: 1.2, boostSt: 0.85, takeoffSt: 0.7 } },
+      hotter_fire_1:  { cost: 250, effect: { cookRate: 1.3, burnRate: 1.3 } },
+      guard_sight:    { cost: 300, effect: { showCones: true } },
     },
 
     corn: { crop: 4, height: 3.2, ignite: 0.4, cool: 0.5, spread: 5, band: 6, regrow: 600 },

@@ -1,6 +1,7 @@
 /*
  * Verdigris campaign - navigation: compass markers and the dragon's sense of smell (Phase 2 T09).
- *   smellRange(cs) -> units                 data.smell.range x stage spot ^ 0.5, x hungryMult when hungry, x starveMult more when starving
+ *   smellRange(cs) -> units                 data.smell.range x stage spot ^ 0.5, x hungryMult when hungry, x starveMult more when starving,
+ *                                           x the prey sense upgrade (T20 smellRange)
  *   step(cs, dt) -> events[]                smell update every data.smell.update s (cs.nav.scents); nothing in the lair;
  *                                           discovery (T12) every data.nav.discoverEvery s: 'place:discovered' { id, type, region }
  *   seesPlace(regionId, pos, place) -> bool within nav.discover and in line of sight over the terrain
@@ -16,7 +17,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), HN = M.need('hunger'), RG = M.need('region');
+  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), HN = M.need('hunger'), RG = M.need('region'), UP = M.need('upgrades');
   const { wrap, clamp } = M.need('math');
 
   const GONE = { carried: 1, roast: 1, dead: 1 };
@@ -26,7 +27,7 @@
     let r = S.range * Math.sqrt(st.spot || 1);
     if (hs !== 'fed') r *= S.hungryMult;
     if (hs === 'starving') r *= S.starveMult;
-    return r;
+    return r * UP.effects(cs).smellRange;                     // T20 prey sense
   }
 
   /** Smooth drift in -1..1 for herd h at nav time t (two slow sines, phase by herd id). */
@@ -151,12 +152,15 @@
     if (cs.town && cs.town.region === cs.region && cs.discovered) {
       for (const pl of cs.town.places) if (cs.discovered[pl.id]) add('settlement', 'place:' + pl.id, pl.x, pl.z, { key: 'c.place.' + pl.type }, { type: pl.type });
     }
-    // scents: toward the herd, blurred far out (a stored offset, so the marker drifts between updates, never jitters)
+    // scents: toward the herd, blurred far out (a stored offset, so the marker drifts between updates, never jitters);
+    // with prey sense (T20 smellType) the label names the prey ('Scent: Goat', type on the marker)
+    const typed = UP.effects(cs).smellType;
     for (const s of (cs.nav && cs.nav.scents) || []) {
       const b = Math.atan2(s.x - x0, s.z - z0) + s.off;
       out.push({ kind: s.livestock ? 'scentLivestock' : 'scent', key: 'scent:' + s.herd, bearing: wrap(b),
                  dist: Math.hypot(s.x - x0, s.z - z0), strength: s.strength,
-                 label: { key: s.livestock ? 'c.nav.scentLivestock' : 'c.nav.scent' } });
+                 label: typed ? { key: 'c.nav.scentType', p: { prey: 'c.prey.' + s.type } } : { key: s.livestock ? 'c.nav.scentLivestock' : 'c.nav.scent' },
+                 prey: typed ? s.type : undefined });
     }
     return out.slice(0, D.nav.markers);
   }

@@ -8,7 +8,7 @@
  *
  *   slots(cs) -> { action: 'grab' | 'eat' | null, move: { kind: 'travel', to } | { kind: 'cave' } | { kind: 'land' } | { kind: 'fly' } | null,
  *                  roll: boolean }   roll only in the air
- *   In the cave (T10) the Action slot is the station in reach, a tap: 'nest' | 'larder' | 'hoard' (open its panel) | 'exit' (leave);
+ *   In the cave (T10) the Action slot is the station in reach, a tap: 'nest' | 'larder' | 'hoard' | 'altar' (T20) (open its panel) | 'exit' (leave);
  *   isStation(kind) tells a station tap from a held Grab / Eat. Move and Roll are hidden inside.
  *   input(kind, held) -> partial state.step input for a held Action press ({ grab } or { eat })
  *   moveInput(move) -> partial state.step input for a Move tap ({ confirm }, { enter } or { land })
@@ -21,7 +21,7 @@
 
   const GRAB_HINTS = { grab: 1, swoop: 1, lootGrab: 1 };   // T19: loot in front on the ground
 
-  const STATIONS = { nest: 1, larder: 1, exit: 1, hoard: 1 };
+  const STATIONS = { nest: 1, larder: 1, exit: 1, hoard: 1, altar: 1 };   // altar: T20
   const isStation = kind => !!STATIONS[kind];
 
   function slots(cs) {

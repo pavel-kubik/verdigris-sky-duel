@@ -43,12 +43,15 @@
  *        'loot:taken' raises the heat (alert.add.loot); lair.enter banks it into cs.hoard ('hoard:banked'), death loses it
  *        ('loot:lost'); a taken item is back fire.rebuild s later (rs.lootTaken, 'loot:back'). cs.lootTarget = the item
  *        Grab would pick up (gold ring).
+ * Upgrades (T20, core/upgrades.js): cs.upgrades (bought at the cave altar, caveAct 'altar' autosaves); upgrades.effects
+ *        scales stamina (apply), roasting (prey.cook), building fire (settlement.burn mult), arrow / bolt damage (defend),
+ *        smell (nav); the renderer reads preyHighlight and showCones.
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -84,6 +87,7 @@
       exitSmall: null,               // T11: an exit the dragon is too small for (prompt "Too small for ..."), or null
       exitSmallT: 0,
       hoard: { gold: 0, relics: [] }, // T19: banked gold (saved), the coin pile in the cave
+      upgrades: [],                  // T20: owned upgrade ids (core/upgrades.js, bought at the altar), saved
       carriedLoot: null,             // T19: { id, kind, gold, size, region } in the claws (shares the slot with prey), or null
       lootTarget: null,              // T19: id of the loot item Grab would pick up on the ground (gold ring), or null
       landOk: false,                 // landing allowed right now (walk.canLand), the Move slot offers Land                      // seconds the offer stays after the dragon turns back from the edge
@@ -160,7 +164,7 @@
    * Autosave triggers (5.9): rest, region change, death (wake in the lair), a discovered settlement (T12) and every save.every s of play.
    * Core only emits { e: 'save', why }; game.js writes it to localStorage (and on visibilitychange to hidden).
    */
-  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered' };   // T12: a new place
+  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade' };   // T12: a new place, T20: a bought upgrade
   function autosave(cs, ev, dt) {
     cs.saveT = (cs.saveT || 0) + dt;
     let why = null;
@@ -179,7 +183,7 @@
       return ev;
     }
     if (d.hp <= 0) return die(cs, ev, 'wounds');
-    const stats = G.statsOf(d.stage), hEff = HN.effects(d.hunger), eff = LT.effects(hEff, cs.carriedLoot), scale = scaleOf(cs), sol = solids(cs, scale);
+    const stats = G.statsOf(d.stage), hEff = HN.effects(d.hunger), up = UP.effects(cs), eff = UP.apply(LT.effects(hEff, cs.carriedLoot), up), scale = scaleOf(cs), sol = solids(cs, scale);
     const loaded = !!cs.carriedLoot;                             // T19: loot in the claws - no prey until it is banked
     let carried = carriedPrey(cs);
     if (!carried) d.carried = null;
@@ -249,8 +253,8 @@
     else if (cs.fireMem != null && !carried) cs.fire = { id: cs.fireMem, inRange: false, cook: 0, kept: true };
     else cs.fire = null;
     cs.breath = p.breathing ? PR.breathCone(aim, scale, cs.field, cs.fire ? cs.fire.id : null) : null;   // the renderer aims the stream along cs.breath.dir
-    for (const e of PR.cook(cs.field, cs.breath, dt, cs.rng)) emit(cs, ev, e);
-    fireStep(cs, dt, ev, scale);                                // T13: buildings catch fire, burn down, come back
+    for (const e of PR.cook(cs.field, cs.breath, dt, cs.rng, up.cookRate)) emit(cs, ev, e);   // T20 hotter fire
+    fireStep(cs, dt, ev, scale, up.burnRate);                                // T13: buildings catch fire, burn down, come back
     if (cs.fire) { const q = PR.byId(cs.field, cs.fire.id); if (q && q.state !== 'roast') cs.fire.cook = Math.min(1, q.cook / D.roast.cookTime); else cs.fire = null; }
     if (cs.fire && cs.fire.cook > 0 && cs.fire.cook < 1) cs.fireMem = cs.fire.id;
 
@@ -343,7 +347,10 @@
    *  (cause 'arrows' / 'bolt'). */
   function defend(cs, ev, dt) {
     const d = cs.dragon;
+    const up = UP.effects(cs);
     for (const e of DF.step(cs, ev, dt, { scale: scaleOf(cs), spot: G.statsOf(d.stage).spot })) {
+      if (e.e === 'arrow:hit') e.damage *= up.arrowDamage;       // T20 iron scales
+      else if (e.e === 'bolt:hit') e.damage *= up.boltDamage;
       emit(cs, ev, e);
       if ((e.e !== 'arrow:hit' && e.e !== 'bolt:hit') || cs.inLair || d.hp <= 0) continue;
       d.hp = Math.max(0, d.hp - e.damage);
@@ -396,10 +403,10 @@
   }
 
   /** Building fire (T13): burn under the breath, spread, ruins (stats, region state), rebuild after fire.rebuild. */
-  function fireStep(cs, dt, ev, scale) {
+  function fireStep(cs, dt, ev, scale, burnRate) {
     const town = ensureTown(cs), now = cs.stats.played, p = cs.dragon.pilot, pad = D.settlement.pad * (scale || 1);
     const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {};
-    for (const e of SE.burn(town, cs.breath, dt, { rng: cs.rng, now })) {
+    for (const e of SE.burn(town, cs.breath, dt, { rng: cs.rng, now, mult: burnRate || 1 })) {
       emit(cs, ev, e);
       if (e.e !== 'building:ruined') continue;
       if (e.civil) cs.stats.civilBurned = (cs.stats.civilBurned || 0) + 1;
@@ -457,8 +464,8 @@
   const lairRest = cs => autosave(cs, relay(cs, LR.rest(cs).events), 0);
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
-  /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave. */
-  const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : relay(cs, CV.act(cs, id, arg)));
+  /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave; altar (T20) = buy upgrade arg (autosaves). */
+  const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : id === 'altar' ? autosave(cs, relay(cs, CV.act(cs, id, arg)), 0) : relay(cs, CV.act(cs, id, arg)));
 
   M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
 })(typeof self !== 'undefined' ? self : this);

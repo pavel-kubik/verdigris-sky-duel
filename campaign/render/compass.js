@@ -3,7 +3,7 @@
  *   VRender.compass.build(canvas, { t, fov }) -> { update(markers, yaw, dt), tap(clientX, clientY) -> marker | null, select(key) }
  * markers come from core/nav.js (world bearings); the strip shows heading ticks, N / E / S / W, and the markers
  * within fov of the heading; markers outside stick to the edges as arrows. The lair always shows its distance,
- * so does the selected (tapped) marker. Marker positions ease (no jumps when a scent updates).
+ * so does the selected (tapped) marker; with prey sense (T20) a scent marker names its prey (m.prey). Marker positions ease (no jumps when a scent updates).
  * Bearings: 0 = +Z = north; yaw grows to the left (stick right lowers yaw), so right of the heading = yaw - bearing > 0.
  */
 (function (root) {
@@ -108,6 +108,12 @@
           const right = edge ? rel < 0 : x + s + 3 + g.measureText(tx).width < W - 12;
           g.textAlign = right ? 'left' : 'right'; const pad = edge ? 16 : s + 3;
           g.fillText(tx, right ? x + pad : x - pad, y + 1); g.restore();
+        }
+        if (m.prey && !showD && !edge) {                      // T20 prey sense: the prey type next to its scent
+          g.save(); g.font = '600 9px "Barlow Semi Condensed", "Arial Narrow", sans-serif'; g.textBaseline = 'middle';
+          g.fillStyle = col; g.globalAlpha = alpha; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 3;
+          const tx = t('c.prey.' + m.prey), right = x + s + 3 + g.measureText(tx).width < W - 12;
+          g.textAlign = right ? 'left' : 'right'; g.fillText(tx, right ? x + s + 3 : x - s - 3, y + 1); g.restore();
         }
         if (m.key === selected) { g.strokeStyle = col; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y, s + 4, 0, TAU); g.stroke(); }
         laid.push({ m, x });

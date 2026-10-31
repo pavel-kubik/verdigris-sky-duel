@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't119.1 2026-10-31 loot and hoard: tithe chests and strongboxes, carry, bank in the lair, coin pile (debug , to loot, ; +100 gold)';
+  const BUILD = 't120.1 2026-10-31 upgrades and the altar: prey sense, iron scales, wing muscles, hotter fire, guard sight (debug \' all / none)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -744,6 +744,7 @@
     larder: '<path d="M4 9h16v10H4zM4 9l3-4h10l3 4M9 13h6"/>',
     exit: '<path d="M4 20c0-9 3-15 8-15s8 6 8 15M12 20v-6M9 17l3-3 3 3"/>',
     hoard: '<path d="M3 19h18M5 19c0-4 3-7 7-7s7 3 7 7M8 12l1-3h6l1 3M10 9V7h4v2"/>',
+    altar: '<path d="M5 20h14M7 20l1-8h8l1 8M6 12h12M12 4l2 3-2 3-2-3z"/>',
   };
   const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
   function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
@@ -851,7 +852,34 @@
       $('#hoardGold').textContent = t('c.hoard.gold', { gold: g });
       $('#hoardTier').textContent = g ? t('c.hoard.tier', { tier: tr + 1, max: T0.length }) + (nx ? ' - ' + t('c.hoard.next', { next: nx }) : '') : t('c.hoard.empty');
     }
+    if (stationOpen === 'altar') renderAltar();
   }
+  /** T20: the altar panel - every upgrade with its effect and cost; Buy while the hoard has the gold (core/upgrades.js). */
+  const altarList = $('#altarList');
+  let altarShown = '';
+  function renderAltar() {
+    const g = (cs.hoard && cs.hoard.gold) || 0, key = g + '|' + (cs.upgrades || []).join(',') + '|' + (window.I18N ? I18N.lang : '');
+    $('#altarGold').textContent = t('c.altar.gold', { gold: g });
+    if (key === altarShown) return;
+    altarShown = key;
+    altarList.innerHTML = '';
+    for (const id of UP.list()) {
+      const U = D.upgrades[id], own = UP.has(cs, id), can = UP.canBuy(cs, id).ok;
+      const li = document.createElement('li'), tx = document.createElement('div'), b = document.createElement('button'), nm = document.createElement('b'), sm = document.createElement('small');
+      nm.textContent = t('c.up.' + id); sm.textContent = t('c.up.' + id + '.d'); tx.append(nm, sm);
+      li.classList.toggle('owned', own);
+      b.className = can ? 'cta' : 'ghost'; b.dataset.id = id; b.disabled = !can;
+      b.textContent = own ? t('c.altar.owned') : can ? t('c.altar.buy', { cost: U.cost }) : t('c.altar.need', { cost: U.cost });
+      li.append(tx, b); altarList.append(li);
+    }
+  }
+  altarList.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || b.disabled || !cs.inLair || state !== 'play') return;
+    const id = b.dataset.id, ev = ST.caveAct(cs, 'altar', id);
+    const got = ev.find(x => x.e === 'upgrade:bought');
+    if (got) { lairMsg(t('c.altar.bought', { name: t('c.up.' + id) })); toast(t('c.altar.bought', { name: t('c.up.' + id) }), t('c.altar.boughtSub', { gold: got.gold }), 3); }
+    onEvents(ev); renderLair();
+  });
   /** death: the "You fell" card on top of the lair panel (cleared when the dragon leaves) */
   function deathCard(e) {
     const el = $('#lairDeath');
@@ -869,9 +897,9 @@
     lairEl.dataset.station = id;
     $('#lairTitle').dataset.i18n = 'c.cave.' + id; $('#lairTitle').textContent = t('c.cave.' + id);
     deathCard(death || null); if (death) { toastEl.style.opacity = 0; toastT = 0; }
-    lairShown = ''; renderLair();
+    lairShown = ''; altarShown = ''; renderLair();
     lairEl.hidden = false;
-    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
+    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
   }
   function closeStation() {
     stationOpen = null;
@@ -940,6 +968,7 @@
     ['.', 'fly to the next livestock pen (60 out, 25 up, facing it)', 'Period', 'to pen'],
     [',', 'stand on the ground in front of the next loot item of this region (tithe chest / strongbox), facing it', 'Comma', 'to loot'],
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
+    ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
@@ -1033,6 +1062,11 @@
         Object.assign(pilot, { mode: 'ground', tr: null, vel: [0, 0, 0], pos: [x, TR.surfaceAt(regionId, x, z) + D.walk.stand * sc, z], yaw: Math.atan2(-dx, -dz), pitch: 0, roll: 0, rollX: 0, speed: 0, boosting: false });
         snapCam(); flashPrompt(t('c.dbg.loot', { loot: lootName(it) }), 1.5);
       }
+    }
+    if (code === 'Quote') {                                       // T20: every upgrade at once, or none (refunded)
+      const all = UP.list(), full = all.every(id => UP.has(cs, id));
+      if (full) { cs.hoard.gold += all.reduce((s, id) => s + D.upgrades[id].cost, 0); cs.upgrades = []; } else cs.upgrades = all.slice();
+      flashPrompt(t(full ? 'c.dbg.upgrades' : 'c.dbg.upgradesAll'), 1.5); if (stationOpen) renderLair();
     }
     if (code === 'Semicolon') { cs.hoard.gold += 100; flashPrompt(t('c.dbg.gold', { gold: cs.hoard.gold }), 1.5); if (stationOpen) renderLair(); }
     if (code === 'Period' && !cs.inLair && cs.town) {             // T18: next livestock pen, approach from 60 out
@@ -1158,7 +1192,7 @@
     motherHud();
     motherArrow();
     compassHud(dt);
-    preyView.update(cs.field, time, carryPose());
+    preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
@@ -1177,8 +1211,9 @@
     defView.update(cs.squad, { time });
     if (pilot) {                                                 // T14 / T15: ? / ! marks within markRange; sight fans with ?debug (7)
       if (!watchView) { watchView = VRender.watch.build(); scene.add(watchView.group); }
-      watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: debug && watchShow && !cs.inLair,
-                                   marks: !cs.inLair, near: pilot.pos, markRange: D.defense.markRange });
+      const cones = UP.effects(cs).showCones;                    // T20 guard sight: the fans and the marks at any distance
+      watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: (cones || debug && watchShow) && !cs.inLair,
+                                   marks: !cs.inLair, near: pilot.pos, markRange: cones ? Infinity : D.defense.markRange });
     }
     targetRing();
     fireTargetRing();
@@ -1281,7 +1316,8 @@
       { const pl = (cs.town && cs.town.pens) || [];
         L.push('STOCK   ' + (pl.map(pn => { const c = PR.penCount(cs.field, pn.id); return pn.id.split('.').slice(1).join('.') + ' ' + pn.type + ' ' + (c ? c.penned + (c.inside ? ' +' + c.inside + ' in barn' : '') : '-'); }).join(', ') || '-') + '  taken ' + (cs.stats.livestockTaken || 0)); }
       { const its = (cs.town && cs.town.items) || [], cl = cs.carriedLoot;
-        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + cl.gold : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0)); }
+        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + cl.gold : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0));
+        L.push('UPGRADE ' + ((cs.upgrades || []).join(', ') || '-') + '  can buy ' + (UP.affordable(cs).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');
