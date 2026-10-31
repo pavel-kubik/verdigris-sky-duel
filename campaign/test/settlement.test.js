@@ -90,6 +90,8 @@ function grounded(regionId, x, z, yaw, stage) {
   for (let i = 0; i < 600; i++) { S.step(cs, { sy: 1 }, dt); minD = Math.min(minD, Math.hypot(p.pos[0] - tower.pos[0], p.pos[2] - tower.pos[2])); }
   ok(minD >= tower.r + D.settlement.pad * sc - 0.05, 'walking straight at a tower stops at its wall (closest ' + minD.toFixed(2) + ')');
   ok(Math.abs(p.pos[1] - WK.standY({ regionId: 'farm' }, p.pos[0], p.pos[2], sc)) < 1e-6, 'still standing on the ground, not on the roof');
+  for (let i = 0; i < 200; i++) S.step(cs, { sy: 0 }, 0.05);                 // stick released at the wall: the creep to a stop
+  ok(Math.abs(p.pos[1] - T.surfaceAt('farm', p.pos[0], p.pos[2]) - D.walk.stand * sc) < 1e-6, 'standing still at the wall never pops onto the roof');
 }
 {
   // a glancing walk past the barracks slides along it instead of stopping dead

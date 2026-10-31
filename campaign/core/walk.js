@@ -92,6 +92,7 @@
   /** Moves by (dx, dz); a blocked move slides along the contour of the slope, else stops. Returns the share moved. */
   function tryMove(p, dx, dz, ctx, scale) {
     const x0 = p.pos[0], z0 = p.pos[2];
+    if (Math.hypot(dx, dz) < 1e-6) return 1;                             // a standstill creep (passable() lets a zero run through)
     if (passable(ctx, x0, z0, x0 + dx, z0 + dz, scale)) { p.pos[0] += dx; p.pos[2] += dz; return 1; }
     const wall = ctx.solidHit ? ctx.solidHit(x0 + dx, z0 + dz) : null;
     if (wall) {                                                          // a building: slide along its wall (T12)
