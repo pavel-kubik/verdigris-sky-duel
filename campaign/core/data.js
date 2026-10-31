@@ -59,6 +59,10 @@
       deer: { size: 1, food: 30, hp: 30, speed: 14, flee: 18, fleeRange: 70, herd: [3, 6], fights: false },
       boar: { size: 2, food: 45, hp: 60, speed: 10, flee: 12, fleeRange: 40, herd: [1, 3], fights: true,
               charge: { range: 14, maxAboveGround: 7, damage: 8, cooldown: 3 } },
+      // livestock (Phase 2 T18): kept in the settlements' pens (data.settlements pens), never in region herds; taking one
+      // raises the region alert by alert.add.livestock; at alert 3 (livestockInside) they are inside the barn
+      sheep: { size: 1, food: 25, hp: 20, speed: 7, flee: 9, fleeRange: 40, herd: [3, 6], fights: false, livestock: true },
+      cow:   { size: 2, food: 60, hp: 50, speed: 6, flee: 7, fleeRange: 35, herd: [2, 4], fights: false, livestock: true },
     },
     // A burned prey leaves ceil(food * foodMult / chunkFood) chunks; the roast food is split evenly.
     // cool: heat lost per second outside the fire (0 = a scorched prey keeps its heat until it is roasted)
@@ -225,7 +229,7 @@
        radius of each piece); gate = gap width (units of arc) centred on the template's local +Z.
        settlements: templates, offsets [type, x, z] from the centre, rotated by the site's yaw (+ seeded jitter of up to
        `jitter` units and jitterYaw rad per building); ring: [r, gate] palisade around the centre; pens: [type, x, z,
-       count] livestock pens (radius penR + count; animals come with T18); alert3: buildings added at alert 3 (T17).
+       count] livestock pens (radius penR + count; the sheep and cows of T18); alert3: buildings added at alert 3 (T17).
        pad: the dragon's collision radius x scale against building solids (walking and flying).
        fire (T13, core/settlement.js burn / rebuild): ignite = s of breath on a building until it catches fire (the heat
        cools at `cool` per s out of the breath); a burning building loses `burn` hp/s on its own, `fan` hp/s more while the
@@ -246,7 +250,7 @@
     },
     palisade: { piece: 6, radius: 1, gate: 12 },
     fire: { ignite: 0.8, cool: 0.5, burn: 6, fan: 2.5, spread: 0.15, reach: 8, rebuild: 600 },
-    settlement: { jitter: 1, jitterYaw: 0.2, penR: 2.5, pad: 1.4 },
+    settlement: { jitter: 1, jitterYaw: 0.2, penR: 4, pad: 1.4 },          // penR 4 (T18): room for the animals, drawn larger than life
     settlements: {
       hamlet:   { buildings: [['house', -8, 0], ['house', 8, 4], ['barn', -3, -13], ['bell', 0, 10]],
                   pens: [['sheep', 14, -10, 4]], peasants: 3 },

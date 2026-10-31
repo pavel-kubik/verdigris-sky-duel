@@ -1,6 +1,6 @@
 /*
  * Verdigris campaign - prey renderer.
- * Low-poly goats, deer and boars built from primitives, drawn with one InstancedMesh per body part
+ * Low-poly goats, deer, boars, sheep and cows (T18) built from primitives, drawn with one InstancedMesh per body part
  * per type (about 15 draw calls for every animal in a region). Legs swing with the animal's speed.
  *   VRender.prey.build() -> { group, update(field, time, carry?), dispose() }
  *   carry: { id, pos: Vector3, yaw, pitch } draws that prey hanging from the claw anchor instead of on the ground
@@ -38,6 +38,20 @@
       { geo: horn(0.05, 0.35), col: 0xf0e8d8, places: [[0.2, 0.75, 1.55, -0.6, 0, 0.5], [-0.2, 0.75, 1.55, -0.6, 0, -0.5]] },
       { geo: box(0.12, 0.55, 0.9), col: 0x2a201a, places: [[0, 1.5, -0.1, 0, 0, 0]] },   // bristly ridge
       { geo: leg(0.11, 0.55), col: 0x2a201a, legs: true, places: [[0.3, 0.55, 0.6], [-0.3, 0.55, 0.6], [0.3, 0.55, -0.6], [-0.3, 0.55, -0.6]] },
+    ] },
+    sheep: { parts: [                                                    // T18 livestock: woolly body, dark face
+      { geo: new THREE.DodecahedronGeometry(0.62, 0), col: [0xf2ede0, 0xd8d0bc], places: [[0, 1.0, 0, 0, 0, 0], [0, 1.02, -0.45, 0.4, 0.3, 0], [0, 1.0, 0.42, 0.2, 0.8, 0]] },
+      { geo: box(0.36, 0.4, 0.5), col: 0x2e2a26, places: [[0, 1.22, 0.92, 0.3, 0, 0]] },
+      { geo: box(0.22, 0.1, 0.16), col: 0x2e2a26, places: [[0.24, 1.32, 0.8, 0, 0, -0.4], [-0.24, 1.32, 0.8, 0, 0, 0.4]] },
+      { geo: leg(0.08, 0.62), col: 0x2e2a26, legs: true, places: [[0.22, 0.62, 0.45], [-0.22, 0.62, 0.45], [0.22, 0.62, -0.45], [-0.22, 0.62, -0.45]] },
+    ] },
+    cow: { parts: [
+      { geo: box(1.05, 1.0, 2.1), col: [0xf0ebe0, 0x7a4a2e], places: [[0, 1.45, 0, 0, 0, 0]] },
+      { geo: box(0.7, 0.4, 0.9), col: 0x2a2420, places: [[0.38, 1.7, 0.2, 0, 0, 0], [-0.4, 1.35, -0.55, 0, 0, 0]] },   // patches
+      { geo: box(0.5, 0.55, 0.65), col: [0xf0ebe0, 0x7a4a2e], places: [[0, 1.75, 1.3, 0.25, 0, 0]] },
+      { geo: box(0.42, 0.3, 0.2), col: 0xd89a8a, places: [[0, 1.55, 1.66, 0.25, 0, 0]] },
+      { geo: horn(0.05, 0.3), col: 0xe8dcc0, places: [[0.22, 2.05, 1.2, 0, 0, -0.9], [-0.22, 2.05, 1.2, 0, 0, 0.9]] },
+      { geo: leg(0.12, 0.95), col: 0x3a302a, legs: true, places: [[0.32, 0.95, 0.75], [-0.32, 0.95, 0.75], [0.32, 0.95, -0.75], [-0.32, 0.95, -0.75]] },
     ] },
     roast: { parts: [
       { geo: new THREE.DodecahedronGeometry(0.55, 0), col: [0x8a4a1e, 0x6a3416], places: [[0, 0.45, 0, 0.3, 0, 0.2]] },

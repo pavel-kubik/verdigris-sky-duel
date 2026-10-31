@@ -8,6 +8,12 @@
  *   remove(field, preyId)                        (eaten, stored; used by T09)
  *   reach / swoopTarget / tryGrab / release / byId  grab and carry (T09)
  *   breathCone / cook                               fire: prey cook into roast chunks (T10)
+ *   addPens(field, town, rng) / pens(field, town, inside, dragon, dt, rng) -> events[]   livestock (Phase 2 T18):
+ *       sheep and cows of the town's pens are herds with herd.pen { id, place, x, z, r } and herd.barn (the barn of their
+ *       settlement); they graze and flee inside the fence. inside (alert response livestockInside): the herd goes into
+ *       its barn (herd.inside = count, pen empty, 'livestock:inside'); below it they come out ('livestock:out'); a barn
+ *       that burns down with the herd inside releases it ('livestock:released'): the animals run free (no pen) and the
+ *       pen restocks after respawn.herdCooldown, away from the dragon. Penned animals never respawn elsewhere.
  */
 (function (root) {
   'use strict';
@@ -53,10 +59,17 @@
     };
   }
 
+  /** Livestock places of a region (its settlements' pens, T18): kept free under preyAi.maxActive for addPens. */
+  function penRoom(regionId) {
+    let n = 0;
+    for (const s of T.region(regionId).settlements || []) for (const pn of (D.settlements[s.type] || {}).pens || []) n += pn[3];
+    return n;
+  }
+
   function fillHerd(field, herd, rng, avoid) {
     const def = D.prey[herd.type];
-    const n = int(rng, def.herd[0], def.herd[1]);
-    for (let i = 0; i < n && field.list.length < D.preyAi.maxActive; i++) {
+    const n = int(rng, def.herd[0], def.herd[1]), cap = D.preyAi.maxActive;
+    for (let i = 0; i < n && field.list.filter(p => !p.pen).length < cap; i++) {
       for (let k = 0; k < 30; k++) {
         const a = rng() * Math.PI * 2, r = rng() * HERD_R * 0.6;
         const x = herd.centre[0] + Math.cos(a) * r, z = herd.centre[1] + Math.sin(a) * r;
@@ -87,9 +100,10 @@
 
   /** Moves an animal along its heading, sliding around water, cliffs and the edge. Returns false if boxed in. */
   function moveOn(regionId, p, heading, speed, dt) {
-    const step = speed * dt;
-    for (const off of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6]) {
+    const step = speed * dt, pen = p.pen;
+    for (const off of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4]) {
       const h = heading + off, x = p.pos[0] + Math.sin(h) * step, z = p.pos[2] + Math.cos(h) * step;
+      if (pen && !inPen(pen, p.pos[0], p.pos[2], x, z, p.size)) continue;   // the fence (T18)
       if (!groundOk(regionId, x, z)) continue;
       p.pos[0] = x; p.pos[2] = z; p.pos[1] = T.surfaceAt(regionId, x, z);
       const d = wrap(h - p.yaw); p.yaw = wrap(p.yaw + d * Math.min(1, dt * 8));
@@ -99,6 +113,13 @@
     p.speed = 0;
     return false;
   }
+
+  /** A move from (x0, z0) to (x, z) stays inside the pen fence (or at least gets no further out). */
+  function inPen(pen, x0, z0, x, z, size) {
+    const lim = pen.r - penGap(size), d = Math.hypot(x - pen.x, z - pen.z);
+    return d <= lim || d <= Math.hypot(x0 - pen.x, z0 - pen.z);
+  }
+  const penGap = size => 1 + (size || 1);   // animals keep this far inside the fence (drawn larger than life: a cow more)
 
   function threat(field, p, dragon, stats) {
     const def = D.prey[p.type];
@@ -126,7 +147,7 @@
       if (p.pause > 0) { p.pause -= dt; p.speed = 0; return; }
       if (!p.goal || dist2([p.goal[0], 0, p.goal[1]], p.pos) < 1.5) {
         const c = herd ? herd.centre : [p.pos[0], p.pos[2]];
-        const a = rng() * Math.PI * 2, r = rng() * HERD_R;
+        const a = rng() * Math.PI * 2, r = rng() * (p.pen ? Math.max(0.5, p.pen.r - penGap(p.size)) : HERD_R);
         p.goal = [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r];
         p.pause = range(rng, 1, 4);
         return;
@@ -166,6 +187,7 @@
       const mates = field.list.filter(q => q.herd === herd.id);
       if (mates.every(q => q.state === 'graze')) {
         herd.alarmed = false;
+        if (herd.pen) return;                                     // a penned herd stays at its pen
         // the herd regroups where its members ended up
         herd.centre = [mates.reduce((a, q) => a + q.pos[0], 0) / mates.length, mates.reduce((a, q) => a + q.pos[2], 0) / mates.length];
       }
@@ -194,6 +216,7 @@
     }
     // empty herds come back after a while, away from the dragon
     for (const h of field.herds) {
+      if (h.pen || h.free) continue;                              // livestock: pens restock in pens(), released herds do not
       if (field.list.some(p => p.herd === h.id)) continue;
       h.emptyT += dt;
       if (h.emptyT < D.respawn.herdCooldown) continue;
@@ -285,6 +308,95 @@
     if (!groundOk(field.regionId, x, z)) { const h = field.herds.find(hh => hh.id === p.herd); if (h) { x = h.centre[0]; z = h.centre[1]; } }
     p.pos = [x, T.surfaceAt(field.regionId, x, z), z];
     p.state = 'flee'; p.calm = 0;
+    if (p.pen && Math.hypot(x - p.pen.x, z - p.pen.z) > p.pen.r) p.pen = null;   // dropped outside the fence: it runs free
+  }
+
+  /* ---------- livestock (Phase 2 T18) ---------- */
+  function penHerdFill(field, h, rng, n) {
+    const pen = h.pen;
+    if (n == null) n = h.count;
+    for (let i = 0; i < n; i++) {
+      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * Math.max(0.5, pen.r - penGap(D.prey[h.type].size));
+      const p = makePrey(field, h, h.type, pen.x + Math.cos(a) * r, pen.z + Math.sin(a) * r, rng);
+      p.pen = pen;
+      field.list.push(p);
+    }
+    h.emptyT = 0; h.alarmed = false;
+  }
+
+  /** Puts the sheep and cows of the town's pens into the field once (field.pens = town region). */
+  function addPens(field, town, rng) {
+    if (!field || !town || field.regionId !== town.region || field.pens === town.region) return;
+    field.pens = town.region;
+    let hid = field.herds.reduce((m, h) => Math.max(m, h.id), 0) + 1;
+    for (const pn of town.pens || []) {
+      if (!D.prey[pn.type]) continue;
+      const barn = town.buildings.find(b => b.place === pn.place && D.buildings[b.type].holds === 'livestock');
+      const h = { id: hid++, type: pn.type, centre: [pn.pos[0], pn.pos[2]], emptyT: 0, alarmed: false, count: pn.count,
+                  pen: { id: pn.id, place: pn.place, x: pn.pos[0], z: pn.pos[2], r: pn.r }, barn: barn ? barn.id : null, inside: 0 };
+      field.herds.push(h);
+      penHerdFill(field, h, rng);
+    }
+  }
+
+  const PENNED = { graze: 1, flee: 1 };                           // carried, roast and charging animals stay out of the barn
+
+  function pens(field, town, inside, dragon, dt, rng) {
+    const ev = [];
+    if (!field || !town || field.pens !== town.region) return ev;
+    for (const h of field.herds) {
+      if (!h.pen) continue;
+      const barn = h.barn ? town.buildings.find(b => b.id === h.barn) : null, barnUp = !!barn && !barn.ruin;
+      const info = { place: h.pen.place, type: h.type, pen: h.pen.id };
+      if (h.inside > 0 && !barnUp) {                              // the barn burned down: the herd breaks out and runs free
+        const free = { id: field.herds.reduce((m, o) => Math.max(m, o.id), 0) + 1, type: h.type, centre: [barn ? barn.pos[0] : h.pen.x, barn ? barn.pos[2] : h.pen.z],
+                       emptyT: 0, alarmed: true, free: true };
+        field.herds.push(free);
+        const at = barn ? barn.pos : [h.pen.x, 0, h.pen.z], rr = barn ? barn.r + 1.5 : 2;
+        for (let i = 0; i < h.inside; i++) {
+          const a = (i / h.inside) * Math.PI * 2 + rng() * 0.5;
+          let x = at[0] + Math.cos(a) * rr, z = at[2] + Math.sin(a) * rr;
+          if (!groundOk(field.regionId, x, z)) { x = h.pen.x; z = h.pen.z; }
+          const p = makePrey(field, free, h.type, x, z, rng);
+          p.state = 'flee'; p.yaw = Math.atan2(Math.cos(a), Math.sin(a));   // facing out of the barn
+          field.list.push(p);
+        }
+        ev.push(Object.assign({ e: 'livestock:released', n: h.inside, pos: at.slice() }, info));
+        h.inside = 0; h.emptyT = 0;
+        continue;
+      }
+      if (h.inside > 0 && !inside) {                              // the alert is down: back out into the pen
+        const n = h.inside; h.inside = 0;
+        penHerdFill(field, h, rng, n);
+        ev.push(Object.assign({ e: 'livestock:out', n }, info));
+        continue;
+      }
+      const mates = field.list.filter(p => p.herd === h.id);
+      if (inside && barnUp && !h.inside) {                        // alert 3: the herd is driven into the barn
+        const inPenNow = mates.filter(p => p.pen === h.pen && PENNED[p.state]);
+        if (inPenNow.length) {
+          for (const p of inPenNow) field.list.splice(field.list.indexOf(p), 1);
+          h.inside = inPenNow.length;
+          ev.push(Object.assign({ e: 'livestock:inside', n: h.inside }, info));
+          continue;
+        }
+      }
+      if (mates.length || h.inside) { h.emptyT = 0; continue; }
+      h.emptyT += dt;                                             // an empty pen restocks, never under the dragon's eyes
+      if (h.emptyT < D.respawn.herdCooldown) continue;
+      if (Math.hypot(h.pen.x - dragon.pos[0], h.pen.z - dragon.pos[2]) < D.respawn.minDistFromDragon) continue;
+      if (inside && barnUp) { h.inside = h.count; h.emptyT = 0; ev.push(Object.assign({ e: 'herd:respawn', herd: h.id, inside: true }, info)); continue; }
+      penHerdFill(field, h, rng);
+      ev.push(Object.assign({ e: 'herd:respawn', herd: h.id }, info));
+    }
+    return ev;
+  }
+
+  /** Livestock of a pen right now: { penned, inside } (debug panel, tests). */
+  function penCount(field, penId) {
+    const h = field && field.herds.find(o => o.pen && o.pen.id === penId);
+    if (!h) return null;
+    return { penned: field.list.filter(p => p.herd === h.id && p.pen === h.pen && p.state !== 'carried').length, inside: h.inside };
   }
 
   /* ---------- fire (T10) ---------- */
@@ -376,7 +488,7 @@
                         cd: 0, t: 0, speed: 0, goal: null, pause: 0, calm: 0, scatter: 0, acc: 0 });
           }
           for (const q of field.list) if (q.herd === p.herd && q.state === 'graze') { q.state = 'flee'; q.calm = 0; }
-          ev.push({ e: 'prey:roasted', type: p.type, chunks: n, food: total, pos: p.pos.slice() });
+          ev.push({ e: 'prey:roasted', type: p.type, id: p.id, taken: !!p.taken, chunks: n, food: total, pos: p.pos.slice() });
         }
       } else if (p.cook > 0) {
         p.cook = Math.max(0, p.cook - R.cool * dt);
@@ -402,5 +514,5 @@
     return c;
   }
 
-  M.define('prey', { spawnRegion, step, remove, census, groundOk, reach, swoopTarget, tryGrab, lift, inFront, release, byId, fireTarget, breathCone, inCone, cook, HERD_R, ALARM_ALT, CHARGE_ALT });
+  M.define('prey', { spawnRegion, step, addPens, pens, penCount, remove, census, groundOk, reach, swoopTarget, tryGrab, lift, inFront, release, byId, fireTarget, breathCone, inCone, cook, HERD_R, ALARM_ALT, CHARGE_ALT });
 })(typeof self !== 'undefined' ? self : this);
