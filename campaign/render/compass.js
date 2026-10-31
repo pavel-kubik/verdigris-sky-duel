@@ -13,7 +13,7 @@
   const wrap = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
 
   const COL = { bg: 'rgba(12,19,16,.62)', line: 'rgba(233,225,204,.22)', tick: 'rgba(233,225,204,.55)', text: '#ebe3cd', mute: '#a9ae9b',
-                lair: '#ff9447', exit: '#62c48a', dim: '#7d8278', scent: '#e0a040', livestock: '#e6d6a8', north: '#ff9447' };
+                lair: '#ff9447', exit: '#62c48a', dim: '#7d8278', scent: '#e0a040', livestock: '#e6d6a8', settlement: '#c9d4e8', north: '#ff9447' };
   const ORDER = { scent: 0, scentLivestock: 0, exit: 1, settlement: 2, lair: 3 };
 
   function icon(g, kind, x, y, s, col, alpha) {
@@ -25,6 +25,10 @@
     } else if (kind === 'exit') {                            // a path through a gap: two posts and an arrow up
       g.beginPath(); g.moveTo(-s, s * 0.8); g.lineTo(-s, -s * 0.5); g.moveTo(s, s * 0.8); g.lineTo(s, -s * 0.5);
       g.moveTo(0, s * 0.8); g.lineTo(0, -s * 0.8); g.moveTo(-s * 0.45, -s * 0.3); g.lineTo(0, -s * 0.85); g.lineTo(s * 0.45, -s * 0.3); g.stroke();
+    } else if (kind === 'settlement') {                       // T12: a house (gable roof)
+      g.beginPath(); g.moveTo(-s, -s * 0.05); g.lineTo(0, -s * 0.95); g.lineTo(s, -s * 0.05); g.closePath(); g.fill();
+      g.fillRect(-s * 0.7, -s * 0.05, s * 1.4, s * 0.9);
+      g.fillStyle = '#1a1410'; g.fillRect(-s * 0.18, s * 0.3, s * 0.36, s * 0.55);
     } else if (kind === 'scentLivestock') {                   // scent over a fence rail
       g.beginPath(); g.arc(-s * 0.35, -s * 0.15, s * 0.42, 0, TAU); g.arc(s * 0.35, -s * 0.3, s * 0.38, 0, TAU); g.fill();
       g.beginPath(); g.moveTo(-s, s * 0.75); g.lineTo(s, s * 0.75); g.moveTo(-s * 0.6, s * 0.35); g.lineTo(-s * 0.6, s * 0.95); g.moveTo(s * 0.6, s * 0.35); g.lineTo(s * 0.6, s * 0.95); g.stroke();

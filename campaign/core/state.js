@@ -17,12 +17,15 @@
  * Ground actions (T08): Grab picks up the prey or roast in front (walk.inFront, ground.reach), carried in the jaws;
  *        Eat on the ground takes ground.eatTime and stands still (a boar's hit cancels it); the breath aims
  *        ground.breathPitch lower so it sweeps the ground in front.
+ * Settlements (T12): cs.town = settlement.build of the current region (rebuilt when the region changes); its buildings
+ *        are solids for flight (floor, walls), walking (walls, roofs) and landing (no landing on a roof, 'roof').
+ *        cs.discovered = { placeId: true } (nav.step, 'place:discovered'), saved per region.
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), CV = M.need('cave');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), CV = M.need('cave'), SE = M.need('settlement');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -43,6 +46,8 @@
       flags: { introSeen: false, heavyT: 0 },
       stats: { played: 0, eaten: 0, food: 0 },
       nav: null,                     // compass and smell (core/nav.js, T09): { t, next, scents, range }, not saved
+      town: null,                    // T12: settlements of the region (core/settlement.js build), rebuilt on region change
+      discovered: {},                // T12: settlement ids seen once (compass markers), saved
       story: { act: 1, mother: null }, // mother: { lesson, at } once the hatching scene hands over to her (T04), driven by core/mother.js (T05)
       hint: null,                    // 'swoop' | 'grab' | 'heavy' | 'eat' | 'near' | null, for the HUD prompt
       swoop: null,                   // id of the prey a held grab is diving at
@@ -67,8 +72,20 @@
   function enterRegion(cs, regionId, pos, yaw) {
     cs.region = regionId;
     cs.field = PR.spawnRegion(regionId, cs.rng, pos || null);
+    ensureTown(cs);
     cs.dragon.carried = null; cs.dragon.eatT = 0;
     if (pos) cs.dragon.pilot = F.newPilot(pos, yaw || 0, G.statsOf(cs.dragon.stage).cruise);
+  }
+
+  /** cs.town for the current region (T12); region.enter and save.apply only switch cs.region. */
+  function ensureTown(cs) {
+    if (!cs.town || cs.town.region !== cs.region) cs.town = SE.build(cs.region, cs.regionStates ? cs.regionStates[cs.region] : null);
+    return cs.town;
+  }
+  /** Building solids for a dragon of this scale: { solidAt, solidHit } with the body pad (settlement.pad x scale). */
+  function solids(cs, scale) {
+    const town = ensureTown(cs), pad = D.settlement.pad * (scale || 1);
+    return { solidAt: (x, z) => SE.solidAt(town, x, z, pad), solidHit: (x, z) => SE.hit(town, x, z, pad) };
   }
 
   const scaleOf = cs => cs.debugScale || G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);   // debugScale: ?debug B (Elder size test, T10)
@@ -80,17 +97,18 @@
   function step(cs, inp, dt) {
     const ev = [];
     if (!cs.dragon.pilot) return ev;
+    ensureTown(cs);
     run(cs, inp, dt, ev);
-    NV.step(cs, dt);                                            // smell: scent markers for the compass (T09)
+    for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);
   }
 
   /**
-   * Autosave triggers (5.9): rest, region change, death (wake in the lair) and every save.every s of play.
+   * Autosave triggers (5.9): rest, region change, death (wake in the lair), a discovered settlement (T12) and every save.every s of play.
    * Core only emits { e: 'save', why }; game.js writes it to localStorage (and on visibilitychange to hidden).
    */
-  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death' };
+  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered' };   // T12: a new place
   function autosave(cs, ev, dt) {
     cs.saveT = (cs.saveT || 0) + dt;
     let why = null;
@@ -109,7 +127,7 @@
       return ev;
     }
     if (d.hp <= 0) return die(cs, ev, 'wounds');
-    const stats = G.statsOf(d.stage), eff = HN.effects(d.hunger), scale = scaleOf(cs);
+    const stats = G.statsOf(d.stage), eff = HN.effects(d.hunger), scale = scaleOf(cs), sol = solids(cs, scale);
     let carried = carriedPrey(cs);
     if (!carried) d.carried = null;
     const eating = !!carried && !!inp.eat;
@@ -117,7 +135,7 @@
 
     // locomotion mode (T06): Land / Fly one-shot, then the mode decides what moves the dragon
     if (!p.mode) p.mode = 'air';
-    if (inp.land) landToggle(cs, p, stats, eff, ev);
+    if (inp.land) landToggle(cs, p, stats, eff, ev, sol);
     // Breath pressed but no fire (T08 feedback): say why once per press - starving (hunger.starving.breath) or the fire bar is empty
     if (inp.breath && !cs.breathHeld && (p.mode || 'air') !== 'landing' && p.mode !== 'takeoff') {
       if (!eff.canBreath) emit(cs, ev, { e: 'breath:blocked', why: 'starving' });
@@ -139,9 +157,9 @@
       fly = Object.assign({}, inp, { sx: clamp(-turn * Sw.steer, -1, 1), sy: clamp(pitchWant / 0.75, -1, 1), boost: false });
     }
 
-    if (air) F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating, softEdge: RG.softEdgeAt(cs.region, p.pos, F.SOFT_EDGE) });
+    if (air) F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating, softEdge: RG.softEdgeAt(cs.region, p.pos, F.SOFT_EDGE), solidAt: sol.solidAt, solidHit: sol.solidHit });
     else {
-      const wctx = { regionId: cs.region, stats, effects: eff, eating, scale };
+      const wctx = { regionId: cs.region, stats, effects: eff, eating, scale, solidAt: sol.solidAt, solidHit: sol.solidHit };
       if (p.mode === 'ground') WK.step(p, inp, dt, wctx);
       else {
         const done = WK.blend(p, dt, wctx);
@@ -248,7 +266,7 @@
       carried = carriedPrey(cs);
     }
 
-    cs.landOk = air && WK.canLand(p, cs.region).ok;                // the Move slot offers Land (controls.slots)
+    cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt).ok;                // the Move slot offers Land (controls.slots)
     if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
     else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
@@ -267,9 +285,9 @@
   }
 
   /** Land / Fly one-shot: lands when allowed (else says why), takes off on the ground (else says why). */
-  function landToggle(cs, p, stats, eff, ev) {
+  function landToggle(cs, p, stats, eff, ev, sol) {
     if (p.mode === 'air') {
-      const c = WK.canLand(p, cs.region);
+      const c = WK.canLand(p, cs.region, sol && sol.solidAt);
       if (c.ok) { WK.startLanding(p); cs.swoop = null; emit(cs, ev, { e: 'dragon:landing', noise: D.land.noise }); }
       else emit(cs, ev, { e: 'land:refused', why: c.why });
     } else if (p.mode === 'ground') {
@@ -294,5 +312,5 @@
   /** Cave station action (T10): nest = rest (autosaves), larder = eat item arg, exit = leave. */
   const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
+  M.define('state', { create, enterRegion, ensureTown, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
 })(typeof self !== 'undefined' ? self : this);

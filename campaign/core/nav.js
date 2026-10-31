@@ -1,9 +1,11 @@
 /*
  * Verdigris campaign - navigation: compass markers and the dragon's sense of smell (Phase 2 T09).
  *   smellRange(cs) -> units                 data.smell.range x stage spot ^ 0.5, x hungryMult when hungry, x starveMult more when starving
- *   step(cs, dt) -> events[]                smell update every data.smell.update s (cs.nav.scents); nothing in the lair
+ *   step(cs, dt) -> events[]                smell update every data.smell.update s (cs.nav.scents); nothing in the lair;
+ *                                           discovery (T12) every data.nav.discoverEvery s: 'place:discovered' { id, type, region }
+ *   seesPlace(regionId, pos, place) -> bool within nav.discover and in line of sight over the terrain
  *   markers(cs) -> [{ kind, key, bearing, dist, label, via?, dim? }]
- *       kind: lair | exit | scent | scentLivestock (settlement comes with T12)
+ *       kind: lair | exit | settlement (discovered ones, T12) | scent | scentLivestock
  *       bearing: world bearing from the dragon (0 = +Z, the yaw convention); the strip subtracts the heading
  *       label: i18n key (+ params) for the tap-to-name tag; via: region id when the lair is reached through an exit
  * Scents: strength = herd size x (1 - distance / range); the strongest data.smell.max herds get a marker.
@@ -63,14 +65,41 @@
     nav.range = range;
   }
 
+  /** A settlement is discovered when the dragon is within nav.discover of it and sees its centre over the terrain. */
+  function seesPlace(regionId, pos, pl) {
+    const N = D.nav, dx = pl.x - pos[0], dz = pl.z - pos[2];
+    if (Math.hypot(dx, dz) > N.discover) return false;
+    const ty = (pl.y != null ? pl.y : T.surfaceAt(regionId, pl.x, pl.z)) + N.losEye;
+    for (let i = 1; i < N.losSteps; i++) {
+      const k = i / N.losSteps, x = pos[0] + dx * k, z = pos[2] + dz * k;
+      if (T.surfaceAt(regionId, x, z) > pos[1] + (ty - pos[1]) * k) return false;
+    }
+    return true;
+  }
+
+  function discover(cs) {
+    const ev = [], town = cs.town, p = cs.dragon.pilot;
+    if (!town || town.region !== cs.region) return ev;
+    if (!cs.discovered) cs.discovered = {};
+    for (const pl of town.places) {
+      if (cs.discovered[pl.id] || !seesPlace(cs.region, p.pos, pl)) continue;
+      cs.discovered[pl.id] = true;
+      ev.push({ e: 'place:discovered', id: pl.id, type: pl.type, region: cs.region });
+    }
+    return ev;
+  }
+
   function step(cs, dt) {
-    if (!cs.nav) cs.nav = { t: 0, next: 0, scents: [], range: 0, field: null };
+    if (!cs.nav) cs.nav = { t: 0, next: 0, scents: [], range: 0, field: null, seeT: 0 };
     const nav = cs.nav;
     if (cs.inLair || !cs.dragon.pilot) return [];
     nav.t += dt;
     nav.next -= dt;
     if (nav.next <= 0 || nav.field !== cs.field) { nav.next = D.smell.update; nav.field = cs.field; sniff(cs); }   // a new region (or prey field) is read at once
-    return [];
+    nav.seeT = (nav.seeT || 0) - dt;
+    if (nav.seeT > 0) return [];
+    nav.seeT = D.nav.discoverEvery;
+    return discover(cs);
   }
 
   /** The exit of `from` on the shortest path to region `to` (breadth first over the exits), or null. */
@@ -118,6 +147,10 @@
       const q = exitPoint(cs.region, e), dim = e.minStage != null && cs.dragon.stage < e.minStage;
       add('exit', 'exit:' + e.to, q[0], q[1], { key: dim ? 'c.nav.exitSmall' : 'c.nav.exit', p: { region: D.regions[e.to] ? D.regions[e.to].nameKey : e.to } }, dim ? { dim: true } : null);
     }
+    // discovered settlements of this region (T12)
+    if (cs.town && cs.town.region === cs.region && cs.discovered) {
+      for (const pl of cs.town.places) if (cs.discovered[pl.id]) add('settlement', 'place:' + pl.id, pl.x, pl.z, { key: 'c.place.' + pl.type }, { type: pl.type });
+    }
     // scents: toward the herd, blurred far out (a stored offset, so the marker drifts between updates, never jitters)
     for (const s of (cs.nav && cs.nav.scents) || []) {
       const b = Math.atan2(s.x - x0, s.z - z0) + s.off;
@@ -131,5 +164,5 @@
   /** Heading-relative angle of a marker (-PI..PI, positive = to the right of the heading). */
   function relative(bearing, yaw) { return wrap(yaw - bearing); }   // yaw grows to the left (flight: stick right lowers yaw)
 
-  M.define('nav', { smellRange, step, markers, sources, routeExit, relative, drift });
+  M.define('nav', { smellRange, step, markers, seesPlace, discover, sources, routeExit, relative, drift });
 })(typeof self !== 'undefined' ? self : this);

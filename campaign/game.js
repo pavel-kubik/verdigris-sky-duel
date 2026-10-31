@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), CV = C.need('cave');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), CV = C.need('cave'), SE = C.need('settlement');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't111.2 2026-10-31 River Farmlands terrain: river, road, plateaus, fields';
+  const BUILD = 't112.2 2026-10-31 settlements: buildings, solids, discovery on the compass (autosave on discovery)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -45,7 +45,7 @@
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
   /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt when the dragon travels, T11) ---------- */
-  let region = null, regionId = null, preyView = null;
+  let region = null, regionId = null, preyView = null, townView = null;   // townView: settlements (T12)
   let caveOn = null;                                           // T10: the cave scene is shown (syncScene), null = re-apply
   const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
   const startId = D.regions[params.get('region')] ? params.get('region') : D.startRegion;
@@ -64,12 +64,15 @@
   function loadRegion(id) {
     if (region) region.dispose();
     if (preyView) preyView.dispose();
+    if (townView) townView.dispose();
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
     scene.add(region.group);
     if (cs.region !== id || !cs.field) ST.enterRegion(cs, id);
     preyView = VRender.prey.build();
     scene.add(preyView.group);
+    townView = VRender.settlements.build(ST.ensureTown(cs));         // T12: buildings and pens of the region
+    scene.add(townView.group);
     scene.fog.color.set(region.fog); caveOn = null;
     const u = sky.material.uniforms;
     u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
@@ -132,6 +135,7 @@
     caveView.group.visible = inCave;
     if (region) region.group.visible = !inCave;
     if (preyView) preyView.group.visible = !inCave;
+    if (townView) townView.group.visible = !inCave;
     sky.visible = !inCave;
     if (inCave === caveOn) return;
     caveOn = inCave;
@@ -657,6 +661,7 @@
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
       else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
+      else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t('c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
       else if (e.e === 'growth:ready' && !cs.inLair) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
@@ -846,9 +851,10 @@
     ['I', 'put the nearest goat in front of the dragon', 'KeyI', 'goat here'],
     ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
     ['B', 'Elder size (scale 4) on / off: walls and camera test in the cave', 'KeyB', 'elder size'],
+    ['1', 'fly to the next settlement of this region (low, 150 out, facing it)', 'Digit1', 'to town'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
-  let dbgExit = 0, dbgExitRegion = null;                         // T: which exit the next press jumps to
+  let dbgExit = 0, dbgExitRegion = null, dbgTown = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
@@ -913,6 +919,13 @@
         pilot.pos = [x, TR.surfaceAt(regionId, x, z) + 50, z]; pilot.yaw = mid; pilot.pitch = 0; snapCam();
       }
     }
+    if (code === 'Digit1' && !cs.inLair && cs.town && cs.town.places.length) {   // T12: next settlement, approach from 150 out
+      dbgTown = (dbgTown + 1) % cs.town.places.length;
+      const pl = cs.town.places[dbgTown], a = Math.atan2(pilot.pos[0] - pl.x, pilot.pos[2] - pl.z) || 0;
+      const x = pl.x + Math.sin(a) * 150, z = pl.z + Math.cos(a) * 150;
+      Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: a + Math.PI, pitch: 0, speed: stats.cruise });
+      snapCam(); flashPrompt(t('c.dbg.town', { place: t('c.place.' + pl.type) }), 1.5);
+    }
     if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(t(okS ? 'c.dbg.saved' : saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); }
     if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
     if (code === 'KeyR') {
@@ -966,6 +979,7 @@
     motherArrow();
     compassHud(dt);
     preyView.update(cs.field, time, carryPose());
+    townView.update(cs.town);
     targetRing();
     fireTargetRing();
     renderer.render(scene, camera);
@@ -1040,7 +1054,7 @@
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
-      const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId) : null;
+      const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId, ST.solids(cs, heroScale).solidAt) : null;
       L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
@@ -1049,6 +1063,8 @@
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
+      { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
+        L.push('TOWNS   ' + (ti ? ti.buildings + ' buildings' : '-') + '  near ' + (near ? near.id + ' ' + Math.round(Math.hypot(near.x - pilot.pos[0], near.z - pilot.pos[2])) : '-') + '  found ' + (Object.keys(cs.discovered || {}).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');

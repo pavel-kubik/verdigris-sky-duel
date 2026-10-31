@@ -13,9 +13,11 @@
  *   pose(a, p, dt, scale) -> a                        render pose (T07) for shared/dragon.js anim: a = { ground, fold,
  *                                                     gait, stride, flare } advanced from the pilot mode and ground speed
  *
- * ctx: { regionId, scale, stats?, effects?, eating?, surface?(x, z), solidAt?(x, z) -> roof height | null }
+ * ctx: { regionId, scale, stats?, effects?, eating?, surface?(x, z), solidAt?(x, z) -> roof height | null,
+ *        solidHit?(x, z) -> { nx, nz, depth } | null }
  * surface defaults to terrain.surfaceAt of the region, so the same code walks in the cave (T10) with another floor.
- * Buildings (solidAt) arrive with settlements in T12; until then the ground is the terrain only.
+ * Buildings (T12, core/settlement.js): solidAt is a roof the dragon cannot climb (over walk.stepUp x scale), solidHit
+ * the wall it slides along (the move's component along the wall is kept).
  */
 (function (root) {
   'use strict';
@@ -90,7 +92,18 @@
   /** Moves by (dx, dz); a blocked move slides along the contour of the slope, else stops. Returns the share moved. */
   function tryMove(p, dx, dz, ctx, scale) {
     const x0 = p.pos[0], z0 = p.pos[2];
+    if (Math.hypot(dx, dz) < 1e-6) return 1;                             // a standstill creep (passable() lets a zero run through)
     if (passable(ctx, x0, z0, x0 + dx, z0 + dz, scale)) { p.pos[0] += dx; p.pos[2] += dz; return 1; }
+    const wall = ctx.solidHit ? ctx.solidHit(x0 + dx, z0 + dz) : null;
+    if (wall) {                                                          // a building: slide along its wall (T12)
+      const k = wall.depth + 1e-3, sx = dx + wall.nx * k, sz = dz + wall.nz * k;   // the move, pushed back out of the wall
+      const along = sx * dx + sz * dz;
+      if (along > 1e-9 && passable(ctx, x0, z0, x0 + sx, z0 + sz, scale)) {
+        p.pos[0] += sx; p.pos[2] += sz;
+        return Math.min(1, Math.hypot(sx, sz) / (Math.hypot(dx, dz) || 1));
+      }
+      return 0;
+    }
     const f = surfaceFn(ctx), e = 1;
     let gx = f(x0 + e, z0) - f(x0 - e, z0), gz = f(x0, z0 + e) - f(x0, z0 - e);
     const gl = Math.hypot(gx, gz);
@@ -179,6 +192,7 @@
       if (Math.hypot(x1, z1) > R.radius) return;
       if (p.mode === 'landing' && T.liquidAt(ctx.regionId, x1, z1)) { p.speed = 0; return; }
     }
+    if (p.mode === 'landing' && ctx.solidHit && ctx.solidHit(x1, z1)) { p.speed = 0; return; }   // no sliding into a building (T12)
     p.pos[0] = x1; p.pos[2] = z1;
     p.vel = [dx / (dt || 1), 0, dz / (dt || 1)];
   }
