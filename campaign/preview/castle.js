@@ -90,8 +90,8 @@
   const VIEWS = {
     river: [[-270, -35, 60], [0, 14, 0]],
     gate:  [[170, 12, 26], [66, 10, 0]],
-    high:  [[230, 190, 230], [0, 0, 0]],
-    yard:  [[30, 8, -4], [-38, 16, 0]],
+    high:  [[150, 120, 170], [0, 0, 0]],
+    yard:  [[34, 9, 2], [-30, 10, -4]],
   };
   const orb = { target: new THREE.Vector3(), r: 300, th: 0.8, ph: 1.0 };
   function setView(name) {
