@@ -202,7 +202,7 @@
       decay: 0.0035,
       towerDownMult: 2,
       bellFast: 0.5,
-      patrol: { speed: 4, gap: 2.5, pause: 4 },
+      patrol: { speed: 4, gap: 2.5, pause: 4, trim: 80 },   // walk speed, the pair's spacing, s at each end, route ends kept off the region edge
       responses: {
         1: { extraArchers: 1, bellFast: true },
         2: { patrols: 2 },

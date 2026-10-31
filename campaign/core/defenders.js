@@ -53,14 +53,39 @@
   /** Eye height of a defender standing on b (a post building) or on the ground. */
   const topOf = b => b.pos[1] + b.h + D.perception.watch.eye;
 
-  function spawn(town, rng) {
+  const NO_RESP = { extraArchers: 0, patrols: 0, bellFast: false };
+
+  /** T17: the patrol route of a region: its road (terrain feature 'road', ends trimmed by patrol.trim), else a line
+   *  through its settlement centres; null with fewer than 2 points. */
+  function routeOf(town) {
+    if (!town) return null;
+    const R = T.region(town.region), road = ((R.terrain && R.terrain.features) || []).find(f => f.type === 'road');
+    let pts = road ? road.points.map(q => [q[0], q[1]]) : town.places.map(pl => [pl.x, pl.z]);
+    const lim = (R.radius || 1000) - D.alert.patrol.trim;
+    pts = pts.map(([x, z]) => { const l = Math.hypot(x, z); return l > lim ? [x / l * lim, z / l * lim] : [x, z]; });
+    if (pts.length < 2) return null;
+    const len = [0];
+    for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    return { pts, len, total: len[len.length - 1] };
+  }
+  /** Point and heading at distance s along a route. */
+  function along(route, s) {
+    s = clamp(s, 0, route.total);
+    let i = 1;
+    while (i < route.pts.length - 1 && route.len[i] < s) i++;
+    const a = route.pts[i - 1], b = route.pts[i], seg = route.len[i] - route.len[i - 1] || 1, k = (s - route.len[i - 1]) / seg;
+    return { x: a[0] + (b[0] - a[0]) * k, z: a[1] + (b[1] - a[1]) * k, yaw: Math.atan2(b[0] - a[0], b[1] - a[1]) };
+  }
+
+  /** opts (T17): { resp: alert.responses(level), old: the squad before (defenders with the same id keep their state) } */
+  function spawn(town, rng, opts) {
     rng = rng || Math.random;
-    const list = [], E = D.defense;
-    if (!town) return { town, list, arrows: [], bolts: [], t: 0, rung: {}, kills: 0 };
+    const list = [], E = D.defense, resp = (opts && opts.resp) || NO_RESP;
+    if (!town) return { town, list, arrows: [], bolts: [], t: 0, rung: {}, kills: 0, resp, alarmed: {} };
     for (const pl of town.places) {
       const tpl = D.settlements[pl.type] || {}, own = town.buildings.filter(b => b.place === pl.id);
       const towers = own.filter(b => D.buildings[b.type].post === 'archer');
-      const nA = tpl.archers || 0;
+      const nA = (tpl.archers || 0) + (tpl.archers ? resp.extraArchers || 0 : 0);   // T17: alert sends more archers up
       for (let i = 0; i < nA && towers.length; i++) {
         const b = towers[i % towers.length], k = Math.floor(i / towers.length), base = baseYaw(b, pl);
         const nOn = Math.floor(nA / towers.length) + (i % towers.length < nA % towers.length ? 1 : 0);
@@ -85,7 +110,50 @@
         list.push(mk('peasant', pl.id + '.peasant' + (i + 1), pl.id, pos, a, { homeB: hb ? hb.id : null, wanderT: rng() * 3 }));
       }
     }
-    return { town, list, arrows: [], bolts: [], t: 0, rung: {}, kills: 0, rng };
+    // T17 patrols: archer pairs walking the road (alert 2+), spread along it, every other pair heading the other way
+    const route = resp.patrols ? routeOf(town) : null, PT = D.alert.patrol;
+    for (let i = 0; route && i < resp.patrols; i++) {
+      const s0 = route.total * (i + 0.5) / resp.patrols, dir = i % 2 ? -1 : 1;
+      for (let k = 0; k < 2; k++) {
+        const at = along(route, s0), side = (k - 0.5) * PT.gap, yaw = dir > 0 ? at.yaw : wrap(at.yaw + Math.PI);
+        const x = at.x + Math.cos(at.yaw) * side, z = at.z - Math.sin(at.yaw) * side;
+        const pl = SE.near(town, x, z, Infinity);
+        list.push(mk('archer', town.region + '.patrol' + (i + 1) + '.' + (k + 1), pl ? pl.id : town.region, [x, T.surfaceAt(town.region, x, z) + E.eye, z], yaw,
+          { patrol: { s: s0, dir, side, pause: 0 } }));
+      }
+    }
+    const old = opts && opts.old;
+    if (old && old.town && old.town.region === town.region) {          // same region (alert level or town change): keep minds
+      const was = new Map(old.list.map(d => [d.id, d]));
+      for (const d of list) {
+        const o = was.get(d.id);
+        if (!o) continue;
+        const keepPos = !d.post && !d.patrol ? { pos: o.pos.slice(), yaw: o.yaw } : d.patrol ? { pos: o.pos.slice(), yaw: o.yaw, patrol: Object.assign({}, o.patrol) } : { yaw: o.yaw };
+        Object.assign(d, { alive: o.alive, down: o.down, hp: o.hp, aware: o.aware, state: o.state, focus: o.focus, search: o.search,
+          cool: o.cool, hidden: o.hidden, hideT: o.hideT, shelter: o.shelter, panic: o.panic, rang: o.rang, wTo: o.wTo, wanderT: o.wanderT }, keepPos);
+      }
+    }
+    return { town, list, arrows: old ? old.arrows : [], bolts: old ? old.bolts || [] : [], t: old ? old.t : 0, rung: old ? old.rung : {},
+             kills: old ? old.kills : 0, rng, resp, route, alarmed: old ? old.alarmed || {} : {} };
+  }
+
+  /** T17: a patrol archer walks its route while idle (ping-pong, a pause at each end); otherwise stands and turns to
+   *  what it noticed. */
+  function patrolStep(sq, d, dt) {
+    const PT = D.alert.patrol, W = D.perception.watch, pa = d.patrol, route = sq.route;
+    d.walk = 0;
+    if (d.state !== 'idle') {
+      if (d.focus) { const dy = wrap(Math.atan2(d.focus[0] - d.pos[0], d.focus[2] - d.pos[2]) - d.yaw), mx = W.turn * dt; d.yaw = wrap(d.yaw + clamp(dy, -mx, mx)); }
+      return;
+    }
+    if (!route) return;
+    if (pa.pause > 0) { pa.pause -= dt; return; }
+    pa.s += pa.dir * PT.speed * dt;
+    if (pa.s <= 0 || pa.s >= route.total) { pa.s = clamp(pa.s, 0, route.total); pa.dir = -pa.dir; pa.pause = PT.pause; }
+    const at = along(route, pa.s), x = at.x + Math.cos(at.yaw) * pa.side, z = at.z - Math.sin(at.yaw) * pa.side;
+    d.pos[0] = x; d.pos[2] = z; d.pos[1] = T.surfaceAt(sq.town.region, x, z) + D.defense.eye;
+    d.yaw = pa.dir > 0 ? at.yaw : wrap(at.yaw + Math.PI);
+    d.walk = PT.speed;
   }
 
   function byId(town, id) { return id ? town.buildings.find(b => b.id === id) : null; }
@@ -285,7 +353,7 @@
       d.ringer = true; d.goalB = bell.id;
       if (d.ring > 0 || walkTo(sq, d, bell.pos[0], bell.pos[2], V.speed, dt, bell.r + 1.6)) {
         d.ring += dt;
-        if (d.ring >= E.ringTime) {
+        if (d.ring >= E.ringTime * (sq.resp && sq.resp.bellFast ? D.alert.bellFast : 1)) {   // T17: alert 1+ rings faster
           d.ring = 0; d.rang = true; d.ringer = false; d.goalB = null;
           sq.rung[d.place] = E.ringCool;
           out.push({ e: 'bell:ring', place: d.place, pos: bell.pos.slice(), id: d.id });
@@ -339,8 +407,15 @@
   }
 
   function step(cs, ev, dt, o) {
-    const out = [], town = cs.town, W = D.perception.watch, P = D.perception;
-    if (!cs.squad || cs.squad.town !== town) cs.squad = spawn(town, cs.rng);
+    const out = [], town = cs.town, W = D.perception.watch, P = D.perception, AL = M.need('alert');
+    const rs = cs.regionStates && cs.regionStates[cs.region], lv = AL.level(rs);
+    if (cs.squad && cs.squad.town === town && cs.squad.level == null && lv === 0) cs.squad.level = 0;   // spawned outside step at level 0
+    if (!cs.squad || cs.squad.town !== town || cs.squad.level !== lv) {   // T17: the alert level changes the squad
+      const old = cs.squad;
+      cs.squad = spawn(town, cs.rng, { resp: AL.responses(lv), old });
+      cs.squad.level = lv;
+      if (old && old.town && town && old.town.region === town.region && old.level != null && lv > old.level) out.push({ e: 'defenders:reinforced', level: lv, from: old.level });
+    }
     const sq = cs.squad, p = cs.dragon.pilot;
     cs.watch = sq;                                      // T14's debug view and 'to post' read cs.watch.list
     sq.t += dt;
@@ -384,6 +459,7 @@
       d.state = now;
       if (now === 'idle') d.focus = null;
       if (now !== was) out.push({ e: 'aware:state', id: d.id, kind: d.kind, state: now, from: was });
+      if (d.patrol) patrolStep(sq, d, dt);
       if (d.kind === 'peasant') peasant(sq, d, cs, dt, out); else archer(sq, d, cs, dt, out);
     }
     stepArrows(sq, cs, dt, scale, out);
@@ -396,6 +472,7 @@
     const by = {}, out = [], town = sq && sq.town;
     for (const d of (sq && sq.list) || []) {
       if (!d.alive || (d.kind !== 'archer' && d.kind !== 'ballista')) continue;
+      if (d.patrol) { out.push({ x: d.pos[0], z: d.pos[2], r: D.defenders.archer.range }); continue; }   // T17: a zone per patrol archer
       const pl = town && town.places.find(p => p.id === d.place), cx = pl ? pl.x : d.pos[0], cz = pl ? pl.z : d.pos[2];
       const r = Math.hypot(d.pos[0] - cx, d.pos[2] - cz) + D.defenders[d.kind].range;
       if (!by[d.place] || by[d.place].r < r) by[d.place] = { x: cx, z: cz, r };
@@ -414,5 +491,5 @@
     return sq;
   }
 
-  M.define('defenders', { spawn, step, burn, zones, calm, aimArrow, inCone, segDist2 });
+  M.define('defenders', { spawn, routeOf, along, step, burn, zones, calm, aimArrow, inCone, segDist2 });
 })(typeof self !== 'undefined' ? self : this);
