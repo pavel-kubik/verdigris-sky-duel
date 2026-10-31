@@ -187,6 +187,29 @@
       watch: { eye: 2, sweep: 0.7, sweepRate: 0.25, turn: 1.5 },
     },
 
+    /* Alert (Phase 2 T17, core/alert.js; 002_task_kingdom.md 4.5 and 5.5). Per region heat 0..maxHeat, level =
+       floor(heat) clamped to maxLevel. Incidents add heat (`add`; sighted once per settlement and alarm, a palisade piece
+       counts as no incident, livestock and loot come with T18 / T19); `quiet` s after the last incident it decays by
+       `decay` per s (x towerDownMult while a watchtower of the region lies in ruins), also while the dragon is elsewhere
+       (alert.catchUp on region load, from the play-time stamp `at`). responses: what each level adds (cumulative, a
+       higher level overrides the same key): extra archers per tower settlement, patrols = archer pairs walking the roads
+       (or between the settlements where a region has no road), the village ballista platform (settlements alert3),
+       livestock kept inside (T18), a faster bell (defense.ringTime x bellFast). */
+    alert: {
+      maxLevel: 3, maxHeat: 3.99,
+      add: { sighted: 0.2, bell: 0.5, orderBurned: 0.5, civilBurned: 0.75, livestock: 1.0, defenderKilled: 0.25, loot: 1.0 },
+      quiet: 60,
+      decay: 0.0035,
+      towerDownMult: 2,
+      bellFast: 0.5,
+      patrol: { speed: 4, gap: 2.5, pause: 4 },
+      responses: {
+        1: { extraArchers: 1, bellFast: true },
+        2: { patrols: 2 },
+        3: { villageBallista: true, livestockInside: true, extraArchers: 2 },
+      },
+    },
+
     /* Corn fields (Pavel's request 2026-10-31, core/crops.js, render/corn-view.js): fields of crop kind `crop` grow stalks
        `height` tall. The breath on the stalks for `ignite` s sets the field alight (heat cools at `cool` per s); a fire front
        runs out from that spot at `spread` units/s, a `band` wide ring of popping corn that throws popcorn into the air,
