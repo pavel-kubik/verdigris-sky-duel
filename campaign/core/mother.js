@@ -55,7 +55,7 @@
     const p = cs.dragon.pilot;
     let best = null, bd = Infinity;
     for (const q of cs.field.list) {
-      if (q.type === 'roast' || q.state === 'carried' || !test(q)) continue;
+      if (q.type === 'roast' || q.state === 'carried' || q.pen || !test(q)) continue;   // never the village's sheep (T18)
       if (inZone(zones, q.pos[0], q.pos[2], MO.dangerPad)) continue;
       const d = Math.hypot(q.pos[0] - p.pos[0], q.pos[2] - p.pos[2]) - (q.cook > 0 ? 1e6 : 0);
       if (d < bd) { bd = d; best = q; }

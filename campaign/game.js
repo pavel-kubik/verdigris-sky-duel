@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't117.1 2026-10-31 region alert (heat, pips, extra archers, patrols, village ballista at 3; debug ] alert +1 / [ calm alert)';
+  const BUILD = 't118.1 2026-10-31 livestock: sheep and cows in pens, into the barn at alert 3, a burned barn releases them (debug . to pen)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -59,6 +59,7 @@
   let saveOff = !!saveBad;                                     // never overwrite a save we could not read (until "Start new")
   let saved = boot.status === 'ok' ? boot.data : null;         // the run to continue (this session's last save, in memory)
   let cornToast = false;                                       // the 'corn is popping' toast once per session
+  let insideToast = false;                                     // T18: 'the herds are in the barns' once per alert 3
   let lastSave = null;                                         // { why, ok, at } for the debug panel
   const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
@@ -661,6 +662,10 @@
         else flashPrompt(t(e.level ? 'c.prompt.alertDown' : 'c.prompt.alertCalm', { region: rn, n: e.level }), 2.5);
         alertPulse = 2;
       }
+      else if (e.e === 'prey:grabbed' && D.prey[e.type] && D.prey[e.type].livestock) { flashPrompt(null); toast(t('c.toast.stolen', { prey: t('c.prey.' + e.type) }), t('c.toast.stolenSub', { region: t(TR.region(cs.region).nameKey) }), 2.4); }
+      else if (e.e === 'livestock:inside' && !insideToast) { insideToast = true; toast(t('c.toast.inside'), t('c.toast.insideSub'), 3); }
+      else if (e.e === 'livestock:out') insideToast = false;
+      else if (e.e === 'livestock:released') toast(t('c.toast.released'), t('c.toast.releasedSub'), 2.6);
       else if (e.e === 'bell:ring') toast(t('c.toast.bell', { place: t('c.place.' + (cs.town.places.find(p => p.id === e.place) || {}).type) }), t('c.toast.bellSub'), 2.8);
       else if (e.e === 'defender:killed' && e.kind === 'archer') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.archerFell' : 'c.prompt.archerBurned'), 1.8);
       else if (e.e === 'defender:killed' && e.kind === 'ballista') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.ballistaFell' : 'c.prompt.crewBurned'), 2.2);
@@ -888,6 +893,7 @@
     [']', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'BracketRight', 'alert +1'],
     ['[', 'alert to 0 in this region', 'BracketLeft', 'calm alert'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
+    ['.', 'fly to the next livestock pen (60 out, 25 up, facing it)', 'Period', 'to pen'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
@@ -895,6 +901,7 @@
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
   let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
   const LIGHTS = [null, 'dusk', 'night'];                        // T14: debug 8 cycles cs.light (T21's clock sets it later)
+  let dbgPen = -1;                                               // T18: pen index of the last '.' press
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1, dbgBal = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
@@ -966,6 +973,17 @@
       const x = pl.x + Math.sin(a) * 150, z = pl.z + Math.cos(a) * 150;
       Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: a + Math.PI, pitch: 0, speed: stats.cruise });
       snapCam(); flashPrompt(t('c.dbg.town', { place: t('c.place.' + pl.type) }), 1.5);
+    }
+    if (code === 'Period' && !cs.inLair && cs.town) {             // T18: next livestock pen, approach from 60 out
+      const list = cs.town.pens || [];
+      if (!list.length) flashPrompt(t('c.dbg.noPen'), 1.5);
+      else {
+        dbgPen = (dbgPen + 1) % list.length;
+        const pn = list[dbgPen], a = Math.atan2(pilot.pos[0] - pn.pos[0], pilot.pos[2] - pn.pos[2]) || 0;
+        const x = pn.pos[0] + Math.sin(a) * 60, z = pn.pos[2] + Math.cos(a) * 60;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 25, z], yaw: a + Math.PI, pitch: -0.2, speed: stats.cruise });
+        snapCam(); flashPrompt(t('c.dbg.pen', { prey: t('c.prey.' + pn.type) }), 1.5);
+      }
     }
     if (code === 'Digit2' && !cs.inLair && cs.town) {            // T13: fire test on the nearest standing building
       let best = null, bd = 400;
@@ -1198,6 +1216,8 @@
           L.push('DEFEND  archers ' + ar.filter(v => v.alive).length + '/' + ar.length + ' (aiming ' + ar.filter(v => v.target).length + ')  peasants ' + pe.length + ' hidden ' + pe.filter(v => v.hidden).length + '  arrows ' + (sq ? sq.arrows.length : 0) + '/' + D.projectiles.max + '  killed ' + (sq ? sq.kills : 0) + '  drawn ' + (defView ? defView.info.drawn : 0));
           L.push('BALLISTA crewed ' + ba.filter(v => v.alive).length + '/' + ba.length + '  aiming ' + ba.filter(v => v.aimAt).map(v => v.aim.toFixed(1) + 's').join(' ') + '  reload ' + ba.filter(v => v.alive && v.cool > 0).map(v => v.cool.toFixed(0) + 's').join(' ') + '  bolts ' + (sq && sq.bolts ? sq.bolts.length : 0)); }
         if (wn) L.push('        near ' + wn.kind + ' ' + Math.round(wd) + '  range ' + Math.round(PC.range(wn, { spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId) })) + '  seen ' + f2(wn.seen) + '  heard ' + (wn.heard ? wn.heard.kind : '-') + '  aware ' + f2(wn.aware) + ' ' + wn.state); }
+      { const pl = (cs.town && cs.town.pens) || [];
+        L.push('STOCK   ' + (pl.map(pn => { const c = PR.penCount(cs.field, pn.id); return pn.id.split('.').slice(1).join('.') + ' ' + pn.type + ' ' + (c ? c.penned + (c.inside ? ' +' + c.inside + ' in barn' : '') : '-'); }).join(', ') || '-') + '  taken ' + (cs.stats.livestockTaken || 0)); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');

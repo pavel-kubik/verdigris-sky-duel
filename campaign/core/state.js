@@ -30,6 +30,9 @@
  *        alarm), bells, burned buildings, killed defenders and taken livestock raise it, quiet lowers it, also while away
  *        (catch-up in ensureTown); 'alert:level' { level, from, region }; the squad follows the level (extra archers,
  *        patrols, faster bell; 'defenders:reinforced'), alert 3 adds the village platform (refreshTown).
+ * Livestock (T18): sheep and cows graze in the town's pens (prey herds with a pen, prey.addPens); taking one (grab, or
+ *        roasting it) raises the heat by alert.add.livestock once per animal (stats.livestockTaken); at alert 3 they are
+ *        inside the barn ('livestock:inside'), a burned barn releases them ('livestock:released'), below 3 they come out.
  * Perception (T14) and defenders (T15): cs.squad = defenders.spawn of the town (peasants, archers on the towers, a
  *        ballista with its crew on each platform (T16: aim line, bolt 'bolt:aim' / 'bolt:fire' / 'bolt:hit'); cs.watch is the same object), fed with this frame's noises; cs.light (null =
  *        day; T21's clock sets it) scales their sight. 'aware:state', 'bell:ring', 'arrow:hit' (HP, cancels a meal,
@@ -58,7 +61,7 @@
       inLair: false,                 // inside the cave (T10: the dragon walks in the hall, core/cave.js); location reads it
       station: null,                 // T10: the cave station in reach ('nest' | 'larder' | 'exit'), the Action slot / E
       flags: { introSeen: false, heavyT: 0 },
-      stats: { played: 0, eaten: 0, food: 0, civilBurned: 0, orderBurned: 0 },
+      stats: { played: 0, eaten: 0, food: 0, civilBurned: 0, orderBurned: 0, livestockTaken: 0 },
       regionStates: {},              // T13: { regionId: { ruins: [{ id, at }] } } (T17 adds heat, T19 taken loot), saved
       nav: null,                     // compass and smell (core/nav.js, T09): { t, next, scents, range }, not saved
       town: null,                    // T12: settlements of the region (core/settlement.js build), rebuilt on region change
@@ -136,6 +139,7 @@
     run(cs, inp, dt, ev);
     defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
     alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
+    livestock(cs, ev, dt);                                       // T18: sheep and cows in pens, into the barn at alert 3
     for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);
@@ -335,7 +339,15 @@
       else if (e.e === 'bell:ring') inc('bell');
       else if (e.e === 'building:ruined' && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
       else if (e.e === 'defender:killed') inc('defenderKilled');
-      else if (e.e === 'prey:grabbed' && D.prey[e.type] && D.prey[e.type].livestock) inc('livestock');   // T18 brings the sheep and cows
+      else if ((e.e === 'prey:grabbed' || e.e === 'prey:roasted') && D.prey[e.type] && D.prey[e.type].livestock) {
+        // T18: a sheep or cow taken (grabbed, or roasted where it stood) raises the heat once per animal
+        const q = e.e === 'prey:grabbed' ? PR.byId(cs.field, e.id) : null;
+        if (e.e === 'prey:roasted' ? !e.taken : q && !q.taken) {
+          if (q) q.taken = true;
+          cs.stats.livestockTaken = (cs.stats.livestockTaken || 0) + 1;
+          inc('livestock');
+        }
+      }
     }
     if (sq) {                                                    // a settlement whose defenders are all idle again can be alarmed anew
       const busy = {};
@@ -345,6 +357,16 @@
     for (const e of AL.step(rs, dt, now, { towerDown: AL.towerDown(cs.town) })) out.push(e);
     for (const e of out) emit(cs, ev, Object.assign(e, { region: cs.region, heat: rs.heat }));
     if (cs.town && cs.town.alert3 !== SE.alert3On(rs)) refreshTown(cs);
+  }
+
+  /** Livestock (T18): the town's pens stock the prey field once; at alert 3 (livestockInside) the herds go into their barn,
+   *  a burned barn releases them (prey.pens). */
+  function livestock(cs, ev, dt) {
+    if (!cs.field || cs.inLair) return;
+    const town = ensureTown(cs);                                 // the region may have changed during this frame
+    PR.addPens(cs.field, town, cs.rng);
+    const inside = AL.responses(AL.level(cs.regionStates[cs.region] || {})).livestockInside;
+    for (const e of PR.pens(cs.field, town, inside, cs.dragon.pilot, dt, cs.rng)) emit(cs, ev, Object.assign(e, { region: cs.region }));
   }
 
   /** Building fire (T13): burn under the breath, spread, ruins (stats, region state), rebuild after fire.rebuild. */

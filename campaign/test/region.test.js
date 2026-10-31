@@ -107,7 +107,8 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
     if (ev.some(e => e.e === 'region:enter')) trips++;
     tm += dt;
     ok(Number.isFinite(d.pilot.pos[0] + d.pilot.pos[1] + d.pilot.pos[2]) && Math.hypot(d.pilot.pos[0], d.pilot.pos[2]) <= R.radius + 1e-6, 'finite, in bounds');
-    ok(cs.field.list.length <= D.preyAi.maxActive, 'prey count bounded');
+    const stock = (cs.town.pens || []).reduce((n, pn) => n + pn.count, 0);       // T18: penned livestock come on top
+    ok(cs.field.list.filter(p => !p.pen).length <= D.preyAi.maxActive && cs.field.list.length <= D.preyAi.maxActive + stock, 'prey count bounded');
   }
   ok(trips === 10, '5 round trips flown (' + trips + ' crossings, ' + Math.round(tm) + ' s)');
   ok(cs.region === 'ash', 'back home in Ash Wastes');

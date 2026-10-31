@@ -66,7 +66,7 @@
       },
       flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0 },
       stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
-               civilBurned: cs.stats.civilBurned || 0, orderBurned: cs.stats.orderBurned || 0 },
+               civilBurned: cs.stats.civilBurned || 0, orderBurned: cs.stats.orderBurned || 0, livestockTaken: cs.stats.livestockTaken || 0 },
     };
   }
 
@@ -128,7 +128,8 @@
     cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0 };
     const s = o.stats || {};
     cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0,
-                 civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0 };
+                 civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0,
+                 livestockTaken: num(s.livestockTaken) ? s.livestockTaken : 0 };
     cs.story = storyOf(o.story);
     cs.discovered = {}; cs.regionStates = {};
     for (const id of Object.keys(o.regions || {})) {
