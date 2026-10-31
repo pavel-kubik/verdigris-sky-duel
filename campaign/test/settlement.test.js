@@ -164,6 +164,7 @@ function grounded(regionId, x, z, yaw, stage) {
   for (let i = 0; i < 60; i++) ev = ev.concat(S.step(cs, { sy: 0 }, dt));
   const d = ev.filter(e => e.e === 'place:discovered' && e.id === 'farm.outpost');
   ok(d.length === 1 && d[0].type === 'outpost', 'discovered once within range and sight');
+  ok(ev.some(e => e.e === 'save' && e.why === 'discovered'), 'a discovery autosaves');
   for (let i = 0; i < 60; i++) ok(!S.step(cs, { sy: 0 }, dt).some(e => e.e === 'place:discovered' && e.id === 'farm.outpost'), 'no second discovery event');
   const m = NV.markers(cs).find(q => q.key === 'place:farm.outpost');
   ok(m && m.kind === 'settlement' && m.label.key === 'c.place.outpost', 'settlement marker on the compass');
