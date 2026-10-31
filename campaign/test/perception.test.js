@@ -125,8 +125,9 @@ const viewer = (o) => Object.assign({ pos: [0, 0, 0], yaw: 0, sight: 130, fov: 1
   const town = S.ensureTown(cs), tw = town.buildings.find(b => b.type === 'tower');
   cs.dragon.pilot = F.newPilot([0, 120, 0], 0, 30);
   S.step(cs, {}, 0.016);
-  ok(cs.watch && cs.watch.list.length === 1 && cs.watch.list[0].kind === 'archer', 'one watcher on the tower');
-  const w = cs.watch.list[0];
+  const posts = cs.watch ? cs.watch.list.filter(v => v.post) : [];   // T15: the defenders are the watchers now
+  ok(posts.length === 2 && posts.every(v => v.kind === 'archer' && v.building === tw.id), 'two archers on the tower');
+  const w = posts[0];
   const at = [w.pos[0] + Math.sin(w.base) * 60, 0, w.pos[2] + Math.cos(w.base) * 60];
   at[1] = T.surfaceAt('wild', at[0], at[2]) + 25;
   const pilot = F.newPilot(at, w.base + Math.PI, 0);
@@ -139,7 +140,9 @@ const viewer = (o) => Object.assign({ pos: [0, 0, 0], yaw: 0, sight: 130, fov: 1
   // into the cave: nobody sees it, awareness falls back
   cs.inLair = true;
   for (let i = 0; i < 100; i++) S.step(cs, {}, 0.1);
-  ok(w.state === 'idle', 'in the cave the post calms down');
+  ok(w.state === 'idle' || w.state === 'search', 'in the cave the post calms down');
+  for (let i = 0; i < 220; i++) S.step(cs, {}, 0.1);
+  ok(w.state === 'idle', 'after the search it is idle');
   cs.inLair = false;
   // night: the same spot at 120 out is beyond sight
   const far = [w.pos[0] + Math.sin(w.base) * 120, 0, w.pos[2] + Math.cos(w.base) * 120];
@@ -151,5 +154,5 @@ const viewer = (o) => Object.assign({ pos: [0, 0, 0], yaw: 0, sight: 130, fov: 1
   tw.ruin = true;
   cs.light = null;
   for (let i = 0; i < 20; i++) { pilot.pos = at.slice(); S.step(cs, {}, 0.05); }
-  ok(w.state === 'idle' && w.seen === 0, 'a ruined tower watches nothing');
+  ok(w.state === 'idle' && w.seen === 0 && !w.alive, 'a ruined tower watches nothing (its archers fell)');
 }
