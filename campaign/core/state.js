@@ -26,14 +26,16 @@
  *        stats.civilBurned / orderBurned count burned buildings (future Renown, alert in T17).
  * Corn (Pavel's request): cs.crops = crops.build of the region's corn fields; the breath sets them alight, a fire front
  *        pops the corn (popcorn drawn by render/corn-view.js), burned fields are in cs.regionStates[region].corn (saved).
- * Perception (T14): cs.watch = perception.step's watchers (one per tower / platform post until the defenders of T15),
- *        fed with this frame's noises; cs.light (null = day; T21's clock sets it) scales their sight. 'aware:state'.
+ * Perception (T14) and defenders (T15): cs.squad = defenders.spawn of the town (peasants, archers on the towers, a
+ *        watcher on each ballista platform; cs.watch is the same object), fed with this frame's noises; cs.light (null =
+ *        day; T21's clock sets it) scales their sight. 'aware:state', 'bell:ring', 'arrow:hit' (HP, cancels a meal,
+ *        death cause 'arrows'), 'defender:killed'. cs.danger = where archers shoot (the mother keeps out).
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), PC = M.need('perception'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -113,7 +115,7 @@
     if (!cs.dragon.pilot) return ev;
     ensureTown(cs);
     run(cs, inp, dt, ev);
-    for (const e of PC.step(cs, ev, dt, { scale: scaleOf(cs), spot: G.statsOf(cs.dragon.stage).spot })) emit(cs, ev, e);   // T14: the posts see and hear the dragon
+    defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
     for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);
@@ -286,6 +288,19 @@
     if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
     else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
+  }
+
+  /** Defenders (T15): perception, bell, volleys; an arrow hit costs HP, cancels a meal and can kill (cause 'arrows'). */
+  function defend(cs, ev, dt) {
+    const d = cs.dragon;
+    for (const e of DF.step(cs, ev, dt, { scale: scaleOf(cs), spot: G.statsOf(d.stage).spot })) {
+      emit(cs, ev, e);
+      if (e.e !== 'arrow:hit' || cs.inLair || d.hp <= 0) continue;
+      d.hp = Math.max(0, d.hp - e.damage);
+      if (d.eatT > 0) emit(cs, ev, { e: 'eat:cancel' });
+      d.eatT = 0;
+      if (d.hp <= 0) die(cs, ev, 'arrows');
+    }
   }
 
   /** Building fire (T13): burn under the breath, spread, ruins (stats, region state), rebuild after fire.rebuild. */

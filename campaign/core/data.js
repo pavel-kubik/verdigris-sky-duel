@@ -154,11 +154,25 @@
        watch: until the defenders of T15 stand on them, every post (tower: archer, platform: ballista) is a watcher with
        an eye `eye` over the roof that sweeps +-`sweep` rad at `sweepRate` around the outward direction (the place's yaw
        for a post in the centre) and turns at `turn` rad/s toward what it saw or heard last. */
+    /* Defenders (T15, core/defenders.js; 4.3 and 5.4). hp; peasants walk at `speed` (x defense.stroll when idle), run to
+       the bell (one per settlement, ringsBell) and hide; archers stand on the towers (template `archers`, round robin over
+       the towers), volley at a dragon they see within `range` and face (defense.aimCone): `aimTime` s of aim, then
+       `volley` arrows `gap` s apart, then `cooldown` s; an arrow flies at `speed` (leading the dragon by its velocity,
+       gravity compensated) with `spread` noise x speed per axis and hits for `damage` (002 4.3 listed `volley: 3,
+       arrows: 3`; built as one `volley` count). The ballista watches only (T16 adds the bolt).
+       defense: eye height of a peasant, idle wander radius around the home and walk factor, collision pad, bell ring
+       time and the s before the same bell rings again, archer spacing on a tower, archers / peasants in the breath:
+       archers lose `burn` hp/s (peasants panic instead, they do not die).
+       projectiles: pool size (all arrows in the air or stuck), gravity, life in the air, s an arrow stays stuck in the
+       ground / a roof, hit radius around the dragon's centre x scale. */
     defenders: {
-      peasant:  { sight: 90,  fov: 2.4 },
-      archer:   { sight: 130, fov: 1.8 },
-      ballista: { sight: 170, fov: 1.2 },
+      peasant:  { hp: 10, speed: 6, sight: 90,  fov: 2.4, flee: true, ringsBell: true },
+      archer:   { hp: 18, sight: 130, fov: 1.8, range: 120, volley: 3, gap: 0.18, spread: 0.06,
+                  speed: 70, damage: 3, aimTime: 0.6, cooldown: 3 },
+      ballista: { hp: 80, sight: 170, fov: 1.2, range: 220 },
     },
+    defense: { eye: 1.6, wander: 7, stroll: 0.3, pad: 0.6, ringTime: 2, ringCool: 40, towerSpacing: 1.6, aimCone: 0.5, burn: 14 },
+    projectiles: { max: 60, gravity: 30, life: 4, stick: 3, hit: 2.4 },
     perception: {
       awareRise: 1.2, awareFall: 0.25, suspicious: 0.35, alert: 1.0,
       dusk: 0.75, night: 0.45,
