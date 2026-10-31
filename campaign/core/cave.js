@@ -25,7 +25,7 @@
   const floor = () => K.floor;
   const standY = scale => K.floor + D.walk.stand * scale;
   const hallR = scale => K.bounds - K.pad * Math.max(1, scale);
-  const laneX = scale => Math.max(1, K.tunnel.w / 2 - Math.max(1, scale));
+  const laneX = () => K.tunnel.w / 2 - K.camera.pad - 1;                  // the centre line band (the camera fits behind)
 
   function walkable(x, z, scale) {
     const s = scale || 1;

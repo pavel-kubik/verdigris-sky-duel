@@ -76,7 +76,9 @@ const mouth = LR.mouthPos('ash');
   p.yaw = Math.PI;
   const ev = S.step(cs, CT.moveInput(sl.move), dt);
   ok(cs.inLair && ev.some(e => e.e === 'lair:enter'), 'Move tap enters the lair');
-  ok(CT.slots(cs).move === null && CT.slots(cs).action === null, 'inside the lair: no context slots');
+  ok(CT.slots(cs).move === null && CT.slots(cs).action === null && !CT.slots(cs).roll, 'inside the lair, in the tunnel: no Move, no Roll, no station yet');
+  for (let i = 0; i < 60 * 12 && cs.station !== 'nest'; i++) S.step(cs, { sx: 0, sy: 1 }, dt);
+  ok(cs.inLair && CT.slots(cs).action === 'nest' && CT.isStation('nest') && !CT.isStation('grab'), 'T10: walking in toward the nest, the Action slot offers the nest');
 }
 
 // 6. Enter cave stores a carried prey like flying in

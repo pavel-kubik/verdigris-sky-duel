@@ -122,10 +122,10 @@
       stations: {
         nest:   [0, -34, 12],
         larder: [-30, -8, 8],
-        exit:   [0, 50, 8],
+        exit:   [0, 56, 4],
         // T19 hoard [30, -8, 10], T20 altar [0, 8, 5]; Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
       },
-      reach: 8, entry: [0, 44],
+      reach: 8, entry: [0, 40],
       camera: { dist: 12, height: 6, look: 6, pad: 2.5 },
       light: { color: 0xff7a2e, intensity: 2.2, distance: 150, flicker: 0.18 },
     },
