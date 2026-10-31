@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't122.1 2026-10-31 save v2: gold, upgrades, alert, ruins, clock, landed and cave restore; v1 migrates (debug X save + reload)';
+  const BUILD = 't123.1 2026-10-31 one-time tips (landing, compass, cave, raid, alert, night, altar, Farmlands), intro note, debug \\ tips reset';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -646,7 +646,7 @@
     if (pr !== shown.ring) { ring.style.setProperty('--p', pr); ring.classList.toggle('ready', ready); shown.ring = pr; }
     hurt = Math.max(0, hurt - dt * 1.8);
     vig.style.opacity = Math.max(hurt, hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0);
-    if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0) $('#hint').hidden = true; }
+    if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0 || stationOpen) { hintT = 0; $('#hint').hidden = true; } }   // T23: a station panel closes the tip
     if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
     promptHud(dt);
     alertHud(dt);
@@ -733,6 +733,7 @@
       else if (e.e === 'corn:burning' && !cornToast) { cornToast = true; toast(t('c.toast.corn'), t('c.toast.cornSub'), 2.2); }
       else if (e.e === 'building:ruined' && e.type !== 'palisade') toast(t('c.toast.burned', { b: t('c.building.' + e.type) }), t('c.toast.burnedSub'), 2.2);
       else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t('c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
+      else if (e.e === 'tip') showTip(D.tips.show, 'c.tip.' + e.id);   // T23: one-time tips
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
       else if (e.e === 'growth:ready' && !cs.inLair) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
@@ -831,8 +832,13 @@
     if (stationOpen || !text) { $('#lairMsg').textContent = text || ''; lairMsgT = text ? secs || 4 : 0; return; }
     flashPrompt(text, secs || 3);
   }
-  /** The hunting tip under the HUD (touch names buttons, desktop names keys), hidden after secs. */
-  function showTip(secs) { hintT = secs; $('#hint').hidden = !(state === 'play' && !cs.inLair); }
+  /** A tip under the HUD (touch variant when there is one: touch names buttons, desktop names keys), hidden after secs.
+      Default: the hunting tip. T23: the one-time tips of core/tips.js, also in the cave while no station panel is open. */
+  function showTip(secs, key) {
+    const k0 = key || 'c.tip.hunt', k = isTouch && t(k0 + 'Touch') !== k0 + 'Touch' ? k0 + 'Touch' : k0, h = $('#hint');
+    h.setAttribute('data-i18n', k); h.textContent = t(k);
+    hintT = secs; h.hidden = !(state === 'play' && (key ? !stationOpen : !cs.inLair));
+  }
   function renderLair() {
     if (!cs.inLair || !stationOpen) return;
     const d = dragon, st = D.stages[d.stage], nx = D.stages[d.stage + 1], ready = G.readyStage(d.foodXp, d.stage) > d.stage;
@@ -985,6 +991,7 @@
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
+    ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
@@ -1122,6 +1129,7 @@
       else { const from = AL.level(rs); rs.heat = 0; rs.lastIncident = now; if (from) onEvents([{ e: 'alert:level', level: 0, from, region: cs.region }]); }
       flashPrompt(t('c.dbg.alert', { n: AL.level(rs) }), 1.5);
     }
+    if (code === 'Backslash') { TP.reset(cs); cs.tipT = D.tips.gap; flashPrompt(t('c.dbg.tips'), 1.5); }   // T23
     if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
     if (code === 'Equal' && !cs.inLair) {                        // T16: cross the front of the next ballista, already seen
       const list = ((cs.squad && cs.squad.list) || []).filter(v => v.kind === 'ballista' && v.alive);

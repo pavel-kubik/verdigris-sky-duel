@@ -73,7 +73,7 @@
         clock: round(cs.clock ? cs.clock.t : CK.create().t, 1e5),          // T22: time of day
         now: round(cs.stats.played, 10),                                   // T22: the stamp of ruins, loot and heat (= stats.played)
       },
-      flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0 },
+      flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0, tips: (cs.flags.tips || []).filter(id => D.tips.order.indexOf(id) >= 0) },   // T23: seen tips
       stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
                civilBurned: cs.stats.civilBurned || 0, orderBurned: cs.stats.orderBurned || 0, livestockTaken: cs.stats.livestockTaken || 0,
                lootBanked: cs.stats.lootBanked || 0 },
@@ -155,7 +155,8 @@
     cs.larder = (o.larder || []).filter(it => it && D.prey[it.prey] && num(it.food) && it.food > 0)
       .slice(0, D.lair.larderSize).map(it => ({ type: it.prey, food: it.food }));
     const f = o.flags || {};
-    cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0 };
+    cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0,
+                 tips: Array.isArray(f.tips) ? f.tips.filter((id, i) => typeof id === 'string' && D.tips.order.indexOf(id) >= 0 && f.tips.indexOf(id) === i) : [] };   // T23
     const s = o.stats || {};
     cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0,
                  civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0,
