@@ -34,7 +34,7 @@ const run = (cs, inp, secs, onEv) => { for (let t = 0; t < secs - 1e-9; t += dt)
   ok(D.loot.tithe.size === 1 && D.loot.tithe.gold === 50 && D.loot.tithe.carry.speedMult === 0.85 && D.loot.tithe.carry.breath === true, 'tithe chest: size 1, 50 gold, x0.85, fire ok');
   ok(D.loot.strongbox.size === 2 && D.loot.strongbox.gold === 150 && D.loot.strongbox.carry.speedMult === 0.8 && D.loot.strongbox.carry.breath === false, 'strongbox: size 2, 150 gold, x0.8, no fire');
   ok(D.cave.stations.hoard[0] === 30 && D.cave.stations.hoard[1] === -8, 'hoard station at [30, -8]');
-  ok(D.alert.add.loot === 1, 'taking loot adds 1 heat');
+  ok(D.alert.add.loot === 1.5, 'taking loot adds 1.5 heat (T24 balancing: one alert level per raid)');
 }
 
 // 2. placement: one item per loot building, off every solid, on the ground, inside the palisade, the same every build
@@ -56,7 +56,7 @@ const run = (cs, inp, secs, onEv) => { for (let t = 0; t < secs - 1e-9; t += dt)
   }
 }
 
-// 3. a Drake picks up the strongbox on the ground: the claws hold it, heat +1, the item is gone from the ground
+// 3. a Drake picks up the strongbox on the ground: the claws hold it, heat + alert.add.loot, the item is gone from the ground
 {
   const cs = make('farm', 1); quiet(cs);
   const box = itemOf(cs, 'strongbox');
@@ -69,7 +69,7 @@ const run = (cs, inp, secs, onEv) => { for (let t = 0; t < secs - 1e-9; t += dt)
   run(cs, { grab: true }, dt, e => { if (e.e === 'loot:taken') got = e; });
   ok(got && got.kind === 'strongbox' && got.gold === 150, 'loot:taken strongbox 150');
   ok(cs.carriedLoot && cs.carriedLoot.id === box.id && box.taken, 'in the claws, taken from the ground');
-  near(cs.regionStates.farm.heat - heat0, 1, 0.05, 'heat +1');
+  near(cs.regionStates.farm.heat - heat0, D.alert.add.loot, 0.05, 'heat + alert.add.loot');
   ok(cs.regionStates.farm.lootTaken.some(r => r.id === box.id), 'remembered in lootTaken');
   ok(cs.hint === 'lootCarry' && CT.slots(cs).action === null, 'carry hint, no Action while loaded');
   // no prey into the same claws

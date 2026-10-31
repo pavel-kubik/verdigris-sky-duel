@@ -146,7 +146,7 @@ settlements: {                                    // templates: offsets from the
 defenders: {
   peasant: { hp: 10, speed: 6, sight: 90, fov: 2.4, flee: true, ringsBell: true },
   archer:  { hp: 18, sight: 130, fov: 1.8, range: 120, volley: 3, arrows: 3, spread: 0.06,
-             speed: 70, damage: 3, aimTime: 0.6, cooldown: 3 },
+             speed: 70, damage: 2, aimTime: 0.6, cooldown: 3 },
   ballista:{ hp: 80, sight: 170, fov: 1.2, range: 220, aimTime: 2.0, bolt: 160, damage: 35, reload: 8,
              turn: 0.9, crew: 1 },
 },
@@ -177,7 +177,7 @@ Seen value (0..1) = in cone x in range (`sight` x `stage.spot` x light x altitud
 ```js
 alert: {
   maxLevel: 3, maxHeat: 3.99,
-  add: { sighted: 0.2, bell: 0.5, orderBurned: 0.5, civilBurned: 0.75, livestock: 1.0, defenderKilled: 0.25, loot: 1.0 },
+  add: { sighted: 0.2, bell: 0.5, orderBurned: 0.5, civilBurned: 0.75, livestock: 1.0, defenderKilled: 0.25, loot: 1.5 },
   quiet: 60,                                // s without incidents before decay starts
   decay: 0.0035,                            // heat per s once quiet (about 1 level per 5 min)
   towerDownMult: 2,                         // decay faster while a watchtower lies in ruins

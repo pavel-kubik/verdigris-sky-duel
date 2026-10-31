@@ -14,16 +14,20 @@ const ROUTE = { ash: 'wild', wild: 'farm' };        // outward; home is the reve
 const BACK = { farm: 'wild', wild: 'ash' };
 const CRUISE = 70;                                   // height over the ground between the regions
 const HIGH = 150;                                    // height over the ground for the approach to the settlement
-const HUNT = { region: 'wild', below: 88, full: 92, sight: 450, giveUp: 120 };   // a meal in the Wildwood on the way out
+const LAND_R = 30;                                   // sets down within this distance of the landing spot
+// meals on the way out (in the Wildwood, no alert there): hunt while hungrier than `below`
+// until `full`, for at most `giveUp` s per region
+const HUNT = { regions: ['wild'], below: 85, full: 95, sight: 450, giveUp: 120 };
 /**
  * Pilots. "careful" stands for a player on a phone (the T24 raid-time target): botches `miss` of the swoops (pulls up
  * and comes round for `recover` s) and circles the settlement once at HIGH (`scout` laps, radius `scoutR`) to find the
  * vault before the drop, sees prey only within `sight`, aborts `goRound` of the landings (overshoots, comes round
- * again) and thinks every `think` s (holds the input between). "expert" knows the way and the vault: a lower bound for a raid.
+ * a pass over the landing spot), thinks every `think` s (holds the input between) and turns away from a ballista's aim line `dodgeLate` s
+ * after it shows (for `dodge` s). "expert" knows the way and the vault: a lower bound for a raid.
  */
 const PROFILES = {
-  careful: { miss: 0.4, recover: 4, scout: 1, scoutR: 170, sight: 320, goRound: 0.35, think: 0.25 },
-  expert: { miss: 0, recover: 0, scout: 0, scoutR: 0, sight: 450, goRound: 0, think: 0 },
+  careful: { miss: 0.4, recover: 4, scout: 1, scoutR: 130, sight: 320, goRound: 0.35, think: 0.25, dodge: 1.2, dodgeLate: 0.8 },
+  expert: { miss: 0, recover: 0, scout: 0, scoutR: 0, sight: 450, goRound: 0, think: 0, dodge: 1.2, dodgeLate: 0 },
 };
 
 function steer(p, to, alt) {
@@ -51,6 +55,36 @@ function standPoint(cs, it) {
   const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
   const f = 1.5 + D.settlement.pad * sc;
   return { pos: [it.pos[0] + dx * f, 0, it.pos[2] + dz * f], out: [dx, dz] };
+}
+
+/**
+ * An open spot to set down near the stand point: nearest point (rings of 4 units, 16 bearings) where landing is allowed
+ * (walk.canLand rules: no roof, no water, not steep) and the walk from it to the stand point crosses no building.
+ */
+/** No building on the straight walk from (x, z) to the stand point. */
+function pathFree(cs, sp, x, z) {
+  const pad = D.settlement.pad * S.scaleOf(cs), dx = sp.pos[0] - x, dz = sp.pos[2] - z, n = Math.ceil(Math.hypot(dx, dz));
+  for (let i = 0; i <= n; i++) if (SE.solidAt(cs.town, x + dx * i / Math.max(1, n), z + dz * i / Math.max(1, n), pad) != null) return false;
+  return true;
+}
+
+function landingSpot(cs, sp, item) {
+  const town = cs.town, pad = D.settlement.pad * S.scaleOf(cs) + 0.6, L = D.land;
+  const free = (x, z) => SE.solidAt(town, x, z, pad) == null && !T.liquidAt(cs.region, x, z) && T.surfaceSlope(cs.region, x, z) <= L.maxSlope;
+  const pl = town.places.find(q => q.id === item.place) || { x: sp.pos[0], z: sp.pos[2] };
+  for (let r = 0; r <= 48; r += 4) {
+    let best = null, bd = Infinity;
+    for (let k = 0; k < (r ? 16 : 1); k++) {
+      const a = k * Math.PI / 8, x = sp.pos[0] + Math.sin(a) * r, z = sp.pos[2] + Math.cos(a) * r;
+      if (!free(x, z) || !pathFree(cs, sp, x, z)) continue;
+      const out = -Math.hypot(x - pl.x, z - pl.z);           // among equals the one furthest out of the settlement
+      if (out < bd) { bd = out; best = [x, 0, z]; }
+    }
+    if (best) {
+      return { pos: best };
+    }
+  }
+  return { pos: sp.pos };
 }
 
 function createBot(cs, opts) {
@@ -84,13 +118,14 @@ function quarry(cs, sight) {
   return best;
 }
 
-/** The meal on the way out: in HUNT.region while hungrier than HUNT.below, swoop (hold Grab) and eat in flight. */
+/** Meals on the way out (HUNT): swoop (hold Grab) at wild prey and eat it in flight. */
 function hunt(bot, dt) {
   const cs = bot.cs, d = cs.dragon, p = d.pilot, H = bot.hunt;
   const carried = S.carriedPrey(cs);
   if (carried) { setPhase(bot, 'hunt'); return { sx: 0, sy: steer(p, p.pos, T.surfaceAt(cs.region, p.pos[0], p.pos[2]) + 40).sy, eat: true }; }
   const want = bot.phase === 'hunt' ? d.hunger < H.full : d.hunger < H.below;
-  if (cs.region !== H.region || !want || bot.huntT > H.giveUp) { if (bot.phase === 'hunt') setPhase(bot, 'out'); return null; }
+  if (bot.huntIn !== cs.region) { bot.huntIn = cs.region; bot.huntT = 0; }
+  if (H.regions.indexOf(cs.region) < 0 || !want || bot.huntT > H.giveUp) { if (bot.phase === 'hunt') setPhase(bot, 'out'); return null; }
   setPhase(bot, 'hunt');
   bot.huntT += dt;
   if (bot.missT > 0) { bot.missT -= dt; return { sx: 0.3, sy: 0.4 }; }   // a botched swoop: pull up and come round
@@ -107,12 +142,26 @@ function hunt(bot, dt) {
   return { sx: s.sx, sy: s.sy };
 }
 
+/**
+ * A ballista's aim line (bolt:aim, shown 2 s before the bolt) makes the pilot change course: a hard turn for `dodge` s,
+ * away from the side it turned last time, climbing. Only in the air; nothing to do on the ground.
+ */
+function dodge(bot, r) {
+  const cs = bot.cs, p = cs.dragon.pilot;
+  if (bot.aimSeen && p.mode === 'air' && bot.prof.dodge) { bot.dodgeT = bot.prof.dodge; bot.dodgeSide = -(bot.dodgeSide || 1); }
+  bot.aimSeen = false;
+  if (!(bot.dodgeT > 0) || p.mode !== 'air' || r.land || r.confirm || bot.pass && bot.phase === 'drop') return r;   // not on the final glide
+  return Object.assign({}, r, { sx: bot.dodgeSide, sy: 0.6, grab: false });
+}
+
 /** One frame of input (a careful pilot keeps it for `think` s, except for one-shot Land / Fly and the travel confirm). */
 function input(bot, dt) {
   bot.thinkT = (bot.thinkT || 0) - dt;
-  bot.t += dt; bot.phaseT += dt;
+  bot.t += dt; bot.phaseT += dt; bot.dodgeT = (bot.dodgeT || 0) - dt;
+  if (bot.aimAt != null && bot.t >= bot.aimAt) { bot.aimSeen = true; bot.aimAt = null; }
   if (bot.prof.think && bot.held && bot.thinkT > 0) return bot.held;
-  const r = decide(bot, bot.prof.think && bot.held ? bot.prof.think : dt);
+  let r = decide(bot, bot.prof.think && bot.held ? bot.prof.think : dt);
+  r = dodge(bot, r);
   bot.thinkT = bot.prof.think;
   bot.held = r.land || r.confirm ? Object.assign({}, r, { land: false, confirm: false }) : r;
   return r;
@@ -159,43 +208,30 @@ function decide(bot, dt) {
       if (d > 140) { const s = steer(p, aim, ground + HIGH); return { sx: s.sx, sy: s.sy }; }
       setPhase(bot, 'drop');
     }
-    // the drop: a steep glide that ends on the stand point; landing as soon as it is allowed close by
-    const gate = [sp.pos[0] + sp.out[0] * 30, 0, sp.pos[2] + sp.out[1] * 30];   // in front of the item, on the open side
-    const dg = Math.hypot(gate[0] - p.pos[0], gate[2] - p.pos[2]);
-    const head = bot.gated || dg < 14 ? sp.pos : gate;
-    if (dg < 14 && !bot.gated) { bot.gated = true; bot.gatedAt = bot.t; bot.overshoot = false; }
-    const dh = Math.hypot(head[0] - p.pos[0], head[2] - p.pos[2]);
+    // the drop: a steep glide toward an open landing spot near the item; it sets down anywhere within LAND_R of the
+    // spot where landing is allowed and the walk to the item is clear (a careful pilot hesitates on `goRound` of the passes)
+    if (!bot.spot || bot.spotFor !== bot.item.id) { bot.spot = landingSpot(cs, sp, bot.item); bot.spotFor = bot.item.id; }
+    const head = bot.spot.pos, dh = Math.hypot(head[0] - p.pos[0], head[2] - p.pos[2]);
     const floor = T.surfaceAt(cs.region, head[0], head[2]);
-    const alt = Math.max(ground, floor) + (bot.gated ? clamp(dh * 0.35, 3, 40) : clamp(dg * 0.35 + 8, 10, 60));
-    const s = steer(p, head, alt);
-    const land = bot.gated && dh < 9 && WK.canLand(p, cs.region, S.solids(cs, S.scaleOf(cs)).solidAt).ok;
-    if (bot.gated && dh > 60 && !bot.long) bot.gated = false;   // missed the stand point: go round again
-    if (land && bot.landTry !== bot.gatedAt) {             // one landing decision per pass
-      bot.landTry = bot.gatedAt;
-      if (bot.rng() < bot.prof.goRound) bot.overshoot = true;
-    }
-    if (land && !bot.overshoot) { bot.walkBest = null; setPhase(bot, 'walk'); return { sx: s.sx, sy: s.sy, land: true }; }
-    if (bot.overshoot && bot.gated && dh < 9) bot.long = true;
-    if (bot.long) {                                         // landed long: glide on past the item, set down where it can
-      const okHere = WK.canLand(p, cs.region, S.solids(cs, S.scaleOf(cs)).solidAt).ok;
-      bot.longT = (bot.longT || 0) + dt;
-      if (okHere && bot.longT > 0.6) { bot.long = false; bot.longT = 0; bot.walkBest = null; setPhase(bot, 'walk'); return { land: true }; }
-      return { sx: 0, sy: steer(p, p.pos, Math.max(ground, floor) + 4).sy };
-    }
+    const s = steer(p, head, Math.max(ground, floor) + clamp(dh * 0.4, 3, 60));
+    if (dh < LAND_R && !bot.pass) { bot.pass = true; bot.hesitate = bot.rng() < bot.prof.goRound; }
+    if (dh > LAND_R + 10) bot.pass = false;
+    const land = bot.pass && !bot.hesitate && WK.canLand(p, cs.region, S.solids(cs, S.scaleOf(cs)).solidAt).ok && pathFree(cs, sp, p.pos[0], p.pos[2]);
+    if (land) { bot.walkBest = null; bot.pass = false; setPhase(bot, 'walk'); return { sx: s.sx, sy: s.sy, land: true }; }
     return { sx: s.sx, sy: s.sy };
   }
 
   if (bot.phase === 'walk') {
     if (p.mode === 'landing') return {};
     if (p.mode === 'takeoff') return {};
-    if (p.mode === 'air') { bot.gated = false; setPhase(bot, 'drop'); return {}; }
+    if (p.mode === 'air') { setPhase(bot, 'drop'); return {}; }
     if (!bot.item || bot.item.taken) { setPhase(bot, 'takeoff'); return {}; }
     if (cs.lootTarget === bot.item.id) return { grab: true };
     const sp = standPoint(cs, bot.item);
     const dx = sp.pos[0] - p.pos[0], dz = sp.pos[2] - p.pos[2], d = Math.hypot(dx, dz);
     // stuck (a wall between the dragon and the item): fly up and try the drop again
     if (bot.walkBest == null || d < bot.walkBest - 0.5) { bot.walkBest = d; bot.walkT = 0; }
-    else if ((bot.walkT += dt) > 2.5) { bot.walkBest = null; bot.walkT = 0; return { land: true }; }
+    else if ((bot.walkT += dt) > 2.5 || bot.phaseT > 15) { bot.walkBest = null; bot.walkT = 0; return { land: true }; }
     // walk to the stand point, then turn to face the item
     const want = d > 1.2 ? Math.atan2(dx, dz) : Math.atan2(bot.item.pos[0] - p.pos[0], bot.item.pos[2] - p.pos[2]);
     const turn = wrap(want - p.yaw);
@@ -245,13 +281,14 @@ function raid(cs, opts) {
   const ev0 = S.lairLeave(cs);
   if (o.check) o.check(cs, ev0);
   const bot = createBot(cs, o);
-  const stats = { meals: 0, arrowHits: 0, boltHits: 0, damage: 0, bells: 0, sighted: 0, maxArrows: 0, taken: null };
+  const stats = { minHp: Infinity, meals: 0, arrowHits: 0, boltHits: 0, damage: 0, bells: 0, sighted: 0, maxArrows: 0, taken: null };
   let t = 0, banked = null, died = null;
   const steps = Math.round(o.maxMin * 60 / o.dt);
   for (let i = 0; i < steps; i++) {
     const ev = S.step(cs, input(bot, o.dt), o.dt);
     t += o.dt;
     for (const e of ev) {
+      if (e.e === 'bolt:aim' && bot.aimAt == null) bot.aimAt = bot.t + bot.prof.dodgeLate;   // the pilot sees the aim line
       if (e.e === 'arrow:hit') { stats.arrowHits++; stats.damage += e.damage; }
       else if (e.e === 'bolt:hit') { stats.boltHits++; stats.damage += e.damage; }
       else if (e.e === 'bell:ring') stats.bells++;
@@ -260,6 +297,7 @@ function raid(cs, opts) {
       else if (e.e === 'prey:eaten') stats.meals++;
       else if (e.e === 'dragon:died') died = e.cause || true;
     }
+    stats.minHp = Math.min(stats.minHp, cs.dragon.hp);
     if (cs.squad) stats.maxArrows = Math.max(stats.maxArrows, cs.squad.arrows.length + (cs.squad.bolts || []).length);
     if (o.check) o.check(cs, ev);
     if (banked || died || cs.inLair) break;
