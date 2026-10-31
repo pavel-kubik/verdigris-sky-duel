@@ -21,6 +21,12 @@
       fog: 0x7f8a70, sky: { top: 0x10283a, mid: 0x4f6f72, bot: 0xd09a64 },
       sand: 0xb39f74, low: 0x46683a, mid: 0x2f4f33, high: 0x5a6a48, steep: 0x6e6556, water: 0x2c5c63,
     },
+    farm: {   // T11: open, sunny farmland; crops = wheat, young green, ploughed, hay
+      fog: 0x9aa98e, sky: { top: 0x1f4a74, mid: 0x7aa0a8, bot: 0xe6bb80 },
+      sand: 0xa89670, low: 0x6f9142, mid: 0x55783a, high: 0x7c8a52, steep: 0x7a705c, water: 0x3d7480,
+      road: 0x9c8660, roadEdge: 0x7f7a4a, bank: 0x8b7d58, plateau: 0x7b8a4c,
+      crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a]],
+    },
   };
   const EXTENT = 1500;                     // build chunks out to here (past the rim, hidden by fog)
 
@@ -29,6 +35,7 @@
     const R = T.region(id);
     const cone = R.terrain.features.find(f => f.type === 'cone');
     const rimH = cone ? T.heightAt(id, cone.x + cone.crater.r, cone.z) : Infinity;
+    const road = R.terrain.features.find(f => f.type === 'road'), roadW = road ? road.width : 0;
     return (x, z, h, slope, jitter) => {
       if (R.palette === 'ash') {
         const dCone = cone ? Math.hypot(x - cone.x, z - cone.z) : Infinity;
@@ -40,6 +47,22 @@
         const flow = Math.sin(x * 0.006 + Math.sin(z * 0.011) * 2.2) * Math.sin(z * 0.004 + 1.1);
         if (dCone > cone.r * 0.6 && flow > 0.82) c.lerp(b.set(pal.scorch), Math.min(1, (flow - 0.82) * 7));
         if (slope > 0.7) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.7) * 2));
+      } else if (R.palette === 'farm') {
+        a.set(pal.low); b.set(pal.mid);
+        c.copy(a).lerp(b, (Math.sin(x * 0.031) * Math.cos(z * 0.027) + 1) / 2);
+        if (h > 30) c.lerp(b.set(pal.high), Math.min(1, (h - 30) / 16));
+        const fd = T.fieldAt(id, x, z);
+        if (fd) {                                                // crop rows along the field
+          const cc = pal.crops[fd.f.crop], row = Math.sin(fd.u * fd.f.w * 1.1) > 0 ? 0 : 1;
+          c.set(cc[row]);
+        }
+        if (T.plateauAt(id, x, z)) c.lerp(b.set(pal.plateau), 0.5);
+        const rv = T.riverAt(id, x, z);
+        if ((rv && h < rv.level + 1.6) || (R.waterLevel != null && h < R.waterLevel + 1.6)) c.set(pal.bank);   // muddy banks, pond shores
+        const rd = T.lineDist(id, 'road', x, z), rw = roadW / 2;
+        if (rd < rw) c.set(pal.road);
+        else if (rd < rw + 3) c.lerp(b.set(pal.roadEdge), 0.6);
+        if (slope > 0.6) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.6) * 2.5));
       } else {
         if (h < 2.2) c.set(pal.sand);
         else {
@@ -121,6 +144,38 @@
     return { lava, crust, light, y };
   }
 
+  /** River water: a flat ribbon along each river at its level, as wide as the channel (the banks hide its edges). */
+  function rivers(id, group, pal) {
+    const list = T.region(id).terrain.features.filter(f => f.type === 'river');
+    if (!list.length) return;
+    const mat = new THREE.MeshStandardMaterial({ color: pal.water, roughness: 0.2, metalness: 0.25, transparent: true, opacity: 0.9 });
+    for (const f of list) {
+      const y = T.riverLevel(id, f), half = f.width / 2 * 1.4 + 1, P = [];
+      // resample the polyline every 10 units so the ribbon bends smoothly at the joints
+      for (let i = 0; i + 1 < f.points.length; i++) {
+        const a = f.points[i], b = f.points[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10));
+        for (let k = 0; k < n; k++) P.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+      }
+      P.push(f.points[f.points.length - 1]);
+      const pos = new Float32Array(P.length * 6), idx = [];
+      P.forEach((p, i) => {
+        const q0 = P[Math.max(0, i - 1)], q1 = P[Math.min(P.length - 1, i + 1)];
+        let dx = q1[0] - q0[0], dz = q1[1] - q0[1];
+        const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+        pos.set([p[0] - dz * half, y, p[1] + dx * half, p[0] + dz * half, y, p[1] - dx * half], i * 6);
+        if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      // normals must face up whatever the winding: flip if needed
+      if (geo.attributes.normal.getY(0) < 0) { const nn = geo.attributes.normal; for (let i = 0; i < nn.count; i++) nn.setXYZ(i, 0, 1, 0); }
+      const m = new THREE.Mesh(geo, mat);
+      m.material.side = THREE.DoubleSide;
+      group.add(m);
+    }
+  }
+
   function build(id, opts) {
     opts = opts || {};
     const R = T.region(id), pal = PALETTES[R.palette];
@@ -134,10 +189,11 @@
       const m = buildChunk(id, cx, cz, mat, colour, rng);
       chunks.push(m); group.add(m);
     }
-    if (pal.water != null) {
+    if (pal.water != null && R.waterLevel != null) {             // lakes and ponds: one plane at the region's water level
       const water = new THREE.Mesh(new THREE.CircleGeometry(EXTENT, 64), new THREE.MeshStandardMaterial({ color: pal.water, roughness: 0.25, metalness: 0.2, transparent: true, opacity: 0.88 }));
-      water.rotation.x = -Math.PI / 2; water.position.y = 0.6; group.add(water);
+      water.rotation.x = -Math.PI / 2; water.position.y = R.waterLevel; group.add(water);
     }
+    rivers(id, group, pal);
     const lavaFx = crater(id, group);
     const mouth = R.lair ? lairMouth(id, group) : null;
     const flora = VR.flora ? VR.flora.build(id, { isTouch: !!opts.isTouch, flora: opts.flora }) : null;

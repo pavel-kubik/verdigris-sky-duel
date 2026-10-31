@@ -52,6 +52,8 @@
       fireMem: null,                 // id of the last prey that got heat: stays the fire target while warm (kept: true)
       exit: null,                    // the region exit on offer (prompt "Fly to ..."), or null
       exitT: 0,
+      exitSmall: null,               // T11: an exit the dragon is too small for (prompt "Too small for ..."), or null
+      exitSmallT: 0,
       landOk: false,                 // landing allowed right now (walk.canLand), the Move slot offers Land                      // seconds the offer stays after the dragon turns back from the edge
       saveT: 0,                      // seconds since the last autosave
       rng: (opts && opts.rng) || Math.random,
@@ -226,12 +228,16 @@
     // lair: flying into the cave mouth enters it (a carried prey goes into the larder); so does the Move slot close by
     if (LR.inMouth(cs) || (inp.enter && LR.canEnter(cs))) {
       for (const e of LR.enter(cs)) emit(cs, ev, e);
-      cs.exit = null; cs.exitT = 0;
+      cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0;
       return ev;
     }
 
     // region edge: offer the exit while near it heading outward (and a moment after); confirm travels
-    const ex = air ? RG.exitAt(cs.region, p.pos, p.yaw) : null;
+    let ex = air ? RG.exitAt(cs.region, p.pos, p.yaw) : null;
+    if (ex && ex.minStage != null && d.stage < ex.minStage) {     // T11: too small for that region - a prompt, no travel
+      if (!cs.exitSmall || cs.exitSmall.to !== ex.to) emit(cs, ev, { e: 'region:tooSmall', from: cs.region, to: ex.to, minStage: ex.minStage });
+      cs.exitSmall = ex; cs.exitSmallT = D.travel.promptHold; ex = null;
+    } else if (cs.exitSmall && (cs.exitSmallT -= dt) <= 0) { cs.exitSmall = null; cs.exitSmallT = 0; }
     if (ex) {
       if (!cs.exit || cs.exit.to !== ex.to) emit(cs, ev, { e: 'region:exit', from: cs.region, to: ex.to });
       cs.exit = ex; cs.exitT = D.travel.promptHold;
