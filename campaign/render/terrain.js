@@ -21,11 +21,11 @@
       fog: 0x7f8a70, sky: { top: 0x10283a, mid: 0x4f6f72, bot: 0xd09a64 },
       sand: 0xb39f74, low: 0x46683a, mid: 0x2f4f33, high: 0x5a6a48, steep: 0x6e6556, water: 0x2c5c63,
     },
-    farm: {   // T11: open, sunny farmland; crops = wheat, young green, ploughed, hay
+    farm: {   // T11: open, sunny farmland; crops = wheat, young green, ploughed, hay, corn (stalks: render/corn-view.js)
       fog: 0x9aa98e, sky: { top: 0x1f4a74, mid: 0x7aa0a8, bot: 0xe6bb80 },
       sand: 0xa89670, low: 0x6f9142, mid: 0x55783a, high: 0x7c8a52, steep: 0x7a705c, water: 0x3d7480,
       road: 0x9c8660, roadEdge: 0x7f7a4a, bank: 0x8b7d58, plateau: 0x7b8a4c,
-      crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a]],
+      crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a], [0x6a5a3a, 0x4f6a2c]],   // corn: soil between the stalk rows
     },
   };
   const EXTENT = 1500;                     // build chunks out to here (past the rim, hidden by fog)

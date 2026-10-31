@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), CV = C.need('cave'), SE = C.need('settlement');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't113.2 2026-10-31 debug: jump to any region (4 / 5 / 6)';
+  const BUILD = 't114.2 2026-10-31 corn fields pop popcorn when burned (debug 0)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -58,6 +58,7 @@
   let saveBad = boot.status === 'corrupt' || boot.status === 'newer' ? boot.status : null;   // unread save: ask before touching it
   let saveOff = !!saveBad;                                     // never overwrite a save we could not read (until "Start new")
   let saved = boot.status === 'ok' ? boot.data : null;         // the run to continue (this session's last save, in memory)
+  let cornToast = false;                                       // the 'corn is popping' toast once per session
   let lastSave = null;                                         // { why, ok, at } for the debug panel
   const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
@@ -662,6 +663,7 @@
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
       else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
+      else if (e.e === 'corn:burning' && !cornToast) { cornToast = true; toast(t('c.toast.corn'), t('c.toast.cornSub'), 2.2); }
       else if (e.e === 'building:ruined' && e.type !== 'palisade') toast(t('c.toast.burned', { b: t('c.building.' + e.type) }), t('c.toast.burnedSub'), 2.2);
       else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t('c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
@@ -856,10 +858,17 @@
     ['1', 'fly to the next settlement of this region (low, 150 out, facing it)', 'Digit1', 'to town'],
     ['2', 'set the nearest building alight (fire test)', 'Digit2', 'fire here'],
     ['3', 'rebuild every ruin of this region now', 'Digit3', 'rebuild'],
+    ['0', 'fly to the next corn field (Farmlands, low, facing it)', 'Digit0', 'to corn'],
+    ['7', 'show / hide the sight of the watching posts (fans, ? and !)', 'Digit7', 'sight'],
+    ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
+    ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
-  let dbgExit = 0, dbgExitRegion = null, dbgTown = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
+  let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
+  let watchView = null, watchShow = true;                        // T14: perception debug view (render/watch-view.js), key / button 7
+  const LIGHTS = [null, 'dusk', 'night'];                        // T14: debug 8 cycles cs.light (T21's clock sets it later)
+  let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
     if (code === 'Backquote') { toggleDebug(); return; }
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
@@ -943,7 +952,29 @@
       if (rs && rs.ruins) for (const r of rs.ruins) r.at = cs.stats.played - D.fire.rebuild - 1;
       flashPrompt(t('c.dbg.rebuilt', { n }), 1.5);
     }
-    const dbgRegion = /^Digit\d$/.test(code) ? Object.keys(D.regions)[+code.slice(5) - 4] : null;
+    if (code === 'Digit0' && !cs.inLair) {                       // corn: in front of the next corn field of the region
+      const list = ST.ensureCrops(cs).list;
+      if (!list.length) flashPrompt(t('c.dbg.noCorn'), 1.5);
+      else {
+        dbgCorn = (dbgCorn + 1) % list.length;
+        const f = list[dbgCorn].f, a = Math.atan2(pilot.pos[0] - f.x, pilot.pos[2] - f.z) || 0, x = f.x + Math.sin(a) * 70, z = f.z + Math.cos(a) * 70;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 14, z], yaw: a + Math.PI, pitch: -0.15, speed: stats.cruise });
+        snapCam(); flashPrompt(t('c.dbg.corn'), 1.5);
+      }
+    }
+    if (code === 'Digit7') { watchShow = !watchShow; flashPrompt(t(watchShow ? 'c.dbg.sightOn' : 'c.dbg.sightOff'), 1.5); }
+    if (code === 'Digit8') { cs.light = LIGHTS[(LIGHTS.indexOf(cs.light == null ? null : cs.light) + 1) % LIGHTS.length]; flashPrompt(t('c.dbg.light', { l: t('c.light.' + (cs.light || 'day')) }), 1.5); }
+    if (code === 'Digit9' && !cs.inLair) {                       // T14: in front of the next post of the region (outward side)
+      const list = (cs.watch && cs.watch.list) || [];
+      if (!list.length) flashPrompt(t('c.dbg.noPost'), 1.5);
+      else {
+        dbgPost = (dbgPost + 1) % list.length;
+        const v = list[dbgPost], x = v.pos[0] + Math.sin(v.base) * 80, z = v.pos[2] + Math.cos(v.base) * 80;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 25, z], yaw: v.base + Math.PI, pitch: 0, speed: stats.cruise });
+        snapCam(); flashPrompt(t('c.dbg.post', { kind: t('c.post.' + v.kind) }), 1.5);
+      }
+    }
+    const dbgRegion = /^Digit[4-6]$/.test(code) ? Object.keys(D.regions)[+code.slice(5) - 4] : null;
     if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
       if (cs.inLair) onEvents(ST.lairLeave(cs));
       if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
@@ -1005,6 +1036,17 @@
     compassHud(dt);
     preyView.update(cs.field, time, carryPose());
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
+    if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
+      if (cornView) { scene.remove(cornView.group); cornView.dispose(); }
+      cornView = VRender.corn.build(cs.crops, { density: qSet.flora });
+      scene.add(cornView.group);
+    }
+    cornView.group.visible = !cs.inLair;
+    cornView.update(cs.crops, dt, { pxScale: renderer.domElement.height * 0.5, time });
+    if (debug && pilot) {                                        // T14: sight fans and ? / ! marks of the watching posts (debug 7)
+      if (!watchView) { watchView = VRender.watch.build(); scene.add(watchView.group); }
+      watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: watchShow && !cs.inLair });
+    }
     targetRing();
     fireTargetRing();
     renderer.render(scene, camera);
@@ -1089,8 +1131,15 @@
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
+        { const ci = cornView ? cornView.info : null, cl = (cs.crops && cs.crops.list) || [];
+          L.push('CORN    fields ' + cl.length + '  burning ' + cl.filter(c => c.burn).length + '  burned ' + cl.filter(c => c.burnedAt != null).length + '  stalks ' + (ci ? ci.stalks : 0) + '  popcorn ' + (ci ? ci.popcorn : 0)); }
         L.push('FIRE    burning ' + (ti ? ti.burning : 0) + '  ruins ' + (ti ? ti.ruins : 0) + '  burned civil ' + (cs.stats.civilBurned || 0) + ' order ' + (cs.stats.orderBurned || 0) + '  lights ' + fireLights.filter(L => L.intensity > 0).length);
         L.push('TOWNS   ' + (ti ? ti.buildings + ' buildings' : '-') + '  near ' + (near ? near.id + ' ' + Math.round(Math.hypot(near.x - pilot.pos[0], near.z - pilot.pos[2])) : '-') + '  found ' + (Object.keys(cs.discovered || {}).join(', ') || '-')); }
+      { const wl = (cs.watch && cs.watch.list) || [];
+        let wn = null, wd = Infinity;
+        for (const v of wl) { const d = Math.hypot(v.pos[0] - pilot.pos[0], v.pos[2] - pilot.pos[2]); if (d < wd) { wd = d; wn = v; } }
+        L.push('WATCH   light ' + (cs.light || 'day') + '  posts ' + wl.length + '  alert ' + wl.filter(v => v.state === 'alert').length + '  suspicious ' + wl.filter(v => v.state === 'suspicious').length + (watchShow ? '' : '  (hidden)'));
+        if (wn) L.push('        near ' + wn.kind + ' ' + Math.round(wd) + '  range ' + Math.round(PC.range(wn, { spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId) })) + '  seen ' + f2(wn.seen) + '  heard ' + (wn.heard ? wn.heard.kind : '-') + '  aware ' + f2(wn.aware) + ' ' + wn.state); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
       L.push('        eaten ' + cs.stats.eaten + '  food ' + cs.stats.food + '  played ' + Math.round(cs.stats.played) + 's');

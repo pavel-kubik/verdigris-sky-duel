@@ -285,7 +285,7 @@
       const c = {
         x: px + Math.cos(along) * off * side, z: pz - Math.sin(along) * off * side,
         yaw: along + (rnd() < 0.5 ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.3,
-        w: FIELD.w[0] + rnd() * (FIELD.w[1] - FIELD.w[0]), l: FIELD.l[0] + rnd() * (FIELD.l[1] - FIELD.l[0]), crop: Math.floor(rnd() * 4),
+        w: FIELD.w[0] + rnd() * (FIELD.w[1] - FIELD.w[0]), l: FIELD.l[0] + rnd() * (FIELD.l[1] - FIELD.l[0]), crop: Math.floor(rnd() * 5),   // 0 wheat, 1 young green, 2 ploughed, 3 hay, 4 corn (core/crops.js: burns and pops)
       };
       if (ok(c)) out.push(c);
     }

@@ -45,6 +45,8 @@
         if (seen.length) o[id].discovered = seen;
         const ruins = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].ruins) || []).filter(r => r && typeof r.id === 'string');
         if (ruins.length) o[id].ruins = ruins.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T13 (v2 shape, 5.9)
+        const corn = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].corn) || []).filter(r => r && typeof r.id === 'string');
+        if (corn.length) o[id].corn = corn.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));       // burned corn fields
         return o;
       }, {}),
       missions: { completed: [], active: null },
@@ -130,8 +132,12 @@
         const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
         if (ruins.length) cs.regionStates[id] = { ruins };
       }
+      if (D.regions[id] && r && Array.isArray(r.corn)) {           // burned corn fields, grow back corn.regrow s after `at`
+        const corn = r.corn.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
+        if (corn.length) (cs.regionStates[id] = cs.regionStates[id] || {}).corn = corn;
+      }
     }
-    cs.town = null;                                              // rebuilt with the loaded ruins (state.ensureTown)
+    cs.town = null; cs.crops = null;                             // rebuilt with the loaded ruins (state.ensureTown)
     cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0; cs.saveT = 0; cs.station = null;
 
     const pos = region === w.region && w.pos ? T.clampToRegion(region, w.pos.slice(), D.flight.minAlt) : null;
