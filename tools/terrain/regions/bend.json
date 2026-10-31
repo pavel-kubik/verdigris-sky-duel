@@ -1,0 +1,35 @@
+{
+  "id": "bend",
+  "module": "demBend",
+  "out": "campaign/core/dem-bend.js",
+  "title": "Veltava Bend",
+  "tile": "N50E014",
+  "crop": { "lon": [14.33, 14.53], "lat": [50.02, 50.15] },
+  "projection": { "lon0": 14.4325, "lat0": 50.0905, "metresPerUnit": 3.6 },
+  "grid": { "radius": 1200, "cell": 10, "base": 170 },
+  "river": {
+    "start": { "zBelow": -1150, "xNear": -375, "xWithin": 200 },
+    "goal": { "zAbove": 950, "xBelow": -450, "minRadius": 1050 },
+    "costScale": 6.0, "maxDist": 170, "aboveLevel": 1.2, "smooth": 4, "simplify": 12
+  },
+  "preview": {
+    "exag": 1.6,
+    "out": "ai_sdlc/001_campaign/img/bend-terrain.png",
+    "label": { "text": "Veltava", "at": [-300, -650], "rotate": 82 },
+    "entry": { "text": "from the Farmlands", "at": [-310, -1135] },
+    "places": [
+      ["Vyshgard Castle", -220, -815, "order"], ["Lethna outpost", -190, 250, "order"], ["Holeshwick", 250, 450],
+      ["Troyvale", -230, 930], ["Petrovel tower", -745, -230, "order"], ["Staromark (burned city)", -230, -200],
+      ["Karlsbridge", -410, -125], ["Hradchan ruins", -645, 0], ["Vitkar Ridge", 345, -45], ["Troyvale aerie", -120, 1010],
+      ["Archer's Isle", -430, -300]
+    ]
+  },
+  "names": [
+    ["Veltava Bend", "Ohyb Veltavy", "Prague basin"], ["Veltava", "Veltava", "Vltava"],
+    ["Vyshgard Castle", "hrad Vyšegrad", "Vyšehrad"], ["Hradchan ruins", "zřícenina Hradčín", "Hradčany"],
+    ["Petrovel", "Petrovel", "Petřín"], ["Lethna Heights", "Letenské výšiny", "Letná"],
+    ["Vitkar Ridge", "hřbet Vítkar", "Vítkov"], ["Holeshwick", "Holešín", "Holešovice"], ["Troyvale", "Trojany", "Troja"],
+    ["Staromark", "Staroměst", "Staré Město"], ["Karlsbridge", "Karlomost", "Charles Bridge"],
+    ["Archer's Isle", "Střelčí ostrov", "Střelecký ostrov"], ["Prahold", "Prahold", "Prague"]
+  ]
+}
