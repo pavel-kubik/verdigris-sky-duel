@@ -4,6 +4,8 @@
  * per type (about 15 draw calls for every animal in a region). Legs swing with the animal's speed.
  *   VRender.prey.build() -> { group, update(field, time, carry?), dispose() }
  *   carry: { id, pos: Vector3, yaw, pitch } draws that prey hanging from the claw anchor instead of on the ground
+ *   update(field, time, carry, { sense: { x, z, range } }): T20 prey sense - an amber ring under every loose animal
+ *   within range of (x, z), larger and fainter far out, drawn over the terrain (one more draw call)
  */
 (function (root) {
   'use strict';
@@ -82,8 +84,29 @@
     const base = new THREE.Matrix4(), m = new THREE.Matrix4(), swing = new THREE.Matrix4(), tmp = new THREE.Matrix4();
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), sc = new THREE.Vector3(VIS, VIS, VIS);
     const colA = new THREE.Color(), colB = new THREE.Color(), eul = new THREE.Euler();
+    // T20 prey sense rings (one InstancedMesh, flat on the ground, seen through hills and trees)
+    const SENSE_CAP = 160;
+    const senseMat = new THREE.MeshBasicMaterial({ color: 0xe0a040, transparent: true, opacity: 0.55, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false });
+    const senseGeo = new THREE.RingGeometry(1.15, 1.45, 24); senseGeo.rotateX(-Math.PI / 2);
+    const sense = new THREE.InstancedMesh(senseGeo, senseMat, SENSE_CAP);
+    sense.count = 0; sense.frustumCulled = false; sense.renderOrder = 4; group.add(sense);
+    const sm = new THREE.Matrix4(), sq = new THREE.Quaternion(), sv = new THREE.Vector3(), ss = new THREE.Vector3();
 
-    function update(field, time, carry) {
+    function senseRings(field, time, S) {
+      let n = 0;
+      if (S) for (const p of field.list) {
+        if (n >= SENSE_CAP) break;
+        if (p.state !== 'graze' && p.state !== 'flee' && p.state !== 'charge') continue;
+        const d = Math.hypot(p.pos[0] - S.x, p.pos[2] - S.z);
+        if (d > S.range) continue;
+        const k = VIS * (p.size > 1 ? 1.3 : 1) * (1 + d / 120) * (1 + 0.06 * Math.sin(time * 3 + p.id));
+        sense.setMatrixAt(n++, sm.compose(sv.set(p.pos[0], p.pos[1] + 0.3, p.pos[2]), sq, ss.set(k, 1, k)));
+      }
+      sense.count = n; sense.instanceMatrix.needsUpdate = true;
+    }
+
+    function update(field, time, carry, opts) {
+      senseRings(field, time, opts && opts.sense);
       const counts = {};
       for (const type in kinds) counts[type] = 0;
       for (const p of field.list) {
@@ -126,6 +149,7 @@
       }
     }
     function dispose() {
+      sense.geometry.dispose(); senseMat.dispose();
       for (const type in kinds) for (const part of kinds[type]) { part.mesh.geometry.dispose(); part.mesh.material.dispose(); if (part.mesh.dispose) part.mesh.dispose(); }
       if (group.parent) group.parent.remove(group);
     }

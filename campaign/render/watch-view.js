@@ -6,8 +6,8 @@
  *     sees the dragon; a '?' or '!' sprite over a suspicious or alert post. Hidden when show is false.
  *   T15: the list is the defenders (cs.squad); ctx.marks shows the '?' (suspicious, search) / '!' (alert) marks without
  *   the fans, only within ctx.markRange of ctx.near (the dragon; 002 4.6: 120 without the guard sight upgrade); dead
- *   and hidden defenders have none. Fans are ?debug only (button / key 7 'sight'); the guard sight upgrade (T20) can
- *   reuse them.
+ *   and hidden defenders have none. Fans show with ?debug (button / key 7 'sight') or the guard sight upgrade (T20,
+ *   game.js passes show, markRange Infinity and fanAlpha 2.5 so the fans read in play).
  */
 (function (root) {
   'use strict';
@@ -90,7 +90,7 @@
         it.fan.scale.set(r, 1, r);
         it.fan.material.color.setHex(COL[v.state] || COL.idle);
         it.edge.material.color.setHex(COL[v.state] || COL.idle);
-        it.fan.material.opacity = v.seen > 0 ? 0.12 : 0.05;
+        it.fan.material.opacity = (v.seen > 0 ? 0.12 : 0.05) * (ctx.fanAlpha || 1);   // T20 guard sight: fanAlpha 2.5
         info.shown++;
       }
     }

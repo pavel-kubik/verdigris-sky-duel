@@ -4,7 +4,8 @@
  * the back wall (emissive ribbon + one flickering point light), the nest (ash ring + bones), the larder slab with the
  * stored carcasses (the prey models, lying on their side), the exit tunnel with daylight at its end, and a ring on
  * the floor under the station in reach. T19: the hoard pile, an InstancedMesh of up to data.cave.maxCoins coins
- * (loot.coins(gold)) heaped in a cone that widens and rises with loot.tier(gold), round a few chests. The altar arrives with T20.
+ * (loot.coins(gold)) heaped in a cone that widens and rises with loot.tier(gold), round a few chests. T20: the altar stone with one rune
+ * per upgrade on its top: bright verdigris = owned, pulsing ember = affordable now, dark = not yet.
  *   VRender.cave.build() -> { group, update(cs, time), dispose() }     group starts hidden; game.js shows it inside
  */
 (function (root) {
@@ -169,6 +170,25 @@
       coinGold = gold;
     }
     pile(0);
+    // T20: the altar - a basalt block with a rune per upgrade on its top (owned / affordable / dark)
+    const UP = C.need('upgrades'), A = K.stations.altar, ups = UP.list();
+    const AH = 3.6, ar0 = A[2] * 0.62, ar1 = A[2] * 0.78;
+    const altar = new THREE.Mesh(new THREE.CylinderGeometry(ar0, ar1, AH, 5), new THREE.MeshStandardMaterial({ color: 0x3b3430, flatShading: true, roughness: 1 }));
+    altar.position.set(A[0], K.floor + AH / 2, A[1]); group.add(altar);
+    const runeMat = {
+      owned: new THREE.MeshBasicMaterial({ color: 0x62c48a, fog: false }),
+      can: new THREE.MeshBasicMaterial({ color: 0xff9447, fog: false }),
+      dark: new THREE.MeshBasicMaterial({ color: 0x4a3a30, fog: false }),
+    };
+    // one rune slab on each of the five side faces (a pentagonal block: face centres at the apothem), seen from every side
+    const canHot = new THREE.Color(0xffd27a);
+    const runeGeo = new THREE.BoxGeometry(1.0, 1.7, 0.2), apo = (ar0 + ar1) / 2 * Math.cos(Math.PI / 5);
+    const runes = ups.map((id, i) => {
+      const a = (i + 0.5) / 5 * Math.PI * 2;
+      const m = new THREE.Mesh(runeGeo, runeMat.dark);
+      m.position.set(A[0] + Math.sin(a) * (apo + 0.05), K.floor + AH * 0.62, A[1] + Math.cos(a) * (apo + 0.05)); m.rotation.y = a;
+      m.rotation.x = 0; group.add(m); return m;
+    });
     // station ring (the one in reach)
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x62c48a, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), ringMat);
@@ -181,8 +201,10 @@
       if (s) {
         ring.position.set(s[0], K.floor + 0.12, s[1]);
         ring.scale.setScalar(s[2] + 1.5 + 0.25 * Math.sin(time * 4));
-        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : 0x62c48a);
+        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : st === 'altar' ? 0xff9447 : 0x62c48a);
       }
+      if (cs) ups.forEach((id, i) => { runes[i].material = UP.has(cs, id) ? runeMat.owned : UP.canBuy(cs, id).ok ? runeMat.can : runeMat.dark; });
+      runeMat.can.color.setHex(0xff7a2e).lerp(canHot, 0.5 + 0.5 * Math.sin(time * 3));   // affordable: an ember pulse
       const gold = cs && cs.hoard ? cs.hoard.gold : 0;
       if (gold !== coinGold) pile(gold);
       // carcasses: one per stored item, side by side across the slab (carcHold local: x = world up, y = across, z = along)

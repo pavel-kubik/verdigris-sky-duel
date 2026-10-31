@@ -62,8 +62,9 @@
 
   function startTakeoff(p, stats, eff) {
     if ((p.mode || 'air') !== 'ground') return { ok: false, why: 'busy' };
-    if (p.st < D.takeoff.st) return { ok: false, why: 'tired' };
-    p.st -= D.takeoff.st;
+    const cost = D.takeoff.st * ((eff && eff.takeoffSt) || 1);   // T20 wing muscles: takeoffSt
+    if (p.st < cost) return { ok: false, why: 'tired' };
+    p.st -= cost;
     p.mode = 'takeoff';
     p.tr = { t: 0, dur: D.takeoff.time, v0: Math.max(0, p.speed), cruise: (stats ? stats.cruise : 30) * ((eff || NO_EFFECTS).speedMult || 1) };
     clearAir(p);
@@ -137,7 +138,7 @@
     if (ctx.eating) want = 0;
     p.speed += (want - p.speed) * Math.min(1, dt * W.accel);
 
-    if (p.boosting) p.st -= W.runSt * dt;
+    if (p.boosting) p.st -= W.runSt * (eff.boostSt || 1) * dt;   // T20 wing muscles: boostSt
     if (p.breathing) p.st -= 32 * dt;
     if (!p.boosting && !p.breathing) p.st += 17 * (eff.stRegenMult || 1) * dt;
     p.st = clamp(p.st, 0, 100);

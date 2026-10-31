@@ -138,6 +138,19 @@ h2{font-size:42px}
 #hoardGold{font-family:var(--f-ui);font-size:22px;font-weight:700;color:#f2c14e;margin:2px 0}
 #hoardTier{color:var(--bone)}
 .hoardCarry{font-size:13px;color:var(--mute)}
+/* T20: the altar - upgrades with cost, effect and Buy */
+#lair .altarInfo{display:none}
+#lair[data-station=altar] .altarInfo{display:block}
+#lair[data-station=altar] .larder,#lair[data-station=altar] #lairStage,#lair[data-station=altar] #lairVitals,#lair[data-station=altar] .restRow{display:none}
+#altarGold{font-family:var(--f-ui);font-size:18px;font-weight:700;color:#f2c14e;margin:2px 0 8px}
+#altarList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#altarList li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:4px;padding:6px 6px 6px 12px}
+#altarList li b{display:block;font-family:var(--f-ui);font-size:15px;color:var(--bone)}
+#altarList li small{display:block;font-size:12px;line-height:1.3;color:var(--mute)}
+#altarList li.owned{border-color:rgba(98,196,138,.5)}
+#altarList li.owned b{color:var(--verd)}
+#altarList button{min-height:44px;min-width:78px;flex:none;white-space:nowrap}
+#altarList button:disabled{opacity:.45;cursor:default}
 /* T19: gold under the stage row; the carried chest as a small icon */
 #goldRow{display:flex;width:max-content;margin:4px auto 0;gap:5px;align-items:center}
 #goldRow small{font-family:var(--f-ui);font-size:12px;font-weight:700;letter-spacing:.06em;color:#f2c14e}
@@ -249,6 +262,7 @@ h2{font-size:42px}
   <p id="lairVitals"></p>
   <div class="row restRow"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button></div>
   <div class="hoardInfo"><p id="hoardGold"></p><p id="hoardTier"></p><p class="hoardCarry" data-i18n="c.hoard.carry">Loot is banked the moment you enter the lair. If you die on the way, it is lost.</p></div>
+  <div class="altarInfo"><p id="altarGold"></p><ul id="altarList"></ul></div>
   <div class="larder"><div class="eyebrow" id="larderHead"></div><ul id="larderList"></ul><p id="larderEmpty" data-i18n="c.lair.empty">Empty - carry prey into the cave to store it</p></div>
   <p id="lairMsg" aria-live="polite"></p>
   <button class="ghost" id="leaveBtn" data-i18n="c.cave.close">Close</button>
@@ -268,7 +282,7 @@ h2{font-size:42px}
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
-     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js', 'core/settlement.js', 'core/loot.js',
+     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/loot.js',
      'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
      'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
