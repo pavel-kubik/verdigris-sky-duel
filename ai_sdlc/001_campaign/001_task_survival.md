@@ -109,7 +109,7 @@ stages: [
   { id: 'hatchling', foodFrom: 0,   growthFrom: 0.00, scaleFrom: 1.0, scaleTo: 1.5,
     hp: 100, turn: 1.00, cruise: 30, boost: 54, hungerMult: 1.0, spot: 1.0, carry: 1 },
   { id: 'drake',     foodFrom: 1000, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
-    hp: 220, turn: 0.85, cruise: 32, boost: 56, hungerMult: 1.5, spot: 1.5, carry: 2 },
+    hp: 220, turn: 0.85, cruise: 32, boost: 56, hungerMult: 1.1, spot: 1.5, carry: 2 },
   // wyrm (foodFrom 2400, growthFrom 0.55) and elder are Phase 4-5; Phase 1 caps food XP at 2399
 ],
 growthCap: { food: 2399 },

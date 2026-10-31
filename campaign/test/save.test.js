@@ -25,7 +25,7 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
   const st = mem();
   ok(SV.store(st, cs), 'store returns true');
   const raw = JSON.parse(st.m[D.saveKey]);
-  ok(raw.version === 1 && raw.world.region === 'wild' && raw.world.location === 'field', 'v1 shape with region and location');
+  ok(raw.version === 2 && raw.world.region === 'wild' && raw.world.location === 'field' && raw.world.mode === 'air', 'v2 shape with region, location and mode');
   ok(!('field' in raw) && !('prey' in raw) && !('pilot' in raw.dragon) && raw.world.pos.length === 3, 'no prey, pilot reduced to pos + yaw');
   ok(raw.larder[0].prey === 'deer' && raw.hoard && raw.missions && raw.story && raw.regions.ash, 'larder as {prey, food} + room for later phases');
 
@@ -95,7 +95,7 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
 {
   const v0 = { xp: 300, stage: 0, hunger: 55, hp: 70, region: 'wild', pos: [10, 90, 20], yaw: 0.5, larder: [{ type: 'boar', food: 30 }] };
   const o = SV.migrate(v0);
-  ok(o.version === 1 && o.dragon.foodXp === 300 && o.world.region === 'wild' && o.larder[0].prey === 'boar', 'v0 migrated to v1');
+  ok(o.version === 2 && o.dragon.foodXp === 300 && o.world.region === 'wild' && o.larder[0].prey === 'boar', 'v0 migrated through v1 to v2');
   const cs = SV.deserialise(v0, mulberry(5));
   ok(cs.region === 'wild' && cs.dragon.foodXp === 300 && cs.dragon.hunger === 55 && Math.abs(cs.dragon.pilot.pos[0] - 10) < 1e-9 && cs.larder[0].type === 'boar', 'v0 save plays');
   ok(JSON.stringify(SV.migrate(JSON.parse(JSON.stringify(o)))) === JSON.stringify(o), 'v1 migrate is identity');
@@ -149,4 +149,23 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
   ok(cs.region === 'wild' && saves.length === 1 && saves[0].why === 'region', 'save on region change');
   const s2 = mem();
   ok(SV.store(s2, cs) && SV.load(s2).data.world.region === 'wild', 'the region-change save holds the new region');
+}
+
+// Story (T104): the hatching scene hands over to the mother; her lesson state survives a reload; old saves have no teacher
+{
+  const cs = S.create({ regionId: 'ash', rng: mulberry(21) });
+  SV.apply(cs, SV.migrate(SV.blank()));
+  ok(cs.story && cs.story.act === 1 && cs.story.mother === null, 'blank run: act 1, no mother yet (the hatching scene comes first)');
+  LR.hatch(cs);
+  cs.story.mother.lesson = 2;
+  const st = mem();
+  ok(SV.store(st, cs), 'store after hatch');
+  const raw = JSON.parse(st.m[D.saveKey]);
+  ok(raw.story.act === 1 && raw.story.mother.lesson === 2 && raw.story.mother.at === 'lair', 'story.mother serialised');
+  const back = SV.deserialise(SV.load(st).data, mulberry(3));
+  ok(back.story.mother && back.story.mother.lesson === 2 && back.story.mother.at === 'lair', 'mother lesson restored');
+  const old = JSON.parse(st.m[D.saveKey]); old.story = { act: 1 };
+  ok(SV.deserialise(SV.migrate(old), mulberry(3)).story.mother === null, 'a phase 1 save (story without mother) keeps playing without a teacher');
+  const v0 = SV.deserialise(SV.migrate({ stage: 0, xp: 10, hp: 30, hunger: 50, region: 'ash', pos: [0, 120, 0] }), mulberry(3));
+  ok(v0.story.act === 1 && v0.story.mother === null, 'v0 migration fills the story');
 }

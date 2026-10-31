@@ -49,6 +49,7 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
 // 4. flying straight at the exit raises the offer; it lingers after turning back, then expires
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
+  cs.dragon.pilot = F.newPilot(at('ash', 0, 300, 60), 0, 30);
   const d = cs.dragon;
   d.pilot = F.newPilot(at('ash', 0.1, 260, 60), 0.1, 30);
   let ev = [], t = 0;
@@ -106,7 +107,8 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
     if (ev.some(e => e.e === 'region:enter')) trips++;
     tm += dt;
     ok(Number.isFinite(d.pilot.pos[0] + d.pilot.pos[1] + d.pilot.pos[2]) && Math.hypot(d.pilot.pos[0], d.pilot.pos[2]) <= R.radius + 1e-6, 'finite, in bounds');
-    ok(cs.field.list.length <= D.preyAi.maxActive, 'prey count bounded');
+    const stock = (cs.town.pens || []).reduce((n, pn) => n + pn.count, 0);       // T18: penned livestock come on top
+    ok(cs.field.list.filter(p => !p.pen).length <= D.preyAi.maxActive && cs.field.list.length <= D.preyAi.maxActive + stock, 'prey count bounded');
   }
   ok(trips === 10, '5 round trips flown (' + trips + ' crossings, ' + Math.round(tm) + ' s)');
   ok(cs.region === 'ash', 'back home in Ash Wastes');
@@ -118,4 +120,15 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
   let threw = false;
   try { RG.enter(cs, 'nowhere', 'ash'); } catch (_) { threw = true; }
   ok(threw && cs.region === 'ash', 'unknown region rejected, state untouched');
+}
+
+// 8. debug region jump: enter works between regions without a shared exit (Ash Wastes -> Farmlands and back)
+{
+  const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
+  cs.dragon.pilot = F.newPilot(at('ash', 0, 300, 60), 0, 30);
+  for (const [to, from] of [['farm', 'ash'], ['ash', 'farm'], ['wild', 'ash'], ['farm', 'wild']]) {
+    const ev = RG.enter(cs, to, from), p = cs.dragon.pilot, R = T.region(to);
+    ok(ev[0].e === 'region:enter' && cs.region === to && cs.field, 'jump ' + from + ' -> ' + to);
+    ok(Number.isFinite(p.pos[1]) && p.pos[1] > T.surfaceAt(to, p.pos[0], p.pos[2]) && p.pos[1] < R.ceiling && Math.hypot(p.pos[0], p.pos[2]) < R.radius, 'placed in the air inside ' + to);
+  }
 }

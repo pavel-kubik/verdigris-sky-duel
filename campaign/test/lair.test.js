@@ -2,7 +2,7 @@
 // spoilage, paused hunger inside, leave.
 'use strict';
 const { ok, near, core } = require('./harness.js');
-const S = core('state'), LR = core('lair'), T = core('terrain'), D = core('data'), F = core('flight'), PR = core('prey'), G = core('growth');
+const S = core('state'), LR = core('lair'), T = core('terrain'), D = core('data'), F = core('flight'), PR = core('prey'), G = core('growth'), CV = core('cave');
 const { mulberry, wrap, clamp } = core('math');
 const dt = 1 / 60;
 
@@ -64,7 +64,8 @@ ok(mouth[1] > T.surfaceAt('ash', mouth[0], mouth[2]) + D.flight.minAlt, 'mouth c
   const pos = d.pilot.pos.slice(), preyPos = cs.field.list.filter(q => q.state !== 'carried').map(q => q.pos.slice());
   for (let i = 0; i < 60 * 20; i++) S.step(cs, { sx: 1, sy: 1, boost: true, breath: true }, dt);
   ok(d.hunger === 50, 'hunger does not drain inside the lair');
-  ok(d.pilot.pos.every((v, i) => v === pos[i]), 'the dragon does not fly while inside');
+  ok(d.pilot.mode === 'ground' && d.pilot.pos[1] === CV.standY(S.scaleOf(cs)) && CV.walkable(d.pilot.pos[0], d.pilot.pos[2], S.scaleOf(cs)), 'T10: inside, the dragon walks on the cave floor, never flies');
+  ok(cs.inLair, 'still inside after 20 s of walking in circles');
   ok(cs.field.list.filter(q => q.state !== 'carried').every((q, i) => q.pos.every((v, j) => v === preyPos[i][j])), 'prey are paused while inside');
   near(cs.larder[0].food, 20 - 20 / D.lair.spoilEvery, 1e-6, 'the larder still spoils inside (1 food per ' + D.lair.spoilEvery + ' s)');
 }
@@ -153,9 +154,11 @@ ok(mouth[1] > T.surfaceAt('ash', mouth[0], mouth[2]) + D.flight.minAlt, 'mouth c
     ok(le && le.hatch && !le.respawn, start + ': lair:enter tagged hatch');
     ok(ev.some(e => e.e === 'region:enter') === (start !== LR.home()), start + ': region:enter only when the start region differs');
     ok(!ev.some(e => e.e === 'dragon:died'), start + ': no death');
+    const mh = ev.find(e => e.e === 'mother:handover');
+    ok(mh && mh.lesson === 0 && mh.at === 'lair' && ev.indexOf(mh) > ev.indexOf(le), start + ': mother:handover after lair:enter (T104)');
+    ok(cs.story.mother && cs.story.mother.lesson === 0 && cs.story.mother.at === 'lair', start + ': the mother is with the hatchling in the lair');
     ok(cs.dragon.stage === 0 && cs.dragon.hp === D.stages[0].hp && cs.dragon.deaths === 0, start + ': full HP hatchling, no deaths');
-    const m = LR.mouthPos(LR.home());
-    ok(Math.hypot(cs.dragon.pilot.pos[0] - m[0], cs.dragon.pilot.pos[2] - m[2]) < 1, start + ': pilot at the cave mouth');
+    ok(cs.station === 'nest' && cs.dragon.pilot.mode === 'ground', start + ': T10: the hatchling stands on the nest in the cave');
     const n = S.step(cs, { sx: 1, sy: 1, breath: true }, 1 / 60);
     ok(cs.inLair && !n.some(e => e.e === 'lair:leave'), start + ': stays inside until Leave');
     LR.leave(cs);

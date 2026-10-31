@@ -1,9 +1,11 @@
 /*
  * Verdigris campaign - prey renderer.
- * Low-poly goats, deer and boars built from primitives, drawn with one InstancedMesh per body part
+ * Low-poly goats, deer, boars, sheep and cows (T18) built from primitives, drawn with one InstancedMesh per body part
  * per type (about 15 draw calls for every animal in a region). Legs swing with the animal's speed.
  *   VRender.prey.build() -> { group, update(field, time, carry?), dispose() }
  *   carry: { id, pos: Vector3, yaw, pitch } draws that prey hanging from the claw anchor instead of on the ground
+ *   update(field, time, carry, { sense: { x, z, range } }): T20 prey sense - an amber ring under every loose animal
+ *   within range of (x, z), larger and fainter far out, drawn over the terrain (one more draw call)
  */
 (function (root) {
   'use strict';
@@ -39,6 +41,20 @@
       { geo: box(0.12, 0.55, 0.9), col: 0x2a201a, places: [[0, 1.5, -0.1, 0, 0, 0]] },   // bristly ridge
       { geo: leg(0.11, 0.55), col: 0x2a201a, legs: true, places: [[0.3, 0.55, 0.6], [-0.3, 0.55, 0.6], [0.3, 0.55, -0.6], [-0.3, 0.55, -0.6]] },
     ] },
+    sheep: { parts: [                                                    // T18 livestock: woolly body, dark face
+      { geo: new THREE.DodecahedronGeometry(0.62, 0), col: [0xf2ede0, 0xd8d0bc], places: [[0, 1.0, 0, 0, 0, 0], [0, 1.02, -0.45, 0.4, 0.3, 0], [0, 1.0, 0.42, 0.2, 0.8, 0]] },
+      { geo: box(0.36, 0.4, 0.5), col: 0x2e2a26, places: [[0, 1.22, 0.92, 0.3, 0, 0]] },
+      { geo: box(0.22, 0.1, 0.16), col: 0x2e2a26, places: [[0.24, 1.32, 0.8, 0, 0, -0.4], [-0.24, 1.32, 0.8, 0, 0, 0.4]] },
+      { geo: leg(0.08, 0.62), col: 0x2e2a26, legs: true, places: [[0.22, 0.62, 0.45], [-0.22, 0.62, 0.45], [0.22, 0.62, -0.45], [-0.22, 0.62, -0.45]] },
+    ] },
+    cow: { parts: [
+      { geo: box(1.05, 1.0, 2.1), col: [0xf0ebe0, 0x7a4a2e], places: [[0, 1.45, 0, 0, 0, 0]] },
+      { geo: box(0.7, 0.4, 0.9), col: 0x2a2420, places: [[0.38, 1.7, 0.2, 0, 0, 0], [-0.4, 1.35, -0.55, 0, 0, 0]] },   // patches
+      { geo: box(0.5, 0.55, 0.65), col: [0xf0ebe0, 0x7a4a2e], places: [[0, 1.75, 1.3, 0.25, 0, 0]] },
+      { geo: box(0.42, 0.3, 0.2), col: 0xd89a8a, places: [[0, 1.55, 1.66, 0.25, 0, 0]] },
+      { geo: horn(0.05, 0.3), col: 0xe8dcc0, places: [[0.22, 2.05, 1.2, 0, 0, -0.9], [-0.22, 2.05, 1.2, 0, 0, 0.9]] },
+      { geo: leg(0.12, 0.95), col: 0x3a302a, legs: true, places: [[0.32, 0.95, 0.75], [-0.32, 0.95, 0.75], [0.32, 0.95, -0.75], [-0.32, 0.95, -0.75]] },
+    ] },
     roast: { parts: [
       { geo: new THREE.DodecahedronGeometry(0.55, 0), col: [0x8a4a1e, 0x6a3416], places: [[0, 0.45, 0, 0.3, 0, 0.2]] },
       { geo: new THREE.CylinderGeometry(0.09, 0.12, 0.9, 5), col: 0xeee4cc, places: [[0.55, 0.42, 0.1, 0, 0, 1.25]] },
@@ -68,8 +84,29 @@
     const base = new THREE.Matrix4(), m = new THREE.Matrix4(), swing = new THREE.Matrix4(), tmp = new THREE.Matrix4();
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), sc = new THREE.Vector3(VIS, VIS, VIS);
     const colA = new THREE.Color(), colB = new THREE.Color(), eul = new THREE.Euler();
+    // T20 prey sense rings (one InstancedMesh, flat on the ground, seen through hills and trees)
+    const SENSE_CAP = 160;
+    const senseMat = new THREE.MeshBasicMaterial({ color: 0xe0a040, transparent: true, opacity: 0.55, depthWrite: false, depthTest: false, side: THREE.DoubleSide, fog: false });
+    const senseGeo = new THREE.RingGeometry(1.15, 1.45, 24); senseGeo.rotateX(-Math.PI / 2);
+    const sense = new THREE.InstancedMesh(senseGeo, senseMat, SENSE_CAP);
+    sense.count = 0; sense.frustumCulled = false; sense.renderOrder = 4; group.add(sense);
+    const sm = new THREE.Matrix4(), sq = new THREE.Quaternion(), sv = new THREE.Vector3(), ss = new THREE.Vector3();
 
-    function update(field, time, carry) {
+    function senseRings(field, time, S) {
+      let n = 0;
+      if (S) for (const p of field.list) {
+        if (n >= SENSE_CAP) break;
+        if (p.state !== 'graze' && p.state !== 'flee' && p.state !== 'charge') continue;
+        const d = Math.hypot(p.pos[0] - S.x, p.pos[2] - S.z);
+        if (d > S.range) continue;
+        const k = VIS * (p.size > 1 ? 1.3 : 1) * (1 + d / 120) * (1 + 0.06 * Math.sin(time * 3 + p.id));
+        sense.setMatrixAt(n++, sm.compose(sv.set(p.pos[0], p.pos[1] + 0.3, p.pos[2]), sq, ss.set(k, 1, k)));
+      }
+      sense.count = n; sense.instanceMatrix.needsUpdate = true;
+    }
+
+    function update(field, time, carry, opts) {
+      senseRings(field, time, opts && opts.sense);
       const counts = {};
       for (const type in kinds) counts[type] = 0;
       for (const p of field.list) {
@@ -78,10 +115,11 @@
         if (i >= CAP) continue;
         let gait = Math.min(1, p.speed / 6) * 0.7, ph = p.t * (4 + p.speed * 0.9);
         if (p.state === 'carried' && carry && carry.id === p.id) {
-          // hang the animal below the claws: back up, legs kicking, tilted with the dragon's pitch
-          pos.set(carry.pos.x, carry.pos.y - 1.9 * VIS * 0.55, carry.pos.z);
-          q.setFromEuler(eul.set(-carry.pitch, carry.yaw, 0, 'YXZ'));
-          gait = 0.9; ph = time * 14;
+          // hang the animal below the claws: back up, legs kicking, tilted with the dragon's pitch;
+          // on the ground (T08) it is held across the jaws (body centre a little below the mouth)
+          pos.set(carry.pos.x, carry.pos.y - (carry.jaws ? 2.1 : 1.9) * VIS * 0.55, carry.pos.z);
+          q.setFromEuler(eul.set(carry.jaws ? 0 : -carry.pitch, carry.yaw + (carry.jaws ? Math.PI / 2 : 0), 0, 'YXZ'));
+          gait = carry.jaws ? 0.4 : 0.9; ph = time * (carry.jaws ? 8 : 14);
         } else {
           pos.set(p.pos[0], p.pos[1], p.pos[2]);
           q.setFromAxisAngle(up, p.yaw);
@@ -111,6 +149,7 @@
       }
     }
     function dispose() {
+      sense.geometry.dispose(); senseMat.dispose();
       for (const type in kinds) for (const part of kinds[type]) { part.mesh.geometry.dispose(); part.mesh.material.dispose(); if (part.mesh.dispose) part.mesh.dispose(); }
       if (group.parent) group.parent.remove(group);
     }
