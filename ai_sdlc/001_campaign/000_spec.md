@@ -72,7 +72,8 @@ Each lap either grows the dragon (food) or its power (hoard), and pushes the reg
 | Renown | Deferred to Phase 4; Phase 2-3 only count civilian damage and livestock taken in the save (decided 2026-10-29) |
 | Hoard | Gold, the hoard pile and the first upgrades arrive in Phase 2 together with the kingdom, so raiding pays off from the start (decided 2026-10-29) |
 | Lair interior | A walkable 3D cave from Phase 2, not a menu; later phases add stations to it (decided 2026-10-29) |
-| Navigation | Compass strip with the dragon's sense of smell in Phase 2, map screen with fast travel in Phase 3 (decided 2026-10-29) |
+| Navigation | Compass strip with the dragon's sense of smell in Phase 2, map screen with fast travel in Phase 3 (decided 2026-10-29); the map is a drawn map with fog of war from exploration (decided 2026-10-31) |
+| First castle | Phase 3 opens with Harrowmere Castle in the River Farmlands, built for looks first (preview page, Pavel's phone check), before the mission systems (decided 2026-10-31) |
 
 ## 2. Story
 
@@ -187,7 +188,7 @@ Settlements scale from a hamlet with pitchforks to a capital with a dragon-slaye
 | Village | Archers, watchtower, 1 ballista | Grain, small gold | Calls knights if the alarm lasts > 60 s |
 | Order outpost | Archers, 2 ballistae, net launcher | Gold, minor relic | Main early mission target |
 | Town | Walls, ballistae, mangonels | Treasury | Sends riders after the dragon |
-| Castle | All of the above + knights, frost mages | Relics, vault | Mission targets with courtyard and keep |
+| Castle | All of the above + knights, frost mages | Relics, vault | Mission targets with courtyard and keep. The first one, Harrowmere in the River Farmlands, comes in Phase 3 with archers and ballistae only; knights and mages join in Phases 4-5 |
 | Capital | Everything + Grand Slayer | Crown relics | Act 4 only |
 
 ### Defender types
@@ -272,7 +273,7 @@ The world is six regions radiating from the volcano, each a seamless map loaded 
 | --- | --- | --- | --- |
 | Ash Wastes | Volcano lair, goats, lava fields | Start | Lair itself |
 | Wildwood | Deer, boar, bears, hamlets, first outpost | Hatchling | Yes |
-| River Farmlands | Villages, livestock, fish, first town | Drake | Yes |
+| River Farmlands | Villages, livestock, fish, Harrowmere Castle (Phase 3) | Drake | Yes |
 | Highland Pass | Fortresses, caravans, bridges | Drake (late) | Yes |
 | Royal Lowlands | Castles, slayer headquarters | Wyrm | Yes |
 | Capital | Final act | Elder | No - boss arena |
@@ -306,7 +307,7 @@ Phones have no room for a minimap, so navigation is a thin compass strip at the 
 | Compass strip | Heading with markers: the lair (always, with distance), region exits (name, greyed out when the dragon is too small), discovered settlements (with the region's alert colour) | 2 |
 | Smell | Scent markers on the compass toward nearby herds: fuzzy far away, sharp up close; a hungry dragon smells further. Livestock smell different from wild prey | 2 |
 | Prey sense upgrade | Longer smell range, prey type on the marker, prey highlighted in the world | 2 |
-| Map screen | Region graph, discovered settlements and aeries, alert per region, fast travel | 3 |
+| Map screen | Drawn world view (regions around the volcano) and region view (terrain image with rivers, roads, fields), fog of war over unexplored ground, discovered settlements, castle and aeries, alert per region, the dragon and the mission target; fast travel from the map stone | 3 |
 
 ### Day and night
 
@@ -364,13 +365,13 @@ Stored in `localStorage` (IndexedDB if it grows), autosaved on rest, mission end
 
 ## 9. Roadmap
 
-Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. **Phase 1 is done (2026-10-29, T01-T17 merged into `campaign-phase-1`). Phase 2 is done (2026-10-31, T01-T25 merged into `campaign-phase-2`, branched from phase 1); Phase 3 starts on `campaign-phase-3`, branched from it, once its task spec is merged.** Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard, upgrades, the walkable cave interior and the compass with smell moved into Phase 2, map screen in Phase 3, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
+Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. **Phase 1 is done (2026-10-29, T01-T17 merged into `campaign-phase-1`). Phase 2 is done (2026-10-31, T01-T25 merged into `campaign-phase-2`, branched from phase 1); Phase 3 starts on `campaign-phase-3`, branched from it, once its task spec is merged; it opens with the castle (revised 2026-10-31).** Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard, upgrades, the walkable cave interior and the compass with smell moved into Phase 2, map screen in Phase 3, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
 
 | Phase | Task file | Scope | Exit criteria |
 | --- | --- | --- | --- |
 | 1 - Survival MVP (**done 2026-10-29**) | `001_task_survival.md` | Ash Wastes + Wildwood, lair (rest, save, larder), hunger, goat / deer / boar, grab and eat, growth Hatchling to Drake, save v1 | A new player can hunt, starve, recover and reach Drake in about 30 min; save survives reload |
 | 2 - Kingdom + hoard (**done 2026-10-31**) | `002_task_kingdom.md` | Foundation first (touch action layout, phone perf baseline, shared dragon model), the hatching scene and the mother as tutor, landing + walking, walkable cave interior (nest, larder, hoard pile, altar), compass strip with smell, then River Farmlands, hamlet + village + outpost (a small outpost in Wildwood), archers + ballista, building fire, Perception, alert 0-3, livestock, gold loot, 5 upgrades incl. prey sense, day / night, save v2 | On a phone a Drake follows the compass to the Farmlands, lands outside the Order outpost, walks in, picks up the strongbox, takes off under archer and ballista fire, carries it into the cave, sees the hoard pile grow and buys an upgrade at the altar; raids raise alert to 3 with visible changes and lying low lowers it |
-| 3 - Missions | `003_task_missions.md` | Mission board and trophy wall in the cave, timer, steal + destroy + intercept types, relics and mission carry rules, aeries, map screen + fast travel, freeing a village (Order garrison destroyed: tribute starts), Act 1-2 story cards | Three missions completable in 5-10 min; death and timeout rules work as specified; the map shows discovered places and fast travel works |
+| 3 - Castle, map + missions | `003_task_missions.md` | Castle first (revised 2026-10-31): Harrowmere Castle in the Farmlands (castle kit, preview page, LOD, night lights, walls and wall walks, castle defenders, fire and char), then the drawn map screen with fog of war, aeries and fast travel, then the mission board and trophy wall in the cave, timer, steal + destroy + intercept types, relics and mission carry rules, freeing a village (tribute starts), Act 1-2 story cards | The castle reads as a castle from 600+ units on a phone, day and night; three missions completable in 5-10 min; death and timeout rules work as specified; the map shows explored ground and discovered places and fast travel works |
 | 4 - Highlands | `004_task_highlands.md` | The mother's death scene (end of Act 2), Highland Pass, Wyrm stage + stage visuals, knights, net launchers, caravans, Renown | A Wyrm intercepts a caravan and survives the knights; Renown changes how villages treat the dragon |
 | 5 - Lowlands | `005_task_lowlands.md` | Royal Lowlands, frost mages, mangonels, first named slayer, alert 4-5, lair defense inside the cave (lava vents), Act 3 | Act 3 playable end to end |
 | 6 - Endgame | `006_task_endgame.md` | Elder stage, Capital, Grand Slayer + war machine bosses, Act 4 | Campaign completable start to finish |
