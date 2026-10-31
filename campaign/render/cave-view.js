@@ -172,19 +172,22 @@
     pile(0);
     // T20: the altar - a basalt block with a rune per upgrade on its top (owned / affordable / dark)
     const UP = C.need('upgrades'), A = K.stations.altar, ups = UP.list();
-    const altar = new THREE.Mesh(new THREE.CylinderGeometry(A[2] * 0.55, A[2] * 0.7, 2.6, 7), new THREE.MeshStandardMaterial({ color: 0x3b3430, flatShading: true, roughness: 1 }));
-    altar.position.set(A[0], K.floor + 1.3, A[1]); group.add(altar);
+    const AH = 3.6, ar0 = A[2] * 0.62, ar1 = A[2] * 0.78;
+    const altar = new THREE.Mesh(new THREE.CylinderGeometry(ar0, ar1, AH, 5), new THREE.MeshStandardMaterial({ color: 0x3b3430, flatShading: true, roughness: 1 }));
+    altar.position.set(A[0], K.floor + AH / 2, A[1]); group.add(altar);
     const runeMat = {
       owned: new THREE.MeshBasicMaterial({ color: 0x62c48a, fog: false }),
-      can: new THREE.MeshBasicMaterial({ color: 0xff9447, transparent: true, opacity: 1, fog: false }),
+      can: new THREE.MeshBasicMaterial({ color: 0xff9447, fog: false }),
       dark: new THREE.MeshBasicMaterial({ color: 0x4a3a30, fog: false }),
     };
-    const runeGeo = new THREE.BoxGeometry(0.5, 0.18, 1.1);
+    // one rune slab on each of the five side faces (a pentagonal block: face centres at the apothem), seen from every side
+    const canHot = new THREE.Color(0xffd27a);
+    const runeGeo = new THREE.BoxGeometry(1.0, 1.7, 0.2), apo = (ar0 + ar1) / 2 * Math.cos(Math.PI / 5);
     const runes = ups.map((id, i) => {
-      const a = i / ups.length * Math.PI * 2, r = A[2] * 0.32;
+      const a = (i + 0.5) / 5 * Math.PI * 2;
       const m = new THREE.Mesh(runeGeo, runeMat.dark);
-      m.position.set(A[0] + Math.sin(a) * r, K.floor + 2.65, A[1] + Math.cos(a) * r); m.rotation.y = a;
-      group.add(m); return m;
+      m.position.set(A[0] + Math.sin(a) * (apo + 0.05), K.floor + AH * 0.62, A[1] + Math.cos(a) * (apo + 0.05)); m.rotation.y = a;
+      m.rotation.x = 0; group.add(m); return m;
     });
     // station ring (the one in reach)
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x62c48a, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false });
@@ -201,7 +204,7 @@
         ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : st === 'altar' ? 0xff9447 : 0x62c48a);
       }
       if (cs) ups.forEach((id, i) => { runes[i].material = UP.has(cs, id) ? runeMat.owned : UP.canBuy(cs, id).ok ? runeMat.can : runeMat.dark; });
-      runeMat.can.opacity = 0.55 + 0.45 * Math.sin(time * 3);
+      runeMat.can.color.setHex(0xff7a2e).lerp(canHot, 0.5 + 0.5 * Math.sin(time * 3));   // affordable: an ember pulse
       const gold = cs && cs.hoard ? cs.hoard.gold : 0;
       if (gold !== coinGold) pile(gold);
       // carcasses: one per stored item, side by side across the slab (carcHold local: x = world up, y = across, z = along)

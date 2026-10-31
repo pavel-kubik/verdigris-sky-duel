@@ -85,6 +85,7 @@
       const list = markers.slice().sort((a, b) => (ORDER[a.kind] || 0) - (ORDER[b.kind] || 0));
       const k = 1 - Math.exp(-(dt || 0) * 8), seen = {};
       laid = [];
+      const labels = [], busy = [];
       for (const m of list) {
         const want = wrap(yaw - m.bearing);
         let rel = eased[m.key];
@@ -109,15 +110,23 @@
           g.textAlign = right ? 'left' : 'right'; const pad = edge ? 16 : s + 3;
           g.fillText(tx, right ? x + pad : x - pad, y + 1); g.restore();
         }
-        if (m.prey && !showD && !edge) {                      // T20 prey sense: the prey type next to its scent
-          g.save(); g.font = '600 9px "Barlow Semi Condensed", "Arial Narrow", sans-serif'; g.textBaseline = 'middle';
-          g.fillStyle = col; g.globalAlpha = alpha; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 3;
-          const tx = t('c.prey.' + m.prey), right = x + s + 3 + g.measureText(tx).width < W - 12;
-          g.textAlign = right ? 'left' : 'right'; g.fillText(tx, right ? x + s + 3 : x - s - 3, y + 1); g.restore();
-        }
+        if (m.prey && !showD && !edge) labels.push({ m, x, y, s, col, alpha });   // T20 prey sense: named after all markers are laid
+        if (showD) busy.push([x - 70, x + 70]);               // a distance text may sit on either side
         if (m.key === selected) { g.strokeStyle = col; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y, s + 4, 0, TAU); g.stroke(); }
         laid.push({ m, x });
       }
+      // T20 prey sense: the prey type beside its scent, on the side that is free of other markers and distance texts
+      g.save(); g.font = '600 9px "Barlow Semi Condensed", "Arial Narrow", sans-serif'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 3;
+      for (const L of labels) {
+        const tx = t('c.prey.' + L.m.prey), w = g.measureText(tx).width, pad = L.s + 3;
+        const free = (a, b) => a > 12 && b < W - 12 && laid.every(o => o.m === L.m || o.x < a - 7 || o.x > b + 7) && busy.every(([u, v]) => v < a || u > b);
+        const right = free(L.x + pad, L.x + pad + w), left = !right && free(L.x - pad - w, L.x - pad);
+        if (!right && !left) continue;
+        g.globalAlpha = L.alpha; g.fillStyle = L.col; g.textAlign = right ? 'left' : 'right';
+        g.fillText(tx, right ? L.x + pad : L.x - pad, L.y + 1);
+        busy.push(right ? [L.x + pad, L.x + pad + w] : [L.x - pad - w, L.x - pad]);
+      }
+      g.restore();
       for (const key in eased) if (!seen[key]) delete eased[key];
       // heading notch
       g.fillStyle = COL.north; g.beginPath(); g.moveTo(W / 2 - 5, 0); g.lineTo(W / 2 + 5, 0); g.lineTo(W / 2, 6); g.closePath(); g.fill();

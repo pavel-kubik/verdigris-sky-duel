@@ -319,6 +319,7 @@
     if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape' && state === 'play' && stationOpen) { closeStation(); return; }
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && stationOpen && document.activeElement && document.activeElement.tagName === 'BUTTON' && lairEl.contains(document.activeElement)) return;   // T20: Enter presses the focused panel button (Buy, Eat)
     if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play' && cs.inLair) { useStation(cs.station); return; }   // T10: E uses the station in reach
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
@@ -1213,7 +1214,7 @@
       if (!watchView) { watchView = VRender.watch.build(); scene.add(watchView.group); }
       const cones = UP.effects(cs).showCones;                    // T20 guard sight: the fans and the marks at any distance
       watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: (cones || debug && watchShow) && !cs.inLair,
-                                   marks: !cs.inLair, near: pilot.pos, markRange: cones ? Infinity : D.defense.markRange });
+                                   marks: !cs.inLair, near: pilot.pos, markRange: cones ? Infinity : D.defense.markRange, fanAlpha: cones ? 2.5 : 1 });
     }
     targetRing();
     fireTargetRing();
