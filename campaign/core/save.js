@@ -39,7 +39,12 @@
       hoard: { gold: 0, relics: [] },
       larder: cs.larder.map(it => ({ prey: it.type, food: round(it.food, 100) })),
       renown: 0,
-      regions: Object.keys(D.regions).reduce((o, id) => { o[id] = {}; return o; }, {}),
+      regions: Object.keys(D.regions).reduce((o, id) => {              // T12: discovered settlements (the rest of v2 in T22)
+        o[id] = {};
+        const seen = Object.keys(cs.discovered || {}).filter(k => cs.discovered[k] && k.indexOf(id + '.') === 0).sort();
+        if (seen.length) o[id].discovered = seen;
+        return o;
+      }, {}),
       missions: { completed: [], active: null },
       story: storyOf(cs.story),
       world: {
@@ -113,6 +118,11 @@
     const s = o.stats || {};
     cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0 };
     cs.story = storyOf(o.story);
+    cs.discovered = {};
+    for (const id of Object.keys(o.regions || {})) {
+      const r = o.regions[id];
+      if (D.regions[id] && r && Array.isArray(r.discovered)) for (const k of r.discovered) if (typeof k === 'string' && k.indexOf(id + '.') === 0) cs.discovered[k] = true;
+    }
     cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0; cs.saveT = 0; cs.station = null;
 
     const pos = region === w.region && w.pos ? T.clampToRegion(region, w.pos.slice(), D.flight.minAlt) : null;
