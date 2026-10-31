@@ -49,14 +49,14 @@
         if (slope > 0.7) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.7) * 2));
       } else if (R.palette === 'farm') {
         a.set(pal.low); b.set(pal.mid);
-        c.copy(a).lerp(b, (Math.sin(x * 0.031) * Math.cos(z * 0.027) + 1) / 2);
+        c.copy(a).lerp(b, 0.15 + 0.6 * (Math.sin(x * 0.013 + Math.cos(z * 0.009) * 1.7) * Math.cos(z * 0.011 - x * 0.004) + 1) / 2);   // meadow patches, no stripes
         if (h > 30) c.lerp(b.set(pal.high), Math.min(1, (h - 30) / 16));
         const fd = T.fieldAt(id, x, z);
         if (fd) {                                                // crop rows along the field
           const cc = pal.crops[fd.f.crop], row = Math.sin(fd.u * fd.f.w * 1.1) > 0 ? 0 : 1;
           c.set(cc[row]);
         }
-        if (T.plateauAt(id, x, z)) c.lerp(b.set(pal.plateau), 0.5);
+        if (T.plateauAt(id, x, z)) c.lerp(b.set(pal.plateau), 0.3);
         const rv = T.riverAt(id, x, z);
         if ((rv && h < rv.level + 1.6) || (R.waterLevel != null && h < R.waterLevel + 1.6)) c.set(pal.bank);   // muddy banks, pond shores
         const rd = T.lineDist(id, 'road', x, z), rw = roadW / 2;
@@ -163,16 +163,12 @@
         let dx = q1[0] - q0[0], dz = q1[1] - q0[1];
         const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
         pos.set([p[0] - dz * half, y, p[1] + dx * half, p[0] + dz * half, y, p[1] - dx * half], i * 6);
-        if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+        if (i) { const a = (i - 1) * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }   // counter-clockwise seen from above
       });
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       geo.setIndex(idx); geo.computeVertexNormals();
-      // normals must face up whatever the winding: flip if needed
-      if (geo.attributes.normal.getY(0) < 0) { const nn = geo.attributes.normal; for (let i = 0; i < nn.count; i++) nn.setXYZ(i, 0, 1, 0); }
-      const m = new THREE.Mesh(geo, mat);
-      m.material.side = THREE.DoubleSide;
-      group.add(m);
+      group.add(new THREE.Mesh(geo, mat));
     }
   }
 

@@ -250,7 +250,7 @@
    * region.flora.fields = how many; each { x, z, yaw, w, l, crop } (w across, l along yaw, crop 0..3).
    * The renderer paints them into the vertex colours and trees keep off them; later tasks put pens beside them.
    */
-  const FIELD = { w: [26, 44], l: [36, 70], gap: 8, slope: 0.22, edgePad: 160, roadPad: 6, riverPad: 8, plateauPad: 18, tries: 60 };
+  const FIELD = { w: [34, 56], l: [50, 90], gap: 8, slope: 0.25, edgePad: 160, roadPad: 6, riverPad: 8, plateauPad: 18, tries: 120 };
   const fieldCache = new Map();
   function fields(id) {
     if (fieldCache.has(id)) return fieldCache.get(id);
@@ -281,7 +281,7 @@
     for (let k = 0; k < n * FIELD.tries && out.length < n && lines.length; k++) {
       const f = lines[Math.floor(rnd() * lines.length)], i = Math.floor(rnd() * (f.points.length - 1));
       const a = f.points[i], b = f.points[i + 1], t = rnd(), px = a[0] + (b[0] - a[0]) * t, pz = a[1] + (b[1] - a[1]) * t;
-      const along = Math.atan2(b[0] - a[0], b[1] - a[1]), side = rnd() < 0.5 ? -1 : 1, off = 30 + rnd() * 170;
+      const along = Math.atan2(b[0] - a[0], b[1] - a[1]), side = rnd() < 0.5 ? -1 : 1, off = 30 + rnd() * 260;
       const c = {
         x: px + Math.cos(along) * off * side, z: pz - Math.sin(along) * off * side,
         yaw: along + (rnd() < 0.5 ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.3,
