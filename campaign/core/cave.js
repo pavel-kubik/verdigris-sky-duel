@@ -21,7 +21,7 @@
   const D = M.need('data'), G = M.need('growth'), HN = M.need('hunger'), WK = M.need('walk');
   const K = D.cave;
 
-  const scaleOf = cs => G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);
+  const scaleOf = cs => cs.debugScale || G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);   // debugScale: ?debug B
   const floor = () => K.floor;
   const standY = scale => K.floor + D.walk.stand * scale;
   const hallR = scale => K.bounds - K.pad * Math.max(1, scale);

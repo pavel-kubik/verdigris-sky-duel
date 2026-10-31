@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), CV = C.need('cave');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't109.1 2026-10-31 compass strip with lair, exits and smell markers';
+  const BUILD = 't110.1 2026-10-31 walkable cave hall: nest, larder, exit tunnel';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -40,7 +40,7 @@
     fragmentShader: 'uniform vec3 top,mid,bot,sun;varying vec3 vP;void main(){float h=vP.y;vec3 c=h>0.?mix(mix(bot,mid,smoothstep(0.,.2,h)),top,smoothstep(.2,.75,h)):mix(bot,mid*.55,smoothstep(0.,-.25,h));float s=max(dot(vP,sun),0.);c+=vec3(1.,.82,.55)*(pow(s,600.)*2.5+pow(s,10.)*.28);gl_FragColor=vec4(c,1.);}',
   }));
   scene.add(sky);
-  scene.add(new THREE.HemisphereLight(0xa6cbc4, 0x3b2a1a, 0.85));
+  const hemi = new THREE.HemisphereLight(0xa6cbc4, 0x3b2a1a, 0.85); scene.add(hemi);
   const sunLight = new THREE.DirectionalLight(0xffc68c, 1.3); sunLight.position.copy(sunDir).multiplyScalar(300); scene.add(sunLight);
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
@@ -69,7 +69,7 @@
     if (cs.region !== id || !cs.field) ST.enterRegion(cs, id);
     preyView = VRender.prey.build();
     scene.add(preyView.group);
-    scene.fog.color.set(region.fog);
+    scene.fog.color.set(region.fog); caveOn = null;
     const u = sky.material.uniforms;
     u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
     $('#regionText').textContent = t(TR.region(id).nameKey);
@@ -98,7 +98,7 @@
     qTier = tier; qSource = src; qSet = QL.settings(tier, window.devicePixelRatio, FOG);
     store(D.quality.storeKey, tier);
     renderer.setPixelRatio(qSet.pixelRatio); resize();
-    scene.fog.near = qSet.fogNear; scene.fog.far = qSet.fogFar;
+    scene.fog.near = qSet.fogNear; scene.fog.far = qSet.fogFar; caveOn = null;
     if (old.flora === qSet.flora && old.fogFar === qSet.fogFar) return;
     fadeEl.classList.add('now');
     loadRegion(regionId);
@@ -121,12 +121,30 @@
   const mom = VDragon.makeDragon({ body: 0x2c6450, dark: 0x173a30, belly: 0xb09c66, wing: 0x346e5a, horn: 0xd8c9a8, eye: 0xffb43a });
   mom.root.scale.setScalar(D.mother.scale); mom.root.visible = false; scene.add(mom.root);
   let momPhase = 0, momAcc = 0;
+  /* the cave hall (T10, render/cave-view.js): shown instead of the region while cs.inLair; the region stays loaded */
+  const caveView = VRender.cave.build();
+  scene.add(caveView.group);
+  const OUT_LIGHT = { hemi: hemi.intensity, sun: sunLight.intensity, rim: rim.intensity };
+  let caveOn = null;
+  /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap. */
+  function syncScene() {
+    const inCave = !!pilot && cs.inLair && state !== 'intro';
+    caveView.group.visible = inCave;
+    if (region) region.group.visible = !inCave;
+    if (preyView) preyView.group.visible = !inCave;
+    sky.visible = !inCave;
+    if (inCave === caveOn) return;
+    caveOn = inCave;
+    hemi.intensity = inCave ? 0 : OUT_LIGHT.hemi; sunLight.intensity = inCave ? 0 : OUT_LIGHT.sun; rim.intensity = inCave ? 0 : OUT_LIGHT.rim;
+    if (inCave) { scene.fog.color.set(0x120a07); scene.fog.near = 40; scene.fog.far = 260; }
+    else { if (region) scene.fog.color.set(region.fog); scene.fog.near = qSet.fogNear; scene.fog.far = qSet.fogFar; }
+  }
   let stats = G.statsOf(0), heroScale = 1;
   let pilot = null, phase = 0;
   const heroPose = {};                                          // T07 legs / wings / walk cycle state (walk.pose)
   function refreshStage() {
     stats = G.statsOf(dragon.stage);
-    heroScale = G.scaleOf(dragon.foodXp, dragon.stage);
+    heroScale = ST.scaleOf(cs);                                 // (debug B: Elder size in the cave)
     hero.root.scale.setScalar(heroScale);
     $('#stageText').textContent = t('c.stage.' + D.stages[dragon.stage].id);
   }
@@ -290,6 +308,8 @@
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
+    if (e.code === 'Escape' && state === 'play' && stationOpen) { closeStation(); return; }
+    if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play' && cs.inLair) { useStation(cs.station); return; }   // T10: E uses the station in reach
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
     keys[e.code] = true;
@@ -333,6 +353,7 @@
   bAction.addEventListener('pointerdown', e => {
     e.preventDefault();
     if (state !== 'play' || !slotNow.action) return;
+    if (CT.isStation(slotNow.action)) { useStation(slotNow.action); return; }   // T10: in the cave the Action slot is a tap on the station
     actionKind = slotNow.action; Object.assign(touch, CT.input(actionKind, true)); bAction.classList.add('on');
     try { bAction.setPointerCapture(e.pointerId); } catch (_) { }
   });
@@ -390,10 +411,10 @@
     $('#hatchUi').hidden = !(s === 'hatch' && !hatchCard);
     $('#pause').hidden = s !== 'paused';
     $('#hudTop').hidden = !inGame;
-    if (s === 'intro') cs.inLair = false;
-    $('#lair').hidden = !(s === 'play' && cs.inLair);
-    $('#legend').hidden = !(s === 'play' && !isTouch && !cs.inLair);
-    $('#touch').hidden = !(s === 'play' && isTouch && !cs.inLair);
+    if (s === 'intro') { cs.inLair = false; stationOpen = null; }
+    $('#lair').hidden = !(s === 'play' && stationOpen);
+    $('#legend').hidden = !(s === 'play' && !isTouch);
+    $('#touch').hidden = !(s === 'play' && isTouch);
     if (s === 'play' && (prev === 'intro' || prev === 'hatch')) {
       hintT = 0;
       if (!cs.dragon.pilot) spawnPilot();                        // a save without a position
@@ -432,7 +453,6 @@
     if (!cs.dragon.pilot && !cs.flags.introSeen) { startHatchScene(); return; }
     cs.flags.introSeen = true;
     setState('play');
-    if (cs.inLair) openLair(null);
     saveNow('start');
   }
   /* ---------- hatching scene (render/hatch-scene.js): plays on a new run, then the hatching card ---------- */
@@ -471,7 +491,7 @@
     const ev = LR.hatch(cs);
     setState('play');
     onEvents(ev);
-    lairMsg(t('c.lair.hatched'), 12);
+    flashPrompt(t(isTouch ? 'c.lair.hatchedTouch' : 'c.lair.hatched'), 10);
     saveNow('start');
   }
   $('#hatchBtn').onclick = hatchNow;
@@ -512,6 +532,7 @@
   /* ---------- dragon pose + chase camera (same rig as the duel) ---------- */
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
   function camDesired(out) {
+    if (cs.inLair) { const c = CV.camera(pilot.pos, pilot.yaw, heroScale); return out.set(c.pos[0], c.pos[1], c.pos[2]); }   // T10: inside the dome
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
     const k = Math.pow(heroScale, 0.75), gc = D.groundCam, gb = heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back
     const back = lerp(22, gc.back, gb) * k, up = lerp(7 - pilot.pitch * 6, gc.height, gb) * k;   // T07: lower and closer on the ground
@@ -607,7 +628,8 @@
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0) $('#hint').hidden = true; }
     if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
     promptHud(dt);
-    if (cs.inLair && (lairTick -= dt) <= 0) { lairTick = 0.5; renderLair(); }
+    if (stationOpen && cs.station !== stationOpen) closeStation();   // walked away from the station
+    if (stationOpen && (lairTick -= dt) <= 0) { lairTick = 0.5; renderLair(); }
     if (lairMsgT > 0 && (lairMsgT -= dt) <= 0) $('#lairMsg').textContent = '';
   }
   const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null;
@@ -630,11 +652,11 @@
       else if (e.e === 'dragon:died') { died = e; hurt = 0; shake = 0; hero.flash = 0; fadeEl.classList.add('now'); requestAnimationFrame(() => fadeEl.classList.remove('now')); }
       else if (e.e === 'region:enter') swapRegion(e.respawn);
       else if (e.e === 'save') saveNow(e.why);
-      else if (e.e === 'lair:enter') { openLair(e.respawn ? died : null); died = null; }
+      else if (e.e === 'lair:enter') { enterCave(e.respawn ? died : null); died = null; }
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
-      else if (e.e === 'lair:leave') { closeLair(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
+      else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
       else if (e.e === 'growth:ready' && !cs.inLair) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(e.stage) }), 4);
@@ -650,6 +672,9 @@
     cave: '<path d="M3 20c0-9 4-15 9-15s9 6 9 15M9 20c0-4 1.5-7 3-7s3 3 3 7"/>',
     land: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
     fly: '<path d="M12 20V8M7 13l5-5 5 5M4 4h16"/>',
+    nest: '<path d="M3 14c2 4 16 4 18 0M5 13c3-2 11-2 14 0M8 10l2 3M16 10l-2 3"/>',
+    larder: '<path d="M4 9h16v10H4zM4 9l3-4h10l3 4M9 13h6"/>',
+    exit: '<path d="M4 20c0-9 3-15 8-15s8 6 8 15M12 20v-6M9 17l3-3 3 3"/>',
   };
   const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
   function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
@@ -675,7 +700,7 @@
     const ex = state === 'play' && cs.exit;
     if (promptFlashT > 0 && promptFlash) text = promptFlash;
     else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
-    else if (cs.inLair) text = '';
+    else if (cs.inLair) text = stationOpen ? '' : cs.station ? t('c.prompt.station.' + cs.station + (isTouch ? 'Touch' : '')) : t(isTouch ? 'c.prompt.caveTouch' : 'c.prompt.cave');
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
     else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / ST.eatTime(cs); }
     else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / ST.eatTime(cs); }
@@ -706,20 +731,24 @@
   /* ---------- survival tick: hunger, its effects, growth moments ---------- */
   function survive(dt) {
     // the dragon keeps growing visibly within its stage as it eats
-    const sc = G.scaleOf(dragon.foodXp, dragon.stage);
+    const sc = ST.scaleOf(cs);
     if (Math.abs(sc - heroScale) > 1e-4) { heroScale += (sc - heroScale) * Math.min(1, dt * 2); hero.root.scale.setScalar(heroScale); }
   }
   function feed(food) {
     if (HN.feed(dragon, food)) toast(t('c.toast.ready'), t('c.toast.readySub', { stage: stageName(dragon.stage + 1) }), 4);
   }
-  /* ---------- lair panel (core/lair.js does the rules; the panel only shows cs and calls state.lair*) ---------- */
+  /* ---------- cave station panels (T10; core/cave.js + lair.js do the rules, the panel shows cs and calls state.caveAct) ---------- */
   const lairEl = $('#lair'), larderList = $('#larderList');
-  let lairMsgT = 0, lairTick = 0, lairShown = '';
-  function lairMsg(text, secs) { $('#lairMsg').textContent = text || ''; lairMsgT = text ? secs || 4 : 0; }
+  let lairMsgT = 0, lairTick = 0, lairShown = '', stationOpen = null;
+  /** A lair message: in the open station panel, else as the bottom prompt for a few seconds. */
+  function lairMsg(text, secs) {
+    if (stationOpen || !text) { $('#lairMsg').textContent = text || ''; lairMsgT = text ? secs || 4 : 0; return; }
+    flashPrompt(text, secs || 3);
+  }
   /** The hunting tip under the HUD (touch names buttons, desktop names keys), hidden after secs. */
   function showTip(secs) { hintT = secs; $('#hint').hidden = !(state === 'play' && !cs.inLair); }
   function renderLair() {
-    if (!cs.inLair) return;
+    if (!cs.inLair || !stationOpen) return;
     const d = dragon, st = D.stages[d.stage], nx = D.stages[d.stage + 1], ready = G.readyStage(d.foodXp, d.stage) > d.stage;
     const stageEl = $('#lairStage');
     stageEl.textContent = ready ? t('c.lair.ready', { stage: stageName(G.readyStage(d.foodXp, d.stage)) })
@@ -752,35 +781,54 @@
       const sm = document.createElement('small'); sm.textContent = line; el.append(sm);
     }
   }
-  function openLair(death) {
-    deathCard(death); if (death) { toastEl.style.opacity = 0; toastT = 0; }
+  /** Opens the panel of a cave station (nest: rest, stage, vitals; larder: stored prey). death: the "You fell" card. */
+  function openStation(id, death) {
+    stationOpen = id;
+    lairEl.dataset.station = id;
+    $('#lairTitle').dataset.i18n = 'c.cave.' + id; $('#lairTitle').textContent = t('c.cave.' + id);
+    deathCard(death || null); if (death) { toastEl.style.opacity = 0; toastT = 0; }
     lairShown = ''; renderLair();
     lairEl.hidden = false;
-    $('#touch').hidden = true; $('#legend').hidden = true; $('#hint').hidden = true;
-    touch.breath = touch.boost = touch.grab = touch.eat = false; mouseBreath = false; actionKind = null; enterQ = confirmQ = false;
-    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
-    setTimeout(() => $('#restBtn').focus({ preventScroll: true }), 0);
+    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : larderList.querySelector('button') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
   }
-  function closeLair() {
-    lairEl.hidden = true; lairMsg(''); deathCard(null);
-    $('#legend').hidden = !(state === 'play' && !isTouch);
-    $('#touch').hidden = !(state === 'play' && isTouch);
-    pilot = dragon.pilot; refreshStage(); snapCam();
+  function closeStation() {
+    stationOpen = null;
+    lairEl.hidden = true; $('#lairMsg').textContent = ''; lairMsgT = 0; deathCard(null);
+    if (document.activeElement && lairEl.contains(document.activeElement)) document.activeElement.blur();
+  }
+  /** The Action slot / E: the exit leaves, the nest and the larder open (or close) their panel. */
+  function useStation(id) {
+    if (!id || !cs.inLair || state !== 'play') return;
+    if (id === 'exit') { onEvents(ST.caveAct(cs, 'exit')); return; }
+    if (stationOpen === id) closeStation(); else openStation(id);
+  }
+  /** lair:enter: the dragon stands in the cave (tunnel, or the nest after death / hatching); the camera cuts inside. */
+  function enterCave(death) {
+    closeStation();
+    pilot = dragon.pilot; refreshStage(); syncScene(); snapCam();
+    touch.breath = touch.boost = touch.grab = touch.eat = false; mouseBreath = false; actionKind = null; enterQ = confirmQ = landQ = false;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    $('#hint').hidden = true; hintT = 0;
+    if (death) openStation('nest', death);
+  }
+  function leaveCave() {
+    closeStation();
+    pilot = dragon.pilot; refreshStage(); syncScene(); snapCam();
   }
   $('#restBtn').onclick = () => {
     if (!cs.inLair || state !== 'play') return;
-    const ev = ST.lairRest(cs);
+    const ev = ST.caveAct(cs, 'nest');
     if (!ev.some(e => e.e === 'stage:up')) lairMsg(t('c.lair.rested'));
     onEvents(ev); renderLair();
   };
   larderList.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !cs.inLair || state !== 'play') return;
     const it = cs.larder[+b.dataset.i];
-    const ev = ST.lairEat(cs, +b.dataset.i);
+    const ev = ST.caveAct(cs, 'larder', +b.dataset.i);
     if (it && ev.length) { hero.jaw.rotation.x = 0.9; lairMsg(t('c.lair.ate', { prey: t('c.prey.' + it.type), food: ev[0].food })); }
     onEvents(ev.filter(x => x.e !== 'prey:eaten')); renderLair();
   });
-  $('#leaveBtn').onclick = () => { if (cs.inLair && state === 'play') onEvents(ST.lairLeave(cs)); };
+  $('#leaveBtn').onclick = () => closeStation();
   /** Debug: rest from anywhere (enters the lair first when in the Ash Wastes, else rests in place). */
   function rest() { onEvents(ST.lairRest(cs)); renderLair(); }
   /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
@@ -795,6 +843,7 @@
     ['Y', 'graphics quality low / mid / high (saved)', 'KeyY', 'quality'],
     ['I', 'put the nearest goat in front of the dragon', 'KeyI', 'goat here'],
     ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
+    ['B', 'Elder size (scale 4) on / off: walls and camera test in the cave', 'KeyB', 'elder size'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   function debugKey(code) {
@@ -810,6 +859,7 @@
       }
     }
     if (code === 'KeyM') { onEvents(MO.skip(cs)); const mo = cs.story && cs.story.mother; flashPrompt(t('c.dbg.mother', { n: mo ? mo.lesson : '-' }), 1.5); }
+    if (code === 'KeyB') { cs.debugScale = cs.debugScale ? null : 4; refreshStage(); if (cs.inLair) { CV.clampPos(pilot.pos, ST.scaleOf(cs)); pilot.pos[1] = CV.standY(ST.scaleOf(cs)); } snapCam(); flashPrompt(t('c.dbg.scale', { s: ST.scaleOf(cs).toFixed(2) }), 1.5); }
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK' && !cs.inLair) { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
@@ -887,6 +937,7 @@
       fwdV.set(Math.sin(pilot.yaw) * Math.cos(pilot.pitch), Math.sin(pilot.pitch), Math.cos(pilot.yaw) * Math.cos(pilot.pitch));
       const gb = heroPose.ground || 0, kc = Math.pow(heroScale, 0.75);   // T07: on the ground look a little ahead of the head
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
+      if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
       camera.position.copy(camPos);
       if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
       shake = Math.max(0, shake - dt * 1.5);
@@ -895,6 +946,8 @@
       if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
       hud(dt);
     }
+    syncScene();
+    caveView.update(cs, time);
     sky.position.copy(camera.position);
     region.update(camera.position, time);
     if (dt > 0) updateParticles(dt);
@@ -984,7 +1037,7 @@
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
-      L.push('LAIR    ' + (cs.inLair ? 'INSIDE' : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
+      L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
@@ -1004,5 +1057,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openLair, renderLair, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

@@ -69,7 +69,7 @@
     if (pos) cs.dragon.pilot = F.newPilot(pos, yaw || 0, G.statsOf(cs.dragon.stage).cruise);
   }
 
-  const scaleOf = cs => G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);
+  const scaleOf = cs => cs.debugScale || G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);   // debugScale: ?debug B (Elder size test, T10)
   const carriedPrey = cs => (cs.dragon.carried == null ? null : PR.byId(cs.field, cs.dragon.carried));
 
   function emit(cs, ev, e) { ev.push(e); cs.bus.emit(e.e, e); }
