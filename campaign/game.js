@@ -869,7 +869,7 @@
     ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
     ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
-    ['=', 'fly to the next ballista (150 out, 30 up, crossing its front): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
+    ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -977,7 +977,7 @@
       else {
         dbgBal = (dbgBal + 1) % list.length;
         const v = list[dbgBal], x = v.pos[0] + Math.sin(v.base) * 150, z = v.pos[2] + Math.cos(v.base) * 150;
-        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: v.base + Math.PI / 2, pitch: 0, speed: stats.cruise });
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: v.base + Math.PI - 0.6, pitch: 0, speed: stats.cruise });   // past it at an angle: the ballista in view
         Object.assign(v, { aware: D.perception.alert, state: 'alert', focus: pilot.pos.slice(), yaw: v.base, cool: 0 });
         snapCam(); flashPrompt(t('c.dbg.ballista'), 1.5);
       }

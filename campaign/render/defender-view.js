@@ -4,7 +4,7 @@
  * Figures: one vertex-coloured InstancedMesh per kind (peasant: tunic, head, straw hat; archer: Order blue-grey coat,
  * helmet, bow), turned to their yaw, a walk bob while moving; dead and hidden ones are not drawn; a defender in the
  * breath (burnT) glows orange. Ballista (T16): a frame on the platform turned to its yaw and pitched toward its aim, its
- * crew (an archer figure) behind it; the aim line is one additive InstancedMesh of red beams from the ballista to d.aimAt,
+ * crew (an archer figure) behind it; the aim line is one translucent InstancedMesh of red beams from the ballista to d.aimAt,
  * brighter as the aim goes on and blinking in the last `lock` s; bolts are thick dark shafts. Arrows: one InstancedMesh of thin shafts (pool size
  * projectiles.max) along their velocity, stuck ones keep their last direction. Awareness marks are render/watch-view.js.
  */
@@ -81,7 +81,7 @@
     ]);
     const frames = new THREE.InstancedMesh(frameGeo, mat, BCAP), crew = new THREE.InstancedMesh(figure('archer'), mat, BCAP);
     const beamGeo = new THREE.BoxGeometry(0.22, 0.22, 1).translate(0, 0, 0.5);
-    const beamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
     const beams = new THREE.InstancedMesh(beamGeo, beamMat, BCAP);
     const boltGeo = new THREE.BoxGeometry(0.28, 0.28, 3.4);
     const bolts = new THREE.InstancedMesh(boltGeo, new THREE.MeshLambertMaterial({ color: 0x3a3028 }), BCAP);
@@ -137,8 +137,8 @@
           dir.set(d.aimAt[0] - v.x, d.aimAt[1] - v.y, d.aimAt[2] - v.z);
           const len = dir.length(); dir.normalize();
           q.setFromUnitVectors(fwd, dir);
-          m4.compose(v, q, tmpS.set(1 + k, 1 + k, len));
-          beams.setMatrixAt(nl, m4); beams.setColorAt(nl, tmp.setRGB(1.0 * glow, 0.18 * glow, 0.1 * glow));
+          m4.compose(v, q, tmpS.set(2.5 + 3 * k, 2.5 + 3 * k, len));   // 0.55 to 1.2 wide: readable on a phone at 200 m
+          beams.setMatrixAt(nl, m4); beams.setColorAt(nl, tmp.setRGB(0.35 + 0.65 * glow, 0.04, 0.03));
           nl++;
         }
       }
