@@ -303,6 +303,29 @@
       vault:    { r: 4, h: 6,  hp: 150, order: true, loot: ['strongbox'] },
       palisade: { r: 0, h: 6,  hp: 40,  order: true, wall: true },
       platform: { r: 4, h: 4,  hp: 80,  order: true, post: 'ballista' },
+      // castle pieces (Phase 3, 003 spec 4.1): stone = fire burns only the wooden parts (roof, hoardings), the shell
+      // stays a solid; walkTop = landable top band height; posts = several archers along a wall / gatehouse
+      wall:      { r: 0,  h: 11, hp: 400, order: true, wall: true, stone: true, walkTop: 9.5, posts: 'archer' },
+      bastion:   { r: 8,  h: 12, hp: 360, order: true, stone: true, walkTop: 11, post: 'ballista' },
+      ctower:    { r: 6,  h: 20, hp: 300, order: true, stone: true, post: 'archer', calmsAlert: true },
+      gatehouse: { r: 8,  h: 16, hp: 360, order: true, stone: true, gate: true, posts: 'archer' },
+      keep:      { r: 11, h: 30, hp: 500, order: true, stone: true, garrison: 4, horn: true },
+      chapel:    { r: 8,  h: 14, hp: 160, order: true, stone: true, spires: 2, spireH: 38, loot: ['relic'] },
+      rotunda:   { r: 4,  h: 9,  hp: 120, civil: true, stone: true },
+      hall:      { r: 9,  h: 11, hp: 200, order: true, loot: ['strongbox'] },
+      workshop:  { r: 8,  h: 8,  hp: 140, order: true, target: 'workshop' },
+      stables:   { r: 7,  h: 6,  hp: 100, order: true },
+      well:      { r: 2,  h: 2,  hp: 0 },
+    },
+    /* Vyshgard Castle (Phase 3 T01): the look and the kit; layout in settlements.castle, piece list from core/castle.js.
+       lod: full kit inside `near`, merged silhouette out to `far`. lights: emissive torches and windows, no real lights. */
+    castle: {
+      wallThick: 3, walkWidth: 2.4, crenel: 1.2,
+      gate: { w: 10, close: 2.5 },
+      horn: { range: 'region', cool: 60 },
+      char: { tint: 0.35 },
+      lod: { near: 280, far: 1000 },
+      lights: { torches: 16, windows: true },
     },
     palisade: { piece: 6, radius: 1, gate: 12 },
     fire: { ignite: 0.8, cool: 0.5, burn: 6, fan: 2.5, spread: 0.15, reach: 8, rebuild: 600 },
@@ -318,6 +341,14 @@
       outpostS: { buildings: [['tower', 0, 0], ['taxhouse', 7, 7]], ring: [16, 12], archers: 2 },
       outpost:  { buildings: [['tower', -14, 0], ['tower', 14, 0], ['barracks', 0, -10], ['vault', 0, 6],
                               ['platform', -10, 14], ['platform', 10, 14]], ring: [24, 12], archers: 4 },
+      // Vyshgard Castle: local +X = east (land side, the gate), the cliff on local -X (west, the river).
+      // walls = corner points (closed polygon); corners[i] = the piece at walls[i]; the gate gap is the segment
+      // between the two gatehouses (indices 3 and 4).
+      castle:   { walls: [[-60, -30], [-20, -42], [30, -38], [70, -14], [72, 14], [30, 38], [-20, 42], [-62, 26]],
+                  corners: ['bastion', 'ctower', 'bastion', 'gatehouse', 'gatehouse', 'bastion', 'ctower', 'bastion'],
+                  buildings: [['keep', -36, 0], ['chapel', 8, 12], ['rotunda', 40, -22], ['hall', 10, -18], ['workshop', 42, 18],
+                              ['stables', -14, 26], ['well', 26, 0]],
+                  archers: 10, peasants: 4 },
     },
 
     regions: {

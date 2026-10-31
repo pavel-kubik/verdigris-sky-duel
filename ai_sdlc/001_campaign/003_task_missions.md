@@ -145,7 +145,7 @@ settlements: {
   castle: {                                         // local frame: +X = east (land side), the cliff on local -X (west, the river)
     walls: [[-60, -30], [-20, -42], [30, -38], [70, -14], [72, 14], [30, 38], [-20, 42], [-62, 26]],
     corners: ['bastion', 'ctower', 'bastion', 'gatehouse', 'gatehouse', 'bastion', 'ctower', 'bastion'],  // gate gap between 4 and 5
-    buildings: [['keep', -36, 0], ['chapel', 8, 12], ['rotunda', 40, -22], ['hall', 10, -18], ['workshop', 48, 20],
+    buildings: [['keep', -36, 0], ['chapel', 8, 12], ['rotunda', 40, -22], ['hall', 10, -18], ['workshop', 42, 18],
                 ['stables', -14, 26], ['well', 26, 0]],
     archers: 10, peasants: 4,
   },
