@@ -135,9 +135,48 @@
        to the edges as arrows); a tapped marker shows its name and distance for `tagTime` s.
        smell: range x stage spot ^ 0.5, x hungryMult when hungry or starving, x starveMult more when starving;
        inside `sharp` the scent points exactly at the herd, beyond it the marker drifts up to `blur` rad off at full
-       range (smooth, no jitter); scents are re-read every `update` s, the strongest `max` (herd size x closeness) shown. */
-    nav: { markers: 7, fov: 2.4, tagTime: 3 },
+       range (smooth, no jitter); scents are re-read every `update` s, the strongest `max` (herd size x closeness) shown.
+       T12: a settlement within nav.discover of the dragon whose centre (losEye above the ground) is in line of sight
+       (losSteps terrain samples) is discovered for good and gets a compass marker; checked every discoverEvery s. */
+    nav: { markers: 7, fov: 2.4, tagTime: 3, discover: 250, discoverEvery: 0.5, losSteps: 12, losEye: 8 },
     smell: { range: 380, hungryMult: 1.4, starveMult: 1.3, sharp: 120, blur: 0.7, update: 0.5, max: 3 },
+
+    /* Settlements and buildings (Phase 2 T12, core/settlement.js, render/settlement-view.js; 002_task_kingdom.md 4.2).
+       buildings: footprint radius r and height h (a vertical cylinder solid: the roof height = ground + h), hp for the
+       fire (T13), civil / order for stats (Phase 4 Renown), post = a defender post (T15 / T16), loot = items (T19),
+       holds / garrison / bell / calmsAlert for later tasks. palisade = a ring of capsule pieces (piece = length,
+       radius of each piece); gate = gap width (units of arc) centred on the template's local +Z.
+       settlements: templates, offsets [type, x, z] from the centre, rotated by the site's yaw (+ seeded jitter of up to
+       `jitter` units and jitterYaw rad per building); ring: [r, gate] palisade around the centre; pens: [type, x, z,
+       count] livestock pens (radius penR + count; animals come with T18); alert3: buildings added at alert 3 (T17).
+       pad: the dragon's collision radius x scale against building solids (walking and flying). fire: T13. */
+    buildings: {
+      house:    { r: 5, h: 7,  hp: 60,  civil: true },
+      barn:     { r: 7, h: 9,  hp: 90,  civil: true,  holds: 'livestock' },
+      granary:  { r: 5, h: 8,  hp: 70,  civil: true },
+      taxhouse: { r: 5, h: 7,  hp: 70,  order: true, loot: ['tithe'] },
+      tower:    { r: 3, h: 16, hp: 80,  order: true, post: 'archer', calmsAlert: true },
+      bell:     { r: 2, h: 6,  hp: 30,  civil: true, bell: true },
+      barracks: { r: 7, h: 8,  hp: 120, order: true, garrison: 2 },
+      vault:    { r: 4, h: 6,  hp: 150, order: true, loot: ['strongbox'] },
+      palisade: { r: 0, h: 6,  hp: 40,  order: true, wall: true },
+      platform: { r: 4, h: 4,  hp: 80,  order: true, post: 'ballista' },
+    },
+    palisade: { piece: 6, radius: 1, gate: 12 },
+    fire: { ignite: 0.8, burn: 6, spread: 0.15, rebuild: 600 },
+    settlement: { jitter: 1, jitterYaw: 0.2, penR: 2.5, pad: 1.4 },
+    settlements: {
+      hamlet:   { buildings: [['house', -8, 0], ['house', 8, 4], ['barn', 0, -12], ['bell', 0, 10]],
+                  pens: [['sheep', 14, -10, 4]], peasants: 3 },
+      village:  { buildings: [['house', -12, 22], ['house', 4, 26], ['house', 24, 24], ['house', -30, 12], ['house', 34, -16],
+                              ['house', -8, -30], ['barn', -34, -24], ['granary', 8, -26], ['taxhouse', 2, 6], ['tower', 24, -18],
+                              ['bell', -6, -8]],
+                  pens: [['sheep', 20, 0, 5], ['cow', -20, -10, 3]], peasants: 6, archers: 2,
+                  alert3: { buildings: [['platform', 12, 18]] } },
+      outpostS: { buildings: [['tower', 0, 0], ['taxhouse', 6, 6]], ring: [16, 12], archers: 2 },
+      outpost:  { buildings: [['tower', -14, 0], ['tower', 14, 0], ['barracks', 0, -10], ['vault', 0, 6],
+                              ['platform', -10, 14], ['platform', 10, 14]], ring: [24, 12], archers: 4 },
+    },
 
     regions: {
       ash: {
@@ -160,7 +199,7 @@
         nameKey: 'c.region.wild', radius: 1100, seed: 23, ceiling: 280,
         waterLevel: 0.6,                                    // lakes in the hollows (T11: not landable, not walkable)
         terrain: { amp: 1.0, base: 12, features: [
-          { type: 'plateau', x: 420, z: -300, r: 40 },      // settlement ground (T11), the hamlet and the small outpost come with T12
+          { type: 'plateau', x: 420, z: -300, r: 40 },      // settlement ground (T11): the hamlet and the small outpost (T12)
           { type: 'plateau', x: -380, z: 520, r: 30 },
         ] },
         palette: 'forest',
