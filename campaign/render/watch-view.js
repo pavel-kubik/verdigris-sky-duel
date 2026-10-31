@@ -4,8 +4,10 @@
  *   update(watch, { regionId, spot, light, alt, show }): one flat sight fan (faint fill + outline) per post (radius = its current range,
  *     angle = fov, turned to its yaw) on the ground at the post (hills cut it), white idle / yellow suspicious / red alert, brighter while it
  *     sees the dragon; a '?' or '!' sprite over a suspicious or alert post. Hidden when show is false.
- * Shown with ?debug (button / key 7 'sight'); the defenders of T15 get their own awareness marks, the guard sight
- * upgrade (T20) can reuse the fans.
+ *   T15: the list is the defenders (cs.squad); ctx.marks shows the '?' (suspicious, search) / '!' (alert) marks without
+ *   the fans, only within ctx.markRange of ctx.near (the dragon; 002 4.6: 120 without the guard sight upgrade); dead
+ *   and hidden defenders have none. Fans are ?debug only (button / key 7 'sight'); the guard sight upgrade (T20) can
+ *   reuse them.
  */
 (function (root) {
   'use strict';
@@ -13,7 +15,7 @@
   if (!THREE || !C) return;
   const VR = root.VRender = root.VRender || {};
   const PC = C.need('perception'), T = C.need('terrain');
-  const COL = { idle: 0xe9e1cc, suspicious: 0xffc94a, alert: 0xff4a36 };
+  const COL = { idle: 0xe9e1cc, suspicious: 0xffc94a, search: 0xffc94a, alert: 0xff4a36 };
   const SEG = 24;
 
   function fanGeo(fov) {
@@ -65,21 +67,30 @@
     }
 
     function update(watch, ctx) {
-      group.visible = !!(ctx && ctx.show && watch);
+      ctx = ctx || {};
+      const fans = !!ctx.show, marksOn = fans || !!ctx.marks;
+      group.visible = !!(marksOn && watch);
       if (!watch) { info.posts = 0; return; }
       if (watch.list !== list) { clear(); list = watch.list; }
       info.posts = list.length; info.shown = 0;
       if (!group.visible) return;
+      const near = ctx.near, mr = ctx.markRange || Infinity, marked = new Set();   // one mark per post building (two archers share a tower)
       for (const v of list) {
-        const it = item(v), r = Math.max(1, PC.range(v, ctx));
+        const it = item(v);
+        const gone = v.alive === false || v.hidden;
+        const close = fans || !near || Math.hypot(v.pos[0] - near[0], v.pos[1] - near[1], v.pos[2] - near[2]) <= mr;
+        it.mark.visible = !gone && close && v.state && v.state !== 'idle' && !(v.building && v.post && marked.has(v.building + v.state));
+        if (it.mark.visible && v.post && v.building) marked.add(v.building + v.state);
+        if (it.mark.visible) { const k = v.post ? 5 : 2.6; it.mark.scale.set(k, k, 1); it.mark.material.map = marks[v.state === 'alert' ? 'alert' : 'suspicious']; it.mark.position.set(v.pos[0], v.pos[1] + (v.post ? 6 : 2.4), v.pos[2]); }
+        it.fan.visible = fans && !gone;
+        if (!it.fan.visible) continue;
+        const r = Math.max(1, PC.range(v, ctx));
         it.fan.position.set(v.pos[0], T.surfaceAt(ctx.regionId, v.pos[0], v.pos[2]) + 1.5, v.pos[2]);   // on the post's ground, so it reads from above
         it.fan.rotation.y = v.yaw;
         it.fan.scale.set(r, 1, r);
         it.fan.material.color.setHex(COL[v.state] || COL.idle);
         it.edge.material.color.setHex(COL[v.state] || COL.idle);
         it.fan.material.opacity = v.seen > 0 ? 0.12 : 0.05;
-        it.mark.visible = v.state !== 'idle';
-        if (it.mark.visible) { it.mark.material.map = marks[v.state] || marks.suspicious; it.mark.position.set(v.pos[0], v.pos[1] + 6, v.pos[2]); }
         info.shown++;
       }
     }

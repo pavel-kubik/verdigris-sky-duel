@@ -166,7 +166,11 @@
       }
       const ground = T.surfaceAt(rid, a.pos[0], a.pos[2]), roof = sq.town ? SE.solidAt(sq.town, a.pos[0], a.pos[2], 0) : null;
       const floor = roof != null && roof > ground && a.prev[1] >= roof - 0.5 ? roof : ground;
-      if (a.pos[1] <= floor) { a.pos[1] = floor + 0.2; a.stuck = P.stick; continue; }
+      if (a.pos[1] <= floor) {
+        const l = Math.hypot(a.vel[0], a.vel[1], a.vel[2]) || 1;
+        a.dir = [a.vel[0] / l, a.vel[1] / l, a.vel[2] / l];   // the renderer keeps a stuck arrow's last direction
+        a.pos[1] = floor + 0.2; a.stuck = P.stick; continue;
+      }
       if (a.t > P.life) sq.arrows.splice(i, 1);
     }
   }

@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't114.2 2026-10-31 corn fields pop popcorn when burned (debug 0)';
+  const BUILD = 't115.1 2026-10-31 peasants and archers (volleys, bell, hide; debug - calm)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -638,11 +638,14 @@
     if (stationOpen && (lairTick -= dt) <= 0) { lairTick = 0.5; renderLair(); }
     if (lairMsgT > 0 && (lairMsgT -= dt) <= 0) $('#lairMsg').textContent = '';
   }
-  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null;
+  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
   function onEvents(ev) {
     for (const e of ev) {
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
+      else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
+      else if (e.e === 'bell:ring') toast(t('c.toast.bell', { place: t('c.place.' + (cs.town.places.find(p => p.id === e.place) || {}).type) }), t('c.toast.bellSub'), 2.8);
+      else if (e.e === 'defender:killed' && e.kind === 'archer') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.archerFell' : 'c.prompt.archerBurned'), 1.8);
       else if (e.e === 'hunger:state' && e.state === 'hungry') toast(t('c.toast.hungry'), t('c.toast.hungrySub'));
       else if (e.e === 'hunger:state' && e.state === 'starving') toast(t('c.toast.starving'), t('c.toast.starvingSub'));
       else if (e.e === 'prey:grabbed') flashPrompt(null);
@@ -862,11 +865,12 @@
     ['7', 'show / hide the sight of the watching posts (fans, ? and !)', 'Digit7', 'sight'],
     ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
     ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
+    ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
     ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
-  let watchView = null, watchShow = true;                        // T14: perception debug view (render/watch-view.js), key / button 7
+  let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
   const LIGHTS = [null, 'dusk', 'night'];                        // T14: debug 8 cycles cs.light (T21's clock sets it later)
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
@@ -962,10 +966,11 @@
         snapCam(); flashPrompt(t('c.dbg.corn'), 1.5);
       }
     }
+    if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
     if (code === 'Digit7') { watchShow = !watchShow; flashPrompt(t(watchShow ? 'c.dbg.sightOn' : 'c.dbg.sightOff'), 1.5); }
     if (code === 'Digit8') { cs.light = LIGHTS[(LIGHTS.indexOf(cs.light == null ? null : cs.light) + 1) % LIGHTS.length]; flashPrompt(t('c.dbg.light', { l: t('c.light.' + (cs.light || 'day')) }), 1.5); }
     if (code === 'Digit9' && !cs.inLair) {                       // T14: in front of the next post of the region (outward side)
-      const list = (cs.watch && cs.watch.list) || [];
+      const list = ((cs.watch && cs.watch.list) || []).filter(v => v.post);   // T15: posts only (not the peasants)
       if (!list.length) flashPrompt(t('c.dbg.noPost'), 1.5);
       else {
         dbgPost = (dbgPost + 1) % list.length;
@@ -1043,9 +1048,13 @@
     }
     cornView.group.visible = !cs.inLair;
     cornView.update(cs.crops, dt, { pxScale: renderer.domElement.height * 0.5, time });
-    if (debug && pilot) {                                        // T14: sight fans and ? / ! marks of the watching posts (debug 7)
+    if (!defView) { defView = VRender.defenders.build(); scene.add(defView.group); }   // T15: peasants, archers, arrows
+    defView.group.visible = !cs.inLair;
+    defView.update(cs.squad, { time });
+    if (pilot) {                                                 // T14 / T15: ? / ! marks within markRange; sight fans with ?debug (7)
       if (!watchView) { watchView = VRender.watch.build(); scene.add(watchView.group); }
-      watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: watchShow && !cs.inLair });
+      watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: debug && watchShow && !cs.inLair,
+                                   marks: !cs.inLair, near: pilot.pos, markRange: D.defense.markRange });
     }
     targetRing();
     fireTargetRing();
@@ -1139,6 +1148,8 @@
         let wn = null, wd = Infinity;
         for (const v of wl) { const d = Math.hypot(v.pos[0] - pilot.pos[0], v.pos[2] - pilot.pos[2]); if (d < wd) { wd = d; wn = v; } }
         L.push('WATCH   light ' + (cs.light || 'day') + '  posts ' + wl.length + '  alert ' + wl.filter(v => v.state === 'alert').length + '  suspicious ' + wl.filter(v => v.state === 'suspicious').length + (watchShow ? '' : '  (hidden)'));
+        { const sq = cs.squad, al = sq ? sq.list : [], ar = al.filter(v => v.kind === 'archer'), pe = al.filter(v => v.kind === 'peasant');
+          L.push('DEFEND  archers ' + ar.filter(v => v.alive).length + '/' + ar.length + ' (aiming ' + ar.filter(v => v.target).length + ')  peasants ' + pe.length + ' hidden ' + pe.filter(v => v.hidden).length + '  arrows ' + (sq ? sq.arrows.length : 0) + '/' + D.projectiles.max + '  killed ' + (sq ? sq.kills : 0) + '  drawn ' + (defView ? defView.info.drawn : 0)); }
         if (wn) L.push('        near ' + wn.kind + ' ' + Math.round(wd) + '  range ' + Math.round(PC.range(wn, { spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId) })) + '  seen ' + f2(wn.seen) + '  heard ' + (wn.heard ? wn.heard.kind : '-') + '  aware ' + f2(wn.aware) + ' ' + wn.state); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');

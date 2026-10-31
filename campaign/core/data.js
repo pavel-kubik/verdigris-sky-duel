@@ -162,7 +162,7 @@
        arrows: 3`; built as one `volley` count). The ballista watches only (T16 adds the bolt).
        defense: eye height of a peasant, idle wander radius around the home and walk factor, collision pad, bell ring
        time and the s before the same bell rings again, archer spacing on a tower, archers / peasants in the breath:
-       archers lose `burn` hp/s (peasants panic instead, they do not die).
+       archers lose `burn` hp/s (peasants panic instead, they do not die); awareness marks show within `markRange`.
        projectiles: pool size (all arrows in the air or stuck), gravity, life in the air, s an arrow stays stuck in the
        ground / a roof, hit radius around the dragon's centre x scale. */
     defenders: {
@@ -171,7 +171,7 @@
                   speed: 70, damage: 3, aimTime: 0.6, cooldown: 3 },
       ballista: { hp: 80, sight: 170, fov: 1.2, range: 220 },
     },
-    defense: { eye: 1.6, wander: 7, stroll: 0.3, pad: 0.6, ringTime: 2, ringCool: 40, towerSpacing: 1.6, aimCone: 0.5, burn: 14 },
+    defense: { eye: 1.6, wander: 7, stroll: 0.3, pad: 0.6, ringTime: 2, ringCool: 40, towerSpacing: 1.6, aimCone: 0.5, burn: 14, markRange: 120 },
     projectiles: { max: 60, gravity: 30, life: 4, stick: 3, hit: 2.4 },
     perception: {
       awareRise: 1.2, awareFall: 0.25, suspicious: 0.35, alert: 1.0,
