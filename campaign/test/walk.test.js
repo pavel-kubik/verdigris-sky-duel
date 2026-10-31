@@ -209,7 +209,9 @@ function grounded(region, xz, scale) {
   for (let i = 0; i < 90; i++) S.step(cs, { sx: 0, sy: 0 }, dt);
   cs.dragon.hp = 0;
   S.step(cs, { sx: 0, sy: 0 }, dt);
-  ok(cs.dragon.pilot.mode === 'air' && !cs.dragon.pilot.tr, 'respawn resets the pilot mode');
+  ok(cs.inLair && cs.dragon.pilot.mode === 'ground' && !cs.dragon.pilot.tr, 'respawn: standing in the cave (T10)');
+  S.caveAct(cs, 'exit');
+  ok(!cs.inLair && cs.dragon.pilot.mode === 'air' && !cs.dragon.pilot.tr, 'leaving the cave resets the pilot mode to air');
 }
 
 // 6. Render pose (T07, walk.pose): legs and wings follow the mode, the walk cycle follows the ground speed

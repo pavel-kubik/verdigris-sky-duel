@@ -20,7 +20,7 @@ const mouth = LR.mouthPos('ash');
   cs.hint = null; cs.exit = null;
   const sl = CT.slots(cs);
   ok(sl.action === null && sl.move === null && sl.roll === true, 'empty sky: no context slots, Roll shown');
-  ok(CT.slots(null).action === null && CT.slots(Object.assign({}, cs, { inLair: true })).move === null, 'no slots without a run or inside the lair');
+  ok(CT.slots(null).action === null && CT.slots(Object.assign({}, cs, { inLair: true })).move === null, 'no slots without a run, no Move inside the lair');
 }
 
 // 2. Action: grab while a prey is in reach or targeted, eat while carrying; not for a heavy or a far prey

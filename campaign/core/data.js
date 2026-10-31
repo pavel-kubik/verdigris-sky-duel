@@ -108,6 +108,28 @@
     // the Move slot "Enter cave" (touch) within enterRange of the mouth while heading toward it
     lair: { larderSize: 3, spoilEvery: 30, nearRange: 140, enterRange: 80, respawnHp: 0.5, respawnHunger: 40 },
 
+    /* Cave interior (Phase 2 T10, core/cave.js, render/cave-view.js; 002_task_kingdom.md 4.7). A dome hall with a flat
+       floor; the dragon walks inside (walk.step) on the circle of radius `bounds` (minus pad x scale) and in the
+       tunnel (|x| < tunnel.w / 2, from the hall to z = tunnel.len); walking past tunnel.out leaves the lair.
+       stations: [x, z, radius]; in reach within radius + reach x scale ^ 0.5 (the Action slot / E opens it).
+       hoard and altar stations come with T19 / T20 (positions kept here so the layout does not move).
+       entry: where flying into the mouth puts the dragon (in the tunnel, facing in); death and hatching wake it
+       on the nest. camera: chase distance / height (x scale ^ 0.75), clamped inside the dome and the tunnel
+       (pad from the walls). light: the lava channel's point light colour, intensity, distance and flicker. */
+    cave: {
+      room: { r: 60, h: 28 }, floor: 0, bounds: 54, pad: 3,
+      tunnel: { w: 16, h: 14, len: 70, out: 62 },
+      stations: {
+        nest:   [0, -34, 12],
+        larder: [-30, -8, 8],
+        exit:   [0, 50, 8],
+        // T19 hoard [30, -8, 10], T20 altar [0, 8, 5]; Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
+      },
+      reach: 8, entry: [0, 44],
+      camera: { dist: 12, height: 6, look: 6, pad: 2.5 },
+      light: { color: 0xff7a2e, intensity: 2.2, distance: 150, flicker: 0.18 },
+    },
+
     /* Compass and smell (Phase 2 T09, core/nav.js, render/compass.js; 002_task_kingdom.md 4.7).
        nav: at most `markers` markers on the strip, which spans `fov` rad around the heading (markers outside it stick
        to the edges as arrows); a tapped marker shows its name and distance for `tagTime` s.

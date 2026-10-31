@@ -16,7 +16,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), F = M.need('flight'), PR = M.need('prey'), S = M.need('state');
+  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), F = M.need('flight'), PR = M.need('prey'), S = M.need('state'), LR = M.need('lair'), CV = M.need('cave');
 
   const num = v => typeof v === 'number' && Number.isFinite(v);
   const round = (v, k) => Math.round(v * k) / k;
@@ -44,7 +44,7 @@
       story: storyOf(cs.story),
       world: {
         region: cs.region,
-        pos: p ? p.pos.map(v => round(v, 100)) : null,
+        pos: p ? (cs.inLair && LR.mouthPos(cs.region) || p.pos).map(v => round(v, 100)) : null,   // inside: the mouth (cave coordinates are local)
         yaw: p ? round(p.yaw, 1e4) : 0,
         st: p ? round(p.st, 10) : 100,
         location: cs.inLair ? 'lair' : 'field',
@@ -113,7 +113,7 @@
     const s = o.stats || {};
     cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0 };
     cs.story = storyOf(o.story);
-    cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.exit = null; cs.exitT = 0; cs.saveT = 0;
+    cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.exit = null; cs.exitT = 0; cs.saveT = 0; cs.station = null;
 
     const pos = region === w.region && w.pos ? T.clampToRegion(region, w.pos.slice(), D.flight.minAlt) : null;
     cs.region = region;
@@ -123,6 +123,7 @@
       const np = F.newPilot(pos, num(w.yaw) ? w.yaw : 0, st.cruise);
       if (num(w.st)) np.st = Math.max(0, Math.min(100, w.st));
       if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;   // same object: the renderer keeps its reference
+      if (cs.inLair) CV.place(cs, 'nest');                       // T10: a save inside the lair restores in the cave, on the nest
     } else d.pilot = null;
     return cs;
   }

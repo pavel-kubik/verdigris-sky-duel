@@ -5,7 +5,8 @@
  *   inMouth(cs) -> boolean                    dragon inside the mouth sphere (radius grows a little with scale)
  *   near(cs) -> boolean                       dragon close to the mouth (for the "fly into the cave" prompt)
  *   canEnter(cs) -> boolean                   near() and within enterRange: the Move slot offers "Enter cave"
- *   enter(cs) -> events[]                     stores a carried prey if there is room, cs.inLair = true
+ *   enter(cs, at?) -> events[]                stores a carried prey if there is room, cs.inLair = true; the dragon stands
+ *                                             in the cave hall (core/cave.js, T10) at 'tunnel' (default) or 'nest'
  *   rest(cs) -> { grew, from, to, events }    HP and fire to max, stage-up if food XP is ready
  *   eatFromLarder(cs, index) -> events[]      feeds the stored item's current food
  *   leave(cs) -> events[]                     dragon back in the air at the region spawn, cs.inLair = false
@@ -16,12 +17,12 @@
  *   hatch(cs) -> events[]                     new hatchling: wakes inside the lair of home() (intro card -> lair panel);
  *                                             the hatching scene hands over to the mother: cs.story.mother = { lesson: 0, at: 'lair' }
  *                                             and a mother:handover event (her lessons are driven by core/mother.js, T05)
- * While cs.inLair, state.step only runs spoil (hunger and prey are paused).
+ * While cs.inLair, state.step walks the dragon in the cave (cave.step) and runs spoil (hunger and prey are paused).
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), HN = M.need('hunger'), F = M.need('flight'), PR = M.need('prey');
+  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), HN = M.need('hunger'), F = M.need('flight'), PR = M.need('prey'), CV = M.need('cave');
   const L = D.lair;
 
   const mouthPos = regionId => T.lairPos(regionId);
@@ -50,7 +51,7 @@
     return near(cs) && distToMouth(cs) < L.enterRange;
   }
 
-  function enter(cs) {
+  function enter(cs, at) {
     const d = cs.dragon, ev = [];
     const carried = d.carried == null ? null : PR.byId(cs.field, d.carried);
     if (carried) {
@@ -65,7 +66,8 @@
     cs.inLair = true;
     cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
     if (d.pilot) { d.pilot.breathing = false; d.pilot.boosting = false; }
-    ev.unshift({ e: 'lair:enter' });
+    CV.place(cs, at || 'tunnel');                                 // T10: standing in the cave hall (tunnel, or the nest on waking)
+    ev.unshift({ e: 'lair:enter', at: at || 'tunnel' });
     return ev;
   }
 
@@ -94,6 +96,7 @@
 
   function leave(cs) {
     const R = T.region(cs.region), s = R.spawn, d = cs.dragon;
+    cs.station = null;
     if (!s) { cs.inLair = false; return [{ e: 'lair:leave' }]; }
     const y = Math.max(s.y, T.surfaceAt(cs.region, s.x, s.z) + 40);
     const st = d.pilot ? d.pilot.st : 100;
@@ -156,7 +159,7 @@
     np.st = stamina;
     if (d.pilot) Object.assign(d.pilot, np); else d.pilot = np;      // same object: the renderer keeps its reference
     cs.exit = null; cs.exitT = 0;
-    ev.push(...enter(cs).map(e => (e.e === 'lair:enter' ? Object.assign(e, tag) : e)));
+    ev.push(...enter(cs, 'nest').map(e => (e.e === 'lair:enter' ? Object.assign(e, tag) : e)));
     return ev;
   }
 
