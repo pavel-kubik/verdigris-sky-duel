@@ -444,7 +444,7 @@
       'c.cave.nest': 'Hnízdo', 'c.cave.larder': 'Spižírna', 'c.cave.close': 'Zavřít',
       'c.btn.nest': 'Hnízdo', 'c.btn.larder': 'Spižírna', 'c.btn.exit': 'Ven', 'c.legend.station': 'Použít (v jeskyni)',
       'c.prompt.cave': 'Choď klávesami W A S D (Shift běh) - hnízdo, spižírna, tunel ven',
-      'c.prompt.caveTouch': 'Choď páčkou (Zrychlit = běh) - hnízdo, spižírna, tunel ven',
+      'c.prompt.caveTouch': 'Choď páčkou (Turbo = běh) - hnízdo, spižírna, tunel ven',
       'c.prompt.station.nest': 'Hnízdo - E a odpočineš si', 'c.prompt.station.nestTouch': 'Hnízdo - klepni na Hnízdo a odpočiň si',
       'c.prompt.station.larder': 'Spižírna - E pro uloženou kořist', 'c.prompt.station.larderTouch': 'Spižírna - klepni na Spižírna pro uloženou kořist',
       'c.prompt.station.exit': 'Tunel - E nebo jdi dál a opustíš doupě', 'c.prompt.station.exitTouch': 'Tunel - klepni na Ven nebo jdi dál a opustíš doupě',

@@ -126,7 +126,7 @@
         // T19 hoard [30, -8, 10], T20 altar [0, 8, 5]; Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
       },
       reach: 8, entry: [0, 40],
-      camera: { dist: 12, height: 6, look: 6, pad: 2.5 },
+      camera: { dist: 18, height: 7, look: 10, pad: 2.5 },
       light: { color: 0xff7a2e, intensity: 2.2, distance: 150, flicker: 0.18 },
     },
 

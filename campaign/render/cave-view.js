@@ -144,7 +144,7 @@
     const LT = K.light;
     const glow = new THREE.PointLight(LT.color, LT.intensity, LT.distance, 1.4);
     glow.position.set(0, K.floor + 9, -K.bounds + 6);
-    const fill = new THREE.HemisphereLight(0x8a5a3a, 0x2a1810, 0.55);
+    const fill = new THREE.HemisphereLight(0xa8744c, 0x3a2416, 0.95);
     const tunnelLight = new THREE.PointLight(0xffd2a0, 0.9, 60, 1.5);
     tunnelLight.position.set(0, K.floor + K.tunnel.h * 0.6, K.tunnel.len);
     group.add(glow, fill, tunnelLight);

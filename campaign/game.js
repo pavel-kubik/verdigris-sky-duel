@@ -46,6 +46,7 @@
 
   /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt when the dragon travels, T11) ---------- */
   let region = null, regionId = null, preyView = null;
+  let caveOn = null;                                           // T10: the cave scene is shown (syncScene), null = re-apply
   const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
   const startId = D.regions[params.get('region')] ? params.get('region') : D.startRegion;
 
@@ -125,7 +126,6 @@
   const caveView = VRender.cave.build();
   scene.add(caveView.group);
   const OUT_LIGHT = { hemi: hemi.intensity, sun: sunLight.intensity, rim: rim.intensity };
-  let caveOn = null;
   /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap. */
   function syncScene() {
     const inCave = !!pilot && cs.inLair && state !== 'intro';
@@ -215,7 +215,7 @@
   const momEl = $('#mother'), momText = $('#motherText');
   let momShown = '';
   function motherHud() {
-    const key = state === 'play' ? MO.line(cs) : null;
+    const key = state === 'play' && !stationOpen ? MO.line(cs) : null;   // T10: a station panel replaces her caption while open
     const tk = key && isTouch && window.I18N && I18N.t(key + 'Touch') !== key + 'Touch' ? key + 'Touch' : key;
     if (tk === momShown) return;
     momShown = tk;

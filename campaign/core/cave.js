@@ -107,7 +107,7 @@
     const C = K.camera, k = Math.pow(scale || 1, 0.75), bx = Math.sin(yaw), bz = Math.cos(yaw);
     const anchor = [pos[0], pos[1] + 1.2 * k, pos[2]];
     const want = [pos[0] - bx * C.dist * k, pos[1] + C.height * k, pos[2] - bz * C.dist * k];
-    const look = [pos[0] + bx * C.look * k, pos[1] + 1.0 * k, pos[2] + bz * C.look * k];
+    const look = [pos[0] + bx * C.look * k, pos[1] + 1.5 * k, pos[2] + bz * C.look * k];
     if (inside(want, C.pad)) return { pos: want, look };
     if (!inside(anchor, C.pad)) anchor[1] = Math.min(anchor[1], K.floor + K.tunnel.h - C.pad - 0.1);
     let lo = 0, hi = 1;
