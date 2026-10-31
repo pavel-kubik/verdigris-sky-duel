@@ -676,7 +676,7 @@
     if (lv !== alertShown) { alertPips.forEach((p, i) => p.classList.toggle('on', i < lv)); alertShown = lv; }
     if (alertPulse > 0) { alertRow.classList.add('pulse'); if ((alertPulse -= dt || 0.016) <= 0) alertRow.classList.remove('pulse'); }
   }
-  let bankedQ = null, goldPulse = 0;                             // T19: the banked toast after the cave cut, HUD gold pulse
+  let goldPulse = 0;                                             // T19: HUD gold pulse after banking
   const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
   function onEvents(ev) {
@@ -709,7 +709,7 @@
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
       else if (e.e === 'loot:tooHeavy') flashPrompt(t('c.prompt.lootHeavy', { loot: lootName(e) }), 2.2);
       else if (e.e === 'loot:dropped') toast(t('c.toast.lootDropped'), t('c.toast.lootDroppedSub', { loot: lootName(e) }), 2.5);
-      else if (e.e === 'hoard:banked') { bankedQ = e; goldPulse = 2; }   // shown once the camera is inside (after lair:enter)
+      else if (e.e === 'hoard:banked') { goldPulse = 2; toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
       else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
       else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
       else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
@@ -718,7 +718,6 @@
       else if (e.e === 'region:enter') swapRegion(e.respawn);
       else if (e.e === 'save') saveNow(e.why);
       else if (e.e === 'lair:enter') { enterCave(e.respawn ? died : null); died = null; }
-      if (e.e === 'lair:enter' && bankedQ) { const b = bankedQ; bankedQ = null; toast(t('c.toast.banked', { gold: b.gold }), t(b.tier > b.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: b.total }), 3.5); }
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
@@ -759,7 +758,7 @@
       bMove.classList.toggle('off', !mk); moveShown = mk;
     }
     bRoll.classList.toggle('off', !slotNow.roll);
-    const noFire = !HN.effects(dragon.hunger).canBreath;            // starving: the Breath button dims (T08 feedback)
+    const noFire = !HN.effects(dragon.hunger).canBreath || LT.blocksBreath(cs.carriedLoot);   // starving (T08) or a strongbox (T19): Breath dims
     if (noFire !== breathDim) { bBreath.classList.toggle('dim', noFire); breathDim = noFire; }
   }
   function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }

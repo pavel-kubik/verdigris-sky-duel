@@ -150,7 +150,7 @@
     tunnelLight.position.set(0, K.floor + K.tunnel.h * 0.6, K.tunnel.len);
     group.add(glow, fill, tunnelLight);
     // T19: the hoard pile - coins in a heap at the hoard station (tier = width and height), a few chests in it
-    const LT = C.need('loot'), H = K.stations.hoard, NC = K.maxCoins;
+    const LO = C.need('loot'), H = K.stations.hoard, NC = K.maxCoins;
     const coinMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 9),
       new THREE.MeshStandardMaterial({ color: 0xf2c14e, emissive: 0x4a3000, roughness: 0.35, metalness: 0.85, flatShading: true }), NC);
     coinMesh.count = 0; group.add(coinMesh);
@@ -159,7 +159,7 @@
     let coinGold = -1;
     const cm = new THREE.Matrix4(), cq = new THREE.Quaternion(), ce = new THREE.Euler(), cp = new THREE.Vector3(), c1 = new THREE.Vector3(1, 1, 1);
     function pile(gold) {
-      const n = LT.coins(gold), tier = LT.tier(gold), R = H[2] * (0.3 + 0.17 * tier), Hh = 0.6 + 1.3 * tier;
+      const n = LO.coins(gold), tier = LO.tier(gold), R = H[2] * (0.32 + 0.12 * tier), Hh = 0.8 + 1.9 * tier;
       for (let i = 0; i < n; i++) {
         const [u, v, a, tx, tz] = seeds[i], r = R * Math.sqrt(u);
         cp.set(H[0] + Math.sin(a) * r, K.floor + 0.06 + Hh * (1 - r / R) * (0.75 + 0.25 * v), H[1] + Math.cos(a) * r);
