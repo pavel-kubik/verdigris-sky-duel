@@ -2,8 +2,12 @@
  * Verdigris campaign - settlement renderer (Phase 2 T12).
  * Low-poly buildings from primitives, one vertex-coloured geometry per building type, drawn as one InstancedMesh
  * per type (about 11 draw calls for every building of a region) + one mesh for all livestock pen fences.
- *   VRender.settlements.build(town) -> { group, update(town), dispose(), info }
- *   update(town): re-reads ruins (T13 burns them; a ruin is not drawn until the ruin meshes come with T13)
+ *   VRender.settlements.build(town) -> { group, update(town, dt, opts), dispose(), info }
+ *   update(town, dt, { cam, particles, pxScale, lights, time }): re-reads ruins (whole buildings and rubble are separate
+ *     instanced meshes), darkens burning buildings as their hp falls (instance colour), and draws the fire (T13):
+ *     flame and smoke particles from fixed pools (two Points, one draw call each), smoke from fresh ruins for a while,
+ *     and moves the two flicker lights (opts.lights, owned by game.js so the light count never changes) to the burning
+ *     buildings nearest the camera (intensity 0 when nothing burns).
  * Models stand on their origin (the ground), local +Z = the building's yaw direction. Palisade pieces are scaled
  * along Z to their segment length.
  */
@@ -73,6 +77,55 @@
                            [box(0.5, 0.8, 4.4, 0, 3.8, 0.4), COL.darkWood], [box(4.2, 0.3, 0.4, 0, 4.4, 2.2), COL.darkWood], [box(0.2, 0.2, 3.2, 0, 4.7, 0.8), COL.iron]]),
     palisade: () => merge([[box(1.5, 5.2, 1), COL.log], [box(1.1, 0.8, 1, 0, 5.2), COL.logTop]]),
   };
+  COL.char = 0x2a2420; COL.ash = 0x4a4440; COL.ember = 0x7a2e14;
+  /** Rubble for every ruin (T13): charred blocks, a fallen beam and a stump of wall on a 5-radius footprint, scaled
+   *  to the building's r (palisade pieces: along their length). */
+  const RUIN = () => merge([
+    [cyl(4.6, 5, 0.5, 9), COL.ash], [box(3, 1.4, 2.2, -1.8, 0.2, 1.2).rotateY(0.3), COL.char], [box(2.2, 2.2, 2, 2.2, 0.2, -1.4).rotateY(-0.4), COL.char],
+    [box(0.5, 0.5, 7, 0.4, 0.7, 0).rotateY(0.9).rotateZ(0.12), COL.darkWood], [box(1.6, 3.2, 0.9, -2.6, 0.2, -2.2), COL.darkStone],
+    [box(1.2, 0.6, 1.2, 1.2, 0.3, 2.6), COL.ember], [box(0.9, 1.8, 0.9, 3.1, 0.2, 1.8), COL.char],
+  ]);
+
+  /* fire and smoke particles: per-particle size and alpha (ShaderMaterial), one Points per pool */
+  const tex = (() => {
+    if (typeof document === 'undefined') return null;
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+  function pool(n, additive) {
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), alpha = new Float32Array(n), size = new Float32Array(n);
+    for (let i = 0; i < n; i++) pos[i * 3 + 1] = -9999;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('alpha', new THREE.BufferAttribute(alpha, 1));
+    geo.setAttribute('size', new THREE.BufferAttribute(size, 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { map: { value: tex }, scale: { value: 400 } },
+      vertexShader: 'attribute float alpha; attribute float size; attribute vec3 color; varying float vA; varying vec3 vC; uniform float scale;' +
+        'void main(){ vA = alpha; vC = color; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale / max(1.0, -mv.z); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform sampler2D map; varying float vA; varying vec3 vC; void main(){ vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(vC, t.a * vA); }',
+      transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    });
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false;
+    return { n, pos, col, alpha, size, geo, mat, pts, vel: new Float32Array(n * 3), life: new Float32Array(n), max: new Float32Array(n), s0: new Float32Array(n), next: 0, acc: new Map() };
+  }
+  function spawn(P, x, y, z, vx, vy, vz, life, size) {
+    const i = P.next; P.next = (P.next + 1) % P.n;
+    P.pos[i * 3] = x; P.pos[i * 3 + 1] = y; P.pos[i * 3 + 2] = z;
+    P.vel[i * 3] = vx; P.vel[i * 3 + 1] = vy; P.vel[i * 3 + 2] = vz;
+    P.life[i] = life; P.max[i] = life; P.s0[i] = size;
+  }
+  /** A random point on a building's footprint (palisade: along the piece), at fraction fy of its height. */
+  function onBuilding(b, fy, out) {
+    if (b.seg) { const k = Math.random(); out[0] = b.seg[0] + (b.seg[2] - b.seg[0]) * k; out[2] = b.seg[1] + (b.seg[3] - b.seg[1]) * k; }
+    else { const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * b.r * 0.85; out[0] = b.pos[0] + Math.cos(a) * r; out[2] = b.pos[2] + Math.sin(a) * r; }
+    out[1] = b.pos[1] + b.h * fy;
+    return out;
+  }
 
   /** One fence ring per pen: posts and two rails, merged into one mesh for all pens. */
   function penMesh(pens) {
@@ -95,7 +148,14 @@
     const group = new THREE.Group(); group.name = 'settlements';
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.92, metalness: 0 });
     const meshes = {}, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    let drawn = 0, current = null, pens = null;
+    let drawn = 0, current = null, pens = null, ruinMesh = null, ruinsDrawn = 0;
+    const slot = new Map();                                   // building id -> [mesh, instance index] (whole buildings)
+    const white = new THREE.Color(1, 1, 1), tint = new THREE.Color();
+    const flames = pool(420, true), smoke = pool(260, false);
+    group.add(flames.pts); group.add(smoke.pts);
+    const smoulder = new Map();                              // ruin id -> seconds of smoke left (fresh ruins)
+    const wasRuin = new Set();
+    let burning = 0;
 
     function sync(t) {
       current = t; drawn = 0;
@@ -107,6 +167,7 @@
         if (!m && list.length) {
           m = meshes[type] = new THREE.InstancedMesh(MODELS[type](), mat, list.length);
           m.name = 'b:' + type; m.frustumCulled = false;     // instances spread over the region: no shared bounds
+          m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3);   // T13: char tint (shared material: every mesh needs one)
           group.add(m);
         }
         if (!m) continue;
@@ -116,32 +177,136 @@
           q.setFromAxisAngle(up, b.yaw || 0);
           sc.set(1, 1, b.seg ? b.len + 0.5 : 1);
           pv.set(b.pos[0], b.pos[1] - 0.15, b.pos[2]);       // sunk a little so no gap shows on a slight slope
+          slot.set(b.id, [m, k]);
+          m.setColorAt(k, charOf(b));
           m.setMatrixAt(k++, m4.compose(pv, q, sc));
         }
-        m.count = k; m.instanceMatrix.needsUpdate = true; drawn += k;
+        m.count = k; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; drawn += k;
+      }
+      // rubble (T13): one instanced mesh for every ruin of the region
+      const all = (t && t.buildings) || [];
+      if (!ruinMesh && all.length) {
+        ruinMesh = new THREE.InstancedMesh(RUIN(), mat, all.length);
+        ruinMesh.name = 'b:ruin'; ruinMesh.frustumCulled = false; group.add(ruinMesh);
+        ruinMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(all.length * 3).fill(1), 3);
+      }
+      if (ruinMesh) {
+        let k = 0;
+        for (const b of all) {
+          if (!b.ruin) continue;
+          q.setFromAxisAngle(up, b.yaw || 0);
+          if (b.seg) sc.set(0.3, 0.6, (b.len + 0.5) / 9); else { const f = Math.max(0.45, b.r / 5); sc.set(f, Math.min(1.4, 0.6 + b.h / 20), f); }
+          pv.set(b.pos[0], b.pos[1] - 0.1, b.pos[2]);
+          ruinMesh.setMatrixAt(k++, m4.compose(pv, q, sc));
+        }
+        ruinMesh.count = k; ruinMesh.instanceMatrix.needsUpdate = true; ruinsDrawn = k;
       }
       if (!pens && t && t.pens && t.pens.length) {
         const g = penMesh(t.pens);
         if (g) { pens = new THREE.Mesh(g, mat); pens.name = 'pens'; group.add(pens); }
       }
     }
+    /** Instance colour: white when whole, darker as a burning building loses hp (charred). */
+    function charOf(b) {
+      const max = D.buildings[b.type].hp, dmg = max > 0 ? 1 - Math.max(0, b.hp) / max : 0;
+      return dmg <= 0 ? white : tint.setRGB(1 - dmg * 0.72, 1 - dmg * 0.78, 1 - dmg * 0.8);
+    }
+    for (const b of (town && town.buildings) || []) if (b.ruin) wasRuin.add(b.id);
     sync(town);
 
-    function update(t) {
-      if (t !== current) { sync(t); return; }
+    const pt = [0, 0, 0];
+    function update(t, dt, o) {
+      o = o || {};
+      if (t !== current) { wasRuin.clear(); smoulder.clear(); for (const b of (t && t.buildings) || []) if (b.ruin) wasRuin.add(b.id); sync(t); }
       let ruins = 0;
       for (const b of (t && t.buildings) || []) if (b.ruin) ruins++;
-      if (t && ruins !== (t._ruinsDrawn || 0)) { t._ruinsDrawn = ruins; sync(t); }
+      if (t && ruins !== ruinsDrawn) sync(t);
+      dt = dt || 0;
+      const cam = o.cam, mult = o.particles == null ? 1 : o.particles, lights = o.lights || [];
+      flames.mat.uniforms.scale.value = smoke.mat.uniforms.scale.value = o.pxScale || 400;
+      const hot = [];
+      burning = 0;
+      for (const b of (t && t.buildings) || []) {
+        if (b.ruin) {
+          if (!wasRuin.has(b.id)) { wasRuin.add(b.id); smoulder.set(b.id, 25); }
+          const sm = smoulder.get(b.id);
+          if (sm != null) {
+            if (sm <= 0) smoulder.delete(b.id); else { smoulder.set(b.id, sm - dt); emitSmoke(b, dt * 0.5 * mult * (sm / 25), cam); }
+          }
+          continue;
+        }
+        wasRuin.delete(b.id);
+        if (!(b.fire > 0)) continue;
+        burning++;
+        const sl = slot.get(b.id);
+        if (sl) { sl[0].setColorAt(sl[1], charOf(b)); sl[0].instanceColor.needsUpdate = true; }
+        const d = cam ? Math.hypot(cam.x - b.pos[0], cam.z - b.pos[2]) : 0;
+        hot.push([d, b]);
+        if (d > 600) continue;
+        // flames: more for bigger buildings, licking up the walls, densest at the roof
+        const size = b.seg ? 1.2 : 1 + b.r * 0.35;
+        let a = (flames.acc.get(b.id) || 0) + dt * 26 * size * mult;
+        while (a >= 1) {
+          a--;
+          onBuilding(b, 0.15 + Math.pow(Math.random(), 0.6) * 0.95, pt);
+          spawn(flames, pt[0], pt[1], pt[2], (Math.random() - 0.5) * 2, 4 + Math.random() * 5, (Math.random() - 0.5) * 2, 0.5 + Math.random() * 0.6, 2.4 + Math.random() * 2 + b.r * 0.25);
+        }
+        flames.acc.set(b.id, a);
+        emitSmoke(b, dt * mult * size, cam);
+      }
+      // the two flicker lights go to the burning buildings nearest the camera
+      hot.sort((x, y) => x[0] - y[0]);
+      const tm = o.time || 0;
+      lights.forEach((L, i) => {
+        const h = group.visible ? hot[i] : null;
+        if (!h) { L.intensity = 0; return; }
+        const b = h[1];
+        L.position.set(b.pos[0], b.pos[1] + b.h * 0.7 + 2, b.pos[2]);
+        L.intensity = 2.2 * (0.8 + 0.2 * Math.sin(tm * 17 + i * 2.1) + 0.12 * Math.sin(tm * 41 + i));
+      });
+      stepPool(flames, dt, true);
+      stepPool(smoke, dt, false);
+    }
+    function emitSmoke(b, rate, cam) {
+      if (cam && Math.hypot(cam.x - b.pos[0], cam.z - b.pos[2]) > 700) return;
+      let a = (smoke.acc.get(b.id) || 0) + rate * 5;
+      while (a >= 1) {
+        a--;
+        onBuilding(b, b.ruin ? 0.1 : 0.9, pt);
+        spawn(smoke, pt[0], pt[1] + 1, pt[2], 1.2 + Math.random() * 1.2, 3 + Math.random() * 2.5, 0.6 + (Math.random() - 0.5) * 1.2, 4 + Math.random() * 2.5, 3 + b.r * 0.4);
+      }
+      smoke.acc.set(b.id, a);
+    }
+    function stepPool(P, dt, fire) {
+      for (let i = 0; i < P.n; i++) {
+        if (P.life[i] <= 0) continue;
+        P.life[i] -= dt;
+        const j = i * 3;
+        if (P.life[i] <= 0) { P.pos[j + 1] = -9999; P.alpha[i] = 0; continue; }
+        P.pos[j] += P.vel[j] * dt; P.pos[j + 1] += P.vel[j + 1] * dt; P.pos[j + 2] += P.vel[j + 2] * dt;
+        const age = 1 - P.life[i] / P.max[i];
+        if (fire) {                                           // yellow -> orange -> dark red, shrinking
+          P.col[j] = 1; P.col[j + 1] = Math.max(0.12, 0.85 - age * 0.9); P.col[j + 2] = Math.max(0, 0.35 - age * 0.9);
+          P.alpha[i] = (1 - age) * 0.9; P.size[i] = P.s0[i] * (1 - age * 0.55);
+        } else {                                              // dark grey, growing and fading
+          const g = 0.16 + age * 0.22; P.col[j] = g; P.col[j + 1] = g * 0.96; P.col[j + 2] = g * 0.92;
+          P.alpha[i] = Math.min(1, age * 6) * (1 - age) * 0.55; P.size[i] = P.s0[i] * (1 + age * 2.6);
+        }
+      }
+      P.geo.attributes.position.needsUpdate = true; P.geo.attributes.color.needsUpdate = true;
+      P.geo.attributes.alpha.needsUpdate = true; P.geo.attributes.size.needsUpdate = true;
     }
 
     function dispose() {
       for (const k of Object.keys(meshes)) meshes[k].geometry.dispose();
       if (pens) pens.geometry.dispose();
+      if (ruinMesh) ruinMesh.geometry.dispose();
+      for (const P of [flames, smoke]) { P.geo.dispose(); P.mat.dispose(); }
       mat.dispose();
       if (group.parent) group.parent.remove(group);
     }
 
-    return { group, update, dispose, get info() { return { buildings: drawn, types: Object.keys(meshes).length, pens: pens ? 1 : 0 }; } };
+    return { group, update, dispose, get info() { return { buildings: drawn, ruins: ruinsDrawn, burning, types: Object.keys(meshes).length, pens: pens ? 1 : 0 }; } };
   }
 
   VR.settlements = { build, MODELS };

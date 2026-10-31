@@ -43,6 +43,8 @@
         o[id] = {};
         const seen = Object.keys(cs.discovered || {}).filter(k => cs.discovered[k] && k.indexOf(id + '.') === 0).sort();
         if (seen.length) o[id].discovered = seen;
+        const ruins = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].ruins) || []).filter(r => r && typeof r.id === 'string');
+        if (ruins.length) o[id].ruins = ruins.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T13 (v2 shape, 5.9)
         return o;
       }, {}),
       missions: { completed: [], active: null },
@@ -55,7 +57,8 @@
         location: cs.inLair ? 'lair' : 'field',
       },
       flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0 },
-      stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100) },
+      stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
+               civilBurned: cs.stats.civilBurned || 0, orderBurned: cs.stats.orderBurned || 0 },
     };
   }
 
@@ -116,13 +119,19 @@
     const f = o.flags || {};
     cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0 };
     const s = o.stats || {};
-    cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0 };
+    cs.stats = { played: num(s.played) ? s.played : 0, eaten: num(s.eaten) ? s.eaten : 0, food: num(s.food) ? s.food : 0,
+                 civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0 };
     cs.story = storyOf(o.story);
-    cs.discovered = {};
+    cs.discovered = {}; cs.regionStates = {};
     for (const id of Object.keys(o.regions || {})) {
       const r = o.regions[id];
       if (D.regions[id] && r && Array.isArray(r.discovered)) for (const k of r.discovered) if (typeof k === 'string' && k.indexOf(id + '.') === 0) cs.discovered[k] = true;
+      if (D.regions[id] && r && Array.isArray(r.ruins)) {          // T13: burned buildings, rebuilt fire.rebuild s after `at`
+        const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
+        if (ruins.length) cs.regionStates[id] = { ruins };
+      }
     }
+    cs.town = null;                                              // rebuilt with the loaded ruins (state.ensureTown)
     cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0; cs.saveT = 0; cs.station = null;
 
     const pos = region === w.region && w.pos ? T.clampToRegion(region, w.pos.slice(), D.flight.minAlt) : null;

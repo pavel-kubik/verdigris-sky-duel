@@ -20,6 +20,10 @@
  * Settlements (T12): cs.town = settlement.build of the current region (rebuilt when the region changes); its buildings
  *        are solids for flight (floor, walls), walking (walls, roofs) and landing (no landing on a roof, 'roof').
  *        cs.discovered = { placeId: true } (nav.step, 'place:discovered'), saved per region.
+ * Building fire (T13): the breath cone (cs.breath) sets buildings alight (settlement.burn, after the prey cook); a burned
+ *        down building is a ruin until fire.rebuild s of play later (settlement.rebuild, now = stats.played). Ruins are kept
+ *        in cs.regionStates[region].ruins [{ id, at }] (saved, so they survive a region change and a reload);
+ *        stats.civilBurned / orderBurned count burned buildings (future Renown, alert in T17).
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
@@ -44,7 +48,8 @@
       inLair: false,                 // inside the cave (T10: the dragon walks in the hall, core/cave.js); location reads it
       station: null,                 // T10: the cave station in reach ('nest' | 'larder' | 'exit'), the Action slot / E
       flags: { introSeen: false, heavyT: 0 },
-      stats: { played: 0, eaten: 0, food: 0 },
+      stats: { played: 0, eaten: 0, food: 0, civilBurned: 0, orderBurned: 0 },
+      regionStates: {},              // T13: { regionId: { ruins: [{ id, at }] } } (T17 adds heat, T19 taken loot), saved
       nav: null,                     // compass and smell (core/nav.js, T09): { t, next, scents, range }, not saved
       town: null,                    // T12: settlements of the region (core/settlement.js build), rebuilt on region change
       discovered: {},                // T12: settlement ids seen once (compass markers), saved
@@ -196,6 +201,7 @@
     else cs.fire = null;
     cs.breath = p.breathing ? PR.breathCone(aim, scale, cs.field, cs.fire ? cs.fire.id : null) : null;   // the renderer aims the stream along cs.breath.dir
     for (const e of PR.cook(cs.field, cs.breath, dt, cs.rng)) emit(cs, ev, e);
+    fireStep(cs, dt, ev, scale);                                // T13: buildings catch fire, burn down, come back
     if (cs.fire) { const q = PR.byId(cs.field, cs.fire.id); if (q && q.state !== 'roast') cs.fire.cook = Math.min(1, q.cook / D.roast.cookTime); else cs.fire = null; }
     if (cs.fire && cs.fire.cook > 0 && cs.fire.cook < 1) cs.fireMem = cs.fire.id;
 
@@ -270,6 +276,24 @@
     if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
     else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
+  }
+
+  /** Building fire (T13): burn under the breath, spread, ruins (stats, region state), rebuild after fire.rebuild. */
+  function fireStep(cs, dt, ev, scale) {
+    const town = ensureTown(cs), now = cs.stats.played, p = cs.dragon.pilot, pad = D.settlement.pad * (scale || 1);
+    const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {};
+    for (const e of SE.burn(town, cs.breath, dt, { rng: cs.rng, now })) {
+      emit(cs, ev, e);
+      if (e.e !== 'building:ruined') continue;
+      if (e.civil) cs.stats.civilBurned = (cs.stats.civilBurned || 0) + 1;
+      if (e.order) cs.stats.orderBurned = (cs.stats.orderBurned || 0) + 1;
+      rs.ruins = (rs.ruins || []).filter(r => r.id !== e.id).concat([{ id: e.id, at: e.at }]);
+    }
+    const blocked = b => SE.sd(b, p.pos[0], p.pos[2]).d < pad;  // never rebuild a house around the dragon
+    for (const e of SE.rebuild(town, now, blocked)) {
+      emit(cs, ev, e);
+      if (rs.ruins) rs.ruins = rs.ruins.filter(r => r.id !== e.id);
+    }
   }
 
   /** Seconds of holding Eat for one meal: eat.time in the air, ground.eatTime on the ground (T08). */

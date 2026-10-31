@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't112.2 2026-10-31 settlements: buildings, solids, discovery on the compass (autosave on discovery)';
+  const BUILD = 't113.2 2026-10-31 debug: jump to any region (4 / 5 / 6)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -46,6 +46,7 @@
 
   /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt when the dragon travels, T11) ---------- */
   let region = null, regionId = null, preyView = null, townView = null;   // townView: settlements (T12)
+  const fireLights = [0, 1].map(() => { const L = new THREE.PointLight(0xff7a2a, 0, 70, 2); scene.add(L); return L; });   // T13: 2 flicker lights, always in the scene (no shader recompile)
   let caveOn = null;                                           // T10: the cave scene is shown (syncScene), null = re-apply
   const rng = MT.mulberry((Math.random() * 1e9) | 0);          // gameplay randomness (core stays deterministic in tests)
   const startId = D.regions[params.get('region')] ? params.get('region') : D.startRegion;
@@ -661,6 +662,7 @@
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
       else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
+      else if (e.e === 'building:ruined' && e.type !== 'palisade') toast(t('c.toast.burned', { b: t('c.building.' + e.type) }), t('c.toast.burnedSub'), 2.2);
       else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t('c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
@@ -852,6 +854,9 @@
     ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
     ['B', 'Elder size (scale 4) on / off: walls and camera test in the cave', 'KeyB', 'elder size'],
     ['1', 'fly to the next settlement of this region (low, 150 out, facing it)', 'Digit1', 'to town'],
+    ['2', 'set the nearest building alight (fire test)', 'Digit2', 'fire here'],
+    ['3', 'rebuild every ruin of this region now', 'Digit3', 'rebuild'],
+    ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
@@ -926,6 +931,26 @@
       Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: a + Math.PI, pitch: 0, speed: stats.cruise });
       snapCam(); flashPrompt(t('c.dbg.town', { place: t('c.place.' + pl.type) }), 1.5);
     }
+    if (code === 'Digit2' && !cs.inLair && cs.town) {            // T13: fire test on the nearest standing building
+      let best = null, bd = 400;
+      for (const b of cs.town.buildings) { const d = Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]); if (!b.ruin && !(b.fire > 0) && d < bd) { bd = d; best = b; } }
+      if (best) { best.fire = 1e-3; best.heat = 0; flashPrompt(t('c.dbg.ignite', { b: t('c.building.' + best.type) }), 1.5); } else flashPrompt(t('c.dbg.noBuilding'), 1.5);
+    }
+    if (code === 'Digit3' && cs.town) {                         // T13: ruins come back now (as if fire.rebuild s had passed)
+      let n = 0;
+      for (const b of cs.town.buildings) if (b.ruin) { b.ruinAt = cs.stats.played - D.fire.rebuild - 1; n++; }
+      const rs = cs.regionStates && cs.regionStates[cs.region];
+      if (rs && rs.ruins) for (const r of rs.ruins) r.at = cs.stats.played - D.fire.rebuild - 1;
+      flashPrompt(t('c.dbg.rebuilt', { n }), 1.5);
+    }
+    const dbgRegion = /^Digit\d$/.test(code) ? Object.keys(D.regions)[+code.slice(5) - 4] : null;
+    if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
+      if (cs.inLair) onEvents(ST.lairLeave(cs));
+      if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
+      if (dbgRegion !== cs.region) onEvents(RG.enter(cs, dbgRegion, cs.region));
+      else { const at = RG.entryPoint(dbgRegion, null, null); Object.assign(pilot, { pos: at.pos, yaw: at.yaw, pitch: 0 }); snapCam(); }
+      flashPrompt(t('c.dbg.region', { region: t(TR.region(dbgRegion).nameKey) }), 1.5);
+    }
     if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(t(okS ? 'c.dbg.saved' : saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); }
     if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
     if (code === 'KeyR') {
@@ -979,7 +1004,7 @@
     motherArrow();
     compassHud(dt);
     preyView.update(cs.field, time, carryPose());
-    townView.update(cs.town);
+    townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     targetRing();
     fireTargetRing();
     renderer.render(scene, camera);
@@ -1064,6 +1089,7 @@
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
+        L.push('FIRE    burning ' + (ti ? ti.burning : 0) + '  ruins ' + (ti ? ti.ruins : 0) + '  burned civil ' + (cs.stats.civilBurned || 0) + ' order ' + (cs.stats.orderBurned || 0) + '  lights ' + fireLights.filter(L => L.intensity > 0).length);
         L.push('TOWNS   ' + (ti ? ti.buildings + ' buildings' : '-') + '  near ' + (near ? near.id + ' ' + Math.round(Math.hypot(near.x - pilot.pos[0], near.z - pilot.pos[2])) : '-') + '  found ' + (Object.keys(cs.discovered || {}).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');

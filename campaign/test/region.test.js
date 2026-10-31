@@ -49,6 +49,7 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
 // 4. flying straight at the exit raises the offer; it lingers after turning back, then expires
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
+  cs.dragon.pilot = F.newPilot(at('ash', 0, 300, 60), 0, 30);
   const d = cs.dragon;
   d.pilot = F.newPilot(at('ash', 0.1, 260, 60), 0.1, 30);
   let ev = [], t = 0;
@@ -118,4 +119,15 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
   let threw = false;
   try { RG.enter(cs, 'nowhere', 'ash'); } catch (_) { threw = true; }
   ok(threw && cs.region === 'ash', 'unknown region rejected, state untouched');
+}
+
+// 8. debug region jump: enter works between regions without a shared exit (Ash Wastes -> Farmlands and back)
+{
+  const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
+  cs.dragon.pilot = F.newPilot(at('ash', 0, 300, 60), 0, 30);
+  for (const [to, from] of [['farm', 'ash'], ['ash', 'farm'], ['wild', 'ash'], ['farm', 'wild']]) {
+    const ev = RG.enter(cs, to, from), p = cs.dragon.pilot, R = T.region(to);
+    ok(ev[0].e === 'region:enter' && cs.region === to && cs.field, 'jump ' + from + ' -> ' + to);
+    ok(Number.isFinite(p.pos[1]) && p.pos[1] > T.surfaceAt(to, p.pos[0], p.pos[2]) && p.pos[1] < R.ceiling && Math.hypot(p.pos[0], p.pos[2]) < R.radius, 'placed in the air inside ' + to);
+  }
 }

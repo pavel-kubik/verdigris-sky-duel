@@ -149,7 +149,12 @@
        settlements: templates, offsets [type, x, z] from the centre, rotated by the site's yaw (+ seeded jitter of up to
        `jitter` units and jitterYaw rad per building); ring: [r, gate] palisade around the centre; pens: [type, x, z,
        count] livestock pens (radius penR + count; animals come with T18); alert3: buildings added at alert 3 (T17).
-       pad: the dragon's collision radius x scale against building solids (walking and flying). fire: T13. */
+       pad: the dragon's collision radius x scale against building solids (walking and flying).
+       fire (T13, core/settlement.js burn / rebuild): ignite = s of breath on a building until it catches fire (the heat
+       cools at `cool` per s out of the breath); a burning building loses `burn` hp/s on its own, `fan` hp/s more while the
+       breath stays on it (a hatchling burns a tower down in about 10 s of breath); each s a burning building sets each
+       neighbour (same settlement, footprints within `reach`) alight with chance `spread`; a ruin comes back after
+       `rebuild` s of play (not while the dragon stands in its footprint). */
     buildings: {
       house:    { r: 5, h: 7,  hp: 60,  civil: true },
       barn:     { r: 7, h: 9,  hp: 90,  civil: true,  holds: 'livestock' },
@@ -163,7 +168,7 @@
       platform: { r: 4, h: 4,  hp: 80,  order: true, post: 'ballista' },
     },
     palisade: { piece: 6, radius: 1, gate: 12 },
-    fire: { ignite: 0.8, burn: 6, spread: 0.15, rebuild: 600 },
+    fire: { ignite: 0.8, cool: 0.5, burn: 6, fan: 2.5, spread: 0.15, reach: 8, rebuild: 600 },
     settlement: { jitter: 1, jitterYaw: 0.2, penR: 2.5, pad: 1.4 },
     settlements: {
       hamlet:   { buildings: [['house', -8, 0], ['house', 8, 4], ['barn', -3, -13], ['bell', 0, 10]],

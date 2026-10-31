@@ -10,7 +10,16 @@
  *   hit(town, x, z, pad?) -> { b, roof, nx, nz, depth } | null   the solid the point is deepest inside: push out along
  *                                           (nx, nz) by depth to stand clear of it (flight and walk collisions)
  *   near(town, x, z, range) -> place | null nearest settlement within range of its centre
- * A ruin is no solid (rubble only, T13 rebuilds it). Pure: no DOM, no THREE.
+ *   burn(town, cone, dt, { mult, rng, now }) -> events[]   T13: the breath cone heats the buildings it reaches
+ *                                           (b.heat, `fire.ignite` s to catch fire: 'building:burning'); a burning one
+ *                                           (b.fire = s burning) loses hp (`fire.burn`, + `fire.fan` under the breath, x
+ *                                           mult), sets neighbours (b.nb, footprints within `fire.reach`) alight with
+ *                                           chance `fire.spread` per s, and at 0 hp becomes a ruin ('building:ruined',
+ *                                           ruinAt = now). cone: prey.breathCone or null (not breathing).
+ *   rebuild(town, now, blocked?) -> events[]   ruins older than `fire.rebuild` s stand again ('building:rebuilt'),
+ *                                           unless blocked(b) (the dragon stands in the footprint)
+ *   inFire(b, cone) -> bool                 the cone reaches building b (samples along the stream)
+ * A ruin is no solid (rubble only). Pure: no DOM, no THREE.
  */
 (function (root) {
   'use strict';
@@ -77,6 +86,10 @@
       });
       out.places.push(place);
     });
+    out.buildings.forEach((b, i) => {             // T13: fire neighbours, same settlement, footprints within fire.reach
+      b.nb = [];
+      out.buildings.forEach((o, j) => { if (j !== i && o.place === b.place && gap(b, o) <= D.fire.reach) b.nb.push(j); });
+    });
     cache.set(regionId, out);
     return out;
   }
@@ -86,7 +99,7 @@
     const ruins = {};
     for (const r of (rs && rs.ruins) || []) if (r && r.id) ruins[r.id] = r.at || 0;
     const buildings = L.buildings.map(b => Object.assign({}, b, {
-      pos: b.pos.slice(), hp: D.buildings[b.type].hp, fire: 0, ruin: b.id in ruins, ruinAt: b.id in ruins ? ruins[b.id] : null,
+      pos: b.pos.slice(), hp: D.buildings[b.type].hp, heat: 0, fire: 0, ruin: b.id in ruins, ruinAt: b.id in ruins ? ruins[b.id] : null,
     }));
     const posts = [];
     for (const b of buildings) {
@@ -145,6 +158,78 @@
     return best;
   }
 
+  /** Gap between two footprints (0 when they touch or overlap): palisade pieces by their segment ends. */
+  function gap(a, b) {
+    const pts = o => (o.seg ? [[o.seg[0], o.seg[1]], [o.seg[2], o.seg[3]], [(o.seg[0] + o.seg[2]) / 2, (o.seg[1] + o.seg[3]) / 2]] : [[o.pos[0], o.pos[2]]]);
+    let g = Infinity;
+    for (const [x, z] of pts(a)) g = Math.min(g, sd(b, x, z).d - a.r);
+    for (const [x, z] of pts(b)) g = Math.min(g, sd(a, x, z).d - b.r);
+    return Math.max(0, g);
+  }
+
+  /** Does the breath cone reach building b? Samples along the stream (every ~2 units), the fire widening with distance
+   *  (radius = t x tan(cone) x fire.width), up to the first terrain hit. */
+  function inFire(b, cone, regionId) {
+    if (!cone || b.ruin) return false;
+    const o = cone.origin, d = cone.dir, n = Math.max(4, Math.ceil(cone.range / 2)), tan = Math.tan(cone.cone) * WIDTH;
+    for (let i = 0; i <= n; i++) {
+      const t = cone.range * i / n, x = o[0] + d[0] * t, y = o[1] + d[1] * t, z = o[2] + d[2] * t;
+      if (regionId && i > 0 && y < T.surfaceAt(regionId, x, z) - 1) return false;   // the stream ends in the ground
+      const rad = 1 + t * tan;
+      if (y < b.pos[1] - rad || y > b.pos[1] + b.h + rad * 0.5) continue;
+      if (sd(b, x, z).d <= rad) return true;
+    }
+    return false;
+  }
+  const WIDTH = 0.6;                             // the fire reaches buildings over 60% of the prey cone's width
+
+  function ignite(b, ev, spread) {
+    b.fire = 1e-3; b.heat = 0;
+    ev.push({ e: 'building:burning', id: b.id, type: b.type, place: b.place, pos: b.pos.slice(), spread: !!spread });
+  }
+
+  function burn(town, cone, dt, opts) {
+    const ev = [];
+    if (!town) return ev;
+    const F = D.fire, mult = (opts && opts.mult) || 1, rng = (opts && opts.rng) || Math.random, now = (opts && opts.now) || 0;
+    const near = {};
+    if (cone) for (const pl of town.places) near[pl.id] = Math.hypot(pl.x - cone.origin[0], pl.z - cone.origin[2]) <= cone.range + pl.r + 4;
+    const lit = [];
+    for (const b of town.buildings) {
+      if (b.ruin) continue;
+      const hot = !!near[b.place] && inFire(b, cone, town.region);
+      if (b.fire > 0) {
+        b.fire += dt;
+        b.hp -= (F.burn + (hot ? F.fan : 0)) * mult * dt;
+        if (b.hp <= 0) {
+          const B = D.buildings[b.type];
+          b.hp = 0; b.fire = 0; b.heat = 0; b.ruin = true; b.ruinAt = now;
+          ev.push({ e: 'building:ruined', id: b.id, type: b.type, place: b.place, pos: b.pos.slice(), civil: !!B.civil, order: !!B.order, at: now });
+        } else lit.push(b);
+      } else if (hot) {
+        b.heat += dt * mult;
+        if (b.heat >= F.ignite) ignite(b, ev, false);
+      } else if (b.heat > 0) b.heat = Math.max(0, b.heat - F.cool * dt);
+    }
+    const p = 1 - Math.exp(-F.spread * dt);      // chance per neighbour this frame
+    for (const b of lit) for (const j of b.nb || []) {
+      const o = town.buildings[j];
+      if (o && !o.ruin && !(o.fire > 0) && rng() < p) ignite(o, ev, true);
+    }
+    return ev;
+  }
+
+  function rebuild(town, now, blocked) {
+    const ev = [];
+    for (const b of (town && town.buildings) || []) {
+      if (!b.ruin || now - (b.ruinAt || 0) < D.fire.rebuild) continue;
+      if (blocked && blocked(b)) continue;
+      b.ruin = false; b.ruinAt = null; b.hp = D.buildings[b.type].hp; b.fire = 0; b.heat = 0;
+      ev.push({ e: 'building:rebuilt', id: b.id, type: b.type, place: b.place });
+    }
+    return ev;
+  }
+
   function near(town, x, z, range) {
     let best = null, bd = range;
     for (const pl of (town && town.places) || []) {
@@ -154,5 +239,5 @@
     return best;
   }
 
-  M.define('settlement', { build, solidAt, hit, near, layout, placeIds });
+  M.define('settlement', { build, solidAt, hit, near, layout, placeIds, burn, rebuild, inFire, sd });
 })(typeof self !== 'undefined' ? self : this);
