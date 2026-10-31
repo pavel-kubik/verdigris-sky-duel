@@ -5,14 +5,15 @@
  *   inMouth(cs) -> boolean                    dragon inside the mouth sphere (radius grows a little with scale)
  *   near(cs) -> boolean                       dragon close to the mouth (for the "fly into the cave" prompt)
  *   canEnter(cs) -> boolean                   near() and within enterRange: the Move slot offers "Enter cave"
- *   enter(cs, at?) -> events[]                stores a carried prey if there is room, cs.inLair = true; the dragon stands
+ *   enter(cs, at?) -> events[]                stores a carried prey if there is room, banks carried loot (T19, 'hoard:banked'),
+ *                                             cs.inLair = true; the dragon stands
  *                                             in the cave hall (core/cave.js, T10) at 'tunnel' (default) or 'nest'
  *   rest(cs) -> { grew, from, to, events }    HP and fire to max, stage-up if food XP is ready
  *   eatFromLarder(cs, index) -> events[]      feeds the stored item's current food
  *   leave(cs) -> events[]                     dragon back in the air at the region spawn, cs.inLair = false
  *   spoil(cs, dt) -> events[]                 larder items lose 1 food per spoilEvery s, removed at 0
  *   home() -> regionId                        the region with the lair (where a dead dragon wakes)
- *   respawn(cs, cause) -> events[]            after death: carried prey lost, back in the lair region, HP respawnHp x max,
+ *   respawn(cs, cause) -> events[]            after death: carried prey and loot lost (T19, 'loot:lost'), back in the lair region, HP respawnHp x max,
  *                                             hunger at least respawnHunger, cs.inLair = true (the panel opens)
  *   hatch(cs) -> events[]                     new hatchling: wakes inside the lair of home() (intro card -> lair panel);
  *                                             the hatching scene hands over to the mother: cs.story.mother = { lesson: 0, at: 'lair' }
@@ -22,7 +23,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), HN = M.need('hunger'), F = M.need('flight'), PR = M.need('prey'), CV = M.need('cave');
+  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), HN = M.need('hunger'), F = M.need('flight'), PR = M.need('prey'), CV = M.need('cave'), LT = M.need('loot');
   const L = D.lair;
 
   const mouthPos = regionId => T.lairPos(regionId);
@@ -62,6 +63,7 @@
         ev.push({ e: 'lair:stored', type: carried.type, food: carried.food });
       } else ev.push({ e: 'lair:full', type: carried.type });
     }
+    ev.push(...LT.bank(cs));                                       // T19: carried loot goes onto the hoard ('hoard:banked')
     d.eatT = 0;
     cs.inLair = true;
     cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
@@ -133,7 +135,9 @@
     const d = cs.dragon, ev = [];
     const carried = d.carried == null || !cs.field ? null : PR.byId(cs.field, d.carried);
     if (carried) PR.remove(cs.field, carried.id);
-    ev.push({ e: 'dragon:died', cause: cause || 'wounds', region: cs.region, lost: carried ? carried.type : null });
+    const loot = cs.carriedLoot;
+    ev.push({ e: 'dragon:died', cause: cause || 'wounds', region: cs.region, lost: carried ? carried.type : null, lostLoot: loot ? loot.kind : null });
+    ev.push(...LT.lose(cs));                                       // T19: the carried loot is gone ('loot:lost'), it refills as taken
     d.carried = null; d.eatT = 0; d.deaths = (d.deaths || 0) + 1;
     const st = G.statsOf(d.stage);
     d.hp = Math.round(L.respawnHp * st.hpMax);

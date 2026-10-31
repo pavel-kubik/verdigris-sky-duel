@@ -127,8 +127,11 @@
         nest:   [0, -34, 12],
         larder: [-30, -8, 8],
         exit:   [0, 56, 4],
-        // T19 hoard [30, -8, 10], T20 altar [0, 8, 5]; Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
+        hoard:  [30, -8, 10],                 // T19: the coin pile (hoardTiers), its panel shows the gold
+        // T20 altar [0, 8, 5]; Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
       },
+      hoardTiers: [0, 100, 300, 700, 1500],   // T19: coin pile size steps (tier = steps reached - 1); coins = min(maxCoins, gold / 2)
+      maxCoins: 800,
       reach: 8, entry: [0, 40],
       camera: { dist: 18, height: 7, look: 10, pad: 2.5 },
       light: { color: 0xff7a2e, intensity: 2.2, distance: 150, flicker: 0.18 },
@@ -219,6 +222,19 @@
        runs out from that spot at `spread` units/s, a `band` wide ring of popping corn that throws popcorn into the air,
        leaving charred stubble that grows back after `regrow` s of play. popcorn: renderer pool, kernels per s per unit of
        front length (`rate`, capped at `maxRate` per field), launch speed up / sideways, gravity, life on the ground (s). */
+    /* Loot (Phase 2 T19, core/loot.js, render/loot-view.js; 002_task_kingdom.md 4.6). Buildings with `loot` (taxhouse:
+       tithe chest, vault: strongbox) keep one item each on the ground `door` units outside their footprint (the first
+       spot `clear` units away from every solid: the building's front, else the side nearest the settlement centre).
+       On the ground Grab picks it up (the one claw slot, shared with prey; size like prey vs the stage's carry);
+       carrying it multiplies the flight and walk speed by carry.speedMult, carry.breath false = no fire. Entering the
+       lair banks its gold into the hoard ('hoard:banked'), dying loses it ('loot:lost'); a taken item comes back
+       fire.rebuild s of play after it was taken (regions.<id>.lootTaken). Taking one adds alert.add.loot heat. */
+    loot: {
+      tithe:     { size: 1, gold: 50,  carry: { speedMult: 0.85, breath: true } },
+      strongbox: { size: 2, gold: 150, carry: { speedMult: 0.8,  breath: false } },
+      door: 2, clear: 3,
+    },
+
     corn: { crop: 4, height: 3.2, ignite: 0.4, cool: 0.5, spread: 5, band: 6, regrow: 600 },
     popcorn: { pool: 1200, rate: 1.2, maxRate: 160, up: [9, 20], side: 5, gravity: 18, life: 6, size: 1.4 },
 
