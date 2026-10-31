@@ -83,6 +83,9 @@ p{margin:0;color:var(--mute);line-height:1.45}
 #toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-family:var(--f-display);font-size:clamp(28px,5vw,46px);text-shadow:0 2px 24px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s;padding-inline:16px;width:min(720px,100%)}
 #toast small{display:block;font-family:var(--f-ui);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-top:6px}
 #regionName{text-align:center;font-family:var(--f-display);font-size:26px;line-height:1;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+#todIcon{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:middle;position:relative;top:-3px;background:#ffd27a;box-shadow:0 0 8px rgba(255,200,110,.7);transition:background .6s,box-shadow .6s}
+#todIcon[data-phase=dusk],#todIcon[data-phase=dawn]{background:#ff8a4a;box-shadow:0 0 8px rgba(255,120,60,.7)}
+#todIcon[data-phase=night]{background:transparent;box-shadow:inset -4px 2px 0 0 #d7e2ff,0 0 6px rgba(170,190,240,.35)}
 #alertRow{display:flex;gap:5px;align-items:center;justify-content:center;margin-top:5px}
 #alertRow[hidden]{display:none}
 #alertRow i{width:16px;height:6px;border-radius:2px;border:1px solid rgba(229,72,79,.55);background:rgba(12,19,16,.45)}
@@ -134,14 +137,14 @@ h2{font-size:42px}
 #lair[data-station=nest] .larder{display:none}
 #lair .hoardInfo{display:none}
 #lair[data-station=hoard] .hoardInfo{display:block}
-#lair[data-station=hoard] .larder,#lair[data-station=hoard] #lairStage,#lair[data-station=hoard] #lairVitals,#lair[data-station=hoard] .restRow{display:none}
+#lair[data-station=hoard] .larder,#lair[data-station=hoard] #lairStage,#lair[data-station=hoard] #lairVitals,#lair[data-station=hoard] #lairTime,#lair[data-station=hoard] .restRow{display:none}
 #hoardGold{font-family:var(--f-ui);font-size:22px;font-weight:700;color:#f2c14e;margin:2px 0}
 #hoardTier{color:var(--bone)}
 .hoardCarry{font-size:13px;color:var(--mute)}
 /* T20: the altar - upgrades with cost, effect and Buy */
 #lair .altarInfo{display:none}
 #lair[data-station=altar] .altarInfo{display:block}
-#lair[data-station=altar] .larder,#lair[data-station=altar] #lairStage,#lair[data-station=altar] #lairVitals,#lair[data-station=altar] .restRow{display:none}
+#lair[data-station=altar] .larder,#lair[data-station=altar] #lairStage,#lair[data-station=altar] #lairVitals,#lair[data-station=altar] #lairTime,#lair[data-station=altar] .restRow{display:none}
 #altarGold{font-family:var(--f-ui);font-size:18px;font-weight:700;color:#f2c14e;margin:2px 0 8px}
 #altarList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 #altarList li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:4px;padding:6px 6px 6px 12px}
@@ -159,7 +162,7 @@ h2{font-size:42px}
 #goldLoot.strongbox{background:#3b3f45;box-shadow:inset 0 -3px 0 #8a8f96,0 0 0 1px #111}
 #goldRow.pulse small{animation:goldPulse .5s ease-in-out 4}
 @keyframes goldPulse{50%{color:#fff3c4;text-shadow:0 0 8px #f2c14e}}
-#lair[data-station=larder] #lairStage,#lair[data-station=larder] #lairVitals,#lair[data-station=larder] .restRow{display:none}
+#lair[data-station=larder] #lairStage,#lair[data-station=larder] #lairVitals,#lair[data-station=larder] #lairTime,#lair[data-station=larder] .restRow{display:none}
 @media (pointer:coarse){#lair.station{left:12px;right:12px;width:auto;top:auto;transform:none;bottom:calc(252px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 252px - 130px - env(safe-area-inset-bottom,0px) - env(safe-area-inset-top,0px));padding:12px 14px;gap:8px}#lair.station h2{font-size:22px}}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
   #lair.station{left:calc(190px + env(safe-area-inset-left,0px));right:calc(190px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 140px)}
@@ -219,7 +222,7 @@ h2{font-size:42px}
     <div class="bar"><span data-i18n="hud.fire">Fire</span><div class="track"><div class="fill" id="stFill"></div></div></div>
     <div class="bar" id="hgBar"><span data-i18n="c.hud.hunger">Hunger</span><div class="track"><div class="fill" id="hgFill"></div></div></div>
   </div>
-  <div id="regionName"><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span><span id="goldRow" hidden aria-label="Gold" data-i18n-attr="aria-label:c.hud.gold"><i class="coin"></i><small id="goldText">0</small><i id="goldLoot" hidden></i></span></div>
+  <div id="regionName"><i id="todIcon" data-phase="day" role="img" aria-label="day"></i><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span><span id="goldRow" hidden aria-label="Gold" data-i18n-attr="aria-label:c.hud.gold"><i class="coin"></i><small id="goldText">0</small><i id="goldLoot" hidden></i></span></div>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
 </div>
 <div id="legend" hidden>
@@ -260,7 +263,8 @@ h2{font-size:42px}
   <h2 id="lairTitle" data-i18n="c.cave.nest">Nest</h2>
   <p id="lairStage"></p>
   <p id="lairVitals"></p>
-  <div class="row restRow"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button></div>
+  <p id="lairTime"></p>
+  <div class="row restRow"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button><button class="ghost" id="sleepDuskBtn" data-i18n="c.clock.sleepDusk">Sleep until dusk</button><button class="ghost" id="sleepDawnBtn" data-i18n="c.clock.sleepDawn">Sleep until dawn</button></div>
   <div class="hoardInfo"><p id="hoardGold"></p><p id="hoardTier"></p><p class="hoardCarry" data-i18n="c.hoard.carry">Loot is banked the moment you enter the lair. If you die on the way, it is lost.</p></div>
   <div class="altarInfo"><p id="altarGold"></p><ul id="altarList"></ul></div>
   <div class="larder"><div class="eyebrow" id="larderHead"></div><ul id="larderList"></ul><p id="larderEmpty" data-i18n="c.lair.empty">Empty - carry prey into the cave to store it</p></div>
@@ -282,9 +286,9 @@ h2{font-size:42px}
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
-     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/loot.js',
+     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/loot.js',
      'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
-     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/hatch-scene.js', 'game.js'
+     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>

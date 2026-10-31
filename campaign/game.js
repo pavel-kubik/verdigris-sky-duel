@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't120.1 2026-10-31 upgrades and the altar: prey sense, iron scales, wing muscles, hotter fire, guard sight (debug \' all / none)';
+  const BUILD = 't121.1 2026-10-31 day and night: 20 min clock, night sky and moon, guards see half as far, sleep until dusk / dawn (debug 8 time, / fast time)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -33,16 +33,13 @@
   scene.fog = new THREE.Fog(0x7d6a58, qSet.fogNear, qSet.fogFar);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);
   const sunDir = new V3(-0.55, 0.16, -0.82).normalize();
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 16), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: new THREE.Color(0x15202a) }, mid: { value: new THREE.Color(0x4a4a48) }, bot: { value: new THREE.Color(0xc07a4a) }, sun: { value: sunDir } },
-    vertexShader: 'varying vec3 vP;void main(){vP=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: 'uniform vec3 top,mid,bot,sun;varying vec3 vP;void main(){float h=vP.y;vec3 c=h>0.?mix(mix(bot,mid,smoothstep(0.,.2,h)),top,smoothstep(.2,.75,h)):mix(bot,mid*.55,smoothstep(0.,-.25,h));float s=max(dot(vP,sun),0.);c+=vec3(1.,.82,.55)*(pow(s,600.)*2.5+pow(s,10.)*.28);gl_FragColor=vec4(c,1.);}',
-  }));
-  scene.add(sky);
   const hemi = new THREE.HemisphereLight(0xa6cbc4, 0x3b2a1a, 0.85); scene.add(hemi);
   const sunLight = new THREE.DirectionalLight(0xffc68c, 1.3); sunLight.position.copy(sunDir).multiplyScalar(300); scene.add(sunLight);
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
+  /* T21: day and night (render/sky.js) - the sky dome, fog colour and the outdoor lights follow cs.clock */
+  const skyView = VRender.sky.build({ hemi, sun: sunLight, rim, fog: scene.fog, sunDir });
+  const sky = skyView.mesh;
+  scene.add(sky);
 
   /* ---------- region: chunked terrain, flora, lava, lair mouth (rebuilt when the dragon travels, T11) ---------- */
   let region = null, regionId = null, preyView = null, townView = null;   // townView: settlements (T12)
@@ -78,8 +75,7 @@
     townView.town = cs.town;
     scene.add(townView.group);
     scene.fog.color.set(region.fog); caveOn = null;
-    const u = sky.material.uniforms;
-    u.top.value.set(region.sky.top); u.mid.value.set(region.sky.mid); u.bot.value.set(region.sky.bot);
+    skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
   }
   loadRegion(bootRegion);
@@ -134,8 +130,8 @@
   scene.add(caveView.group);
   const lootView = VRender.loot.build();                           // T19: tithe chests and strongboxes, the carried one
   scene.add(lootView.group);
-  const OUT_LIGHT = { hemi: hemi.intensity, sun: sunLight.intensity, rim: rim.intensity };
-  /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap. */
+  /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap.
+   *  Outside, render/sky.js sets the lights and the fog colour from the clock every frame (T21). */
   function syncScene() {
     const inCave = !!pilot && cs.inLair && state !== 'intro';
     caveView.group.visible = inCave;
@@ -143,11 +139,11 @@
     if (preyView) preyView.group.visible = !inCave;
     if (townView) townView.group.visible = !inCave;
     sky.visible = !inCave;
+    if (!inCave) skyView.update(cs.clock ? cs.clock.t : D.clock.start);
     if (inCave === caveOn) return;
     caveOn = inCave;
-    hemi.intensity = inCave ? 0 : OUT_LIGHT.hemi; sunLight.intensity = inCave ? 0 : OUT_LIGHT.sun; rim.intensity = inCave ? 0 : OUT_LIGHT.rim;
-    if (inCave) { scene.fog.color.set(0x120a07); scene.fog.near = 40; scene.fog.far = 260; }
-    else { if (region) scene.fog.color.set(region.fog); scene.fog.near = qSet.fogNear; scene.fog.far = qSet.fogFar; }
+    if (inCave) { hemi.intensity = sunLight.intensity = rim.intensity = 0; scene.fog.color.set(0x120a07); scene.fog.near = 40; scene.fog.far = 260; }
+    else { scene.fog.near = qSet.fogNear; scene.fog.far = qSet.fogFar; }
   }
   let stats = G.statsOf(0), heroScale = 1;
   let pilot = null, phase = 0;
@@ -671,9 +667,12 @@
   /** T17: alert pips under the region name (0-3 lit), shown where the region has settlements or any heat. */
   const alertRow = $('#alertRow'), alertPips = [...alertRow.querySelectorAll('i')];
   let alertShown = -1, alertPulse = 0;
+  const todIcon = $('#todIcon'); let todShown = '';
   function alertHud(dt) {
     const rs = cs.regionStates[cs.region], lv = AL.level(rs), has = !!(cs.town && cs.town.places.length) || lv > 0;
     alertRow.hidden = !has || state === 'intro';
+    const ph = cs.clock ? CK.phase(cs.clock.t) : 'day';         // T21: sun / moon by the region name
+    if (ph !== todShown) { todShown = ph; todIcon.dataset.phase = ph; todIcon.setAttribute('aria-label', t('c.light.' + ph)); }
     if (lv !== alertShown) { alertPips.forEach((p, i) => p.classList.toggle('on', i < lv)); alertShown = lv; }
     if (alertPulse > 0) { alertRow.classList.add('pulse'); if ((alertPulse -= dt || 0.016) <= 0) alertRow.classList.remove('pulse'); }
   }
@@ -684,6 +683,9 @@
     for (const e of ev) {
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
       else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
+      else if (e.e === 'clock:phase') {                          // T21: night falls / day breaks (outside only; the nest panel shows the time)
+        if (!cs.inLair && state === 'play' && (e.phase === 'night' || e.phase === 'day')) toast(t('c.clock.' + e.phase), t('c.clock.' + e.phase + 'Sub'), 3);
+      }
       else if (e.e === 'alert:level') {                          // T17: the region's alert level changed
         const rn = t(TR.region(e.region).nameKey);
         if (e.level > e.from) toast(t('c.toast.alertUp', { region: rn }), t(['c.toast.alertSub1', 'c.toast.alertSub2', 'c.toast.alertSub3'][Math.min(3, e.level) - 1]), 3.2);
@@ -835,6 +837,7 @@
       : t('c.lair.max', { stage: t('c.stage.' + st.id) });
     stageEl.classList.toggle('ready', ready);
     $('#lairVitals').textContent = t('c.lair.vitals', { hp: Math.round(100 * d.hp / G.statsOf(d.stage).hpMax), st: Math.round(pilot ? pilot.st : 100), hunger: Math.round(d.hunger) });
+    if (cs.clock) $('#lairTime').textContent = t('c.clock.outside', { phase: t('c.light.' + CK.phase(cs.clock.t)), time: CK.hours(cs.clock.t) });   // T21
     $('#larderHead').textContent = t('c.lair.larder', { n: cs.larder.length, max: D.lair.larderSize });
     const key = cs.larder.map(it => it.type + ':' + Math.max(1, Math.round(it.food))).join(',');
     if (key !== lairShown) {
@@ -926,12 +929,15 @@
     closeStation();
     pilot = dragon.pilot; refreshStage(); syncScene(); snapCam();
   }
-  $('#restBtn').onclick = () => {
+  $('#restBtn').onclick = () => nestAct(null);
+  $('#sleepDuskBtn').onclick = () => nestAct('dusk');            // T21: Sleep until dusk / dawn (rest + the clock forward)
+  $('#sleepDawnBtn').onclick = () => nestAct('dawn');
+  function nestAct(sleep) {
     if (!cs.inLair || state !== 'play') return;
-    const ev = ST.caveAct(cs, 'nest');
-    if (!ev.some(e => e.e === 'stage:up')) lairMsg(t('c.lair.rested'));
+    const ev = ST.caveAct(cs, 'nest', sleep);
+    if (!ev.some(e => e.e === 'stage:up')) lairMsg(t(sleep ? 'c.clock.slept.' + sleep : 'c.lair.rested'));
     onEvents(ev); renderLair();
-  };
+  }
   larderList.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !cs.inLair || state !== 'play') return;
     const it = cs.larder[+b.dataset.i];
@@ -961,7 +967,8 @@
     ['3', 'rebuild every ruin of this region now', 'Digit3', 'rebuild'],
     ['0', 'fly to the next corn field (Farmlands, low, facing it)', 'Digit0', 'to corn'],
     ['7', 'show / hide the sight of the watching posts (fans, ? and !)', 'Digit7', 'sight'],
-    ['8', 'light: day / dusk / night (sight range)', 'Digit8', 'light'],
+    ['8', 'time of day: jump to day / dusk / night / dawn (sky, light, sight range)', 'Digit8', 'time'],
+    ['/', 'fast time x40 on / off (watch a full day in 30 s)', 'Slash', 'fast time'],
     ['9', 'fly to the next watching post (80 out, low, facing it)', 'Digit9', 'to post'],
     [']', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'BracketRight', 'alert +1'],
     ['[', 'alert to 0 in this region', 'BracketLeft', 'calm alert'],
@@ -976,7 +983,7 @@
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
   let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
-  const LIGHTS = [null, 'dusk', 'night'];                        // T14: debug 8 cycles cs.light (T21's clock sets it later)
+  let fastTime = false;                                          // T21: debug / - the clock runs x40
   let dbgPen = -1, dbgLoot = -1;                                 // T19: item index of the last ',' press                                               // T18: pen index of the last '.' press
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1, dbgBal = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
@@ -1122,7 +1129,11 @@
       }
     }
     if (code === 'Digit7') { watchShow = !watchShow; flashPrompt(t(watchShow ? 'c.dbg.sightOn' : 'c.dbg.sightOff'), 1.5); }
-    if (code === 'Digit8') { cs.light = LIGHTS[(LIGHTS.indexOf(cs.light == null ? null : cs.light) + 1) % LIGHTS.length]; flashPrompt(t('c.dbg.light', { l: t('c.light.' + (cs.light || 'day')) }), 1.5); }
+    if (code === 'Digit8') {                                     // T21: the clock jumps to the middle of the next phase
+      const P = CK.PHASES, nx = P[(P.indexOf(CK.phase(cs.clock.t)) + 1) % P.length];
+      CK.setPhase(cs, nx); flashPrompt(t('c.dbg.light', { l: t('c.light.' + nx) }), 1.5);
+    }
+    if (code === 'Slash') { fastTime = !fastTime; flashPrompt(t(fastTime ? 'c.dbg.fastOn' : 'c.dbg.fastOff'), 1.5); }
     if (code === 'Digit9' && !cs.inLair) {                       // T14: in front of the next post of the region (outward side)
       const list = ((cs.watch && cs.watch.list) || []).filter(v => v.post);   // T15: posts only (not the peasants)
       if (!list.length) flashPrompt(t('c.dbg.noPost'), 1.5);
@@ -1165,6 +1176,7 @@
       PR.step(cs.field, { pos: [h.x, h.y + 400, h.z], inv: 0 }, dt, { stats, rng });
     } else {
       if (state === 'play') {
+        if (fastTime && cs.clock) cs.clock.t = (cs.clock.t + dt * 39 / D.clock.dayLength) % 1;   // T21 debug /: x40 (the step adds the 1x)
         onEvents(ST.step(cs, readInput(), dt));
         survive(dt);
       }
@@ -1274,6 +1286,7 @@
     const i = region.info, r = renderer.info.render;
     const L = [];
     L.push('BUILD   ' + BUILD + (params.get('v') ? '  (v=' + params.get('v') + ')' : ''));
+    if (cs.clock) L.push('CLOCK   ' + CK.hours(cs.clock.t) + '  t ' + cs.clock.t.toFixed(3) + '  ' + CK.phase(cs.clock.t) + '  light ' + f2(CK.light(cs.clock.t)) + '  sight x' + f2(CK.sight(cs.clock.t)) + (fastTime ? '  FAST x40' : ''));
     const mo = cs.story && cs.story.mother;
     const ml = MO.lesson(cs), mm = cs.mom;
     L.push('STORY   act ' + ((cs.story && cs.story.act) || 1) + '  mother ' + (mo ? 'lesson ' + mo.lesson + (ml ? ' ' + ml.id : '') + ' (' + mo.at + ')' + (mm ? ' ' + mm.phase + (mm.hidden ? ' hidden' : '') + ' prog ' + mm.prog.toFixed(1) : '') : '-'));
@@ -1309,7 +1322,7 @@
       { const wl = (cs.watch && cs.watch.list) || [];
         let wn = null, wd = Infinity;
         for (const v of wl) { const d = Math.hypot(v.pos[0] - pilot.pos[0], v.pos[2] - pilot.pos[2]); if (d < wd) { wd = d; wn = v; } }
-        L.push('WATCH   light ' + (cs.light || 'day') + '  posts ' + wl.length + '  alert ' + wl.filter(v => v.state === 'alert').length + '  suspicious ' + wl.filter(v => v.state === 'suspicious').length + (watchShow ? '' : '  (hidden)'));
+        L.push('WATCH   sight x' + f2(cs.light == null ? 1 : cs.light) + '  posts ' + wl.length + '  alert ' + wl.filter(v => v.state === 'alert').length + '  suspicious ' + wl.filter(v => v.state === 'suspicious').length + (watchShow ? '' : '  (hidden)'));
         { const sq = cs.squad, al = sq ? sq.list : [], ar = al.filter(v => v.kind === 'archer'), pe = al.filter(v => v.kind === 'peasant'), ba = al.filter(v => v.kind === 'ballista');
           L.push('DEFEND  archers ' + ar.filter(v => v.alive).length + '/' + ar.length + ' (aiming ' + ar.filter(v => v.target).length + ')  peasants ' + pe.length + ' hidden ' + pe.filter(v => v.hidden).length + '  arrows ' + (sq ? sq.arrows.length : 0) + '/' + D.projectiles.max + '  killed ' + (sq ? sq.kills : 0) + '  drawn ' + (defView ? defView.info.drawn : 0));
           L.push('BALLISTA crewed ' + ba.filter(v => v.alive).length + '/' + ba.length + '  aiming ' + ba.filter(v => v.aimAt).map(v => v.aim.toFixed(1) + 's').join(' ') + '  reload ' + ba.filter(v => v.alive && v.cool > 0).map(v => v.cool.toFixed(0) + 's').join(' ') + '  bolts ' + (sq && sq.bolts ? sq.bolts.length : 0)); }
@@ -1335,7 +1348,7 @@
   $('#loading').remove();
   setState('intro');
   requestAnimationFrame(frame);
-  if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
+  if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
   if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();
