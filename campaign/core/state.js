@@ -24,12 +24,14 @@
  *        down building is a ruin until fire.rebuild s of play later (settlement.rebuild, now = stats.played). Ruins are kept
  *        in cs.regionStates[region].ruins [{ id, at }] (saved, so they survive a region change and a reload);
  *        stats.civilBurned / orderBurned count burned buildings (future Renown, alert in T17).
+ * Perception (T14): cs.watch = perception.step's watchers (one per tower / platform post until the defenders of T15),
+ *        fed with this frame's noises; cs.light (null = day; T21's clock sets it) scales their sight. 'aware:state'.
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), CV = M.need('cave'), SE = M.need('settlement');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), PC = M.need('perception'), CV = M.need('cave'), SE = M.need('settlement');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -104,6 +106,7 @@
     if (!cs.dragon.pilot) return ev;
     ensureTown(cs);
     run(cs, inp, dt, ev);
+    for (const e of PC.step(cs, ev, dt, { scale: scaleOf(cs), spot: G.statsOf(cs.dragon.stage).spot })) emit(cs, ev, e);   // T14: the posts see and hear the dragon
     for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     return autosave(cs, ev, dt);

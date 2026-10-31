@@ -141,6 +141,33 @@
     nav: { markers: 7, fov: 2.4, tagTime: 3, discover: 250, discoverEvery: 0.5, losSteps: 12, losEye: 8 },
     smell: { range: 380, hungryMult: 1.4, starveMult: 1.3, sharp: 120, blur: 0.7, update: 0.5, max: 3 },
 
+    /* Perception (Phase 2 T14, core/perception.js; 002_task_kingdom.md 4.4 and 5.3).
+       defenders: the sight part of each defender type (sight range, fov = full cone angle in rad); T15 / T16 add the rest.
+       Seen value 0..1 = in the cone x in range x line of sight clear; range = sight x stage spot x light x altitude factor,
+       falling off linearly over the last `fade` of the range. light: day 1, `dusk`, `night` (T21's clock sets cs.light).
+       altitude: the dragon's height over the ground; x1 below `from`, down to `min` at `to` (high flight is hard to see).
+       Line of sight: from the viewer's eye to the dragon's centre or `losTop` x scale above it (a big dragon shows over a
+       ridge first), `losSteps` samples at least, one every `losSpacing` units, over the terrain and building roofs.
+       hearing: noise radii x dragon scale (boost in the air, breath, landing, takeoff, running on the ground).
+       Awareness rises by awareRise x seen per s, falls by awareFall per s while unseen; >= suspicious = 'suspicious',
+       >= alert = 'alert' (stays alert until it falls under suspicious); a heard noise lifts it to suspicious at once.
+       watch: until the defenders of T15 stand on them, every post (tower: archer, platform: ballista) is a watcher with
+       an eye `eye` over the roof that sweeps +-`sweep` rad at `sweepRate` around the outward direction (the place's yaw
+       for a post in the centre) and turns at `turn` rad/s toward what it saw or heard last. */
+    defenders: {
+      peasant:  { sight: 90,  fov: 2.4 },
+      archer:   { sight: 130, fov: 1.8 },
+      ballista: { sight: 170, fov: 1.2 },
+    },
+    perception: {
+      awareRise: 1.2, awareFall: 0.25, suspicious: 0.35, alert: 1.0,
+      dusk: 0.75, night: 0.45,
+      altitude: { from: 80, to: 220, min: 0.5 },
+      hearing: { boost: 60, breath: 80, land: 60, takeoff: 90, run: 30 },
+      fade: 0.3, losSteps: 8, losSpacing: 12, losTop: 1.5, searchTime: 20,
+      watch: { eye: 2, sweep: 0.7, sweepRate: 0.25, turn: 1.5 },
+    },
+
     /* Settlements and buildings (Phase 2 T12, core/settlement.js, render/settlement-view.js; 002_task_kingdom.md 4.2).
        buildings: footprint radius r and height h (a vertical cylinder solid: the roof height = ground + h), hp for the
        fire (T13), civil / order for stats (Phase 4 Renown), post = a defender post (T15 / T16), loot = items (T19),
