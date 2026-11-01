@@ -24,14 +24,15 @@ def load_crop(rid):
 
 
 def grid(cfg, H, m):
-    """Samples heights (metres) on the game grid: rows = z (south -> north), cols = x (west -> east)."""
+    """Samples heights (metres) on the game grid: rows = z (south -> north), cols = x (east -> west).
+    The game's +X is west (yaw / compass convention: facing north (+Z), +X is on the left), +Z is north."""
     from scipy.ndimage import map_coordinates
     p, g = cfg['projection'], cfg['grid']
     R, C = g['radius'], g['cell']; N = 2 * R // C + 1
     mx, my = 111320 * np.cos(np.radians(p['lat0'])), 111200
     xs = np.arange(N) * C - R
     X, Z = np.meshgrid(xs, xs)
-    lon = p['lon0'] + X * p['metresPerUnit'] / mx
+    lon = p['lon0'] - X * p['metresPerUnit'] / mx                     # +X = west
     lat = p['lat0'] + Z * p['metresPerUnit'] / my
     row = (m['lat'][1] - lat) * m['perDegree']
     col = (lon - m['lon'][0]) * m['perDegree']
