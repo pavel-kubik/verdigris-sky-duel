@@ -274,7 +274,7 @@
      mission or with mission loot), state.travel does the region change ---------- */
   const mapEl = $('#map'), travelEl = $('#mapTravel'), travelList = $('#mapTravelList');
   let travelOn = false;
-  function travelMode(on) { travelOn = on; mapEl.classList.toggle('travel', on); travelEl.hidden = !on; }
+  function travelMode(on) { travelOn = on; mapEl.classList.toggle('travel', on); travelEl.hidden = !on; mapView.setPad(on ? travelEl.offsetHeight + 12 : 0); }
   function destName(d) { return d.kind === 'lair' ? t('c.travel.lair') : t('c.travel.aerie', { region: t(TR.region(d.region).nameKey) }); }
   function renderTravel() {
     travelList.innerHTML = '';
@@ -291,13 +291,14 @@
     $('#mapTravelHead').textContent = t(list.length ? 'c.travel.head' : 'c.travel.none');
     $('#mapTravelWhy').textContent = why ? t('c.travel.why.' + why) : '';
     $('#mapTravelWhy').hidden = !why;
+    if (travelOn) mapView.setPad(travelEl.offsetHeight + 12);
   }
   function openTravel() {
     if (state !== 'play' || !MP.here(cs)) return;
     if (stationOpen) closeStation();
     openMap();
     if (!mapView.isOpen) return;
-    travelMode(true); renderTravel();
+    travelMode(true); renderTravel(); mapView.setPad(travelEl.offsetHeight + 12);
     mapView.setView('world');
     if (!isTouch) setTimeout(() => { const b = travelList.querySelector('button:not(:disabled)'); if (b) b.focus({ preventScroll: true }); }, 0);
   }
@@ -1561,5 +1562,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

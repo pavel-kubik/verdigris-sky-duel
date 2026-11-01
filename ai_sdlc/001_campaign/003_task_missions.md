@@ -306,6 +306,15 @@ Mission times are longer than in the first draft because the Bend is one region 
 - `map.model(cs)` -> `{ regions: [{ id, known, locked, alert }], places: [{ id, kind, x, z, discovered, alert, freed }], dragon, target }` for the renderer (pure, tested).
 - `map.canTravel(cs, from, to)` -> `{ ok, why }`: only from the lair map stone or an aerie, only to a discovered aerie or the lair, not with a mission active and not with mission loot in the claws.
 - `map.travel(cs, to)`: region change to the aerie or lair mouth (fade), emits `travel:done`.
+- As built (T09): `map.here(cs)` ('lair' inside the cave, '<region>.aerie' inside an aerie) and `map.destinations(cs)`
+  (the lair and every found aerie); `canTravel` reasons `station`, `unknown`, `here`, `mission` (`cs.mission.state` is
+  accepted, running or done - T10 fills `cs.mission`), `missionLoot` (a relic or loot with a `mission` tag in the claws).
+  `state.travel(cs, to)` wraps `map.travel` (town of the new region, autosave). The dragon comes out as if it had left
+  that station: in front of the aerie's cleft facing out (like Leave), or at the lair spawn in front of the cave (like
+  leaving the lair), so it flies on at once; a carried prey travels along. The map stone stands at [-22, 32] (off the
+  tunnel entry line, so arriving in the cave is not already at it). The map stone's Action slot and the aerie panel's
+  Fast travel button open the map on the world view with a "Fly there" strip (one button per destination, disabled with
+  the reason while blocked); the icons on the map are not tappable for travel.
 
 ### 5.4 `aerie`
 

@@ -194,13 +194,13 @@
     const MS = K.stations.mapStone;
     if (MS) {
       const stone = new THREE.Group(), face = Math.atan2(-MS[0], -MS[1]);
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(MS[2] * 1.5, MS[2] * 1.9, MS[2] * 0.45), new THREE.MeshStandardMaterial({ color: 0x4a4038, flatShading: true, roughness: 1 }));
-      slab.position.y = MS[2] * 0.95; stone.add(slab);
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(MS[2] * 2, MS[2] * 2.6, MS[2] * 0.45), new THREE.MeshStandardMaterial({ color: 0x4a4038, flatShading: true, roughness: 1 }));
+      slab.position.y = MS[2] * 1.3; stone.add(slab);
       const lineMat = new THREE.MeshBasicMaterial({ color: 0xffb066, fog: false });
       const lines = [[0, 0.55, 0.9, 0.05], [0, 0.2, 0.06, 0.6], [-0.3, 0.05, 0.5, 0.05], [0.28, -0.25, 0.05, 0.5], [-0.2, -0.5, 0.6, 0.05]];   // regions and their links, in slab units
       for (const [lx, ly, w, h] of lines) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(MS[2] * w, MS[2] * h, 0.06), lineMat);
-        m.position.set(MS[2] * lx, MS[2] * (0.95 + ly), MS[2] * 0.23); stone.add(m);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(MS[2] * w * 1.3, MS[2] * h * 1.3, 0.06), lineMat);
+        m.position.set(MS[2] * lx * 1.3, MS[2] * (1.3 + ly * 1.3), MS[2] * 0.24); stone.add(m);
       }
       stone.position.set(MS[0], K.floor, MS[1]); stone.rotation.y = face; stone.rotation.x = -0.12;
       group.add(stone);
