@@ -13,8 +13,8 @@
   const wrap = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
 
   const COL = { bg: 'rgba(12,19,16,.62)', line: 'rgba(233,225,204,.22)', tick: 'rgba(233,225,204,.55)', text: '#ebe3cd', mute: '#a9ae9b',
-                lair: '#ff9447', exit: '#62c48a', dim: '#7d8278', scent: '#e0a040', livestock: '#e6d6a8', settlement: '#c9d4e8', north: '#ff9447' };
-  const ORDER = { scent: 0, scentLivestock: 0, exit: 1, settlement: 2, lair: 3 };
+                lair: '#ff9447', exit: '#62c48a', dim: '#7d8278', scent: '#e0a040', livestock: '#e6d6a8', settlement: '#c9d4e8', castle: '#e8c46a', north: '#ff9447' };
+  const ORDER = { scent: 0, scentLivestock: 0, exit: 1, settlement: 2, castle: 2.5, lair: 3 };
 
   function icon(g, kind, x, y, s, col, alpha) {
     g.save(); g.translate(x, y); g.globalAlpha = alpha; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.8; g.lineCap = 'round'; g.lineJoin = 'round';
@@ -29,6 +29,11 @@
       g.beginPath(); g.moveTo(-s, -s * 0.05); g.lineTo(0, -s * 0.95); g.lineTo(s, -s * 0.05); g.closePath(); g.fill();
       g.fillRect(-s * 0.7, -s * 0.05, s * 1.4, s * 0.9);
       g.fillStyle = '#1a1410'; g.fillRect(-s * 0.18, s * 0.3, s * 0.36, s * 0.55);
+    } else if (kind === 'castle') {                           // T04: a castle tower with three merlons and a gate
+      g.beginPath(); g.moveTo(-s, s * 0.9); g.lineTo(-s, -s * 0.55); g.lineTo(-s * 0.6, -s * 0.55); g.lineTo(-s * 0.6, -s * 0.95);
+      g.lineTo(-s * 0.2, -s * 0.95); g.lineTo(-s * 0.2, -s * 0.55); g.lineTo(s * 0.2, -s * 0.55); g.lineTo(s * 0.2, -s * 0.95);
+      g.lineTo(s * 0.6, -s * 0.95); g.lineTo(s * 0.6, -s * 0.55); g.lineTo(s, -s * 0.55); g.lineTo(s, s * 0.9); g.closePath(); g.fill();
+      g.fillStyle = '#1a1410'; g.beginPath(); g.moveTo(-s * 0.3, s * 0.9); g.lineTo(-s * 0.3, s * 0.3); g.quadraticCurveTo(0, -s * 0.05, s * 0.3, s * 0.3); g.lineTo(s * 0.3, s * 0.9); g.closePath(); g.fill();
     } else if (kind === 'scentLivestock') {                   // scent over a fence rail
       g.beginPath(); g.arc(-s * 0.35, -s * 0.15, s * 0.42, 0, TAU); g.arc(s * 0.35, -s * 0.3, s * 0.38, 0, TAU); g.fill();
       g.beginPath(); g.moveTo(-s, s * 0.75); g.lineTo(s, s * 0.75); g.moveTo(-s * 0.6, s * 0.35); g.lineTo(-s * 0.6, s * 0.95); g.moveTo(s * 0.6, s * 0.35); g.lineTo(s * 0.6, s * 0.95); g.stroke();
@@ -94,7 +99,7 @@
         const edge = Math.abs(rel) > fov / 2, x = edge ? (rel > 0 ? W - 14 : 14) : xOf(rel), y = H / 2 - 3;
         const col = m.dim ? COL.dim : COL[m.kind === 'scentLivestock' ? 'livestock' : m.kind] || COL.text;
         const alpha = m.kind.indexOf('scent') === 0 ? 0.55 + 0.45 * Math.min(1, (m.strength || 1) / 3) : 1;
-        const s = m.kind === 'lair' ? 7 : 6;
+        const s = m.kind === 'lair' || m.kind === 'castle' ? 7 : 6;
         if (edge) {                                           // behind: an arrow at the edge pointing the way to turn
           g.save(); g.fillStyle = col; g.globalAlpha = alpha; g.beginPath();
           const d = rel > 0 ? 1 : -1;

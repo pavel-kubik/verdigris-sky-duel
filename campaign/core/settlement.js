@@ -58,6 +58,7 @@
       const id = ids[si], rng = mulberry((R.seed || 1) * 7919 + si * 104729 + 17);
       const y = T.surfaceAt(regionId, site.x, site.z);
       const place = { id, type: site.type, x: site.x, z: site.z, yaw: site.yaw || 0, y, r: 0 };
+      if (site.name) place.name = site.name;                        // T04: named places (the Bend) for the compass and toasts
       const count = {};
       const add = (type, lx, lz, extra) => {
         count[type] = (count[type] || 0) + 1;

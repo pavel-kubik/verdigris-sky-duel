@@ -6,7 +6,7 @@
  *                                           discovery (T12) every data.nav.discoverEvery s: 'place:discovered' { id, type, region }
  *   seesPlace(regionId, pos, place) -> bool within nav.discover and in line of sight over the terrain
  *   markers(cs) -> [{ kind, key, bearing, dist, label, via?, dim? }]
- *       kind: lair | exit | settlement (discovered ones, T12) | scent | scentLivestock
+ *       kind: lair | exit | settlement (discovered ones, T12) | castle (T04) | scent | scentLivestock
  *       bearing: world bearing from the dragon (0 = +Z, the yaw convention); the strip subtracts the heading
  *       label: i18n key (+ params) for the tap-to-name tag; via: region id when the lair is reached through an exit
  * Scents: strength = herd size x (1 - distance / range); the strongest data.smell.max herds get a marker.
@@ -66,6 +66,9 @@
     nav.range = range;
   }
 
+  /** i18n key of a place's name: its own name when it has one (T04, 'c.placeName.<name>'), else its type. */
+  const placeKey = pl => pl.name ? 'c.placeName.' + pl.name : 'c.place.' + pl.type;
+
   /** A settlement is discovered when the dragon is within nav.discover of it and sees its centre over the terrain. */
   function seesPlace(regionId, pos, pl) {
     const N = D.nav, dx = pl.x - pos[0], dz = pl.z - pos[2];
@@ -85,7 +88,7 @@
     for (const pl of town.places) {
       if (cs.discovered[pl.id] || !seesPlace(cs.region, p.pos, pl)) continue;
       cs.discovered[pl.id] = true;
-      ev.push({ e: 'place:discovered', id: pl.id, type: pl.type, region: cs.region });
+      ev.push({ e: 'place:discovered', id: pl.id, type: pl.type, name: pl.name, key: placeKey(pl), castle: !!pl.castle, region: cs.region });
     }
     return ev;
   }
@@ -150,7 +153,7 @@
     }
     // discovered settlements of this region (T12)
     if (cs.town && cs.town.region === cs.region && cs.discovered) {
-      for (const pl of cs.town.places) if (cs.discovered[pl.id]) add('settlement', 'place:' + pl.id, pl.x, pl.z, { key: 'c.place.' + pl.type }, { type: pl.type });
+      for (const pl of cs.town.places) if (cs.discovered[pl.id]) add(pl.castle ? 'castle' : 'settlement', 'place:' + pl.id, pl.x, pl.z, { key: placeKey(pl) }, { type: pl.type });
     }
     // scents: toward the herd, blurred far out (a stored offset, so the marker drifts between updates, never jitters);
     // with prey sense (T20 smellType) the label names the prey ('Scent: Goat', type on the marker)
@@ -168,5 +171,5 @@
   /** Heading-relative angle of a marker (-PI..PI, positive = to the right of the heading). */
   function relative(bearing, yaw) { return wrap(yaw - bearing); }   // yaw grows to the left (flight: stick right lowers yaw)
 
-  M.define('nav', { smellRange, step, markers, seesPlace, discover, sources, routeExit, relative, drift });
+  M.define('nav', { placeKey, smellRange, step, markers, seesPlace, discover, sources, routeExit, relative, drift });
 })(typeof self !== 'undefined' ? self : this);
