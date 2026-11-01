@@ -405,6 +405,13 @@
       full.visible = lod === 'full'; sil.visible = lod === 'sil';
       return lod;
     }
+    /* T05: portcullis 0 = up (squeezed under the lintel) .. 1 = down (full grate in the gap) */
+    const gateMesh = geos.gate && geos.gate.grateMesh, gateTop = D.buildings.wall.walkTop - 3.2;
+    function setGate(k) {
+      if (!gateMesh) return;
+      const sy = 0.08 + 0.92 * Math.max(0, Math.min(1, k));
+      gateMesh.scale.y = sy; gateMesh.position.y = gateTop * (1 - sy);
+    }
     function update(dt, t) {
       time.value = t;
       if (torches.visible) tMat.size = 5 * (0.85 + 0.15 * Math.sin(t * 13) * Math.sin(t * 7.3));
@@ -422,8 +429,8 @@
       return { lod, calls, tris: Math.round(tris) };
     }
     function dispose() { group.parent && group.parent.remove(group); for (const d of disposables) d.dispose(); }
-    setNight(0); setLod('full');
-    return { group, full, sil, meshes, setLod, setNight, update, info, dispose, geos, flags: flags.length, torches: nT, smoke: geos.hall && geos.hall.smoke };
+    setNight(0); setLod('full'); setGate(opts.gate || 0);
+    return { group, full, sil, meshes, setLod, setNight, setGate, update, info, dispose, geos, flags: flags.length, torches: nT, smoke: geos.hall && geos.hall.smoke };
   }
 
   VR.castleKit = { build, models, silhouette, COL };

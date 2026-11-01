@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't204.1 2026-11-01 castle-view: LOD, night, smoke; named places, castle icon';
+  const BUILD = 't205.1 2026-11-01 castle defenders: wall walk archers, bastion ballistae, gate, horn';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -329,7 +329,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^Digit[456]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
+    if (debug) debugKey(e.shiftKey && /^Digit[45678]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -706,6 +706,9 @@
       else if (e.e === 'livestock:inside' && !insideToast) { insideToast = true; toast(t('c.toast.inside'), t('c.toast.insideSub'), 3); }
       else if (e.e === 'livestock:out') insideToast = false;
       else if (e.e === 'livestock:released') toast(t('c.toast.released'), t('c.toast.releasedSub'), 2.6);
+      else if (e.e === 'horn:blow') { toast(t('c.toast.horn'), t('c.toast.hornSub', { region: t(TR.region(cs.region).nameKey) }), 3.2); alertPulse = 2; }   // T05
+      else if (e.e === 'gate:closed') flashPrompt(t('c.prompt.gateShut'), 2.2);
+      else if (e.e === 'gate:open') flashPrompt(t('c.prompt.gateOpen'), 1.8);
       else if (e.e === 'bell:ring') toast(t('c.toast.bell', { place: t('c.place.' + (cs.town.places.find(p => p.id === e.place) || {}).type) }), t('c.toast.bellSub'), 2.8);
       else if (e.e === 'defender:killed' && e.kind === 'archer') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.archerFell' : 'c.prompt.archerBurned'), 1.8);
       else if (e.e === 'defender:killed' && e.kind === 'ballista') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.ballistaFell' : 'c.prompt.crewBurned'), 2.2);
@@ -1000,6 +1003,8 @@
     ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
     ['Shift+5', 'castle gate: close / open (portcullis solid while closed, T03)', 'ShiftDigit5', 'gate'],
     ['Shift+6', 'fly low over the castle wall walk, slow, along the wall (land test, T03)', 'ShiftDigit6', 'to wall'],
+    ['Shift+7', 'castle alarm: the keep horn sounds now (the whole region on alert, the gate drops), T05', 'ShiftDigit7', 'horn'],
+    ['Shift+8', 'fly a low pass along the outside of a castle wall (60 out, wall walk height + 15): archers volley, a bastion aims, T05', 'ShiftDigit8', 'wall pass'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1167,6 +1172,17 @@
         snapCam(); flashPrompt(t('c.dbg.post', { kind: t('c.post.' + v.kind) }), 1.5);
       }
     }
+    if (code === 'ShiftDigit7' || code === 'ShiftDigit8') {      // T05: castle horn / a low pass along a wall
+      const CA = VCamp.need('castle'), pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair || !cs.squad) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else if (code === 'ShiftDigit7') onEvents(CA.blowHorn(cs.squad, { pos: pilot.pos, pad: D.settlement.pad * ST.scaleOf(cs) }));
+      else {
+        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall').sort((a, b) => b.len - a.len)[0];
+        const [nx, nz] = CA.outward(w, pl), x = (w.seg[0] + w.seg[2]) / 2 + nx * 60, z = (w.seg[1] + w.seg[3]) / 2 + nz * 60;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, w.pos[1] + D.buildings.wall.walkTop + 15, z], yaw: w.yaw, pitch: 0, speed: 18 });
+        snapCam(); flashPrompt(t('c.dbg.wallPass'), 2);
+      }
+    }
     if (code === 'ShiftDigit5' || code === 'ShiftDigit6') {      // T03: castle gate toggle / over the wall walk
       const CA = VCamp.need('castle'), pl = cs.town && cs.town.places.find(p => p.castle);
       if (!pl || cs.inLair) flashPrompt(t('c.dbg.noCastle'), 1.5);
@@ -1248,7 +1264,7 @@
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
     }
-    if (castleView) castleView.update(dt, { cam: camera.position, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
+    if (castleView) castleView.update(dt, { town: cs.town, cam: camera.position, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
       if (cornView) { scene.remove(cornView.group); cornView.dispose(); }

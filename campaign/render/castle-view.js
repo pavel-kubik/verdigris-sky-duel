@@ -6,6 +6,8 @@
  *     (fog). A hysteresis band (lod.band) keeps the swap from flickering when the camera sits on the line.
  *   - night (0..1, from the sky): torches on the walls, lit windows, the silhouette's lights far away.
  *   - banners wave (kit shader), chimney smoke from the great hall (one small Points pool per castle, normal blend).
+ *   - T05: the portcullis follows town.gateK (kit.setGate), a red signal fire on the keep top while town.signal
+ *     (update's o.town, else the town it was built from).
  * The LOD rule is core/castle.js lodFor (tested in Node).
  */
 (function (root) {
@@ -59,6 +61,35 @@
     return { pts, update, dispose() { geo.dispose(); mat.dispose(); } };
   }
 
+  /** T05: the red signal fire on the keep top while the castle is alarmed (one additive Points, visible far out). */
+  function signalFire(at) {
+    const tex = (() => {
+      if (typeof document === 'undefined') return null;
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gr.addColorStop(0, 'rgba(255,230,170,1)'); gr.addColorStop(0.3, 'rgba(255,80,30,0.85)'); gr.addColorStop(1, 'rgba(200,20,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+      return new THREE.CanvasTexture(c);
+    })();
+    const n = 5, pos = new Float32Array(n * 3);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({ map: tex, size: 9, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xff5a2a });
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.visible = false;
+    let k = 0;
+    function update(dt, t, on) {
+      k = Math.max(0, Math.min(1, k + (on ? dt : -dt) * 0.8));
+      pts.visible = k > 0.01;
+      if (!pts.visible) return;
+      for (let i = 0; i < n; i++) {
+        const a = (t * 1.7 + i / n) % 1;
+        pos[i * 3] = at[0] + Math.sin(i * 2.4 + t * 3) * 0.7; pos[i * 3 + 1] = at[1] + a * 5; pos[i * 3 + 2] = at[2] + Math.cos(i * 1.7 + t * 2.3) * 0.7;
+      }
+      geo.attributes.position.needsUpdate = true;
+      mat.size = 9 * k * (0.85 + 0.15 * Math.sin(t * 11)); mat.opacity = k;
+    }
+    return { pts, update, dispose() { geo.dispose(); mat.dispose(); if (tex) tex.dispose(); } };
+  }
+
   /** The hall's chimney top (kit model frame) in the castle's local frame. */
   function chimney(hall, at) {
     const c = Math.cos(hall.yaw || 0), s = Math.sin(hall.yaw || 0);
@@ -78,7 +109,10 @@
       const hall = L.buildings.find(b => b.type === 'hall');
       const smoke = kit.smoke && hall ? smokePool(chimney(hall, kit.smoke), D.castle.smoke.puffs) : null;
       if (smoke) kit.full.add(smoke.pts);
-      list.push({ place: pl, kit, smoke, lod: 'full' });
+      const keep = L.buildings.find(b => b.type === 'keep');
+      const signal = keep ? signalFire([keep.x, keep.h + 12, keep.z]) : null;   // over the keep's lead roof (apex h + 11)
+      if (signal) kit.group.add(signal.pts);                                 // both LODs: the alarm shows far out
+      list.push({ place: pl, kit, smoke, signal, lod: 'full', gate: 0 });
     }
     let night = -1;
     function update(dt, o) {
@@ -93,16 +127,20 @@
         }
         if (Math.abs(nt - night) > 0.01) c.kit.setNight(nt);
         if (c.lod === 'full') { c.kit.update(dt, o.time || 0); if (c.smoke) c.smoke.update(dt, nt); }
+        const tw = o.town || town;                                           // T05: gate and signal fire follow the town
+        const gk = tw && tw.gateK || 0;
+        if (Math.abs(gk - c.gate) > 1e-3) { c.gate = gk; c.kit.setGate(gk); }
+        if (c.signal) c.signal.update(dt, o.time || 0, !!(tw && tw.signal) && c.lod !== 'off');
       }
       if (Math.abs(nt - night) > 0.01) night = nt;
     }
     function info() {
       let calls = 0, tris = 0;
-      for (const c of list) if (c.kit.group.visible) { const i = c.kit.info(); calls += i.calls + (c.lod === 'full' && c.smoke ? 1 : 0); tris += i.tris; }
+      for (const c of list) if (c.kit.group.visible) { const i = c.kit.info(); calls += i.calls + (c.lod === 'full' && c.smoke ? 1 : 0) + (c.signal && c.signal.pts.visible ? 1 : 0); tris += i.tris; }
       return { castles: list.length, calls, tris, lod: list.map(c => c.lod).join(',') };
     }
     function dispose() {
-      for (const c of list) { if (c.smoke) c.smoke.dispose(); c.kit.dispose(); }
+      for (const c of list) { if (c.smoke) c.smoke.dispose(); if (c.signal) c.signal.dispose(); c.kit.dispose(); }
       list.length = 0;
       group.parent && group.parent.remove(group);
     }
