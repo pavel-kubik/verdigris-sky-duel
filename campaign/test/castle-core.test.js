@@ -128,5 +128,6 @@ ok(typeof ST.solids === 'function', 'state.solids exists');
 /* the solids match the kit: inner buildings at their layout spots (no jitter) */
 for (const lb of L.buildings) {
   const b = cb.find(o => o.type === lb.type);
-  near(b.pos[0], site.x + lb.x, 1e-6, lb.type + ' x at its layout spot'); near(b.pos[2], site.z + lb.z, 1e-6, lb.type + ' z at its layout spot');
+  const c = Math.cos(site.yaw || 0), s = Math.sin(site.yaw || 0);           // the site's yaw turns the local frame (settlement.rot)
+  near(b.pos[0], site.x + lb.x * c + lb.z * s, 1e-6, lb.type + ' x at its layout spot'); near(b.pos[2], site.z - lb.x * s + lb.z * c, 1e-6, lb.type + ' z at its layout spot');
 }

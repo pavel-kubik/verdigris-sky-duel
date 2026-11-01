@@ -8,20 +8,20 @@
   "projection": { "lon0": 14.4325, "lat0": 50.0905, "metresPerUnit": 3.6 },
   "grid": { "radius": 1200, "cell": 10, "base": 170 },
   "river": {
-    "start": { "zBelow": -1150, "xNear": -375, "xWithin": 200 },
-    "goal": { "zAbove": 950, "xBelow": -450, "minRadius": 1050 },
+    "start": { "zBelow": -1150, "xNear": 375, "xWithin": 200 },
+    "goal": { "zAbove": 950, "xAbove": 450, "minRadius": 1050 },
     "costScale": 6.0, "maxDist": 170, "aboveLevel": 1.2, "smooth": 4, "simplify": 12
   },
   "preview": {
     "exag": 1.6,
     "out": "ai_sdlc/001_campaign/img/bend-terrain.png",
-    "label": { "text": "Veltava", "at": [-300, -650], "rotate": 82 },
-    "entry": { "text": "from the Farmlands", "at": [-310, -1135] },
+    "label": { "text": "Veltava", "at": [300, -650], "rotate": 82 },
+    "entry": { "text": "from the Farmlands", "at": [310, -1135] },
     "places": [
-      ["Vyshgard Castle", -220, -815, "order"], ["Lethna outpost", -190, 250, "order"], ["Holeshwick", 250, 450],
-      ["Troyvale", -230, 930], ["Petrovel tower", -745, -230, "order"], ["Staromark (burned city)", -230, -200],
-      ["Karlsbridge", -410, -125], ["Hradchan ruins", -645, 0], ["Vitkar Ridge", 345, -45], ["Troyvale aerie", -120, 1010],
-      ["Archer's Isle", -430, -300]
+      ["Vyshgard Castle", 220, -815, "order"], ["Lethna outpost", 190, 250, "order"], ["Holeshwick", -250, 450],
+      ["Troyvale", 230, 930], ["Petrovel tower", 745, -230, "order"], ["Staromark (burned city)", 230, -200],
+      ["Karlsbridge", 410, -125], ["Hradchan ruins", 645, 0], ["Vitkar Ridge", -345, -45], ["Troyvale aerie", 120, 1010],
+      ["Archer's Isle", 430, -300]
     ]
   },
   "names": [

@@ -45,7 +45,8 @@ node campaign/test/run.js                   # dem.test.js checks the module agai
 
 ## Veltava Bend (`regions/bend.json`)
 
-- Crop 14.33-14.53 E, 50.02-50.15 N; projection around 14.4325 E, 50.0905 N at 3.6 m per unit (+X east, +Z north);
+- Crop 14.33-14.53 E, 50.02-50.15 N; projection around 14.4325 E, 50.0905 N at 3.6 m per unit (+X west, +Z north: the game's axes,
+  facing north +X is on the left);
   grid 241 x 241 every 10 units, radius 1200 (8.6 km across).
 - River traced from the south edge (Podolí) to the north-west edge (Troja / Podbaba), water within 170 units of the
   path and at most 1.2 m above the smoothed river level; result: the real Vltava with its loop and islands.
