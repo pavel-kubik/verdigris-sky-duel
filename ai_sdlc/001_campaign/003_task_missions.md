@@ -312,6 +312,12 @@ Mission times are longer than in the first draft because the Bend is one region 
 - `aerie.discover(cs)`: within `discover` and in line of sight (same check as settlements) -> `aerie:found`.
 - Flying into an aerie mouth: banks carried loot (as the lair does), completes a mission whose objective is done, offers Rest (save, heal, no stage-up; stage-up stays at the nest), Fast travel to the lair, Leave. The aerie interior is a small cave scene reusing `cave.js` with its own room data.
 
+- As built (T08): the aerie interior is a panel over the ledge view (Rest, Leave), not a separate cave scene: the dragon
+  stands on the ledge in front of the cleft, the camera looks back at it and the world outside waits (hunger, prey,
+  defenders paused; the clock and play time run). Found aeries are saved in `cs.discovered['<region>.aerie']` with the
+  settlements (save v2 already keeps them; v3 in T18 can move them to `aerieFound`). The crag (`render/aerie-view.js`,
+  one merged mesh) is scenery without solids. Fast travel from an aerie comes with T09.
+
 ### 5.5 `missions` and `relics`
 
 - States: `offered` -> `accepted` (at the board) -> `running` (timer starts when the dragon leaves the lair region or an aerie with the mission accepted) -> `done` (objective met) -> `success` (delivered to the lair or an aerie before 0) or `failed` (timeout, death).
