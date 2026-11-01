@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't206.1 2026-11-01 castle fire and char: roofs burn, stone stays charred, Shift+9 castle fire';
+  const BUILD = 't207.1 2026-11-01 map screen: region + world view, fog, pan / zoom';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
