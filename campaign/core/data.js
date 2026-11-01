@@ -325,7 +325,8 @@
       gate: { w: 10, close: 2.5 },
       horn: { range: 'region', cool: 60 },
       char: { tint: 0.35 },
-      lod: { near: 280, far: 1000 },
+      lod: { near: 280, far: 1000, band: 20 },          // T04: full kit inside near, silhouette to far, +-band hysteresis
+      smoke: { puffs: 14, life: 7, rise: 26, drift: 9, size: 6, alpha: 0.5 },   // T04: chimney smoke from the great hall
       lights: { torches: 16, windows: true },
     },
     palisade: { piece: 6, radius: 1, gate: 12 },

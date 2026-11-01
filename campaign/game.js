@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't203.3 2026-11-01 castle solids, wall walks, gate; DBG gate / to wall';
+  const BUILD = 't204.1 2026-11-01 castle-view: LOD, night, smoke; named places, castle icon';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -62,22 +62,11 @@
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
   const dragon = cs.dragon;
   let castleView = null;
-  /** T03: Vyshgard Castle from the castle kit, placed at the region's castle site (LOD and night from the kit). */
-  function castleFor(town) {
-    const pl = town && town.places.find(p => p.castle);
-    if (!pl || !VRender.castleKit) return null;
-    const kit = VRender.castleKit.build(VCamp.need('castle').layout(D.settlements[pl.type]), { tier: qTier });
-    kit.group.position.set(pl.x, pl.y, pl.z);
-    kit.group.rotation.y = pl.yaw || 0;
-    scene.add(kit.group);
-    kit.at = pl;
-    return kit;
-  }
   function loadRegion(id) {
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     if (townView) townView.dispose();
-    if (castleView) { scene.remove(castleView.group); castleView.dispose(); castleView = null; }
+    if (castleView) { castleView.dispose(); castleView = null; }
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
     scene.add(region.group);
@@ -87,7 +76,8 @@
     townView = VRender.settlements.build(ST.ensureTown(cs));         // T12: buildings and pens of the region
     townView.town = cs.town;
     scene.add(townView.group);
-    castleView = castleFor(cs.town);                                   // T03: the castle kit at the castle site (castle-view: T04)
+    castleView = VRender.castleView ? VRender.castleView.build(cs.town, { tier: qTier }) : null;   // T04: castles of the region (LOD, night, smoke)
+    if (castleView) scene.add(castleView.group);
     scene.fog.color.set(region.fog); caveOn = null;
     skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
@@ -747,7 +737,7 @@
       else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
       else if (e.e === 'corn:burning' && !cornToast) { cornToast = true; toast(t('c.toast.corn'), t('c.toast.cornSub'), 2.2); }
       else if (e.e === 'building:ruined' && e.type !== 'palisade') toast(t('c.toast.burned', { b: t('c.building.' + e.type) }), t('c.toast.burnedSub'), 2.2);
-      else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t('c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
+      else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t(e.key || 'c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
       else if (e.e === 'tip') showTip(D.tips.show, 'c.tip.' + e.id);   // T23: one-time tips
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
@@ -1087,7 +1077,7 @@
       const pl = cs.town.places[dbgTown], a = Math.atan2(pilot.pos[0] - pl.x, pilot.pos[2] - pl.z) || 0;
       const x = pl.x + Math.sin(a) * 150, z = pl.z + Math.cos(a) * 150;
       Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: a + Math.PI, pitch: 0, speed: stats.cruise });
-      snapCam(); flashPrompt(t('c.dbg.town', { place: t('c.place.' + pl.type) }), 1.5);
+      snapCam(); flashPrompt(t('c.dbg.town', { place: t(NV.placeKey(pl)) }), 1.5);
     }
     if (code === 'Comma' && !cs.inLair && cs.town) {              // T19: landed in front of the next tithe chest / strongbox
       const list = (cs.town.items || []).filter(it => !it.taken);
@@ -1258,11 +1248,7 @@
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
     }
-    if (castleView) {
-      castleView.setLod('auto', Math.hypot(camera.position.x - castleView.at.x, camera.position.z - castleView.at.z));
-      castleView.setNight(1 - (skyView.state ? skyView.state.light : 1));
-      castleView.update(dt, time);
-    }
+    if (castleView) castleView.update(dt, { cam: camera.position, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
       if (cornView) { scene.remove(cornView.group); cornView.dispose(); }
@@ -1344,6 +1330,7 @@
     L.push('STORY   act ' + ((cs.story && cs.story.act) || 1) + '  mother ' + (mo ? 'lesson ' + mo.lesson + (ml ? ' ' + ml.id : '') + ' (' + mo.at + ')' + (mm ? ' ' + mm.phase + (mm.hidden ? ' hidden' : '') + ' prog ' + mm.prog.toFixed(1) : '') : '-'));
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
+    if (castleView && castleView.list.length) { const ci = castleView.info(); L.push('CASTLE  lod ' + ci.lod + '  draw ' + ci.calls + '  tris ' + Math.round(ci.tris / 1000) + 'k'); }
     L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');
     L.push('QUALITY ' + qTier + ' (' + qSource + (qAutoFps != null ? ' ' + Math.round(qAutoFps) + ' fps' : '') + (qSampler && !qSampler.done ? ', measuring ' + Math.round(qSampler.time) + '/' + D.quality.auto.sample + ' s' : '') + ')' +
       '  px ' + f2(renderer.getPixelRatio()) + '  flora x' + f2(qSet.flora) + '  fog ' + Math.round(qSet.fogFar));
@@ -1402,5 +1389,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

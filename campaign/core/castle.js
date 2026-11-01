@@ -91,5 +91,16 @@
     return inn;
   }
 
-  M.define('castle', { layout, inside, pieces, closeGate, openGate, gateOpen });
+  /** T04: castle LOD for a camera distance: 'full' (the kit) | 'sil' (merged silhouette) | 'off' (beyond the fog),
+   *  with a +-lod.band hysteresis around the current level so the swap does not flicker on the line. */
+  function lodFor(dist, cur) {
+    const L = D.castle.lod, band = L.band || 0;
+    const nearIn = cur === 'full' ? L.near + band : L.near - band;
+    const farIn = cur === 'off' ? L.far - band : L.far + band;
+    if (dist < nearIn) return 'full';
+    if (dist < farIn) return 'sil';
+    return 'off';
+  }
+
+  M.define('castle', { lodFor, layout, inside, pieces, closeGate, openGate, gateOpen });
 })(typeof window !== 'undefined' ? window : globalThis);
