@@ -129,7 +129,7 @@
     const was = new Map(((old && old.region === cs.region && old.buildings) || []).map(b => [b.id, b]));
     for (const b of town.buildings) {
       const o = was.get(b.id);
-      if (o) Object.assign(b, { hp: o.hp, heat: o.heat, fire: o.fire, ruin: o.ruin, ruinAt: o.ruinAt });
+      if (o) Object.assign(b, { hp: o.hp, heat: o.heat, fire: o.fire, ruin: o.ruin, ruinAt: o.ruinAt, char: o.char, charAt: o.charAt });
     }
     town.items = old && old.region === cs.region && old.items ? old.items : LT.place(town, cs.regionStates[cs.region], cs.stats.played);   // T19: same items
     cs.town = town;
@@ -377,7 +377,7 @@
     for (const e of ev) {
       if (e.e === 'aware:state' && e.state === 'alert' && sq && !sq.alarmed[e.place || '']) { sq.alarmed[e.place || ''] = true; inc('sighted'); }
       else if (e.e === 'bell:ring' || e.e === 'horn:blow') inc('bell');   // T05: the castle horn counts as a bell
-      else if (e.e === 'building:ruined' && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
+      else if ((e.e === 'building:ruined' || e.e === 'building:charred') && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
       else if (e.e === 'defender:killed') inc('defenderKilled');
       else if (e.e === 'loot:taken') inc('loot');                // T19: a tithe chest or strongbox taken
       else if ((e.e === 'prey:grabbed' || e.e === 'prey:roasted') && D.prey[e.type] && D.prey[e.type].livestock) {
@@ -416,10 +416,11 @@
     const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {};
     for (const e of SE.burn(town, cs.breath, dt, { rng: cs.rng, now, mult: burnRate || 1 })) {
       emit(cs, ev, e);
-      if (e.e !== 'building:ruined') continue;
+      if (e.e !== 'building:ruined' && e.e !== 'building:charred') continue;
       if (e.civil) cs.stats.civilBurned = (cs.stats.civilBurned || 0) + 1;
       if (e.order) cs.stats.orderBurned = (cs.stats.orderBurned || 0) + 1;
-      rs.ruins = (rs.ruins || []).filter(r => r.id !== e.id).concat([{ id: e.id, at: e.at }]);
+      const r = e.e === 'building:charred' ? { id: e.id, at: e.at, char: true } : { id: e.id, at: e.at };   // T06: charred stone
+      rs.ruins = (rs.ruins || []).filter(q => q.id !== e.id).concat([r]);
     }
     ensureCrops(cs);                                            // corn fields: burn and pop
     for (const e of CR.step(cs.crops, cs.breath, dt, now)) {

@@ -304,15 +304,16 @@
       palisade: { r: 0, h: 6,  hp: 40,  order: true, wall: true },
       platform: { r: 4, h: 4,  hp: 80,  order: true, post: 'ballista' },
       // castle pieces (Phase 3, 003 spec 4.1): stone = fire burns only the wooden parts (roof, hoardings), the shell
-      // stays a solid; walkTop = landable top band height; posts = several archers along a wall / gatehouse
+      // stays a solid; woodHp (T06) = hp of the wooden parts: a stone piece with it burns, at 0 it turns charred and
+      // roofless (b.char) but stays a solid, its archers fall; without woodHp (walls, bastions) stone does not burn; walkTop = landable top band height; posts = several archers along a wall / gatehouse
       wall:      { r: 0,  h: 11, hp: 400, order: true, wall: true, stone: true, walkTop: 9.5, posts: 'archer' },
       bastion:   { r: 8,  h: 12, hp: 360, order: true, stone: true, walkTop: 11, post: 'ballista' },
-      ctower:    { r: 6,  h: 20, hp: 300, order: true, stone: true, post: 'archer', calmsAlert: true },
-      gatehouse: { r: 8,  h: 16, hp: 360, order: true, stone: true, gate: true, posts: 'archer' },
+      ctower:    { r: 6,  h: 20, hp: 300, order: true, stone: true, woodHp: 110, post: 'archer', calmsAlert: true },
+      gatehouse: { r: 8,  h: 16, hp: 360, order: true, stone: true, woodHp: 130, gate: true, posts: 'archer' },
       portcullis: { r: 0, h: 11, hp: 0, order: true, stone: true, gate: true },         // T03: the gate gap, a solid only while closed
-      keep:      { r: 11, h: 30, hp: 500, order: true, stone: true, garrison: 4, horn: true },
-      chapel:    { r: 8,  h: 14, hp: 160, order: true, stone: true, spires: 2, spireH: 38, loot: ['relic'] },
-      rotunda:   { r: 4,  h: 9,  hp: 120, civil: true, stone: true },
+      keep:      { r: 11, h: 30, hp: 500, order: true, stone: true, woodHp: 180, garrison: 4, horn: true },
+      chapel:    { r: 8,  h: 14, hp: 160, order: true, stone: true, woodHp: 100, spires: 2, spireH: 38, loot: ['relic'] },
+      rotunda:   { r: 4,  h: 9,  hp: 120, civil: true, stone: true, woodHp: 60 },
       hall:      { r: 9,  h: 11, hp: 200, order: true, loot: ['strongbox'] },
       workshop:  { r: 8,  h: 8,  hp: 140, order: true, target: 'workshop' },
       stables:   { r: 7,  h: 6,  hp: 100, order: true },

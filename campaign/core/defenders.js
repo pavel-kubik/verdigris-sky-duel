@@ -38,6 +38,7 @@
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const D = M.need('data'), T = M.need('terrain'), SE = M.need('settlement'), PC = M.need('perception');
+  const SE_OUT = b => !!(b && (b.ruin || b.char));          // T06: a ruin or a charred stone shell: its posts are empty
   const { wrap, clamp } = M.need('math');
   const TAU = Math.PI * 2;
   const SHELTER = { house: 1, barn: 1, granary: 1, taxhouse: 1, barracks: 1, hall: 1, stables: 1, keep: 1, rotunda: 1 };   // T05: castle folk hide too
@@ -99,7 +100,7 @@
         const side = (k % 2 ? -1 : 1) * Math.ceil(k / 2) * E.towerSpacing;   // more archers than posts: side by side
         const pos = [sl.x + Math.cos(sl.yaw) * side, sl.y, sl.z - Math.sin(sl.yaw) * side];
         const d = mk('archer', sl.building + '.archer' + (i + 1), pl.id, pos, sl.yaw, { building: sl.building, post: true });
-        if (b && b.ruin) { d.alive = false; d.down = true; }
+        if (b && SE_OUT(b)) { d.alive = false; d.down = true; }
         list.push(d);
       }
       for (let i = 0; !slots && i < nA && towers.length; i++) {
@@ -108,13 +109,13 @@
         const side = (k - (nOn - 1) / 2) * E.towerSpacing;   // side by side, across the outward direction
         const pos = [b.pos[0] + Math.cos(base) * side, topOf(b), b.pos[2] - Math.sin(base) * side];
         const d = mk('archer', b.id + '.archer' + (k + 1), pl.id, pos, base, { building: b.id, post: true });
-        if (b.ruin) { d.alive = false; d.down = true; }
+        if (SE_OUT(b)) { d.alive = false; d.down = true; }
         list.push(d);
       }
       for (const b of own.filter(x => D.buildings[x.type].post === 'ballista')) {
         const pos = [b.pos[0], topOf(b), b.pos[2]];
         const d = mk('ballista', b.id + '.ballista', pl.id, pos, baseYaw(b, pl), { building: b.id, post: true });
-        if (b.ruin) { d.alive = false; d.down = true; }
+        if (SE_OUT(b)) { d.alive = false; d.down = true; }
         list.push(d);
       }
       const homes = own.filter(b => b.type === 'house').concat(own.filter(b => SHELTER[b.type] && b.type !== 'house'));
@@ -444,7 +445,7 @@
       d.burnT = Math.max(0, d.burnT - dt);
       const b = d.post ? byId(town, d.building) : null;
       if (d.post && b) {
-        if (b.ruin) { if (d.alive) kill(sq, d, 'fall', out); d.down = true; continue; }
+        if (SE_OUT(b)) { if (d.alive) kill(sq, d, 'fall', out); d.down = true; continue; }   // T06: a charred tower too
         if (!d.alive && d.down) {                       // the tower stands again: new archers on it
           Object.assign(d, { alive: true, down: false, hp: D.defenders[d.kind].hp, aware: 0, state: 'idle', focus: null, search: 0 });
           out.push({ e: 'defender:back', id: d.id, kind: d.kind, place: d.place });
@@ -506,7 +507,7 @@
     for (const d of (sq && sq.list) || []) {
       const b = d.post && sq.town ? byId(sq.town, d.building) : null;
       Object.assign(d, { aware: 0, state: 'idle', focus: null, search: 0, panic: false, hidden: false, rang: false, ringer: false, shots: 0, aim: 0, cool: 0, aimAt: null, target: null });
-      if (!(b && b.ruin)) { d.alive = true; d.down = false; d.hp = D.defenders[d.kind].hp; }
+      if (!(b && SE_OUT(b))) { d.alive = true; d.down = false; d.hp = D.defenders[d.kind].hp; }
     }
     if (sq) { sq.arrows.length = 0; sq.bolts = []; sq.rung = {}; }
     return sq;
