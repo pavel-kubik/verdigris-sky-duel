@@ -480,6 +480,21 @@
       ],
     },
 
+    /* Map and exploration (Phase 3 T07, 003_task_missions.md 4.3, core/map.js + render/map-view.js).
+       cell: explored grid cell (a region of radius r has ceil(2r / cell) cells per side, a bitset per region);
+       reveal: cells within this distance of the dragon (x stage spot ^ 0.5) become explored, x revealAlt when
+       flying above ceiling x highAlt; every: explored update period (s, at most 4 Hz). image: region view terrain
+       image (px, drawn once per region and cached). world: [column, row] of each region in the world view (row grows
+       north, toward the capital); later: regions of later phases, shown locked with the stage they need. zoom: the
+       region view's zoom range. tapPx: the smallest tap target of a map icon (css px). */
+    map: {
+      cell: 50, reveal: 160, revealAlt: 1.5, highAlt: 0.6, every: 0.25, image: 256,
+      world: { ash: [0, 0], wild: [0, 1], farm: [0, 2], bend: [0, 3], pass: [-1, 2.6], low: [1, 3.6], capital: [0, 4.4] },
+      later: { pass: { stage: 2 }, low: { stage: 2 }, capital: { stage: 3 } },
+      links: [['pass', 'farm'], ['low', 'bend'], ['capital', 'bend']],
+      zoom: [1, 4], tapPx: 36,
+    },
+
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
   };
 

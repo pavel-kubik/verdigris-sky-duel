@@ -54,7 +54,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -78,6 +78,7 @@
       nav: null,                     // compass and smell (core/nav.js, T09): { t, next, scents, range }, not saved
       town: null,                    // T12: settlements of the region (core/settlement.js build), rebuilt on region change
       discovered: {},                // T12: settlement ids seen once (compass markers), saved
+      explored: {},                  // Phase 3 T07: { regionId: bitset words } of explored map cells (core/map.js); save v3 (T18)
       story: { act: 1, mother: null }, // mother: { lesson, at } once the hatching scene hands over to her (T04), driven by core/mother.js (T05)
       hint: null,                    // 'swoop' | 'grab' | 'heavy' | 'eat' | 'near' | null, for the HUD prompt
       swoop: null,                   // id of the prey a held grab is diving at
@@ -163,6 +164,7 @@
     alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
     livestock(cs, ev, dt);                                       // T18: sheep and cows in pens, into the barn at alert 3
     for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
+    for (const e of MP.step(cs, dt)) emit(cs, ev, e);           // Phase 3 T07: cells around the dragon become explored (map fog)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     for (const e of TP.step(cs, ev, dt)) emit(cs, ev, e);      // T23: one-time tips (landing, compass, cave, raid, alert, altar)
     return autosave(cs, ev, dt);
