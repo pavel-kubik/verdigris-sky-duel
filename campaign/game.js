@@ -1177,9 +1177,11 @@
       if (!pl || cs.inLair || !cs.squad) flashPrompt(t('c.dbg.noCastle'), 1.5);
       else if (code === 'ShiftDigit7') onEvents(CA.blowHorn(cs.squad, { pos: pilot.pos, pad: D.settlement.pad * ST.scaleOf(cs) }));
       else {
-        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall').sort((a, b) => b.len - a.len)[0];
+        // the long wall facing south (the side the dragon comes from, away from the cliff), 60 out, turned a little to it
+        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall' && b.len > 20).sort((a, b) => CA.outward(a, pl)[1] - CA.outward(b, pl)[1])[0];
         const [nx, nz] = CA.outward(w, pl), x = (w.seg[0] + w.seg[2]) / 2 + nx * 60, z = (w.seg[1] + w.seg[3]) / 2 + nz * 60;
-        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, w.pos[1] + D.buildings.wall.walkTop + 15, z], yaw: w.yaw, pitch: 0, speed: 18 });
+        const yaw = Math.atan2(-nx, -nz) + Math.PI * 0.1;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, w.pos[1] + D.buildings.wall.walkTop + 15, z], yaw, pitch: 0, speed: 18 });
         snapCam(); flashPrompt(t('c.dbg.wallPass'), 2);
       }
     }
