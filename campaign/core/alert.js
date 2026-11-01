@@ -75,7 +75,7 @@
   /** A watchtower (building type with calmsAlert) lies in ruins: from a town (b.ruin) or a region state (rs.ruins ids). */
   function towerDown(x) {
     if (!x) return false;
-    if (Array.isArray(x.buildings)) return x.buildings.some(b => b.ruin && D.buildings[b.type] && D.buildings[b.type].calmsAlert);
+    if (Array.isArray(x.buildings)) return x.buildings.some(b => (b.ruin || b.char) && D.buildings[b.type] && D.buildings[b.type].calmsAlert);
     return (x.ruins || []).some(r => {
       const m = /\.([a-z]+)\d+$/.exec(r && r.id || '');
       return !!(m && D.buildings[m[1]] && D.buildings[m[1]].calmsAlert);

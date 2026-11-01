@@ -23,7 +23,12 @@
  * T03 castle (a template with `walls`, core/castle.js): its pieces (corners, wall runs as capsules, the portcullis,
  *   inner buildings) are buildings like the others. A piece type with walkTop (wall walk, bastion top) is a solid with a
  *   walkable top at pos.y + walkTop; the portcullis (gate: true) is a solid only while town.gateClosed. Stone pieces
- *   (stone: true) do not burn yet (charring comes in T06).
+ *   (stone: true) do not become ruins: T06 - a stone piece with woodHp burns its wooden parts (roof, hoardings) and at 0
+ *   hp turns charred (b.char, charAt; 'building:charred'), stays a solid, its archers fall; stone without woodHp (walls,
+ *   bastions) does not burn. Charred pieces are kept in rs.ruins as { id, at, char: true } and rebuilt like ruins.
+ *   burnable(b) -> bool   can catch fire now (not a ruin, not charred, wood to burn)
+ *   burnedOut(b) -> bool  a ruin or a charred stone shell (its posts are empty, a watchtower counts as down)
+ *   fullHp(type) -> hp    the hp a piece (re)starts with: woodHp for stone pieces, else hp
  *   surfaceAt(town, x, z, pad?) -> height | null   the walkable top under (x, z) when it is the highest solid there
  * A ruin is no solid (rubble only). Pure: no DOM, no THREE.
  */
@@ -128,13 +133,14 @@
 
   function build(regionId, rs) {
     const L = layout(regionId);
-    const ruins = {};
-    for (const r of (rs && rs.ruins) || []) if (r && r.id) ruins[r.id] = r.at || 0;
+    const ruins = {}, chars = {};
+    for (const r of (rs && rs.ruins) || []) if (r && r.id) (r.char ? chars : ruins)[r.id] = r.at || 0;
     const on = alert3On(rs), keep = L.buildings.map(b => !b.alert3 || on), map = [];
     let n = 0;
     keep.forEach((k, i) => { map[i] = k ? n++ : -1; });
     const buildings = L.buildings.filter((b, i) => keep[i]).map(b => Object.assign({}, b, {
-      pos: b.pos.slice(), hp: D.buildings[b.type].hp, heat: 0, fire: 0, ruin: b.id in ruins, ruinAt: b.id in ruins ? ruins[b.id] : null,
+      pos: b.pos.slice(), hp: fullHp(b.type), heat: 0, fire: 0, ruin: b.id in ruins && !stoneOf(b.type), ruinAt: b.id in ruins && !stoneOf(b.type) ? ruins[b.id] : null,
+      char: b.id in chars && charable(b.type), charAt: b.id in chars && charable(b.type) ? chars[b.id] : null,
       nb: (b.nb || []).filter(j => keep[j]).map(j => map[j]),
     }));
     const posts = [];
@@ -236,7 +242,13 @@
     }
     return false;
   }
-  const WIDTH = 0.6;                             // the fire reaches buildings over 60% of the prey cone's width
+  const WIDTH = 0.6;
+
+  const stoneOf = type => !!(D.buildings[type] && D.buildings[type].stone);
+  const charable = type => stoneOf(type) && D.buildings[type].woodHp > 0;
+  function fullHp(type) { const B = D.buildings[type]; return B.stone && B.woodHp > 0 ? B.woodHp : B.hp; }
+  function burnable(b) { return !b.ruin && !b.char && (!stoneOf(b.type) || charable(b.type)); }
+  function burnedOut(b) { return !!(b && (b.ruin || b.char)); }                             // the fire reaches buildings over 60% of the prey cone's width
 
   function ignite(b, ev, spread) {
     b.fire = 1e-3; b.heat = 0;
@@ -251,12 +263,16 @@
     if (cone) for (const pl of town.places) near[pl.id] = Math.hypot(pl.x - cone.origin[0], pl.z - cone.origin[2]) <= cone.range + pl.r + 4;
     const lit = [];
     for (const b of town.buildings) {
-      if (b.ruin || D.buildings[b.type].stone) continue;   // T03: stone castle pieces do not burn (charring: T06)
+      if (!burnable(b)) continue;                // T06: ruins, charred shells and stone without wood do not burn
       const hot = !!near[b.place] && inFire(b, cone, town.region);
       if (b.fire > 0) {
         b.fire += dt;
         b.hp -= (F.burn + (hot ? F.fan : 0)) * mult * dt;
-        if (b.hp <= 0) {
+        if (b.hp <= 0 && B0(b).stone) {          // T06: the wood is gone, the stone shell stands (still a solid)
+          const B = D.buildings[b.type];
+          b.hp = 0; b.fire = 0; b.heat = 0; b.char = true; b.charAt = now;
+          ev.push({ e: 'building:charred', id: b.id, type: b.type, place: b.place, pos: b.pos.slice(), civil: !!B.civil, order: !!B.order, at: now });
+        } else if (b.hp <= 0) {
           const B = D.buildings[b.type];
           b.hp = 0; b.fire = 0; b.heat = 0; b.ruin = true; b.ruinAt = now;
           ev.push({ e: 'building:ruined', id: b.id, type: b.type, place: b.place, pos: b.pos.slice(), civil: !!B.civil, order: !!B.order, at: now });
@@ -269,7 +285,7 @@
     const p = 1 - Math.exp(-F.spread * dt);      // chance per neighbour this frame
     for (const b of lit) for (const j of b.nb || []) {
       const o = town.buildings[j];
-      if (o && !o.ruin && !(o.fire > 0) && !D.buildings[o.type].stone && rng() < p) ignite(o, ev, true);
+      if (o && burnable(o) && !(o.fire > 0) && rng() < p) ignite(o, ev, true);
     }
     return ev;
   }
@@ -277,9 +293,15 @@
   function rebuild(town, now, blocked) {
     const ev = [];
     for (const b of (town && town.buildings) || []) {
+      if (b.char) {                              // T06: new roof and hoardings; the shell stood all along (no blocked check)
+        if (now - (b.charAt || 0) < D.fire.rebuild) continue;
+        b.char = false; b.charAt = null; b.hp = fullHp(b.type); b.fire = 0; b.heat = 0;
+        ev.push({ e: 'building:rebuilt', id: b.id, type: b.type, place: b.place, char: true });
+        continue;
+      }
       if (!b.ruin || now - (b.ruinAt || 0) < D.fire.rebuild) continue;
       if (blocked && blocked(b)) continue;
-      b.ruin = false; b.ruinAt = null; b.hp = D.buildings[b.type].hp; b.fire = 0; b.heat = 0;
+      b.ruin = false; b.ruinAt = null; b.hp = fullHp(b.type); b.fire = 0; b.heat = 0;
       ev.push({ e: 'building:rebuilt', id: b.id, type: b.type, place: b.place });
     }
     return ev;
@@ -294,5 +316,8 @@
     return best;
   }
 
-  M.define('settlement', { build, alert3On, solidAt, surfaceAt, topOf, hit, near, layout, placeIds, burn, rebuild, inFire, sd });
+  const B0 = b => D.buildings[b.type];
+
+  M.define('settlement', { build, alert3On, solidAt, surfaceAt, topOf, hit, near, layout, placeIds, burn, rebuild, inFire, sd,
+                           burnable, burnedOut, fullHp });
 })(typeof self !== 'undefined' ? self : this);

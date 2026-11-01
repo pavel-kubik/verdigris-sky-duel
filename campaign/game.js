@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't205.1 2026-11-01 castle defenders: wall walk archers, bastion ballistae, gate, horn';
+  const BUILD = 't206.1 2026-11-01 castle fire and char: roofs burn, stone stays charred, Shift+9 castle fire';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -329,7 +329,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^Digit[45678]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
+    if (debug) debugKey(e.shiftKey && /^Digit[456789]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -739,6 +739,7 @@
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
       else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
       else if (e.e === 'corn:burning' && !cornToast) { cornToast = true; toast(t('c.toast.corn'), t('c.toast.cornSub'), 2.2); }
+      else if (e.e === 'building:charred') toast(t('c.toast.charred', { b: t('c.building.' + e.type) }), t('c.toast.charredSub'), 2.2);   // T06
       else if (e.e === 'building:ruined' && e.type !== 'palisade') toast(t('c.toast.burned', { b: t('c.building.' + e.type) }), t('c.toast.burnedSub'), 2.2);
       else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t(e.key || 'c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
       else if (e.e === 'tip') showTip(D.tips.show, 'c.tip.' + e.id);   // T23: one-time tips
@@ -1005,6 +1006,7 @@
     ['Shift+6', 'fly low over the castle wall walk, slow, along the wall (land test, T03)', 'ShiftDigit6', 'to wall'],
     ['Shift+7', 'castle alarm: the keep horn sounds now (the whole region on alert, the gate drops), T05', 'ShiftDigit7', 'horn'],
     ['Shift+8', 'fly a low pass along the outside of a castle wall (60 out, wall walk height + 15): archers volley, a bastion aims, T05', 'ShiftDigit8', 'wall pass'],
+    ['Shift+9', 'castle fire: every wooden roof and hoarding of the castle catches fire now (they burn out in about a minute; stone stays, charred), T06', 'ShiftDigit9', 'castle fire'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1117,12 +1119,15 @@
     }
     if (code === 'Digit2' && !cs.inLair && cs.town) {            // T13: fire test on the nearest standing building
       let best = null, bd = 400;
-      for (const b of cs.town.buildings) { const d = Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]); if (!b.ruin && !(b.fire > 0) && d < bd) { bd = d; best = b; } }
+      for (const b of cs.town.buildings) { const d = Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]); if (SE.burnable(b) && !(b.fire > 0) && d < bd) { bd = d; best = b; } }
       if (best) { best.fire = 1e-3; best.heat = 0; flashPrompt(t('c.dbg.ignite', { b: t('c.building.' + best.type) }), 1.5); } else flashPrompt(t('c.dbg.noBuilding'), 1.5);
     }
     if (code === 'Digit3' && cs.town) {                         // T13: ruins come back now (as if fire.rebuild s had passed)
       let n = 0;
-      for (const b of cs.town.buildings) if (b.ruin) { b.ruinAt = cs.stats.played - D.fire.rebuild - 1; n++; }
+      for (const b of cs.town.buildings) {
+        if (b.ruin) { b.ruinAt = cs.stats.played - D.fire.rebuild - 1; n++; }
+        if (b.char) { b.charAt = cs.stats.played - D.fire.rebuild - 1; n++; }   // T06: charred castle pieces too
+      }
       const rs = cs.regionStates && cs.regionStates[cs.region];
       if (rs && rs.ruins) for (const r of rs.ruins) r.at = cs.stats.played - D.fire.rebuild - 1;
       flashPrompt(t('c.dbg.rebuilt', { n }), 1.5);
@@ -1183,6 +1188,15 @@
         const yaw = Math.atan2(-nx, -nz) + Math.PI * 0.1;
         Object.assign(pilot, { mode: 'air', tr: null, pos: [x, w.pos[1] + D.buildings.wall.walkTop + 15, z], yaw, pitch: 0, speed: 18 });
         snapCam(); flashPrompt(t('c.dbg.wallPass'), 2);
+      }
+    }
+    if (code === 'ShiftDigit9') {                                // T06: the castle's wooden parts and inner wooden buildings alight
+      const pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else {
+        let n = 0;
+        for (const b of cs.town.buildings) if (b.place === pl.id && SE.burnable(b) && !(b.fire > 0) && D.buildings[b.type].hp > 0) { b.fire = 1e-3; b.heat = 0; n++; }
+        flashPrompt(t('c.dbg.castleFire', { n }), 2);
       }
     }
     if (code === 'ShiftDigit5' || code === 'ShiftDigit6') {      // T03: castle gate toggle / over the wall walk

@@ -48,7 +48,7 @@
         const seen = Object.keys(cs.discovered || {}).filter(k => cs.discovered[k] && k.indexOf(id + '.') === 0).sort();
         if (seen.length) o[id].discovered = seen;
         const ruins = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].ruins) || []).filter(r => r && typeof r.id === 'string');
-        if (ruins.length) o[id].ruins = ruins.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T13 (v2 shape, 5.9)
+        if (ruins.length) o[id].ruins = ruins.map(r => r.char ? { id: r.id, at: round(r.at || 0, 10), char: true } : { id: r.id, at: round(r.at || 0, 10) });   // T13 (v2 shape, 5.9); T06: char = a charred castle stone piece
         const corn = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].corn) || []).filter(r => r && typeof r.id === 'string');
         if (corn.length) o[id].corn = corn.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));       // burned corn fields
         const rs = cs.regionStates && cs.regionStates[id];
@@ -175,7 +175,7 @@
       const r = o.regions[id];
       if (D.regions[id] && r && Array.isArray(r.discovered)) for (const k of r.discovered) if (typeof k === 'string' && k.indexOf(id + '.') === 0) cs.discovered[k] = true;
       if (D.regions[id] && r && Array.isArray(r.ruins)) {          // T13: burned buildings, rebuilt fire.rebuild s after `at`
-        const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
+        const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => q.char === true ? { id: q.id, at: q.at, char: true } : { id: q.id, at: q.at });
         if (ruins.length) cs.regionStates[id] = { ruins };
       }
       if (D.regions[id] && r && Array.isArray(r.corn)) {           // burned corn fields, grow back corn.regrow s after `at`

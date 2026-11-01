@@ -10,6 +10,8 @@
  *     kit.setLod(mode, dist)    mode 'auto' | 'full' | 'sil'; auto: full inside data.castle.lod.near, silhouette beyond
  *     kit.setNight(k)           0 day .. 1 night: lit windows and torches fade in
  *     kit.update(dt, time)      banner wave, torch flicker
+ *     kit.setBurn(fn)           T06: fn(type, x, z) -> 0 standing | 1 charred (stone dark by data.castle.char.tint, roof,
+ *                               hoardings and banner gone) | 2 ruin (the whole piece hidden; rubble is settlement-view's)
  *     kit.info()                { lod, calls, tris } of the shown model (draw calls of the castle alone)
  *     kit.dispose()
  *   VRender.castleKit.models(tier) -> { type: { stone, roof, win, flag } } (geometries, for tests and castle-view)
@@ -298,7 +300,8 @@
     const group = new THREE.Group(), full = new THREE.Group(), sil = new THREE.Group();
     group.add(full, sil);
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const geos = models(tier), meshes = [], disposables = [mat];
+    const matC = new THREE.MeshLambertMaterial({ vertexColors: true });   // T06: the instance-coloured (charrable) pieces
+    const geos = models(tier), meshes = [], disposables = [mat, matC];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
 
     /* instances per piece type: [x, z, yaw, scaleZ] */
@@ -339,15 +342,19 @@
       if (G.roof && !D.buildings[type].stone) { G.stone = mergeGeos([G.stone, G.roof]); G.roof = null; }
       G.stoneMesh = mk(G.stone);
       if (G.roof) G.roofMesh = mk(G.roof);
+      if (G.roofMesh || !D.buildings[type] || !D.buildings[type].stone) {   // T06: pieces that can char or burn get instance colours
+        G.stoneMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3);
+        G.stoneMesh.material = matC;             // own material: r128 keeps one program per material (instancingColor is not re-checked)
+      }
       if (G.grate) G.grateMesh = mk(G.grate);
-      for (const [x, z, yaw] of list) {
+      list.forEach(([x, z, yaw], li) => {
         q.setFromAxisAngle(up, yaw); v.set(x, 0, z); m4.compose(v, q, sc.set(1, 1, 1));
         for (const w of G.win || []) winParts.push(w.clone().applyMatrix4(m4));
         for (const f of G.flag || []) {
           const p = new THREE.Vector3(f[0], f[1], f[2]).applyMatrix4(m4);
-          flags.push([p, yaw + 0.6 * (flags.length % 3 - 1), f[3]]);
+          flags.push([p, yaw + 0.6 * (flags.length % 3 - 1), f[3], type, li]);   // T06: the owner, to drop it when burned
         }
-      }
+      });
       for (const w of G.win || []) w.dispose();
     }
 
@@ -412,6 +419,35 @@
       const sy = 0.08 + 0.92 * Math.max(0, Math.min(1, k));
       gateMesh.scale.y = sy; gateMesh.position.y = gateTop * (1 - sy);
     }
+    /* T06: burned pieces - charred stone (instance colour), roof / hoardings / banner hidden, ruins hidden whole */
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0), white = new THREE.Color(1, 1, 1), dark = new THREE.Color().setScalar(K.char.tint);
+    const burnState = {};
+    function setBurn(fn) {
+      let changed = 0;
+      for (const type of Object.keys(inst)) {
+        const G = geos[type];
+        if (!G || !G.stoneMesh) continue;
+        const st = burnState[type] = burnState[type] || [];
+        inst[type].forEach(([x, z, yaw, sz], i) => {
+          const k = (fn && fn(type, x, z)) || 0;
+          if ((st[i] || 0) === k) return;
+          st[i] = k; changed++;
+          q.setFromAxisAngle(up, yaw); v.set(x, 0, z); sc.set(1, 1, sz); m4.compose(v, q, sc);
+          G.stoneMesh.setMatrixAt(i, k === 2 ? zero : m4); G.stoneMesh.instanceMatrix.needsUpdate = true;
+          if (G.stoneMesh.instanceColor) { G.stoneMesh.setColorAt(i, k === 1 ? dark : white); G.stoneMesh.instanceColor.needsUpdate = true; }
+          if (G.roofMesh) { G.roofMesh.setMatrixAt(i, k ? zero : m4); G.roofMesh.instanceMatrix.needsUpdate = true; }
+        });
+      }
+      if (changed) {
+        flags.forEach(([p, yaw, s, type, li], i) => {
+          const k = burnState[type] && burnState[type][li];
+          q.setFromAxisAngle(up, yaw); sc.set(s, s, s); m4.compose(p, q, sc);
+          ban.setMatrixAt(i, k ? zero : m4);
+        });
+        ban.instanceMatrix.needsUpdate = true;
+      }
+      return changed;
+    }
     function update(dt, t) {
       time.value = t;
       if (torches.visible) tMat.size = 5 * (0.85 + 0.15 * Math.sin(t * 13) * Math.sin(t * 7.3));
@@ -430,7 +466,7 @@
     }
     function dispose() { group.parent && group.parent.remove(group); for (const d of disposables) d.dispose(); }
     setNight(0); setLod('full'); setGate(opts.gate || 0);
-    return { group, full, sil, meshes, setLod, setNight, setGate, update, info, dispose, geos, flags: flags.length, torches: nT, smoke: geos.hall && geos.hall.smoke };
+    return { group, full, sil, meshes, setLod, setNight, setGate, setBurn, burnState, update, info, dispose, geos, flags: flags.length, torches: nT, smoke: geos.hall && geos.hall.smoke };
   }
 
   VR.castleKit = { build, models, silhouette, COL };
