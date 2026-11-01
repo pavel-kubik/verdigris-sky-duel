@@ -258,6 +258,8 @@
     if (R.terrain.water === 'mask') maskWater(id, group, pal);
     const bridges = VR.bridges ? VR.bridges.build(id) : null;           // T02: Karlsbridge and the wooden bridge
     if (bridges) group.add(bridges.group);
+    const aerie = VR.aerie ? VR.aerie.build(id) : null;                 // Phase 3 T08: the region's aerie crag
+    if (aerie) group.add(aerie.group);
     const ruins = VR.ruins ? VR.ruins.build(id, { density: opts.flora }) : null;   // T02: Staromark and Hradchan
     if (ruins) group.add(ruins.group);
     const lavaFx = crater(id, group);

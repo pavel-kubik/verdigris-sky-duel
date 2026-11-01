@@ -495,6 +495,18 @@
       zoom: [1, 4], tapPx: 36,
     },
 
+    /* Aeries (Phase 3 T08, core/aerie.js, render/aerie-view.js; 003_task_missions.md 4.4). A small cliff cave per region
+       outside the Ash Wastes: a rock outcrop with a mouth on a ledge `above` the ground, facing `facing` (yaw: 0 = +Z).
+       Found within `discover` and in line of sight (nav.seesPlace), saved as cs.discovered['<region>.aerie'].
+       Flying into the mouth (inside `mouthR` x scale) or the Move slot within `enterRange` enters: carried loot is
+       banked, Rest heals (no stage-up: that stays at the nest), Leave puts the dragon back in the air in front of it. */
+    aeries: {
+      wild: { x: -620, z: -480, facing: 1.9 },
+      farm: { x: 720, z: 560, facing: -2.4 },
+      bend: { x: -120, z: 1010, facing: Math.PI },     // a cleft in the Troyvale rocks, facing the river
+      discover: 200, enterRange: 40, nearRange: 110, mouthR: 9, above: 6, out: 26, outY: 22, room: { r: 22, h: 14 },
+    },
+
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
   };
 

@@ -49,12 +49,15 @@
  * Day and night (T21, core/clock.js): cs.clock = { t } runs first in every step (also in the cave) and sets cs.light =
  *        clock.sight (the defenders' sight multiplier, night about half); 'clock:phase' { phase, from } on a change.
  *        The nest's Sleep until dusk / dawn = caveAct(cs, 'nest', 'dusk' | 'dawn'): rest, then clock.sleepTo ('clock:slept').
+ * Aeries (Phase 3 T08, core/aerie.js): found by sight ('aerie:found', saved in cs.discovered); flying into the mouth enters
+ *        (cs.inAerie = region, carried loot banked); while inside only the clock, play time and the larder run; the aerie
+ *        panel calls aerieAct(cs, 'rest' | 'leave'). cs.aerieNear = the Move slot offers "Enter aerie".
  * The renderer reads cs; save.js serialises the durable parts of it (autosave: a 'save' event, see autosave()). See 001_task_survival.md 5.8.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -70,6 +73,7 @@
       },
       field: null,
       larder: [],                    // stored prey in the lair: { type, food }
+      inAerie: null,                 // Phase 3 T08: region id while inside its aerie (core/aerie.js)
       inLair: false,                 // inside the cave (T10: the dragon walks in the hall, core/cave.js); location reads it
       station: null,                 // T10: the cave station in reach ('nest' | 'larder' | 'exit'), the Action slot / E
       flags: { introSeen: false, heavyT: 0 },
@@ -159,6 +163,7 @@
     if (!cs.dragon.pilot) return ev;
     ensureTown(cs);
     for (const e of CK.step(cs, dt)) emit(cs, ev, e);           // T21: time of day first; sets cs.light for the defenders
+    if (cs.inAerie) { cs.stats.played += dt; for (const e of LR.spoil(cs, dt)) emit(cs, ev, e); return autosave(cs, ev, dt); }   // Phase 3 T08: inside an aerie the world waits
     run(cs, inp, dt, ev);
     defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
     alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
@@ -174,7 +179,7 @@
    * Autosave triggers (5.9): rest, region change, death (wake in the lair), a discovered settlement (T12) and every save.every s of play.
    * Core only emits { e: 'save', why }; game.js writes it to localStorage (and on visibilitychange to hidden).
    */
-  const SAVE_ON = { 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade', 'dragon:landed': 'landed', 'lair:enter': 'cave' };   // T12: a new place, T20: a bought upgrade, T22: landed / in the cave (save v2 keeps both)
+  const SAVE_ON = { 'aerie:rest': 'rest', 'aerie:found': 'discovered', 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade', 'dragon:landed': 'landed', 'lair:enter': 'cave' };   // T12: a new place, T20: a bought upgrade, T22: landed / in the cave (save v2 keeps both)
   function autosave(cs, ev, dt) {
     cs.saveT = (cs.saveT || 0) + dt;
     let why = null;
@@ -329,6 +334,15 @@
       cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0;
       return ev;
     }
+    // aerie (Phase 3 T08): found by sight; flying into its mouth (or the Move slot close by) enters it and banks the loot
+    cs.aerieT = (cs.aerieT || 0) - dt;
+    if (cs.aerieT <= 0) { cs.aerieT = D.nav.discoverEvery; for (const e of AE.discover(cs)) emit(cs, ev, e); }
+    if (air && (AE.inMouth(cs) || (inp.enter && AE.canEnter(cs)))) {
+      for (const e of AE.enter(cs)) emit(cs, ev, e);
+      cs.exitSmall = null; cs.exitSmallT = 0;
+      return ev;
+    }
+    cs.aerieNear = air && AE.canEnter(cs);
 
     // region edge: offer the exit while near it heading outward (and a moment after); confirm travels
     let ex = air ? RG.exitAt(cs.region, p.pos, p.yaw) : null;
@@ -347,9 +361,10 @@
     }
 
     cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt, sol.walkTop).ok;                // the Move slot offers Land (controls.slots)
-    if (cs.carriedLoot) cs.hint = LR.near(cs) ? 'lairBank' : 'lootCarry';   // T19: take it home
+    const aerieNear = air && AE.near(cs);
+    if (cs.carriedLoot) cs.hint = LR.near(cs) ? 'lairBank' : aerieNear ? 'aerieBank' : 'lootCarry';   // T19: take it home
     else if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : lootFront.best ? 'lootGrab' : lootFront.heavy ? 'lootHeavy' : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
-    else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
+    else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : aerieNear ? 'aerie' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
   }
 
@@ -481,7 +496,9 @@
   const lairEat = (cs, i) => relay(cs, LR.eatFromLarder(cs, i));
   const lairLeave = cs => relay(cs, LR.leave(cs));
   /** Cave station action (T10): nest = rest (arg 'dusk' | 'dawn': sleep until then, T21; autosaves), larder = eat item arg, exit = leave; altar (T20) = buy upgrade arg (autosaves). */
+  /** Aerie panel actions (Phase 3 T08): rest (autosaves), leave. */
+  const aerieAct = (cs, id) => (id === 'rest' ? autosave(cs, relay(cs, AE.rest(cs)), 0) : id === 'leave' ? relay(cs, AE.leave(cs)) : []);
   const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs, arg) : id === 'altar' ? autosave(cs, relay(cs, CV.act(cs, id, arg)), 0) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct });
+  M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct, aerieAct });
 })(typeof self !== 'undefined' ? self : this);

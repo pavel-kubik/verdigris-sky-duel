@@ -6,7 +6,7 @@
  *                                           discovery (T12) every data.nav.discoverEvery s: 'place:discovered' { id, type, region }
  *   seesPlace(regionId, pos, place) -> bool within nav.discover and in line of sight over the terrain
  *   markers(cs) -> [{ kind, key, bearing, dist, label, via?, dim? }]
- *       kind: lair | exit | settlement (discovered ones, T12) | castle (T04) | scent | scentLivestock
+ *       kind: lair | exit | settlement (discovered ones, T12) | castle (T04) | aerie (found, Phase 3 T08) | scent | scentLivestock
  *       bearing: world bearing from the dragon (0 = +Z, the yaw convention); the strip subtracts the heading
  *       label: i18n key (+ params) for the tap-to-name tag; via: region id when the lair is reached through an exit
  * Scents: strength = herd size x (1 - distance / range); the strongest data.smell.max herds get a marker.
@@ -155,6 +155,9 @@
     if (cs.town && cs.town.region === cs.region && cs.discovered) {
       for (const pl of cs.town.places) if (cs.discovered[pl.id]) add(pl.castle ? 'castle' : 'settlement', 'place:' + pl.id, pl.x, pl.z, { key: placeKey(pl) }, { type: pl.type });
     }
+    // the region's aerie once found (Phase 3 T08)
+    const ae = D.aeries && D.aeries[cs.region];
+    if (ae && ae.x != null && cs.discovered && cs.discovered[cs.region + '.aerie']) add('aerie', 'aerie', ae.x, ae.z, { key: 'c.place.aerie' });
     // scents: toward the herd, blurred far out (a stored offset, so the marker drifts between updates, never jitters);
     // with prey sense (T20 smellType) the label names the prey ('Scent: Goat', type on the marker)
     const typed = UP.effects(cs).smellType;

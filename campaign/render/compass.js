@@ -13,8 +13,8 @@
   const wrap = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
 
   const COL = { bg: 'rgba(12,19,16,.62)', line: 'rgba(233,225,204,.22)', tick: 'rgba(233,225,204,.55)', text: '#ebe3cd', mute: '#a9ae9b',
-                lair: '#ff9447', exit: '#62c48a', dim: '#7d8278', scent: '#e0a040', livestock: '#e6d6a8', settlement: '#c9d4e8', castle: '#e8c46a', north: '#ff9447' };
-  const ORDER = { scent: 0, scentLivestock: 0, exit: 1, settlement: 2, castle: 2.5, lair: 3 };
+                lair: '#ff9447', exit: '#62c48a', dim: '#7d8278', scent: '#e0a040', livestock: '#e6d6a8', settlement: '#c9d4e8', castle: '#e8c46a', aerie: '#d9b48a', north: '#ff9447' };
+  const ORDER = { scent: 0, scentLivestock: 0, exit: 1, settlement: 2, castle: 2.5, aerie: 2.7, lair: 3 };
 
   function icon(g, kind, x, y, s, col, alpha) {
     g.save(); g.translate(x, y); g.globalAlpha = alpha; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.8; g.lineCap = 'round'; g.lineJoin = 'round';
@@ -34,6 +34,11 @@
       g.lineTo(-s * 0.2, -s * 0.95); g.lineTo(-s * 0.2, -s * 0.55); g.lineTo(s * 0.2, -s * 0.55); g.lineTo(s * 0.2, -s * 0.95);
       g.lineTo(s * 0.6, -s * 0.95); g.lineTo(s * 0.6, -s * 0.55); g.lineTo(s, -s * 0.55); g.lineTo(s, s * 0.9); g.closePath(); g.fill();
       g.fillStyle = '#1a1410'; g.beginPath(); g.moveTo(-s * 0.3, s * 0.9); g.lineTo(-s * 0.3, s * 0.3); g.quadraticCurveTo(0, -s * 0.05, s * 0.3, s * 0.3); g.lineTo(s * 0.3, s * 0.9); g.closePath(); g.fill();
+    } else if (kind === 'aerie') {                            // Phase 3 T08: a crag with a dark cleft and a nest ledge
+      g.beginPath(); g.moveTo(-s, s * 0.85); g.lineTo(-s * 0.75, -s * 0.2); g.lineTo(-s * 0.3, -s * 0.95); g.lineTo(s * 0.25, -s * 0.6);
+      g.lineTo(s * 0.7, -s * 0.85); g.lineTo(s, s * 0.85); g.closePath(); g.fill();
+      g.fillStyle = '#1a0e06'; g.beginPath(); g.moveTo(-s * 0.3, s * 0.45); g.lineTo(-s * 0.12, -s * 0.45); g.lineTo(s * 0.12, -s * 0.2); g.lineTo(s * 0.3, s * 0.45); g.closePath(); g.fill();
+      g.strokeStyle = '#1a0e06'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-s * 0.7, s * 0.62); g.lineTo(s * 0.7, s * 0.62); g.stroke();
     } else if (kind === 'scentLivestock') {                   // scent over a fence rail
       g.beginPath(); g.arc(-s * 0.35, -s * 0.15, s * 0.42, 0, TAU); g.arc(s * 0.35, -s * 0.3, s * 0.38, 0, TAU); g.fill();
       g.beginPath(); g.moveTo(-s, s * 0.75); g.lineTo(s, s * 0.75); g.moveTo(-s * 0.6, s * 0.35); g.lineTo(-s * 0.6, s * 0.95); g.moveTo(s * 0.6, s * 0.35); g.lineTo(s * 0.6, s * 0.95); g.stroke();
