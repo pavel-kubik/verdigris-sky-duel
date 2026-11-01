@@ -84,11 +84,12 @@ for (const f of R.terrain.features.filter(ff => ff.type === 'bridge')) {
   ok(Math.abs(top - T.demHeight(id, -230, -820)) < 3, 'Vyshgard plateau level with the rock top: ' + top.toFixed(1));
   ok(top > T.waterY(id, -345, -815) + 15, 'the rock stands well over the river');
   let faces = 0;
+  const cr = R.terrain.features.find(f => f.type === 'cliff').r;   // the face starts at the cliff rim (T03: 84, room for the castle)
   for (let k = -3; k <= 3; k++) {
     const a = -Math.PI / 2 + k * 0.12, at = d => [-220 + Math.sin(a) * d, -815 + Math.cos(a) * d];
-    const drop = T.heightAt(id, ...at(74)) - T.heightAt(id, ...at(86));
+    const drop = T.heightAt(id, ...at(cr - 6)) - T.heightAt(id, ...at(cr + 6));
     let steep = 0;
-    for (let d = 74; d <= 84; d += 1) if (T.surfaceSlope(id, ...at(d)) > D.land.maxSlope * 2) steep++;
+    for (let d = cr - 6; d <= cr + 4; d += 1) if (T.surfaceSlope(id, ...at(d)) > D.land.maxSlope * 2) steep++;
     if (drop > 10 && steep >= 4) faces++;
   }
   ok(faces === 7, 'the west face drops over 10 units within 12 and is too steep to walk (' + faces + ' of 7)');

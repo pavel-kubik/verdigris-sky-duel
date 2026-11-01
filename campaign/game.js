@@ -1320,7 +1320,7 @@
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
-      const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId, ST.solids(cs, heroScale).solidAt) : null;
+      const lc = (pilot.mode || 'air') === 'air' ? (s => WK.canLand(pilot, regionId, s.solidAt, s.walkTop))(ST.solids(cs, heroScale)) : null;
       L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));

@@ -309,6 +309,7 @@
       bastion:   { r: 8,  h: 12, hp: 360, order: true, stone: true, walkTop: 11, post: 'ballista' },
       ctower:    { r: 6,  h: 20, hp: 300, order: true, stone: true, post: 'archer', calmsAlert: true },
       gatehouse: { r: 8,  h: 16, hp: 360, order: true, stone: true, gate: true, posts: 'archer' },
+      portcullis: { r: 0, h: 11, hp: 0, order: true, stone: true, gate: true },         // T03: the gate gap, a solid only while closed
       keep:      { r: 11, h: 30, hp: 500, order: true, stone: true, garrison: 4, horn: true },
       chapel:    { r: 8,  h: 14, hp: 160, order: true, stone: true, spires: 2, spireH: 38, loot: ['relic'] },
       rotunda:   { r: 4,  h: 9,  hp: 120, civil: true, stone: true },
@@ -415,8 +416,8 @@
         terrain: {
           dem: 'demBend', exag: 1.6, offset: 4, water: 'mask',
           features: [
-            { type: 'plateau', x: -220, z: -815, r: 80, edge: 20, level: 'top' },                        // Vyshgard top
-            { type: 'cliff', x: -220, z: -815, r: 80, face: -PI / 2, drop: 12, width: 60 },              // rock face west, to the river
+            { type: 'plateau', x: -220, z: -815, r: 84, edge: 20, level: 'top' },                        // Vyshgard top
+            { type: 'cliff', x: -220, z: -815, r: 84, face: -PI / 2, drop: 12, width: 60 },              // rock face west, to the river
             { type: 'plateau', x: -190, z: 250, r: 34 }, { type: 'plateau', x: 250, z: 450, r: 60 },
             { type: 'plateau', x: -230, z: 930, r: 34 }, { type: 'plateau', x: -745, z: -230, r: 24 },
             { type: 'ruins', x: -230, z: -200, r: 150 },                                                 // Staromark
@@ -433,6 +434,7 @@
         vines: { x: -230, z: 880, r: 110, rows: 9 },                                                     // Troyvale vineyard slopes
         herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
         settlements: [
+          { type: 'castle',   x: -220, z: -815, yaw: 0, name: 'vyshgard' },                                 // T03: on the plateau top
           { type: 'outpost',  x: -190, z: 250, yaw: PI, name: 'lethna' },
           { type: 'village',  x: 250, z: 450, yaw: 0.6, name: 'holeshwick' },
           { type: 'hamlet',   x: -230, z: 930, yaw: 2.2, name: 'troyvale' },

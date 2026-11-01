@@ -20,6 +20,11 @@
  *   rebuild(town, now, blocked?) -> events[]   ruins older than `fire.rebuild` s stand again ('building:rebuilt'),
  *                                           unless blocked(b) (the dragon stands in the footprint)
  *   inFire(b, cone) -> bool                 the cone reaches building b (samples along the stream)
+ * T03 castle (a template with `walls`, core/castle.js): its pieces (corners, wall runs as capsules, the portcullis,
+ *   inner buildings) are buildings like the others. A piece type with walkTop (wall walk, bastion top) is a solid with a
+ *   walkable top at pos.y + walkTop; the portcullis (gate: true) is a solid only while town.gateClosed. Stone pieces
+ *   (stone: true) do not burn yet (charring comes in T06).
+ *   surfaceAt(town, x, z, pad?) -> height | null   the walkable top under (x, z) when it is the highest solid there
  * A ruin is no solid (rubble only). Pure: no DOM, no THREE.
  */
 (function (root) {
@@ -72,6 +77,19 @@
       for (const [type, lx, lz] of (tpl.alert3 && tpl.alert3.buildings) || []) {   // T17: built at alert 3 only (build drops them below)
         const b = add(type, lx, lz, { alert3: true });
         b.yaw = wrap(b.yaw + (rng() * 2 - 1) * S.jitterYaw);
+      }
+      if (tpl.walls) {                           // T03: castle pieces from core/castle.js (local frame = the site frame)
+        const CA = M.need('castle');
+        for (const pc of CA.pieces(tpl)) {
+          if (pc.inner) continue;                // inner buildings come from tpl.buildings above (with the jitter)
+          if (!pc.seg) { add(pc.type, pc.x, pc.z); continue; }
+          const p0 = rot(pc.seg[0], pc.seg[1], place.yaw), p1 = rot(pc.seg[2], pc.seg[3], place.yaw);
+          const b = add(pc.type, pc.x, pc.z, pc.gate ? { gate: true } : null);
+          b.seg = [site.x + p0[0], site.z + p0[1], site.x + p1[0], site.z + p1[1]];
+          b.r = pc.r; b.len = pc.len; b.yaw = Math.atan2(p1[0] - p0[0], p1[1] - p0[1]);
+          place.r = Math.max(place.r, Math.hypot(pc.seg[0], pc.seg[1]) + pc.r, Math.hypot(pc.seg[2], pc.seg[3]) + pc.r);
+        }
+        place.castle = true;
       }
       if (tpl.ring) {                            // palisade: pieces round the centre, a gate gap at local +Z
         const [r, gate] = tpl.ring, P = D.palisade, n = Math.max(6, Math.ceil(2 * Math.PI * r / P.piece)), half = gate / 2 / r;
@@ -148,7 +166,7 @@
     if (!town) return;
     for (const pl of town.places) {
       if (Math.hypot(x - pl.x, z - pl.z) > pl.r + pad + 2) continue;
-      for (const b of town.buildings) if (b.place === pl.id && !b.ruin) yield b;
+      for (const b of town.buildings) if (b.place === pl.id && !b.ruin && !(b.gate && !town.gateClosed)) yield b;
     }
   }
 
@@ -157,10 +175,29 @@
     let roof = null;
     for (const b of candidates(town, x, z, pad)) {
       if (sd(b, x, z).d > pad) continue;
-      const top = b.pos[1] + b.h;
+      const top = topOf(b);
       if (roof == null || top > roof) roof = top;
     }
     return roof;
+  }
+
+  /** The height a dragon meets on top of b: the walk top for wall walks and bastions (T03), else the roof. */
+  function topOf(b) {
+    const wt = D.buildings[b.type].walkTop;
+    return b.pos[1] + (wt != null ? wt : b.h);
+  }
+
+  /** T03: the walkable top under (x, z) (a wall walk or bastion top) when it is the highest solid there, else null. */
+  function surfaceAt(town, x, z, pad) {
+    pad = pad || 0;
+    let roof = null, walk = false;
+    for (const b of candidates(town, x, z, pad)) {
+      if (sd(b, x, z).d > pad) continue;
+      const top = topOf(b);
+      if (roof == null || top > roof + 1e-6) { roof = top; walk = D.buildings[b.type].walkTop != null; }
+      else if (Math.abs(top - roof) <= 1e-6 && D.buildings[b.type].walkTop != null) walk = true;
+    }
+    return walk ? roof : null;
   }
 
   function hit(town, x, z, pad) {
@@ -169,7 +206,7 @@
     for (const b of candidates(town, x, z, pad)) {
       const s = sd(b, x, z), depth = pad - s.d;
       if (depth < 0) continue;
-      if (!best || depth > best.depth) best = { b, roof: b.pos[1] + b.h, nx: s.nx, nz: s.nz, depth };
+      if (!best || depth > best.depth) best = { b, roof: topOf(b), nx: s.nx, nz: s.nz, depth };
     }
     return best;
   }
@@ -212,7 +249,7 @@
     if (cone) for (const pl of town.places) near[pl.id] = Math.hypot(pl.x - cone.origin[0], pl.z - cone.origin[2]) <= cone.range + pl.r + 4;
     const lit = [];
     for (const b of town.buildings) {
-      if (b.ruin) continue;
+      if (b.ruin || D.buildings[b.type].stone) continue;   // T03: stone castle pieces do not burn (charring: T06)
       const hot = !!near[b.place] && inFire(b, cone, town.region);
       if (b.fire > 0) {
         b.fire += dt;
@@ -230,7 +267,7 @@
     const p = 1 - Math.exp(-F.spread * dt);      // chance per neighbour this frame
     for (const b of lit) for (const j of b.nb || []) {
       const o = town.buildings[j];
-      if (o && !o.ruin && !(o.fire > 0) && rng() < p) ignite(o, ev, true);
+      if (o && !o.ruin && !(o.fire > 0) && !D.buildings[o.type].stone && rng() < p) ignite(o, ev, true);
     }
     return ev;
   }
@@ -255,5 +292,5 @@
     return best;
   }
 
-  M.define('settlement', { build, alert3On, solidAt, hit, near, layout, placeIds, burn, rebuild, inFire, sd });
+  M.define('settlement', { build, alert3On, solidAt, surfaceAt, topOf, hit, near, layout, placeIds, burn, rebuild, inFire, sd });
 })(typeof self !== 'undefined' ? self : this);
