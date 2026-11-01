@@ -143,7 +143,8 @@
   /** Building solids for a dragon of this scale: { solidAt, solidHit } with the body pad (settlement.pad x scale). */
   function solids(cs, scale) {
     const town = ensureTown(cs), pad = D.settlement.pad * (scale || 1);
-    return { solidAt: (x, z) => SE.solidAt(town, x, z, pad), solidHit: (x, z) => SE.hit(town, x, z, pad) };
+    return { solidAt: (x, z) => SE.solidAt(town, x, z, pad), solidHit: (x, z) => SE.hit(town, x, z, pad),
+             walkTop: (x, z) => SE.surfaceAt(town, x, z) };          // T03: wall walks and bastion tops are landable
   }
 
   const scaleOf = cs => cs.debugScale || G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);   // debugScale: ?debug B (Elder size test, T10)
@@ -343,7 +344,7 @@
       carried = carriedPrey(cs);
     }
 
-    cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt).ok;                // the Move slot offers Land (controls.slots)
+    cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt, sol.walkTop).ok;                // the Move slot offers Land (controls.slots)
     if (cs.carriedLoot) cs.hint = LR.near(cs) ? 'lairBank' : 'lootCarry';   // T19: take it home
     else if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : lootFront.best ? 'lootGrab' : lootFront.heavy ? 'lootHeavy' : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
     else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
@@ -449,7 +450,7 @@
   /** Land / Fly one-shot: lands when allowed (else says why), takes off on the ground (else says why). */
   function landToggle(cs, p, stats, eff, ev, sol) {
     if (p.mode === 'air') {
-      const c = WK.canLand(p, cs.region, sol && sol.solidAt);
+      const c = WK.canLand(p, cs.region, sol && sol.solidAt, sol && sol.walkTop);
       if (c.ok) { WK.startLanding(p); cs.swoop = null; emit(cs, ev, { e: 'dragon:landing', noise: D.land.noise }); }
       else emit(cs, ev, { e: 'land:refused', why: c.why });
     } else if (p.mode === 'ground') {

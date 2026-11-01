@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't202.4 2026-11-01 Veltava Bend: DBG to bend button fixed';
+  const BUILD = 't203.3 2026-11-01 castle solids, wall walks, gate; DBG gate / to wall';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -61,10 +61,23 @@
   const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
   const dragon = cs.dragon;
+  let castleView = null;
+  /** T03: Vyshgard Castle from the castle kit, placed at the region's castle site (LOD and night from the kit). */
+  function castleFor(town) {
+    const pl = town && town.places.find(p => p.castle);
+    if (!pl || !VRender.castleKit) return null;
+    const kit = VRender.castleKit.build(VCamp.need('castle').layout(D.settlements[pl.type]), { tier: qTier });
+    kit.group.position.set(pl.x, pl.y, pl.z);
+    kit.group.rotation.y = pl.yaw || 0;
+    scene.add(kit.group);
+    kit.at = pl;
+    return kit;
+  }
   function loadRegion(id) {
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     if (townView) townView.dispose();
+    if (castleView) { scene.remove(castleView.group); castleView.dispose(); castleView = null; }
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
     scene.add(region.group);
@@ -74,6 +87,7 @@
     townView = VRender.settlements.build(ST.ensureTown(cs));         // T12: buildings and pens of the region
     townView.town = cs.town;
     scene.add(townView.group);
+    castleView = castleFor(cs.town);                                   // T03: the castle kit at the castle site (castle-view: T04)
     scene.fog.color.set(region.fog); caveOn = null;
     skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
@@ -138,6 +152,7 @@
     if (region) region.group.visible = !inCave;
     if (preyView) preyView.group.visible = !inCave;
     if (townView) townView.group.visible = !inCave;
+    if (castleView) castleView.group.visible = !inCave;
     sky.visible = !inCave;
     if (!inCave) skyView.update(cs.clock ? cs.clock.t : D.clock.start);
     if (inCave === caveOn) return;
@@ -324,7 +339,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && e.code === 'Digit4' ? 'ShiftDigit4' : e.code);   // Shift+4: 4th region jump (7 is sight)
+    if (debug) debugKey(e.shiftKey && /^Digit[456]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -993,6 +1008,8 @@
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
+    ['Shift+5', 'castle gate: close / open (portcullis solid while closed, T03)', 'ShiftDigit5', 'gate'],
+    ['Shift+6', 'fly low over the castle wall walk, slow, along the wall (land test, T03)', 'ShiftDigit6', 'to wall'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1160,6 +1177,19 @@
         snapCam(); flashPrompt(t('c.dbg.post', { kind: t('c.post.' + v.kind) }), 1.5);
       }
     }
+    if (code === 'ShiftDigit5' || code === 'ShiftDigit6') {      // T03: castle gate toggle / over the wall walk
+      const CA = VCamp.need('castle'), pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else if (code === 'ShiftDigit5') {
+        if (CA.gateOpen(cs.town)) CA.closeGate(cs.town); else CA.openGate(cs.town);
+        flashPrompt(t(CA.gateOpen(cs.town) ? 'c.dbg.gateOpen' : 'c.dbg.gateClosed'), 1.5);
+      } else {
+        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall').sort((a, b) => b.len - a.len)[0];
+        const x = (w.seg[0] + w.seg[2]) / 2, z = (w.seg[1] + w.seg[3]) / 2;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, SE.solidAt(cs.town, x, z) + 6, z], yaw: w.yaw, pitch: 0, speed: 15 });
+        snapCam(); flashPrompt(t('c.dbg.wall'), 2);
+      }
+    }
     const dbgRi = DBG_REGION_KEYS.findIndex(k => k[1] === code), dbgRegion = dbgRi >= 0 ? Object.keys(D.regions)[dbgRi] || null : null;
     if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
       if (cs.inLair) onEvents(ST.lairLeave(cs));
@@ -1227,6 +1257,11 @@
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
+    }
+    if (castleView) {
+      castleView.setLod('auto', Math.hypot(camera.position.x - castleView.at.x, camera.position.z - castleView.at.z));
+      castleView.setNight(1 - (skyView.state ? skyView.state.light : 1));
+      castleView.update(dt, time);
     }
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
@@ -1320,7 +1355,7 @@
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
-      const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId, ST.solids(cs, heroScale).solidAt) : null;
+      const lc = (pilot.mode || 'air') === 'air' ? (s => WK.canLand(pilot, regionId, s.solidAt, s.walkTop))(ST.solids(cs, heroScale)) : null;
       L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));

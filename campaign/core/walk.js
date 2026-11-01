@@ -2,7 +2,9 @@
  * Verdigris campaign - landing, walking and takeoff (Phase 2 T06, 002_task_kingdom.md 4.1 and 5.1).
  *
  * pilot.mode: 'air' (core/flight.js) | 'landing' | 'ground' | 'takeoff'.
- *   canLand(p, regionId, solids?) -> { ok, why? }     why: 'busy' | 'high' | 'fast' | 'water' | 'lava' | 'roof' | 'steep'
+ *   canLand(p, regionId, solids?, walkTop?) -> { ok, why? }   why: 'busy' | 'high' | 'fast' | 'water' | 'lava' | 'roof' | 'steep'
+ *                                                     walkTop(x, z) -> height | null (T03): a castle wall walk or bastion
+ *                                                     top there is landable (height and slope measured from that top)
  *   startLanding(p)                                   air -> landing (land.time s, then ground)
  *   startTakeoff(p, stats?, eff?) -> { ok, why? }     ground -> takeoff (takeoff.time s, then air); why: 'busy' | 'tired'
  *   step(p, input, dt, ctx) -> p                      ground: tank steering, run, slope limit, solids, stays on the surface
@@ -36,15 +38,22 @@
   const standY = (ctx, x, z, scale) => groundAt(ctx, x, z) + D.walk.stand * (scale || 1);
 
   /** Is landing allowed here and now? Checked in the order of the reasons a player can fix most easily. */
-  function canLand(p, regionId, solids) {
+  function canLand(p, regionId, solids, walkTop) {
     const L = D.land;
     if ((p.mode || 'air') !== 'air') return { ok: false, why: 'busy' };
     const x = p.pos[0], z = p.pos[2], surf = T.surfaceAt(regionId, x, z);
-    if (p.pos[1] - surf > L.maxAlt) return { ok: false, why: 'high' };
+    const roof = solids ? solids(x, z) : null, top = roof != null && walkTop ? walkTop(x, z) : null;
+    if (top != null && roof <= top + 1e-6) {                             // T03: a wall walk / bastion top
+      if (p.pos[1] - top > L.maxAlt) return { ok: false, why: 'high' };
+      if (p.pos[1] < top) return { ok: false, why: 'roof' };
+      if (p.speed > L.maxSpeed) return { ok: false, why: 'fast' };
+      return { ok: true, top };
+    }
+    if (p.pos[1] - (roof != null && roof > surf ? roof : surf) > L.maxAlt) return { ok: false, why: 'high' };   // T03: low over a tall roof says 'roof'
     if (p.speed > L.maxSpeed) return { ok: false, why: 'fast' };
     const liquid = T.liquidAt(regionId, x, z);
     if (liquid) return { ok: false, why: liquid };
-    if (solids && solids(x, z) != null) return { ok: false, why: 'roof' };
+    if (roof != null) return { ok: false, why: 'roof' };
     if (T.surfaceSlope(regionId, x, z) > L.maxSlope) return { ok: false, why: 'steep' };
     return { ok: true };
   }
