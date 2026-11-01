@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't202.4 2026-11-01 Veltava Bend: DBG to bend button fixed';
+  const BUILD = 't203.1 2026-11-01 castle solids, wall walks, gate';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -61,10 +61,23 @@
   const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
   const dragon = cs.dragon;
+  let castleView = null;
+  /** T03: Vyshgard Castle from the castle kit, placed at the region's castle site (LOD and night from the kit). */
+  function castleFor(town) {
+    const pl = town && town.places.find(p => p.castle);
+    if (!pl || !VRender.castleKit) return null;
+    const kit = VRender.castleKit.build(VCamp.need('castle').layout(D.settlements[pl.type]), { tier: qTier });
+    kit.group.position.set(pl.x, pl.y, pl.z);
+    kit.group.rotation.y = pl.yaw || 0;
+    scene.add(kit.group);
+    kit.at = pl;
+    return kit;
+  }
   function loadRegion(id) {
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     if (townView) townView.dispose();
+    if (castleView) { scene.remove(castleView.group); castleView.dispose(); castleView = null; }
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
     scene.add(region.group);
@@ -74,6 +87,7 @@
     townView = VRender.settlements.build(ST.ensureTown(cs));         // T12: buildings and pens of the region
     townView.town = cs.town;
     scene.add(townView.group);
+    castleView = castleFor(cs.town);                                   // T03: the castle kit at the castle site (castle-view: T04)
     scene.fog.color.set(region.fog); caveOn = null;
     skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
@@ -138,6 +152,7 @@
     if (region) region.group.visible = !inCave;
     if (preyView) preyView.group.visible = !inCave;
     if (townView) townView.group.visible = !inCave;
+    if (castleView) castleView.group.visible = !inCave;
     sky.visible = !inCave;
     if (!inCave) skyView.update(cs.clock ? cs.clock.t : D.clock.start);
     if (inCave === caveOn) return;
@@ -1227,6 +1242,11 @@
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
+    }
+    if (castleView) {
+      castleView.setLod('auto', Math.hypot(camera.position.x - castleView.at.x, camera.position.z - castleView.at.z));
+      castleView.setNight(1 - (skyView.state ? skyView.state.light : 1));
+      castleView.update(dt, time);
     }
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)

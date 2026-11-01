@@ -70,9 +70,10 @@
         return b;
       };
       for (const [type, lx, lz] of tpl.buildings) {
-        const a = rng() * Math.PI * 2, j = S.jitter * rng();
+        const a = rng() * Math.PI * 2, j = tpl.walls ? 0 : S.jitter * rng();   // T03: castle pieces sit exactly where the kit draws them
         const b = add(type, lx + Math.cos(a) * j, lz + Math.sin(a) * j);
-        b.yaw = wrap(b.yaw + (rng() * 2 - 1) * S.jitterYaw);
+        if (tpl.walls) b.yaw = wrap(b.yaw + Math.PI / 2);                       // castle.layout: inner buildings face the gate (+X)
+        else b.yaw = wrap(b.yaw + (rng() * 2 - 1) * S.jitterYaw);
       }
       for (const [type, lx, lz] of (tpl.alert3 && tpl.alert3.buildings) || []) {   // T17: built at alert 3 only (build drops them below)
         const b = add(type, lx, lz, { alert3: true });

@@ -124,3 +124,9 @@ ok(W.canLand(over(yard[0], yard[1], 6), 'bend', s1.solidAt, s1.walkTop).ok, 'the
 
 /* state wiring: solids() offers the walk tops */
 ok(typeof ST.solids === 'function', 'state.solids exists');
+
+/* the solids match the kit: inner buildings at their layout spots (no jitter) */
+for (const lb of L.buildings) {
+  const b = cb.find(o => o.type === lb.type);
+  near(b.pos[0], site.x + lb.x, 1e-6, lb.type + ' x at its layout spot'); near(b.pos[2], site.z + lb.z, 1e-6, lb.type + ' z at its layout spot');
+}
