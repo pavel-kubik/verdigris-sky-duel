@@ -21,11 +21,16 @@
       { id: 'broadleaf', share: 0.7, trunk: [0.6, 1.0, 5, 0x5a4029], crown: { geo: 'ico', r: 5.0, h: 0, y: 8, col: [0x5f8a3c, 0x7a9a45] }, scale: [0.8, 1.3] },
       { id: 'poplar', share: 0.3, trunk: [0.4, 0.7, 4, 0x5a4632], crown: { geo: 'cone', r: 2.6, h: 15, y: 11, col: [0x4d7a36, 0x63883c] }, scale: [0.9, 1.3] },
     ],
+    bend: [   // Phase 3 T02: oak and lime woods on the hills, willows and poplars along the Veltava
+      { id: 'broadleaf', share: 0.6, trunk: [0.6, 1.0, 5, 0x55402a], crown: { geo: 'ico', r: 5.2, h: 0, y: 8.5, col: [0x4f7838, 0x6c8c40] }, scale: [0.8, 1.4] },
+      { id: 'poplar', share: 0.2, trunk: [0.4, 0.7, 4, 0x5a4632], crown: { geo: 'cone', r: 2.6, h: 15, y: 11, col: [0x4d7a36, 0x63883c] }, scale: [0.9, 1.3] },
+      { id: 'conifer', share: 0.2, trunk: [0.5, 0.9, 4, 0x4a3524], crown: { geo: 'cone', r: 4.0, h: 11, y: 8.5, col: [0x2f4f30, 0x3d6038] }, scale: [0.8, 1.4] },
+    ],
     ash: [
       { id: 'deadwood', share: 1, trunk: [0.35, 0.8, 7, 0x231c18], crown: null, scale: [0.7, 1.5] },
     ],
   };
-  const ROCK_COL = { forest: [0x6a5f50, 0x7b7364], ash: [0x2a2420, 0x3d3530], farm: [0x7a7262, 0x8c8474] };
+  const ROCK_COL = { forest: [0x6a5f50, 0x7b7364], ash: [0x2a2420, 0x3d3530], farm: [0x7a7262, 0x8c8474], bend: [0x8f8a7e, 0xa49e90] };
 
   function place(id, rng, n, ok) {
     const R = T.region(id), out = [];
@@ -50,6 +55,7 @@
       if (T.plateauAt(id, x, z, 10) || T.fieldAt(id, x, z, 3) || T.lineDist(id, 'road', x, z) < 9) return false;   // settlements, crops, roads (T11)
       if (cone && Math.hypot(x - cone.x, z - cone.z) < cone.r * 0.9) return false;
       if (R.lair && Math.hypot(x - R.lair.x, z - R.lair.z) < 45) return false;
+      if (T.ruinsAt(id, x, z) || T.deckAt(id, x, z, 8) || (R.vines && Math.hypot(x - R.vines.x, z - R.vines.z) < R.vines.r)) return false;   // T02
       return T.slopeAt(id, x, z, 3) < 0.5;
     };
     const rockOk = (x, z) => !T.liquidAt(id, x, z) && !T.plateauAt(id, x, z, 6) && !T.fieldAt(id, x, z) && T.lineDist(id, 'road', x, z) > 7 && T.slopeAt(id, x, z, 3) < 1.1;
@@ -108,8 +114,31 @@
       group.add(rock); meshes.push(rock);
     }
 
+    // vineyard rows (T02, region.vines { x, z, r, rows }): low green hedges of vines on the sloping ground, one instanced mesh
+    let vines = 0;
+    if (R.vines) {
+      const V = R.vines, items = [];
+      for (let k = -V.rows; k <= V.rows; k++) for (let j = -12; j <= 12; j++) {
+        const x = V.x + k * (V.r / V.rows) * 0.9, z = V.z + j * 8;
+        if (Math.hypot(x - V.x, z - V.z) > V.r || !T.dryAt(id, x, z) || T.plateauAt(id, x, z, 6) || T.lineDist(id, 'road', x, z) < 6) continue;
+        if (T.surfaceSlope(id, x, z) < 0.06 || T.surfaceSlope(id, x, z) > 0.7) continue;
+        items.push([x, z]);
+      }
+      if (items.length) {
+        const g = new THREE.BoxGeometry(1.2, 1.6, 7.4); g.translate(0, 0.8, 0);
+        const vm = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ flatShading: true, roughness: 1 }), items.length);
+        items.forEach(([x, z], i) => {
+          p.set(x, T.surfaceAt(id, x, z) - 0.2, z); q.set(0, 0, 0, 1); s.set(1, Mth.range(rng, 0.85, 1.15), 1);
+          m4.compose(p, q, s); vm.setMatrixAt(i, m4);
+          vm.setColorAt(i, col.set(0x4f6e2c).lerp(colB.set(0x6d8a3a), rng()));
+        });
+        vm.instanceMatrix.needsUpdate = true; if (vm.instanceColor) vm.instanceColor.needsUpdate = true;
+        vm.frustumCulled = false; group.add(vm); meshes.push(vm); vines = items.length;
+      }
+    }
+
     return {
-      group, trees: placed, count: { trees: trees.length, rocks: rocks.length },
+      group, trees: placed, vines, count: { trees: trees.length, rocks: rocks.length },
       dispose() { meshes.forEach(m => { m.geometry.dispose(); m.material.dispose(); if (m.dispose) m.dispose(); }); },
     };
   }

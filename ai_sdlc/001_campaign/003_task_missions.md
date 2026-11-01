@@ -185,22 +185,23 @@ regions.bend: {
     dem: 'demBend', exag: 1.6, offset: 4,           // height = (metres above base) / metresPerUnit x exag + offset
     water: 'mask',                                  // liquidAt from the mask (river level falls downstream), no waterLevel
     features: [
-      { type: 'plateau', x: -220, z: -815, r: 80 },                                                 // Vyshgard top
-      { type: 'cliff', x: -220, z: -815, r: 80, face: -PI / 2, drop: 12 },                          // rock face west
+      { type: 'plateau', x: -220, z: -815, r: 80, edge: 20, level: 'top' },                       // Vyshgard top (T02: level with the rock top)
+      { type: 'cliff', x: -220, z: -815, r: 80, face: -PI / 2, drop: 12, width: 60 },             // rock face west, down to the shore
       { type: 'plateau', x: -190, z: 250, r: 34 }, { type: 'plateau', x: 250, z: 450, r: 60 },
       { type: 'plateau', x: -230, z: 930, r: 34 }, { type: 'plateau', x: -745, z: -230, r: 24 },
       { type: 'ruins', x: -230, z: -200, r: 150 },
-      { type: 'road', width: 8, points: [[-320, -1190], [-290, -1000], [-230, -870]] },             // south entry -> gate
+      { type: 'road', width: 8, points: [[-255, -1190], [-245, -1000], [-230, -870]] },             // south entry -> gate (T02: east bank, the old line was in the river)
       { type: 'road', width: 7, points: [[-640, 40], [-460, -125], [-360, -125], [-280, -300], [-250, -600], [-230, -870]] },
       { type: 'road', width: 7, points: [[-280, -300], [-100, 20], [150, 212], [250, 450]] },        // to Holeshwick
-      { type: 'bridge', x: -410, z: -125, yaw: PI / 2, len: 80, width: 10, towers: true },          // Karlsbridge
+      { type: 'bridge', x: -418, z: -125, yaw: PI / 2, len: 104, width: 10, towers: true },         // Karlsbridge (T02: bank to bank)
       { type: 'bridge', x: 150, z: 212, yaw: 0.5, len: 60, width: 7, kind: 'wood' },
     ],
   },
   flora: { trees: 700, rocks: 90, fields: 14, vines: 'troyvale' },
+  vines: { x: -230, z: 880, r: 110, rows: 9 },                                                       // T02: Troyvale vineyard rows
   herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
   settlements: [
-    { type: 'castle',   x: -220, z: -815, yaw: 0, name: 'vyshgard' },
+    { type: 'castle',   x: -220, z: -815, yaw: 0, name: 'vyshgard' },                                // added in T03 / T04 (T02 keeps its plateau)
     { type: 'outpost',  x: -190, z: 250, yaw: PI, name: 'lethna' },
     { type: 'village',  x: 250, z: 450, yaw: 0.6, name: 'holeshwick' },
     { type: 'hamlet',   x: -230, z: 930, yaw: 2.2, name: 'troyvale' },
