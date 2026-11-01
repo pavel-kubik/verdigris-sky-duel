@@ -3,7 +3,7 @@
  * The right thumb has 3 fixed buttons (Breath, Boost, Roll) and 2 context slots that show the action that
  * applies right now and hide when nothing applies:
  *   Action (hold): Grab / swoop while a prey is in reach or targeted, Eat while carrying one.
- *   Move (tap):    Fly to <region> at an exit, Enter cave close to the lair mouth, Land where landing is allowed
+ *   Move (tap):    Fly to <region> at an exit, Enter cave close to the lair mouth, Enter aerie (T08) at a found aerie, Land where landing is allowed
  *                  (cs.landOk), Fly (take off) on the ground (T06).
  *
  *   slots(cs) -> { action: 'grab' | 'eat' | null, move: { kind: 'travel', to } | { kind: 'cave' } | { kind: 'land' } | { kind: 'fly' } | null,
@@ -27,6 +27,7 @@
   function slots(cs) {
     const out = { action: null, move: null, roll: true };
     if (!cs || !cs.dragon || !cs.dragon.pilot) return out;
+    if (cs.inAerie) { out.roll = false; return out; }              // Phase 3 T08: the aerie panel has the buttons
     if (cs.inLair) { out.roll = false; out.action = STATIONS[cs.station] ? cs.station : null; return out; }   // T10: cave station (tap)
     const mode = cs.dragon.pilot.mode || 'air';
     out.roll = mode === 'air';
@@ -34,6 +35,7 @@
     else if (GRAB_HINTS[cs.hint]) out.action = 'grab';
     if (cs.exit) out.move = { kind: 'travel', to: cs.exit.to };
     else if (LR.canEnter(cs)) out.move = { kind: 'cave' };
+    else if (cs.aerieNear) out.move = { kind: 'aerie' };            // Phase 3 T08: Enter aerie
     else if (mode === 'ground') out.move = { kind: 'fly' };
     else if (mode === 'air' && cs.landOk) out.move = { kind: 'land' };
     return out;
@@ -46,7 +48,7 @@
 
   function moveInput(move) {
     const k = move && move.kind;
-    return { confirm: k === 'travel', enter: k === 'cave', land: k === 'land' || k === 'fly' };
+    return { confirm: k === 'travel', enter: k === 'cave' || k === 'aerie', land: k === 'land' || k === 'fly' };
   }
 
   M.define('controls', { slots, input, moveInput, isStation });

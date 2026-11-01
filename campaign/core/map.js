@@ -15,7 +15,7 @@
  *         locked = { stage, later } the stage needed (an exit's minStage, or data.map.later) when the dragon is below it;
  *         a region of a later phase is always locked (later: true once the dragon has the stage)
  *       places of regionId (default the current region): only discovered ones, plus the lair (always known):
- *         [{ id, kind: 'lair' | 'settlement' | 'castle', type, x, z, key, discovered: true, alert, freed }]
+ *         [{ id, kind: 'lair' | 'settlement' | 'castle' | 'aerie' (T08), type, x, z, key, discovered: true, alert, freed }]
  *       dragon: { x, z, yaw } when the dragon is in regionId (and not in the cave), else null; target: null (T11)
  * cs.explored = { regionId: number[] } (bitset words). Not saved yet: save v3 (T18) adds it.
  * Map axes: +Z = north (bearing 0), +X = west (the yaw convention: facing +Z, +X is on the left).
@@ -24,7 +24,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), SE = M.need('settlement'), AL = M.need('alert');
+  const D = M.need('data'), T = M.need('terrain'), G = M.need('growth'), SE = M.need('settlement'), AL = M.need('alert'), AE = M.need('aerie');
 
   const P = () => D.map;
   const grids = {};
@@ -157,6 +157,8 @@
         places.push({ id: pl.id, kind: pl.castle ? 'castle' : 'settlement', type: pl.type, x: pl.x, z: pl.z,
                       key: pl.name ? 'c.placeName.' + pl.name : 'c.place.' + pl.type, discovered: true, alert, freed: false });
       }
+      const ae = AE.site(rid);                                    // T08: the region's aerie once found
+      if (ae && AE.found(cs, rid)) places.push({ id: ae.id, kind: 'aerie', type: 'aerie', x: ae.x, z: ae.z, key: 'c.place.aerie', discovered: true, alert: 0, freed: false });
     }
     const p = cs.dragon.pilot;
     const dragon = p && rid === cs.region && !cs.inLair ? { x: p.pos[0], z: p.pos[2], yaw: p.yaw } : null;

@@ -131,12 +131,12 @@
         label(name, sx - ux * 22, sy - uy * 22, locked ? '#a9ae9b' : '#ebe3cd');
         hits.push({ x: sx, y: sy, name });
       }
-      // places: lair + discovered settlements / castles
+      // places: lair + discovered settlements / castles / aeries (T08)
       for (const p of model.places) {
         const [sx, sy] = toScreen(p.x, p.z);
         g.fillStyle = 'rgba(12,19,16,.7)'; g.beginPath(); g.arc(sx, sy, 15, 0, TAU); g.fill();
         g.strokeStyle = p.alert ? ALERT[Math.min(3, p.alert)] : 'rgba(233,225,204,.6)'; g.lineWidth = 1.5; g.stroke();
-        const col = p.kind === 'lair' ? COL.lair : p.kind === 'castle' ? COL.castle : COL.settlement;
+        const col = p.kind === 'lair' ? COL.lair : p.kind === 'castle' ? COL.castle : p.kind === 'aerie' ? COL.aerie : COL.settlement;
         if (icon) icon(g, p.kind, sx, sy, 9, col || '#fff', 1);
         hits.push({ x: sx, y: sy, name: t(p.key) });
       }

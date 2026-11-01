@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't207.3 2026-11-01 map screen, map reveal on Shift+0';
+  const BUILD = 't208.2 2026-11-01 aeries, rebased; to aerie on Shift+1';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);

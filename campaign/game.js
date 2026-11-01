@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't207.3 2026-11-01 map screen, map reveal on Shift+0';
+  const BUILD = 't208.2 2026-11-01 aeries, rebased; to aerie on Shift+1';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -282,7 +282,7 @@
     return t(L.key, p);
   }
   function compassHud(dt) {
-    const on = state === 'play' && !!pilot && !cs.inLair;
+    const on = state === 'play' && !!pilot && !cs.inLair && !cs.inAerie;
     if (on !== compassOn) { compassEl.hidden = !on; compassOn = on; if (!on) { compassTag.hidden = true; tagT = 0; } }
     if (!on) return;
     const list = NV.markers(cs);
@@ -343,6 +343,8 @@
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape' && state === 'play' && stationOpen) { closeStation(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && stationOpen && document.activeElement && document.activeElement.tagName === 'BUTTON' && lairEl.contains(document.activeElement)) return;   // T20: Enter presses the focused panel button (Buy, Eat)
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && cs.inAerie && document.activeElement && aerieEl.contains(document.activeElement)) return;   // T08: Enter presses the focused aerie button
+    if (e.code === 'KeyE' && !e.repeat && state === 'play' && cs.inAerie) { aerieAct('leave'); return; }
     if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play' && cs.inLair) { useStation(cs.station); return; }   // T10: E uses the station in reach
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
@@ -573,6 +575,8 @@
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
   function camDesired(out) {
     if (cs.inLair) { const c = CV.camera(pilot.pos, pilot.yaw, heroScale); return out.set(c.pos[0], c.pos[1], c.pos[2]); }   // T10: inside the dome
+    if (cs.inAerie) { const k = Math.pow(heroScale, 0.75), bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);   // T08: in front of the ledge, looking back at the dragon and the cleft
+      const kk = Math.max(k, 1.6); return out.set(pilot.pos[0] + bx * 17 * kk + bz * 6 * kk, pilot.pos[1] + 3 * kk, pilot.pos[2] + bz * 17 * kk - bx * 6 * kk); }
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
     const k = Math.pow(heroScale, 0.75), gc = D.groundCam, gb = heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back
     const back = lerp(22, gc.back, gb) * k, up = lerp(7 - pilot.pitch * 6, gc.height, gb) * k;   // T07: lower and closer on the ground
@@ -748,7 +752,7 @@
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
       else if (e.e === 'loot:tooHeavy') flashPrompt(t('c.prompt.lootHeavy', { loot: lootName(e) }), 2.2);
       else if (e.e === 'loot:dropped') toast(t('c.toast.lootDropped'), t('c.toast.lootDroppedSub', { loot: lootName(e) }), 2.5);
-      else if (e.e === 'hoard:banked') { goldPulse = 2; toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
+      else if (e.e === 'hoard:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.aerie.banked', { gold: e.gold, total: e.total })); toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
       else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
       else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
       else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
@@ -756,6 +760,10 @@
       else if (e.e === 'dragon:died') { died = e; hurt = 0; shake = 0; hero.flash = 0; fadeEl.classList.add('now'); requestAnimationFrame(() => fadeEl.classList.remove('now')); }
       else if (e.e === 'region:enter') swapRegion(e.respawn);
       else if (e.e === 'save') saveNow(e.why);
+      else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
+      else if (e.e === 'aerie:enter') openAerie();
+      else if (e.e === 'aerie:leave') closeAerie();
+      else if (e.e === 'aerie:rest') { aerieMsg(t('c.aerie.rested')); renderAerie(); }
       else if (e.e === 'lair:enter') { enterCave(e.respawn ? died : null); died = null; }
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
@@ -779,6 +787,7 @@
     eat: '<path d="M4 12a8 8 0 0 0 16 0zM8 12l2-3 2 3 2-3 2 3"/>',
     travel: '<path d="M4 12h14M13 6l6 6-6 6"/>',
     cave: '<path d="M3 20c0-9 4-15 9-15s9 6 9 15M9 20c0-4 1.5-7 3-7s3 3 3 7"/>',
+    aerie: '<path d="M3 20l3-10 4-6 3 4 3-3 5 15zM10 20l1.5-7 2 2 .5 5M7 20h10"/>',
     land: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
     fly: '<path d="M12 20V8M7 13l5-5 5 5M4 4h16"/>',
     nest: '<path d="M3 14c2 4 16 4 18 0M5 13c3-2 11-2 14 0M8 10l2 3M16 10l-2 3"/>',
@@ -813,6 +822,9 @@
     else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
     else if (state === 'play' && cs.exitSmall && !cs.inLair) text = t('c.prompt.tooSmall.' + cs.exitSmall.to);   // T11: gated exit, phone and desktop
     else if (cs.inLair) text = stationOpen ? '' : cs.station ? t('c.prompt.station.' + cs.station + (isTouch ? 'Touch' : '')) : t(isTouch ? 'c.prompt.caveTouch' : 'c.prompt.cave');
+    else if (cs.inAerie) text = '';
+    else if (cs.hint === 'aerieBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieBankTouch' : 'c.prompt.aerieBank');   // T08
+    else if (cs.hint === 'aerie') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieTouch' : 'c.prompt.aerie');
     else if (cs.hint === 'lairBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairBankTouch' : 'c.prompt.lairBank');   // T19
     else if (cs.hint === 'lootCarry') text = t('c.prompt.lootCarry', { loot: lootName(cs.carriedLoot) });
     else if (cs.hint === 'lootGrab') text = t(isTouch ? 'c.prompt.lootGrabTouch' : 'c.prompt.lootGrab', { loot: lootName(lootItem(cs.lootTarget)) });
@@ -989,6 +1001,34 @@
     onEvents(ev.filter(x => x.e !== 'prey:eaten')); renderLair();
   });
   $('#leaveBtn').onclick = () => closeStation();
+  /* ---------- the aerie panel (Phase 3 T08; core/aerie.js does the rules, state.aerieAct the actions) ---------- */
+  const aerieEl = $('#aeriePanel');
+  function aerieMsg(text) { $('#aerieMsg').textContent = text || ''; }
+  function renderAerie() {
+    if (!cs.inAerie) return;
+    const d = dragon;
+    $('#aerieWhere').textContent = t(TR.region(cs.inAerie).nameKey);
+    $('#aerieVitals').textContent = t('c.lair.vitals', { hp: Math.round(100 * d.hp / G.statsOf(d.stage).hpMax), st: Math.round(pilot ? pilot.st : 100), hunger: Math.round(d.hunger) });
+    $('#aerieGold').textContent = t('c.hoard.gold', { gold: (cs.hoard && cs.hoard.gold) || 0 });
+  }
+  function openAerie() {
+    closeStation(); aerieMsg('');
+    pilot = dragon.pilot; snapCam();
+    touch.breath = touch.boost = touch.grab = touch.eat = false; mouseBreath = false; actionKind = null; enterQ = confirmQ = landQ = false;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    $('#hint').hidden = true; hintT = 0;
+    renderAerie();
+    aerieEl.hidden = false;
+    if (!isTouch) setTimeout(() => $('#aerieRestBtn').focus({ preventScroll: true }), 0);
+  }
+  function closeAerie() {
+    aerieEl.hidden = true; aerieMsg('');
+    if (document.activeElement && aerieEl.contains(document.activeElement)) document.activeElement.blur();
+    pilot = dragon.pilot; snapCam();
+  }
+  function aerieAct(id) { if (!cs.inAerie || state !== 'play') return; onEvents(ST.aerieAct(cs, id)); renderAerie(); }
+  $('#aerieRestBtn').onclick = () => aerieAct('rest');
+  $('#aerieLeaveBtn').onclick = () => aerieAct('leave');
   /** Debug: rest from anywhere (enters the lair first when in the Ash Wastes, else rests in place). */
   function rest() { onEvents(ST.lairRest(cs)); renderLair(); }
   /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
@@ -1031,6 +1071,7 @@
     ['Shift+7', 'castle alarm: the keep horn sounds now (the whole region on alert, the gate drops), T05', 'ShiftDigit7', 'horn'],
     ['Shift+8', 'fly a low pass along the outside of a castle wall (60 out, wall walk height + 15): archers volley, a bastion aims, T05', 'ShiftDigit8', 'wall pass'],
     ['Shift+9', 'castle fire: every wooden roof and hoarding of the castle catches fire now (they burn out in about a minute; stone stays, charred), T06', 'ShiftDigit9', 'castle fire'],
+    ['Shift+1', 'aerie of this region: found, fly in from 120 out, facing the mouth (T08)', 'ShiftDigit1', 'to aerie'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1241,6 +1282,16 @@
         snapCam(); flashPrompt(t('c.dbg.wall'), 2);
       }
     }
+    if (code === 'ShiftDigit1') {                                 // T08: in front of this region's aerie, already found
+      const s = AE.site(cs.region);
+      if (!s || cs.inLair || cs.inAerie) flashPrompt(t('c.dbg.noAerie'), 1.5);
+      else {
+        cs.discovered[s.id] = true;
+        const x = s.mouth[0] + s.dir[0] * 120, z = s.mouth[2] + s.dir[1] * 120, y = Math.max(s.mouth[1] + 12, TR.surfaceAt(cs.region, x, z) + 15);
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, y, z], yaw: s.facing + Math.PI, pitch: -0.08, speed: stats.cruise });
+        snapCam(); flashPrompt(t('c.dbg.aerie'), 2);
+      }
+    }
     const dbgRi = DBG_REGION_KEYS.findIndex(k => k[1] === code), dbgRegion = dbgRi >= 0 ? Object.keys(D.regions)[dbgRi] || null : null;
     if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
       if (cs.inLair) onEvents(ST.lairLeave(cs));
@@ -1287,6 +1338,7 @@
       const gb = heroPose.ground || 0, kc = Math.pow(heroScale, 0.75);   // T07: on the ground look a little ahead of the head
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
+      else if (cs.inAerie) camLook.set(pilot.pos[0], pilot.pos[1] - (isTouch ? 4 : 1) * Math.max(kc, 1.6), pilot.pos[2]);   // touch: the dragon above the panel
       camera.position.copy(camPos);
       if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
       shake = Math.max(0, shake - dt * 1.5);
@@ -1412,6 +1464,7 @@
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
+      { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+1: to aerie)')); }   // T08
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
         { const ci = cornView ? cornView.info : null, cl = (cs.crops && cs.crops.list) || [];
