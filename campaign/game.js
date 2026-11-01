@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't208.1 2026-11-01 aeries: find, enter, bank, rest, leave';
+  const BUILD = 't208.2 2026-11-01 aeries, rebased; to aerie on Shift+1';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -1464,7 +1464,7 @@
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
-      { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+7: to aerie)')); }   // T08
+      { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+1: to aerie)')); }   // T08
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
         { const ci = cornView ? cornView.info : null, cl = (cs.crops && cs.crops.list) || [];
