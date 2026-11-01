@@ -8,6 +8,9 @@
  *   - banners wave (kit shader), chimney smoke from the great hall (one small Points pool per castle, normal blend).
  *   - T05: the portcullis follows town.gateK (kit.setGate), a red signal fire on the keep top while town.signal
  *     (update's o.town, else the town it was built from).
+ *   - T06: burned pieces follow the town (kit.setBurn): charred stone pieces dark and roofless, ruined wooden ones
+ *     (hall, workshop, stables) hidden (settlement-view draws their rubble); the hall's smoke stops while it is a ruin.
+ *     burnOf(town, place, type, x, z) maps a kit instance (local frame) to its town building's state (core-free, tested).
  * The LOD rule is core/castle.js lodFor (tested in Node).
  */
 (function (root) {
@@ -18,6 +21,22 @@
   const D = C.need('data');
 
   const lodFor = (d, cur) => C.need('castle').lodFor(d, cur);
+
+  /** T06: the town building drawn by kit instance (type, x, z) of place pl: wall modules by the wall run they sit on,
+   *  other pieces by type and position; the gate module (portcullis and arch) never burns. -> building | null */
+  function pieceOf(town, pl, type, x, z) {
+    if (type === 'gate') return null;
+    const SE = C.need('settlement'), c = Math.cos(pl.yaw || 0), s = Math.sin(pl.yaw || 0);
+    const wx = pl.x + x * c + z * s, wz = pl.z - x * s + z * c;
+    let best = null, bd = type === 'wall' ? 1.5 : 2;
+    for (const b of town.buildings) {
+      if (b.place !== pl.id || b.type !== type) continue;
+      const d = type === 'wall' ? Math.max(0, SE.sd(b, wx, wz).d) : Math.hypot(b.pos[0] - wx, b.pos[2] - wz);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+  const burnOf = b => (!b ? 0 : b.ruin ? 2 : b.char ? 1 : 0);
 
   const smokeTex = (() => {
     if (typeof document === 'undefined') return null;
@@ -131,6 +150,21 @@
         const gk = tw && tw.gateK || 0;
         if (Math.abs(gk - c.gate) > 1e-3) { c.gate = gk; c.kit.setGate(gk); }
         if (c.signal) c.signal.update(dt, o.time || 0, !!(tw && tw.signal) && c.lod !== 'off');
+        if (tw) {                                                            // T06: charred and ruined pieces
+          if (c.burnTown !== tw) {                                         // map kit instances to the town's buildings once per town
+            c.burnTown = tw; c.burnMap = new Map(); c.burnSig = null;
+            const own = tw.places.find(p => p.id === c.place.id) || c.place;
+            c.hallB = tw.buildings.find(b => b.place === own.id && b.type === 'hall') || null;
+            c.kit.setBurn((type, x, z) => { c.burnMap.set(type + ':' + x + ':' + z, pieceOf(tw, own, type, x, z)); return 0; });
+          }
+          let sig = '';
+          for (const b of c.burnMap.values()) sig += b ? burnOf(b) : 0;
+          if (sig !== c.burnSig) {
+            c.burnSig = sig;
+            c.kit.setBurn((type, x, z) => burnOf(c.burnMap.get(type + ':' + x + ':' + z)));
+          }
+          if (c.smoke) c.smoke.pts.visible = !(c.hallB && c.hallB.ruin);
+        }
       }
       if (Math.abs(nt - night) > 0.01) night = nt;
     }
@@ -147,5 +181,5 @@
     return { group, list, update, info, dispose };
   }
 
-  VR.castleView = { build, chimney };
+  VR.castleView = { build, chimney, pieceOf, burnOf };
 })(typeof window !== 'undefined' ? window : globalThis);
