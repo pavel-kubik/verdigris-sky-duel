@@ -376,7 +376,7 @@
     const inc = kind => { for (const e of AL.add(rs, kind, now)) out.push(e); };
     for (const e of ev) {
       if (e.e === 'aware:state' && e.state === 'alert' && sq && !sq.alarmed[e.place || '']) { sq.alarmed[e.place || ''] = true; inc('sighted'); }
-      else if (e.e === 'bell:ring') inc('bell');
+      else if (e.e === 'bell:ring' || e.e === 'horn:blow') inc('bell');   // T05: the castle horn counts as a bell
       else if (e.e === 'building:ruined' && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
       else if (e.e === 'defender:killed') inc('defenderKilled');
       else if (e.e === 'loot:taken') inc('loot');                // T19: a tithe chest or strongbox taken

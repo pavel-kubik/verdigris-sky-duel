@@ -15,6 +15,10 @@
  *     the gate run becomes two stubs and a 'portcullis' piece with gate: true, solid only while the gate is closed)
  *   castle.closeGate(town) / openGate(town)    T03: town.gateClosed (the portcullis is a solid while it is set)
  *   castle.gateOpen(town) -> bool
+ *   T05: castle.posts(town, place) -> archer posts (towers, gatehouses, wall walks) in fill order;
+ *   castle.step(squad, { pos, pad, inside }, dt) -> events   alarm -> gate drops (never on a dragon in the gap), search
+ *   over -> gate opens, the keep's horn alerts every defender of the region once per horn.cool, town.signal (signal fire);
+ *   castle.inGap(town, pos, pad), castle.blowHorn(squad, o) (debug).
  */
 (function (root) {
   'use strict';
@@ -76,8 +80,8 @@
     return out;
   }
 
-  function closeGate(town) { if (town) town.gateClosed = true; return town; }
-  function openGate(town) { if (town) town.gateClosed = false; return town; }
+  function closeGate(town) { if (town) { town.gateClosed = true; town.gateK = 1; town.gateHold = true; } return town; }
+  function openGate(town) { if (town) { town.gateClosed = false; town.gateK = 0; town.gateHold = true; } return town; }
   const gateOpen = town => !(town && town.gateClosed);
 
   /** Inside test for the wall polygon (local frame). */
@@ -102,5 +106,132 @@
     return 'off';
   }
 
-  M.define('castle', { lodFor, layout, inside, pieces, closeGate, openGate, gateOpen });
+  /* ---- T05: defenders' posts, the gate on alarm, the keep's horn ---- */
+
+  /** Outward unit vector of a wall run b (world seg) for a castle place: away from the place centre. */
+  function outward(b, pl) {
+    const [x0, z0, x1, z1] = b.seg, vx = x1 - x0, vz = z1 - z0, l = Math.hypot(vx, vz) || 1;
+    let nx = vz / l, nz = -vx / l;
+    const mx = (x0 + x1) / 2 - pl.x, mz = (z0 + z1) / 2 - pl.z;
+    if (nx * mx + nz * mz < 0) { nx = -nx; nz = -nz; }
+    return [nx, nz];
+  }
+
+  /** Archer posts of a castle place (T05), in fill order: the round towers, the gatehouses (posts.gatehouse each),
+   *  then the wall walks (one slot every posts.wallEvery units of a run, runs shorter than posts.wallMin get none),
+   *  the wall slots dealt round robin over the runs so a few archers spread over the whole wall.
+   *  -> [{ building, x, y, z, yaw }]   (x, z) where the archer stands, y = its eye, yaw = outward. */
+  function posts(town, pl) {
+    const P = D.castle.posts, eye = D.perception.watch.eye, out = [];
+    if (!town || !pl) return out;
+    const own = town.buildings.filter(b => b.place === pl.id);
+    const yawOut = (x, z) => Math.atan2(x - pl.x, z - pl.z);
+    for (const b of own) {
+      if (b.type !== 'ctower') continue;
+      const a = yawOut(b.pos[0], b.pos[2]), r = b.r + P.towerOut;     // on the parapet, under the eaves of the cone
+      out.push({ building: b.id, x: b.pos[0] + Math.sin(a) * r, y: b.pos[1] + b.h + P.towerUp + eye, z: b.pos[2] + Math.cos(a) * r, yaw: a });
+    }
+    for (const b of own) {
+      if (b.type !== 'gatehouse') continue;
+      const a = yawOut(b.pos[0], b.pos[2]), r = b.r * 0.8 + P.gateOut, n = P.gatehouse;
+      for (let k = 0; k < n; k++) {
+        const s = (k - (n - 1) / 2) * P.gateSpacing;
+        out.push({ building: b.id, x: b.pos[0] + Math.sin(a) * r + Math.cos(a) * s, y: b.pos[1] + b.h + P.gateUp + eye,
+                   z: b.pos[2] + Math.cos(a) * r - Math.sin(a) * s, yaw: a });
+      }
+    }
+    const runs = own.filter(b => b.type === 'wall' && b.seg && b.len >= P.wallMin)
+      .sort((a, b) => yawOut(a.pos[0], a.pos[2]) - yawOut(b.pos[0], b.pos[2]))
+      .map(b => {
+        const n = Math.max(1, Math.floor(b.len / P.wallEvery)), [nx, nz] = outward(b, pl), [x0, z0, x1, z1] = b.seg, slots = [];
+        for (let i = 0; i < n; i++) {
+          const k = (i + 0.5) / n, x = x0 + (x1 - x0) * k + nx * P.wallOut, z = z0 + (z1 - z0) * k + nz * P.wallOut;
+          slots.push({ building: b.id, x, y: b.pos[1] + D.buildings.wall.walkTop + eye, z, yaw: Math.atan2(nx, nz) });
+        }
+        // the middle slot first, then outward from it (one archer stands mid-wall)
+        const mid = Math.floor((n - 1) / 2), order = [];
+        for (let d = 0; order.length < n; d++) { if (mid + d < n) order.push(slots[mid + d]); if (d && mid - d >= 0) order.push(slots[mid - d]); }
+        return order;
+      });
+    for (let i = 0, more = true; more; i++) {
+      more = false;
+      for (const r of runs) if (i < r.length) { out.push(r[i]); more = true; }
+    }
+    return out;
+  }
+
+  /** The dragon is in the portcullis gap (under the lintel) - the gate must not drop on it. */
+  function inGap(town, pos, pad) {
+    if (!town || !pos) return false;
+    const g = town.buildings.find(b => b.gate && b.type === 'portcullis');
+    if (!g) return false;
+    const [x0, z0, x1, z1] = g.seg, vx = x1 - x0, vz = z1 - z0, l2 = vx * vx + vz * vz || 1;
+    const k = Math.max(0, Math.min(1, ((pos[0] - x0) * vx + (pos[2] - z0) * vz) / l2));
+    const d = Math.hypot(pos[0] - (x0 + vx * k), pos[2] - (z0 + vz * k));
+    return d <= D.castle.wallThick / 2 + (pad || 0) + D.castle.gate.margin && pos[1] - g.pos[1] < D.buildings.portcullis.h + (pad || 0);
+  }
+
+  /** T05: castle alarm, gate and horn, once per frame from defenders.step.
+   *  sq = the squad (sq.list defenders, sq.horn { place: cool s }), o = { pos (dragon or null), pad, inside }.
+   *  Per castle place: alarmed = a live defender of it is 'alert' or 'search'. The gate (town.gateK 0 open .. 1 shut)
+   *  drops over gate.close s while alarmed, waits while the dragon is in the gap, and is a solid (town.gateClosed) once
+   *  down; when the search is over it opens (no longer a solid at once, the grate rises over gate.close s).
+   *  The keep's horn (a standing building with horn) sounds when a castle defender is 'alert' and its cooldown is over:
+   *  every live defender of the region turns alert toward the dragon; then horn.cool s until it can sound again.
+   *  town.signal = the red signal fire on the keep (while alarmed). town.gateHold (debug toggle) pauses the gate until
+   *  the alarm changes. Events: 'gate:closing' | 'gate:closed' | 'gate:open' { place }, 'horn:blow' { place, pos }. */
+  function step(sq, o, dt) {
+    const out = [], town = sq && sq.town;
+    if (!town) return out;
+    const G = D.castle.gate, H = D.castle.horn, PC = D.perception;
+    sq.horn = sq.horn || {};
+    for (const k in sq.horn) sq.horn[k] = Math.max(0, sq.horn[k] - dt);
+    for (const pl of town.places) {
+      if (!pl.castle) continue;
+      let alarmed = false, alert = false;
+      for (const d of sq.list) if (d.alive && d.place === pl.id) {
+        if (d.state === 'alert') alert = alarmed = true;
+        else if (d.state === 'search') alarmed = true;
+      }
+      const keep = town.buildings.find(b => b.place === pl.id && D.buildings[b.type].horn && !b.ruin);
+      if (alert && keep && !(sq.horn[pl.id] > 0)) {
+        sq.horn[pl.id] = H.cool;
+        const at = [keep.pos[0], keep.pos[1] + keep.h, keep.pos[2]];
+        out.push({ e: 'horn:blow', place: pl.id, pos: at });
+        for (const d of sq.list) {
+          if (!d.alive || d.hidden) continue;
+          d.aware = PC.alert; d.search = 0;
+          if (o && o.pos && !o.inside) d.focus = o.pos.slice();
+          if (d.state !== 'alert') { out.push({ e: 'aware:state', id: d.id, kind: d.kind, place: d.place, state: 'alert', from: d.state, horn: true }); d.state = 'alert'; }
+        }
+        alarmed = true;
+      }
+      town.signal = alarmed;
+      if (town.gateAlarm !== alarmed) { if (town.gateAlarm != null) town.gateHold = false; town.gateAlarm = alarmed; }
+      if (town.gateHold) continue;
+      const k0 = town.gateK || 0;
+      if (alarmed) {
+        if (town.gateClosed) { town.gateK = 1; continue; }
+        if (o && o.pos && inGap(town, o.pos, o.pad)) continue;            // never on a dragon in the gap: wait
+        if (k0 === 0) out.push({ e: 'gate:closing', place: pl.id });
+        town.gateK = Math.min(1, k0 + dt / G.close);
+        if (town.gateK >= 1) { town.gateClosed = true; out.push({ e: 'gate:closed', place: pl.id }); }
+      } else if (k0 > 0 || town.gateClosed) {
+        if (town.gateClosed) { town.gateClosed = false; out.push({ e: 'gate:open', place: pl.id }); }
+        town.gateK = Math.max(0, k0 - dt / G.close);
+      }
+    }
+    return out;
+  }
+
+  /** Debug / scripted: sound the horn of the town's castle now (cooldown ignored). */
+  function blowHorn(sq, o) {
+    if (sq) sq.horn = {};
+    const pl = sq && sq.town && sq.town.places.find(p => p.castle);
+    if (!pl) return [];
+    for (const d of sq.list) if (d.alive && d.place === pl.id && !d.hidden) { d.state = 'alert'; d.aware = D.perception.alert; if (o && o.pos) d.focus = o.pos.slice(); }
+    return step(sq, o, 0);
+  }
+
+  M.define('castle', { lodFor, layout, inside, pieces, closeGate, openGate, gateOpen, posts, inGap, step, blowHorn, outward });
 })(typeof window !== 'undefined' ? window : globalThis);
