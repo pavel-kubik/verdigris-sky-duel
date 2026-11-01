@@ -490,7 +490,7 @@
     map: {
       cell: 50, reveal: 160, revealAlt: 1.5, highAlt: 0.6, every: 0.25, image: 256,
       world: { ash: [0, 0], wild: [0, 1], farm: [0, 2], bend: [0, 3], pass: [-1, 2.6], low: [1, 3.6], capital: [0, 4.4] },
-      later: { pass: { stage: 2 }, low: { stage: 2 }, capital: { stage: 3 } },
+      later: { pass: { stage: 1 }, low: { stage: 2 }, capital: { stage: 3 } },   // 000_spec.md 9: Drake (late), Wyrm, Elder
       links: [['pass', 'farm'], ['low', 'bend'], ['capital', 'bend']],
       zoom: [1, 4], tapPx: 36,
     },

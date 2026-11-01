@@ -25,6 +25,16 @@
 
   const images = {}, imageMs = {};
 
+  /** terrain.liquidAt with the height already known (no surfaceAt: 3 fewer height samples per pixel). */
+  function wetAt(id, R, x, z, h) {
+    for (const f of R.terrain.features) if (f.type === 'cone' && f.crater && Math.hypot(x - f.x, z - f.z) < f.crater.r && h < T.lavaLevel(id)) return 'lava';
+    for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return 'water';
+    const rv = T.riverAt(id, x, z);
+    if (rv && (R.terrain.water === 'mask' || h < rv.level)) return 'water';
+    if (R.waterLevel != null && h < R.waterLevel) return 'water';
+    return null;
+  }
+
   /** The region image: heights on an N x N grid, palette colour, toned toward parchment, hill shaded, water blue. */
   function regionImage(id) {
     if (images[id]) return images[id];
@@ -43,7 +53,7 @@
       const dx = (hs[k - 1] - hs[k + 1]) / (2 * step), dz = (hs[k - (N + 2)] - hs[k + (N + 2)]) / (2 * step);   // dx: west - east
       const slope = Math.hypot(dx, dz);
       let c = colour ? colour(x, z, h, slope, 1) : [0.5, 0.5, 0.4];
-      const wet = T.liquidAt(id, x, z);
+      const wet = wetAt(id, R, x, z, h);
       if (wet === 'water') c = water;
       else if (wet === 'lava') c = [0.85, 0.32, 0.1];
       // light from the north-west (top left): dx = west - east, dz = north - south; ground falling toward the light is brighter
@@ -117,7 +127,7 @@
         g.save(); g.translate(sx, sy); g.rotate(Math.atan2(uy, ux));
         g.fillStyle = locked ? '#7d8278' : '#62c48a'; g.beginPath(); g.moveTo(10, 0); g.lineTo(-6, -8); g.lineTo(-6, 8); g.closePath(); g.fill();
         g.restore();
-        const name = t('c.region.' + e.to) + (locked ? ' - ' + t('c.map.needs', { stage: stageName(locked.stage) }) : '');
+        const name = t('c.region.' + e.to) + (locked ? ' - ' + (locked.later ? t('c.map.later') : t('c.map.needs', { stage: stageName(locked.stage) })) : '');
         label(name, sx - ux * 22, sy - uy * 22, locked ? '#a9ae9b' : '#ebe3cd');
         hits.push({ x: sx, y: sy, name });
       }
@@ -147,7 +157,7 @@
     function label(txt, x, y, col) {
       g.font = '600 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       const w = g.measureText(txt).width + 10;
-      const lx = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, x)), ly = Math.max(70, Math.min(H - 14, y));
+      const lx = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, x)), ly = Math.max(70, Math.min(H - 76, y));   // clear of the bar and the help line
       g.fillStyle = 'rgba(12,19,16,.72)'; g.fillRect(lx - w / 2, ly - 9, w, 18);
       g.fillStyle = col; g.fillText(txt, lx, ly);
     }
@@ -184,7 +194,10 @@
         if (q.here) { g.fillStyle = '#ff9447'; g.beginPath(); g.arc(x + rr * 0.55, y - rr * 0.55, 7, 0, TAU); g.fill(); g.strokeStyle = INK; g.lineWidth = 2; g.stroke(); }
         let name = t(q.nameKey);
         label(name, x, y + rr * 0.62, '#ebe3cd');
-        if (q.locked) { lock(x, y - 2); label(t('c.map.needs', { stage: stageName(q.locked.stage) }), x, y + rr * 0.62 + 20, '#e0b040'); name += ' - ' + t('c.map.needs', { stage: stageName(q.locked.stage) }); }
+        if (q.locked) {
+          const why = q.locked.later ? t('c.map.later') : t('c.map.needs', { stage: stageName(q.locked.stage) });
+          lock(x, y - 2); label(why, x, y + rr * 0.62 + 20, '#e0b040'); name += ' - ' + why;
+        }
         hits.push({ x, y, r: Math.max(rr, D.map.tapPx / 2), name, region: q.playable && q.visited ? q.id : null });
       }
     }
@@ -235,7 +248,7 @@
     const ptrs = new Map();
     let pinch = null, downAt = null;
     cv.addEventListener('pointerdown', e => {
-      cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+      try { cv.setPointerCapture(e.pointerId); } catch (_) { /* synthetic or already released pointer */ }
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (ptrs.size === 1) downAt = { x: e.clientX, y: e.clientY, t: Date.now(), moved: 0 };
       if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), zoom: cam.zoom }; if (downAt) downAt.moved = 99; }

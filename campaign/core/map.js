@@ -12,7 +12,8 @@
  *   model(cs, regionId?) -> { regions, places, dragon, target, region }
  *       regions: [{ id, nameKey, col, row, known, here, visited, locked: null | { stage }, alert, playable }]
  *         known = visited, or a playable neighbour of a visited region (the exits), or a later region linked to one;
- *         locked = the stage needed (an exit's minStage, or data.map.later) when the dragon is below it
+ *         locked = { stage, later } the stage needed (an exit's minStage, or data.map.later) when the dragon is below it;
+ *         a region of a later phase is always locked (later: true once the dragon has the stage)
  *       places of regionId (default the current region): only discovered ones, plus the lair (always known):
  *         [{ id, kind: 'lair' | 'settlement' | 'castle', type, x, z, key, discovered: true, alert, freed }]
  *       dragon: { x, z, yaw } when the dragon is in regionId (and not in the cave), else null; target: null (T11)
@@ -145,7 +146,7 @@
     for (const id of Object.keys(W)) {
       const need = stageFor(id), rs = cs.regionStates && cs.regionStates[id];
       regions.push({ id, nameKey: 'c.region.' + id, col: W[id][0], row: W[id][1], known: !!known[id], visited: vis[id], here: id === cs.region,
-                     playable: !!D.regions[id], locked: (!D.regions[id] || stage < need) ? { stage: need } : null, alert: rs ? AL.level(rs) : 0 });
+                     playable: !!D.regions[id], locked: (!D.regions[id] || stage < need) ? { stage: need, later: !D.regions[id] && stage >= need } : null, alert: rs ? AL.level(rs) : 0 });
     }
     const places = [];
     if (D.regions[rid]) {
