@@ -106,6 +106,15 @@ p{margin:0;color:var(--mute);line-height:1.45}
 #mapZoom{position:absolute;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:8px}
 #map #mapZoom button{width:48px;height:48px;padding:0;font-size:22px}
 #mapTag{position:absolute;transform:translateX(-50%);font-size:13px;font-weight:600;color:var(--bone);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 10px;pointer-events:none;white-space:nowrap}
+#mapTravel{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));right:calc(74px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;display:grid;gap:8px}
+#mapTravel[hidden]{display:none}
+#mapTravelHead{margin:0;font-family:var(--f-ui);font-weight:700;color:var(--bone)}
+#mapTravelList{display:flex;flex-wrap:wrap;gap:8px}
+#map #mapTravelList button{height:auto;min-height:44px;padding:8px 14px;line-height:1.2;text-align:left}
+#map #mapTravelList button.cta{border-color:var(--verd,#62c48a);color:#62c48a}
+#map #mapTravelList button:disabled{opacity:.45}
+#mapTravelWhy{margin:0;font-size:13px;color:#e0b040}
+#map.travel #mapHelp{display:none}
 #mapHelp{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));font-size:12px;color:var(--mute);max-width:60%;pointer-events:none}
 #pauseBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(620px,70vw);font-size:12px;color:var(--mute);pointer-events:none}
@@ -299,7 +308,7 @@ h2{font-size:42px}
   <p id="aerieGold"></p>
   <p id="aerieNote" data-i18n="c.aerie.note">Loot you carry in is banked here, like in the lair. Growing up still needs the nest in the volcano.</p>
   <p id="aerieMsg" aria-live="polite"></p>
-  <div class="row"><button class="cta" id="aerieRestBtn" data-i18n="c.aerie.rest">Rest</button><button class="ghost" id="aerieLeaveBtn" data-i18n="c.aerie.leave">Leave</button></div>
+  <div class="row"><button class="cta" id="aerieRestBtn" data-i18n="c.aerie.rest">Rest</button><button class="ghost" id="aerieTravelBtn" data-i18n="c.aerie.travel">Fast travel</button><button class="ghost" id="aerieLeaveBtn" data-i18n="c.aerie.leave">Leave</button></div>
 </section>
 
 <section id="map" hidden aria-label="Map" data-i18n-attr="aria-label:c.map.open">
@@ -308,6 +317,7 @@ h2{font-size:42px}
   <div id="mapZoom"><button id="mapZoomIn" aria-label="Zoom in" data-i18n-attr="aria-label:c.map.zoomIn">+</button><button id="mapZoomOut" aria-label="Zoom out" data-i18n-attr="aria-label:c.map.zoomOut">-</button></div>
   <div id="mapHelp"></div>
   <div id="mapTag" hidden aria-live="polite"></div>
+  <div id="mapTravel" hidden><p id="mapTravelHead"></p><div id="mapTravelList"></div><p id="mapTravelWhy" hidden></p></div>
 </section>
 
 <section id="pause" class="panel center" hidden>
