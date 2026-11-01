@@ -17,6 +17,18 @@
  *       places of regionId (default the current region): only discovered ones, plus the lair (always known):
  *         [{ id, kind: 'lair' | 'settlement' | 'castle' | 'aerie' (T08), type, x, z, key, discovered: true, alert, freed }]
  *       dragon: { x, z, yaw } when the dragon is in regionId (and not in the cave), else null; target: null (T11)
+ * Fast travel (T09, 003_task_missions.md 5.3):
+ *   here(cs) -> 'lair' | '<region>.aerie' | null      the travel station the dragon is at (inside the lair or an aerie)
+ *   destinations(cs) -> [{ id, kind: 'lair' | 'aerie', region, key }]   the lair and every found aerie
+ *   canTravel(cs, from?, to) -> { ok, why }           why: 'station' (not at the map stone or inside an aerie), 'unknown'
+ *                                                     (not the lair or a found aerie), 'here', 'mission' (a mission is
+ *                                                     accepted or running: cs.mission.state, T10), 'missionLoot' (a relic or
+ *                                                     mission loot in the claws)
+ *   travel(cs, to) -> events[]                        region change to `to` (fresh prey field, carried prey re-homed); the
+ *                                                     dragon comes out as if it left that station: an aerie -> in the air in
+ *                                                     front of its cleft, facing out; the lair -> the lair's spawn in front
+ *                                                     of the cave. Events: region:enter { travel: true } (when the region
+ *                                                     changed), travel:done { from, to, region }; refused: travel:refused { why }
  * cs.explored = { regionId: number[] } (bitset words). Not saved yet: save v3 (T18) adds it.
  * Map axes: +Z = north (bearing 0), +X = west (the yaw convention: facing +Z, +X is on the left).
  * Pure: no DOM, no THREE.
@@ -165,5 +177,61 @@
     return { region: rid, regions, places, dragon, target: null };
   }
 
-  M.define('map', { grid, cellOf, bits, revealRange, reveal, explored, fraction, step, stageFor, model });
+  /* ---------- fast travel (T09) ---------- */
+  const PR = M.need('prey');
+  const LR = () => M.need('lair');
+  const here = cs => (cs.inLair ? 'lair' : cs.inAerie ? cs.inAerie + '.aerie' : null);
+
+  function destinations(cs) {
+    const home = LR().home(), out = [{ id: 'lair', kind: 'lair', region: home, key: 'c.nav.lair' }];
+    for (const id of Object.keys(D.regions)) {
+      const s = AE.site(id);
+      if (s && AE.found(cs, id)) out.push({ id: s.id, kind: 'aerie', region: id, key: 'c.region.' + id });
+    }
+    return out;
+  }
+
+  const MISSION_ON = { accepted: true, running: true, done: true };
+  const missionActive = cs => !!(cs.mission && MISSION_ON[cs.mission.state]);
+  const missionLoot = cs => !!(cs.carriedLoot && (cs.carriedLoot.mission || cs.carriedLoot.kind === 'relic'));
+
+  function canTravel(cs, from, to) {
+    const at = here(cs);
+    if (!at || (from && from !== at)) return { ok: false, why: 'station' };
+    if (!destinations(cs).some(d => d.id === to)) return { ok: false, why: 'unknown' };
+    if (to === at) return { ok: false, why: 'here' };
+    if (missionActive(cs)) return { ok: false, why: 'mission' };
+    if (missionLoot(cs)) return { ok: false, why: 'missionLoot' };
+    return { ok: true, why: null };
+  }
+
+  function travel(cs, to) {
+    const from = here(cs), c = canTravel(cs, from, to);
+    if (!c.ok) return [{ e: 'travel:refused', why: c.why, to }];
+    const dest = destinations(cs).find(d => d.id === to), d = cs.dragon, old = cs.region;
+    const carried = d.carried == null || !cs.field ? null : PR.byId(cs.field, d.carried);
+    cs.inLair = false; cs.inAerie = null; cs.station = null;
+    cs.region = dest.region;
+    if (dest.kind === 'aerie') { cs.inAerie = dest.region; AE.leave(cs); }       // out in front of the cleft, facing out
+    else LR().leave(cs);                                                          // the lair spawn, in front of the cave
+    const p = d.pilot;
+    cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
+    cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0;
+    const ev = [];
+    if (dest.region !== old || !cs.field) {
+      cs.field = PR.spawnRegion(dest.region, cs.rng, p ? p.pos : null);
+      d.carried = null; d.eatT = 0;
+      if (carried) {                                                              // the prey in the claws comes along
+        carried.id = cs.field.nextId++; carried.herd = 0;
+        carried.pos = p ? p.pos.slice() : carried.pos;
+        cs.field.list.push(carried);
+        d.carried = carried.id;
+      }
+      ev.push({ e: 'region:enter', region: dest.region, from: old, travel: true });
+    }
+    ev.push({ e: 'travel:done', from, to, region: dest.region });
+    return ev;
+  }
+
+  M.define('map', { grid, cellOf, bits, revealRange, reveal, explored, fraction, step, stageFor, model, here, destinations, canTravel, travel });
 })(typeof self !== 'undefined' ? self : this);

@@ -2,7 +2,8 @@
  * Verdigris campaign - map screen (Phase 3 T07, 003_task_missions.md 6 "Map screen"). A 2D canvas over the game, no THREE
  * scene (the terrain colours come from render/terrain.js colourFn).
  *   VRender.mapView.build(el, { t, stageName }) -> { open(cs, view?), close(), isOpen, redraw(), setView('region' | 'world'),
- *                                                    zoomBy(f), imageMs(regionId), info }
+ *                                                    zoomBy(f), imageMs(regionId), info, setPad(px) }
+ *   setPad(px): keep px free at the bottom (T09: the travel strip of the map stone); 0 = the whole screen
  *   el: the #map section with canvas#mapCanvas, #mapTitle, #mapTag, buttons #mapWorldBtn, #mapRegionBtn, #mapZoomIn,
  *       #mapZoomOut, #mapClose (game.js wires Close).
  * Region view: the terrain image (data.map.image px, from heights + the region palette, toned to parchment, hill shaded,
@@ -89,15 +90,15 @@
     const icon = VR.compass && VR.compass.icon, COL = (VR.compass && VR.compass.COL) || {};
     let cs = null, view = 'region', regionId = null, model = null, open = false, W = 0, H = 0, dpr = 1;
     const cam = { zoom: 1, cx: 0, cz: 0 }, fogCache = {};
-    let hits = [], tagT = 0;
+    let hits = [], tagT = 0, padB = 0;                                  // padB: px kept free at the bottom (T09 travel strip)
 
     function size() {
       dpr = Math.min(2, root.devicePixelRatio || 1);
       W = cv.clientWidth || root.innerWidth; H = cv.clientHeight || root.innerHeight;
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     }
-    const base = () => (Math.min(W, H - 120) * 0.94) / (2 * T.region(regionId).radius);
-    const toScreen = (x, z) => { const s = base() * cam.zoom; return [W / 2 - (x - cam.cx) * s, (H + 40) / 2 - (z - cam.cz) * s]; };
+    const base = () => (Math.min(W, H - 120 - padB) * 0.94) / (2 * T.region(regionId).radius);
+    const toScreen = (x, z) => { const s = base() * cam.zoom; return [W / 2 - (x - cam.cx) * s, (H + 40 - padB) / 2 - (z - cam.cz) * s]; };
     function clampCam() {
       const [z0, z1] = D.map.zoom, r = T.region(regionId).radius;
       cam.zoom = Math.max(z0, Math.min(z1, cam.zoom));
@@ -163,7 +164,7 @@
     }
 
     function drawWorld() {
-      const ids = model.regions, S = Math.min(W / 3.4, (H - 120) / 5.6), cy = (H + 40) / 2;
+      const ids = model.regions, S = Math.min(W / 3.4, (H - 120 - padB) / 5.6), cy = (H + 40 - padB) / 2;
       const pos = q => [W / 2 + q.col * S, cy - (q.row - 2.2) * S];
       const by = {}; for (const q of ids) by[q.id] = q;
       g.strokeStyle = 'rgba(233,225,204,.35)'; g.lineWidth = 3; g.setLineDash([6, 6]);
@@ -295,7 +296,7 @@
     root.addEventListener('resize', () => { if (open) { size(); draw(); } });
 
     return {
-      open: openMap, close, tick, redraw: () => open && refresh(), setView, zoomBy, tap,
+      open: openMap, close, tick, setPad: px => { padB = Math.max(0, px || 0); if (open) draw(); }, redraw: () => open && refresh(), setView, zoomBy, tap,
       get isOpen() { return open; }, get view() { return view; }, get region() { return regionId; }, get cam() { return cam; },
       get hits() { return hits.slice(); }, imageMs: id => imageMs[id], get info() { return { images: Object.keys(images), imageMs: Object.assign({}, imageMs) }; },
     };

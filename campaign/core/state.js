@@ -498,7 +498,9 @@
   /** Cave station action (T10): nest = rest (arg 'dusk' | 'dawn': sleep until then, T21; autosaves), larder = eat item arg, exit = leave; altar (T20) = buy upgrade arg (autosaves). */
   /** Aerie panel actions (Phase 3 T08): rest (autosaves), leave. */
   const aerieAct = (cs, id) => (id === 'rest' ? autosave(cs, relay(cs, AE.rest(cs)), 0) : id === 'leave' ? relay(cs, AE.leave(cs)) : []);
+  /** T09: fast travel from the map stone or an aerie (core/map.js rules); the new region's town, autosave. */
+  const travel = (cs, to) => { const ev = relay(cs, MP.travel(cs, to)); ensureTown(cs); return autosave(cs, ev, 0); };
   const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs, arg) : id === 'altar' ? autosave(cs, relay(cs, CV.act(cs, id, arg)), 0) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct, aerieAct });
+  M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct, aerieAct, travel });
 })(typeof self !== 'undefined' ? self : this);

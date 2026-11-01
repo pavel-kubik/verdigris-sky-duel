@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't208.2 2026-11-01 aeries, rebased; to aerie on Shift+1';
+  const BUILD = 't209.2 2026-11-01 fast travel, rebased; debug Shift+1 / 2 / 3';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -268,7 +268,50 @@
     document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
     mapView.open(cs);
   }
-  function closeMap() { if (mapView.isOpen) mapView.close(); }
+  function closeMap() { if (mapView.isOpen) mapView.close(); travelMode(false); }
+  /* ---------- fast travel (Phase 3 T09): the map stone in the cave and the aerie panel open the map in travel mode;
+     core/map.js has the rules (canTravel: only from the lair or an aerie, only to the lair or a found aerie, never during a
+     mission or with mission loot), state.travel does the region change ---------- */
+  const mapEl = $('#map'), travelEl = $('#mapTravel'), travelList = $('#mapTravelList');
+  let travelOn = false;
+  function travelMode(on) { travelOn = on; mapEl.classList.toggle('travel', on); travelEl.hidden = !on; mapView.setPad(on ? travelEl.offsetHeight + 12 : 0); }
+  function destName(d) { return d.kind === 'lair' ? t('c.travel.lair') : t('c.travel.aerie', { region: t(TR.region(d.region).nameKey) }); }
+  function renderTravel() {
+    travelList.innerHTML = '';
+    const at = MP.here(cs), list = MP.destinations(cs).filter(d => d.id !== at);
+    let why = null;
+    for (const d of list) {
+      const c = MP.canTravel(cs, at, d.id);
+      if (!c.ok && !why) why = c.why;
+      const b = document.createElement('button');
+      b.className = c.ok ? 'cta' : 'ghost'; b.disabled = !c.ok; b.dataset.id = d.id;
+      b.textContent = t('c.travel.fly', { place: destName(d) });
+      travelList.append(b);
+    }
+    $('#mapTravelHead').textContent = t(list.length ? 'c.travel.head' : 'c.travel.none');
+    $('#mapTravelWhy').textContent = why ? t('c.travel.why.' + why) : '';
+    $('#mapTravelWhy').hidden = !why;
+    if (travelOn) mapView.setPad(travelEl.offsetHeight + 12);
+  }
+  function openTravel() {
+    if (state !== 'play' || !MP.here(cs)) return;
+    if (stationOpen) closeStation();
+    openMap();
+    if (!mapView.isOpen) return;
+    travelMode(true); renderTravel(); mapView.setPad(travelEl.offsetHeight + 12);
+    mapView.setView('world');
+    if (!isTouch) setTimeout(() => { const b = travelList.querySelector('button:not(:disabled)'); if (b) b.focus({ preventScroll: true }); }, 0);
+  }
+  function travelTo(id) {
+    if (!travelOn || state !== 'play') return;
+    const from = MP.here(cs), ev = ST.travel(cs, id);
+    if (ev.some(e => e.e === 'travel:refused')) { renderTravel(); return; }
+    closeMap();
+    if (from === 'lair') closeStation(); else closeAerie();
+    pilot = dragon.pilot;
+    onEvents(ev);
+  }
+  travelList.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) travelTo(b.dataset.id); });
   $('#mapBtn').addEventListener('click', e => { e.stopPropagation(); if (mapView.isOpen) closeMap(); else openMap(); });
   $('#mapClose').addEventListener('click', closeMap);
 
@@ -332,6 +375,7 @@
   let confirmQ = false, enterQ = false, landQ = false;          // one-shots: Enter / Move slot (travel), Move slot (enter cave), F / Move slot (land, fly)
   addEventListener('keydown', e => {
     if (mapView.isOpen) {                                        // T07: the map takes the keys while open
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && travelOn && document.activeElement && travelEl.contains(document.activeElement)) return;   // T09: the focused Fly there button
       if (e.code === 'Tab' || e.code === 'Escape') closeMap();
       else if (e.code === 'Equal' || e.code === 'NumpadAdd') mapView.zoomBy(1.4);
       else if (e.code === 'Minus' || e.code === 'NumpadSubtract') mapView.zoomBy(1 / 1.4);
@@ -758,7 +802,8 @@
       else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
       else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
       else if (e.e === 'dragon:died') { died = e; hurt = 0; shake = 0; hero.flash = 0; fadeEl.classList.add('now'); requestAnimationFrame(() => fadeEl.classList.remove('now')); }
-      else if (e.e === 'region:enter') swapRegion(e.respawn);
+      else if (e.e === 'region:enter') swapRegion(e.respawn || e.travel);
+      else if (e.e === 'travel:done') { leaveCave(); toast(t('c.travel.done', { place: destName(MP.destinations(cs).find(d => d.id === e.to) || { kind: 'lair' }) }), t(e.to === 'lair' ? 'c.travel.doneLair' : 'c.travel.doneAerie'), 3); }   // T09
       else if (e.e === 'save') saveNow(e.why);
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
       else if (e.e === 'aerie:enter') openAerie();
@@ -969,6 +1014,7 @@
   function useStation(id) {
     if (!id || !cs.inLair || state !== 'play') return;
     if (id === 'exit') { onEvents(ST.caveAct(cs, 'exit')); return; }
+    if (id === 'mapStone') { if (mapView.isOpen) closeMap(); else openTravel(); return; }   // T09: the map in travel mode
     if (stationOpen === id) closeStation(); else openStation(id);
   }
   /** lair:enter: the dragon stands in the cave (tunnel, or the nest after death / hatching); the camera cuts inside. */
@@ -1029,6 +1075,7 @@
   function aerieAct(id) { if (!cs.inAerie || state !== 'play') return; onEvents(ST.aerieAct(cs, id)); renderAerie(); }
   $('#aerieRestBtn').onclick = () => aerieAct('rest');
   $('#aerieLeaveBtn').onclick = () => aerieAct('leave');
+  $('#aerieTravelBtn').onclick = () => openTravel();             // T09: fast travel from the aerie
   /** Debug: rest from anywhere (enters the lair first when in the Ash Wastes, else rests in place). */
   function rest() { onEvents(ST.lairRest(cs)); renderLair(); }
   /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
@@ -1072,6 +1119,8 @@
     ['Shift+8', 'fly a low pass along the outside of a castle wall (60 out, wall walk height + 15): archers volley, a bastion aims, T05', 'ShiftDigit8', 'wall pass'],
     ['Shift+9', 'castle fire: every wooden roof and hoarding of the castle catches fire now (they burn out in about a minute; stone stays, charred), T06', 'ShiftDigit9', 'castle fire'],
     ['Shift+1', 'aerie of this region: found, fly in from 120 out, facing the mouth (T08)', 'ShiftDigit1', 'to aerie'],
+    ['Shift+2', 'find every aerie (fast travel test, T09)', 'ShiftDigit2', 'all aeries'],
+    ['Shift+3', 'stand-in mission on / off: fast travel is blocked while it runs (T09, until the T10 missions)', 'ShiftDigit3', 'mission'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1282,6 +1331,14 @@
         snapCam(); flashPrompt(t('c.dbg.wall'), 2);
       }
     }
+    if (code === 'ShiftDigit2') {                                 // T09: every aerie found (the map stone lists them)
+      for (const id of Object.keys(D.regions)) { const s = AE.site(id); if (s) cs.discovered[s.id] = true; }
+      flashPrompt(t('c.dbg.allAeries'), 1.5); if (travelOn) renderTravel();
+    }
+    if (code === 'ShiftDigit3') {                                 // T09: a stand-in running mission (T10 brings the real ones)
+      cs.mission = cs.mission ? null : { id: 'debug', state: 'running' };
+      flashPrompt(t(cs.mission ? 'c.dbg.missionOn' : 'c.dbg.missionOff'), 1.5); if (travelOn) renderTravel();
+    }
     if (code === 'ShiftDigit1') {                                 // T08: in front of this region's aerie, already found
       const s = AE.site(cs.region);
       if (!s || cs.inLair || cs.inAerie) flashPrompt(t('c.dbg.noAerie'), 1.5);
@@ -1465,6 +1522,7 @@
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
       { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+1: to aerie)')); }   // T08
+      L.push('TRAVEL  at ' + (MP.here(cs) || '-') + '  to ' + MP.destinations(cs).map(d => d.id).join(', ') + (cs.mission ? '  mission ' + cs.mission.state : '') + '  (Shift+2 all aeries, Shift+3 mission)');   // T09
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
         { const ci = cornView ? cornView.info : null, cl = (cs.crops && cs.crops.list) || [];
@@ -1504,5 +1562,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();
