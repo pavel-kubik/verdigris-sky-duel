@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't207.1 2026-11-01 map screen: region + world view, fog, pan / zoom';
+  const BUILD = 't207.2 2026-11-01 map screen, rebased on T05 + T06';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */

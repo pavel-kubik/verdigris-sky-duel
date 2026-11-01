@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't207.1 2026-11-01 map screen: region + world view, fog, pan / zoom';
+  const BUILD = 't207.2 2026-11-01 map screen, rebased on T05 + T06';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
