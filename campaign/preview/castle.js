@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't201.1 2026-10-31 castle kit and preview page';
+  const BUILD = 't202.3 2026-11-01 Veltava Bend rebased on castle kit';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
