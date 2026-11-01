@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't207.2 2026-11-01 map screen, rebased on T05 + T06';
+  const BUILD = 't207.3 2026-11-01 map screen, map reveal on Shift+0';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -351,7 +351,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^Digit[456789]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
+    if (debug) debugKey(e.shiftKey && /^Digit[0-9]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1023,7 +1023,7 @@
     [',', 'stand on the ground in front of the next loot item of this region (tithe chest / strongbox), facing it', 'Comma', 'to loot'],
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
-    ['\\', 'map: reveal the whole region and discover every place in it (map test)', 'Backslash', 'map reveal'],
+    ['Shift+0', 'map: reveal the whole region and discover every place in it (map test)', 'ShiftDigit0', 'map reveal'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
     ['Shift+5', 'castle gate: close / open (portcullis solid while closed, T03)', 'ShiftDigit5', 'gate'],
@@ -1044,7 +1044,7 @@
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
-    if (code === 'Backslash') {                                   // T07: no fog, every place of the region discovered
+    if (code === 'ShiftDigit0') {                                 // T07: no fog, every place of the region discovered
       C.need('map').reveal(cs, regionId, 0, 0, 1e5);
       for (const pl of SE.layout(regionId).places) cs.discovered[pl.id] = true;
       flashPrompt('map: ' + regionId + ' revealed', 1.5);
