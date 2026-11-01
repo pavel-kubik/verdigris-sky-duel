@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't206.1 2026-11-01 castle fire and char: roofs burn, stone stays charred, Shift+9 castle fire';
+  const BUILD = 't207.3 2026-11-01 map screen, map reveal on Shift+0';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -257,6 +257,21 @@
     }
     if (momArrow.hidden === show) momArrow.hidden = !show;
   }
+  /* ---------- map screen (Phase 3 T07): render/map-view.js over core/map.js; map button (touch and mouse), Tab ---------- */
+  const STAGE_IDS = ['hatchling', 'drake', 'wyrm', 'elder'];
+  const mapView = VRender.mapView.build($('#map'), { t, stageName: s => t('c.stage.' + (STAGE_IDS[s] || 'drake')),
+                                                     help: t(isTouch ? 'c.map.helpTouch' : 'c.map.helpKeys') });
+  function openMap() {
+    if (state !== 'play' || !cs.dragon.pilot || mapView.isOpen) return;
+    for (const k in keys) keys[k] = false;
+    mouseBreath = false; touch.breath = touch.boost = touch.grab = touch.eat = false; touch.x = touch.y = 0;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    mapView.open(cs);
+  }
+  function closeMap() { if (mapView.isOpen) mapView.close(); }
+  $('#mapBtn').addEventListener('click', e => { e.stopPropagation(); if (mapView.isOpen) closeMap(); else openMap(); });
+  $('#mapClose').addEventListener('click', closeMap);
+
   /* ---------- compass strip (T109): markers from core/nav.js; tap a marker for its name and distance ---------- */
   const compassEl = $('#compass'), compassTag = $('#compassTag');
   const compass = VRender.compass.build(compassEl, { t, fov: D.nav.fov });
@@ -316,6 +331,13 @@
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
   let confirmQ = false, enterQ = false, landQ = false;          // one-shots: Enter / Move slot (travel), Move slot (enter cave), F / Move slot (land, fly)
   addEventListener('keydown', e => {
+    if (mapView.isOpen) {                                        // T07: the map takes the keys while open
+      if (e.code === 'Tab' || e.code === 'Escape') closeMap();
+      else if (e.code === 'Equal' || e.code === 'NumpadAdd') mapView.zoomBy(1.4);
+      else if (e.code === 'Minus' || e.code === 'NumpadSubtract') mapView.zoomBy(1 / 1.4);
+      e.preventDefault(); return;
+    }
+    if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) openMap(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
@@ -329,7 +351,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^Digit[456789]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
+    if (debug) debugKey(e.shiftKey && /^Digit[0-9]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -417,6 +439,7 @@
   }
   function setState(s) {
     const prev = state; state = s;
+    if (s !== 'play') closeMap();                                 // T07: pause, menu, hatch close the map
     const inGame = s === 'play' || s === 'paused';
     $('#intro').hidden = s !== 'intro';
     $('#hatch').hidden = !(s === 'hatch' && hatchCard);
@@ -1000,6 +1023,7 @@
     [',', 'stand on the ground in front of the next loot item of this region (tithe chest / strongbox), facing it', 'Comma', 'to loot'],
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
+    ['Shift+0', 'map: reveal the whole region and discover every place in it (map test)', 'ShiftDigit0', 'map reveal'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
     ['Shift+5', 'castle gate: close / open (portcullis solid while closed, T03)', 'ShiftDigit5', 'gate'],
@@ -1020,6 +1044,11 @@
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
+    if (code === 'ShiftDigit0') {                                 // T07: no fog, every place of the region discovered
+      C.need('map').reveal(cs, regionId, 0, 0, 1e5);
+      for (const pl of SE.layout(regionId).places) cs.discovered[pl.id] = true;
+      flashPrompt('map: ' + regionId + ' revealed', 1.5);
+    }
     if (code === 'KeyI') {                                        // T08: a grazing goat 4 m (x scale) in front, to test the ground pick up
       const g = cs.field.list.filter(q => q.type === 'goat' && q.state !== 'carried').sort((a, b) => Math.hypot(a.pos[0] - pilot.pos[0], a.pos[2] - pilot.pos[2]) - Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]))[0];
       if (g) {
@@ -1236,6 +1265,7 @@
     const rawDt = (now - last) / 1000;
     let dt = Math.min(0.05, rawDt); last = now;
     if (state === 'paused') dt = 0;
+    if (mapView.isOpen) { mapView.tick(Math.min(0.1, rawDt)); return; }   // T07: the region scene is paused (not drawn) under the map
     time += reduceMotion ? dt * 0.3 : dt;
     if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
 
@@ -1421,5 +1451,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();
