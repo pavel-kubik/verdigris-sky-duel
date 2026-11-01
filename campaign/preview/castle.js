@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't203.3 2026-11-01 castle solids, wall walks, gate; DBG gate / to wall';
+  const BUILD = 't204.1 2026-11-01 castle-view: LOD, night, smoke; named places, castle icon';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
