@@ -69,8 +69,8 @@
     cs.exit = null; cs.exitT = 0;
     d.eatT = 0;
     p.breathing = false; p.boosting = false;
-    p.pos[0] = s.mouth[0] - s.dir[0] * 4; p.pos[1] = s.mouth[1]; p.pos[2] = s.mouth[2] - s.dir[1] * 4;   // on the ledge inside the mouth
-    p.yaw = s.facing;
+    p.pos[0] = s.mouth[0] + s.dir[0] * 2; p.pos[1] = s.mouth[1] - 0.1 + D.walk.stand * scaleOf(cs); p.pos[2] = s.mouth[2] + s.dir[1] * 2;   // standing on the ledge
+    p.yaw = s.facing; p.pitch = 0; p.roll = 0; p.speed = 0; p.vel = [0, 0, 0]; p.mode = 'ground'; p.tr = null;
     return ev;
   }
 

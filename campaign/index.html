@@ -143,12 +143,13 @@ kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);bor
 .center{left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));text-align:center}
 .center .row{justify-content:center}
 h2{font-size:42px}
-#lair{max-height:calc(100% - 24px);overflow:auto;gap:10px}
+#lair,#aeriePanel{max-height:calc(100% - 24px);overflow:auto;gap:10px}
+#aerieNote{color:var(--mute);font-size:13px}
 /* T10 station panel: the dragon stays in the cave, the panel names one station (nest or larder).
    Desktop: side panel on the right. Touch portrait: a sheet above the stick and buttons. Touch landscape: between them. */
-#lair.station{left:auto;top:50%;right:calc(16px + env(safe-area-inset-right,0px));transform:translateY(-50%);width:min(340px,calc(100% - 32px));padding:16px 18px;text-align:left}
-#lair.station .row{justify-content:flex-start}
-#lair.station h2{font-size:28px}
+#lair.station,#aeriePanel.station{left:auto;top:50%;right:calc(16px + env(safe-area-inset-right,0px));transform:translateY(-50%);width:min(340px,calc(100% - 32px));padding:16px 18px;text-align:left}
+#lair.station .row,#aeriePanel.station .row{justify-content:flex-start}
+#lair.station h2,#aeriePanel.station h2{font-size:28px}
 #lair[data-station=nest] .larder{display:none}
 #lair .hoardInfo{display:none}
 #lair[data-station=hoard] .hoardInfo{display:block}
@@ -178,15 +179,15 @@ h2{font-size:42px}
 #goldRow.pulse small{animation:goldPulse .5s ease-in-out 4}
 @keyframes goldPulse{50%{color:#fff3c4;text-shadow:0 0 8px #f2c14e}}
 #lair[data-station=larder] #lairStage,#lair[data-station=larder] #lairVitals,#lair[data-station=larder] #lairTime,#lair[data-station=larder] .restRow{display:none}
-@media (pointer:coarse){#lair.station{left:12px;right:12px;width:auto;top:auto;transform:none;bottom:calc(252px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 252px - 130px - env(safe-area-inset-bottom,0px) - env(safe-area-inset-top,0px));padding:12px 14px;gap:8px}#lair.station h2{font-size:22px}}
+@media (pointer:coarse){#lair.station,#aeriePanel.station{left:12px;right:12px;width:auto;top:auto;transform:none;bottom:calc(252px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 252px - 130px - env(safe-area-inset-bottom,0px) - env(safe-area-inset-top,0px));padding:12px 14px;gap:8px}#lair.station h2,#aeriePanel.station h2{font-size:22px}}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
-  #lair.station{left:calc(190px + env(safe-area-inset-left,0px));right:calc(190px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 140px)}
+  #lair.station,#aeriePanel.station{left:calc(190px + env(safe-area-inset-left,0px));right:calc(190px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 140px)}
 }
 #lair .larder{display:grid;gap:6px;text-align:left}
 #larderList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 #larderList li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:4px;padding:4px 4px 4px 12px}
 #larderList button{min-height:38px;min-width:64px}
-#lairMsg{min-height:1.4em;color:var(--verd);font-weight:600}
+#lairMsg,#aerieMsg{min-height:1.4em;color:var(--verd);font-weight:600}
 #lairDeath{margin:0;padding:8px 12px;border:1px solid var(--blood);border-radius:4px;color:var(--bone);background:rgba(229,72,79,.14);font-weight:600}
 #saveNote{margin:0;font-size:14px;color:var(--mute)}
 #introNew{margin:0;font-size:14px;color:var(--mute);border-left:2px solid var(--verd);padding-left:10px}
@@ -289,6 +290,16 @@ h2{font-size:42px}
   <div class="larder"><div class="eyebrow" id="larderHead"></div><ul id="larderList"></ul><p id="larderEmpty" data-i18n="c.lair.empty">Empty - carry prey into the cave to store it</p></div>
   <p id="lairMsg" aria-live="polite"></p>
   <button class="ghost" id="leaveBtn" data-i18n="c.cave.close">Close</button>
+</section>
+
+<section id="aeriePanel" class="panel station" hidden aria-labelledby="aerieTitle">
+  <div class="eyebrow" id="aerieWhere"></div>
+  <h2 id="aerieTitle" data-i18n="c.aerie.title">Aerie</h2>
+  <p id="aerieVitals"></p>
+  <p id="aerieGold"></p>
+  <p id="aerieNote" data-i18n="c.aerie.note">Loot you carry in is banked here, like in the lair. Growing up still needs the nest in the volcano.</p>
+  <p id="aerieMsg" aria-live="polite"></p>
+  <div class="row"><button class="cta" id="aerieRestBtn" data-i18n="c.aerie.rest">Rest</button><button class="ghost" id="aerieLeaveBtn" data-i18n="c.aerie.leave">Leave</button></div>
 </section>
 
 <section id="map" hidden aria-label="Map" data-i18n-attr="aria-label:c.map.open">
