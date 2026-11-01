@@ -150,5 +150,5 @@
     return { update, tap, select, get selected() { return selected; } };
   }
 
-  VR.compass = { build };
+  VR.compass = { build, icon, COL };   // icon + COL: the map view (T07) draws the same marker icons
 })(typeof self !== 'undefined' ? self : this);

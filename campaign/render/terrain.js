@@ -294,5 +294,5 @@
     };
   }
 
-  VR.terrain = { build, PALETTES };
+  VR.terrain = { build, PALETTES, colourFn };   // colourFn: the map view (T07) paints its region image with it
 })(typeof self !== 'undefined' ? self : this);
