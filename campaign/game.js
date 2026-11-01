@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't202.3 2026-11-01 Veltava Bend rebased on castle kit';
+  const BUILD = 't202.4 2026-11-01 Veltava Bend: DBG to bend button fixed';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -324,7 +324,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.code);
+    if (debug) debugKey(e.shiftKey && e.code === 'Digit4' ? 'ShiftDigit4' : e.code);   // Shift+4: 4th region jump (7 is sight)
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -960,6 +960,8 @@
   /** Debug: rest from anywhere (enters the lair first when in the Ash Wastes, else rests in place). */
   function rest() { onEvents(ST.lairRest(cs)); renderLair(); }
   /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
+  // region jumps: keys 4 / 5 / 6, Shift+4 for the 4th region (Digit7+ are taken by sight / time / to post)
+  const DBG_REGION_KEYS = [['4', 'Digit4'], ['5', 'Digit5'], ['6', 'Digit6'], ['Shift+4', 'ShiftDigit4']];
   const DEBUG_KEYS = [
     ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
     ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],
@@ -990,7 +992,7 @@
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
-    ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
+    ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1158,7 +1160,7 @@
         snapCam(); flashPrompt(t('c.dbg.post', { kind: t('c.post.' + v.kind) }), 1.5);
       }
     }
-    const dbgRegion = /^Digit[4-6]$/.test(code) ? Object.keys(D.regions)[+code.slice(5) - 4] : null;
+    const dbgRi = DBG_REGION_KEYS.findIndex(k => k[1] === code), dbgRegion = dbgRi >= 0 ? Object.keys(D.regions)[dbgRi] || null : null;
     if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
       if (cs.inLair) onEvents(ST.lairLeave(cs));
       if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
