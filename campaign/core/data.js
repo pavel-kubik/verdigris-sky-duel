@@ -322,8 +322,12 @@
        lod: full kit inside `near`, merged silhouette out to `far`. lights: emissive torches and windows, no real lights. */
     castle: {
       wallThick: 3, walkWidth: 2.4, crenel: 1.2,
-      gate: { w: 10, close: 2.5 },
+      gate: { w: 10, close: 2.5, margin: 1 },          // T05: margin = extra reach of 'the dragon is in the gap'
       horn: { range: 'region', cool: 60 },
+      // T05 archer posts: towerOut / towerUp = where on a round tower (out from its radius, up from its wall top),
+      // gatehouse = archers per gatehouse (gateSpacing apart, gateOut beyond 0.8 r, gateUp over its top), one wall walk
+      // slot every wallEvery units of a run (runs under wallMin get none), wallOut = toward the outer parapet
+      posts: { towerOut: 1.0, towerUp: 1.8, gatehouse: 2, gateSpacing: 3, gateOut: 1.2, gateUp: 0.6, wallEvery: 14, wallMin: 8, wallOut: 0.4 },
       char: { tint: 0.35 },
       lod: { near: 280, far: 1000, band: 20 },          // T04: full kit inside near, silhouette to far, +-band hysteresis
       smoke: { puffs: 14, life: 7, rise: 26, drift: 9, size: 6, alpha: 0.5 },   // T04: chimney smoke from the great hall

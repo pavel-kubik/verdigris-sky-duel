@@ -28,6 +28,9 @@
  *       settlement, `patrols` archer pairs walking the road (routeOf: the region's road or a line through its settlements;
  *       d.patrol { s, dir, side, pause }), bellFast (ringTime x alert.bellFast); old = the squad before (same ids keep
  *       their state). step() respawns the squad when the region's alert level changes ('defenders:reinforced' on a rise).
+ * T05 castle: a castle place's archers stand on castle.posts (round towers, gatehouses, wall walks; round robin, side
+ *       by side when there are more archers than posts), the bastions' ballistae on their walk tops; after the defenders
+ *       move, castle.step runs the gate (closes on alarm, opens after the search) and the keep's horn ('horn:blow').
  * The squad also serves as cs.watch (the T14 debug view and the 'to post' debug jump read cs.watch.list).
  * Pure: no DOM, no THREE.
  */
@@ -37,7 +40,7 @@
   const D = M.need('data'), T = M.need('terrain'), SE = M.need('settlement'), PC = M.need('perception');
   const { wrap, clamp } = M.need('math');
   const TAU = Math.PI * 2;
-  const SHELTER = { house: 1, barn: 1, granary: 1, taxhouse: 1, barracks: 1 };
+  const SHELTER = { house: 1, barn: 1, granary: 1, taxhouse: 1, barracks: 1, hall: 1, stables: 1, keep: 1, rotunda: 1 };   // T05: castle folk hide too
 
   function baseYaw(b, pl) {
     const dx = b.pos[0] - (pl ? pl.x : b.pos[0]), dz = b.pos[2] - (pl ? pl.z : b.pos[2]);
@@ -55,7 +58,7 @@
   }
 
   /** Eye height of a defender standing on b (a post building) or on the ground. */
-  const topOf = b => b.pos[1] + b.h + D.perception.watch.eye;
+  const topOf = b => b.pos[1] + (D.buildings[b.type].walkTop != null ? D.buildings[b.type].walkTop : b.h) + D.perception.watch.eye;   // T05: bastion = its walk top
 
   const NO_RESP = { extraArchers: 0, patrols: 0, bellFast: false };
 
@@ -90,7 +93,16 @@
       const tpl = D.settlements[pl.type] || {}, own = town.buildings.filter(b => b.place === pl.id);
       const towers = own.filter(b => D.buildings[b.type].post === 'archer');
       const nA = (tpl.archers || 0) + (tpl.archers ? resp.extraArchers || 0 : 0);   // T17: alert sends more archers up
-      for (let i = 0; i < nA && towers.length; i++) {
+      const slots = pl.castle ? M.need('castle').posts(town, pl) : null;   // T05: castle posts (towers, gatehouses, wall walks)
+      for (let i = 0; slots && slots.length && i < nA; i++) {
+        const sl = slots[i % slots.length], k = Math.floor(i / slots.length), b = byId(town, sl.building);
+        const side = (k % 2 ? -1 : 1) * Math.ceil(k / 2) * E.towerSpacing;   // more archers than posts: side by side
+        const pos = [sl.x + Math.cos(sl.yaw) * side, sl.y, sl.z - Math.sin(sl.yaw) * side];
+        const d = mk('archer', sl.building + '.archer' + (i + 1), pl.id, pos, sl.yaw, { building: sl.building, post: true });
+        if (b && b.ruin) { d.alive = false; d.down = true; }
+        list.push(d);
+      }
+      for (let i = 0; !slots && i < nA && towers.length; i++) {
         const b = towers[i % towers.length], k = Math.floor(i / towers.length), base = baseYaw(b, pl);
         const nOn = Math.floor(nA / towers.length) + (i % towers.length < nA % towers.length ? 1 : 0);
         const side = (k - (nOn - 1) / 2) * E.towerSpacing;   // side by side, across the outward direction
@@ -138,7 +150,7 @@
       }
     }
     return { town, list, arrows: old ? old.arrows : [], bolts: old ? old.bolts || [] : [], t: old ? old.t : 0, rung: old ? old.rung : {},
-             kills: old ? old.kills : 0, rng, resp, route, alarmed: old ? old.alarmed || {} : {} };
+             kills: old ? old.kills : 0, rng, resp, route, alarmed: old ? old.alarmed || {} : {}, horn: old ? old.horn || {} : {} };
   }
 
   /** T17: a patrol archer walks its route while idle (ping-pong, a pause at each end); otherwise stands and turns to
@@ -467,6 +479,11 @@
       if (d.kind === 'peasant') peasant(sq, d, cs, dt, out); else archer(sq, d, cs, dt, out);
     }
     stepArrows(sq, cs, dt, scale, out);
+    // T05: castle alarm -> gate and the keep's horn (the horn's 'aware:state' events reach the alert heat as usual)
+    if (town && town.places.some(pl => pl.castle)) {
+      const pad = D.settlement.pad * scale;
+      for (const e of M.need('castle').step(sq, { pos: p ? p.pos : null, pad, inside }, dt)) out.push(e);
+    }
     cs.danger = zones(sq);
     return out;
   }
