@@ -292,6 +292,13 @@ Mission times are longer than in the first draft because the Bend is one region 
   'roof' instead of 'high'. Stone pieces do not burn until T06 adds charring. The Vyshgard plateau and cliff rim grew
   from r 80 to 84 so the gatehouses (81 from the centre) stand on the flat top. Until T04's `castle-view`, the game
   places the T01 kit at the castle site (LOD and night from the kit).
+- As built (T06): a stone piece burns only when its type has `woodHp` (the hp of its roof and hoardings: round towers,
+  gatehouses, keep, chapel, rotunda); it starts with that hp, and at 0 it turns charred (`b.char`, event
+  `building:charred`), stays a solid with the same top, loses its roof mesh and banner and darkens to `castle.char.tint`.
+  Walls and bastions have no wooden parts in the kit, so they never burn (and fire never spreads to them); their
+  archers and ballistae stay. Archers on a charred tower or gatehouse fall, a charred round tower counts as a watchtower
+  down. Charred pieces are kept in `rs.ruins` as `{ id, at, char: true }` (saved in the v2 shape) and get their roof back
+  after `fire.rebuild` (the dragon standing on the shell does not block it). Hall, workshop and stables burn to ruins.
 
 ### 5.3 `map`
 

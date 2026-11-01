@@ -300,7 +300,8 @@
     const group = new THREE.Group(), full = new THREE.Group(), sil = new THREE.Group();
     group.add(full, sil);
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const geos = models(tier), meshes = [], disposables = [mat];
+    const matC = new THREE.MeshLambertMaterial({ vertexColors: true });   // T06: the instance-coloured (charrable) pieces
+    const geos = models(tier), meshes = [], disposables = [mat, matC];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
 
     /* instances per piece type: [x, z, yaw, scaleZ] */
@@ -343,6 +344,7 @@
       if (G.roof) G.roofMesh = mk(G.roof);
       if (G.roofMesh || !D.buildings[type] || !D.buildings[type].stone) {   // T06: pieces that can char or burn get instance colours
         G.stoneMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3).fill(1), 3);
+        G.stoneMesh.material = matC;             // own material: r128 keeps one program per material (instancingColor is not re-checked)
       }
       if (G.grate) G.grateMesh = mk(G.grate);
       list.forEach(([x, z, yaw], li) => {
