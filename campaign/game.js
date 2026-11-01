@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't203.2 2026-11-01 castle solids, wall walks, gate';
+  const BUILD = 't203.3 2026-11-01 castle solids, wall walks, gate; DBG gate / to wall';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -339,7 +339,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && e.code === 'Digit4' ? 'ShiftDigit4' : e.code);   // Shift+4: 4th region jump (7 is sight)
+    if (debug) debugKey(e.shiftKey && /^Digit[456]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+4: 4th region jump (7 is sight)
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1008,6 +1008,8 @@
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
     ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
+    ['Shift+5', 'castle gate: close / open (portcullis solid while closed, T03)', 'ShiftDigit5', 'gate'],
+    ['Shift+6', 'fly low over the castle wall walk, slow, along the wall (land test, T03)', 'ShiftDigit6', 'to wall'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1173,6 +1175,19 @@
         const v = list[dbgPost], x = v.pos[0] + Math.sin(v.base) * 80, z = v.pos[2] + Math.cos(v.base) * 80;
         Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 25, z], yaw: v.base + Math.PI, pitch: 0, speed: stats.cruise });
         snapCam(); flashPrompt(t('c.dbg.post', { kind: t('c.post.' + v.kind) }), 1.5);
+      }
+    }
+    if (code === 'ShiftDigit5' || code === 'ShiftDigit6') {      // T03: castle gate toggle / over the wall walk
+      const CA = VCamp.need('castle'), pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else if (code === 'ShiftDigit5') {
+        if (CA.gateOpen(cs.town)) CA.closeGate(cs.town); else CA.openGate(cs.town);
+        flashPrompt(t(CA.gateOpen(cs.town) ? 'c.dbg.gateOpen' : 'c.dbg.gateClosed'), 1.5);
+      } else {
+        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall').sort((a, b) => b.len - a.len)[0];
+        const x = (w.seg[0] + w.seg[2]) / 2, z = (w.seg[1] + w.seg[3]) / 2;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, SE.solidAt(cs.town, x, z) + 6, z], yaw: w.yaw, pitch: 0, speed: 15 });
+        snapCam(); flashPrompt(t('c.dbg.wall'), 2);
       }
     }
     const dbgRi = DBG_REGION_KEYS.findIndex(k => k[1] === code), dbgRegion = dbgRi >= 0 ? Object.keys(D.regions)[dbgRi] || null : null;
