@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't209.1 2026-11-01 map stone + fast travel';
+  const BUILD = 't209.2 2026-11-01 fast travel, rebased; debug Shift+1 / 2 / 3';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
