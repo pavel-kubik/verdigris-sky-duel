@@ -284,6 +284,14 @@ Mission times are longer than in the first draft because the Bend is one region 
 - `settlement.build` calls it for a site with `walls`; segments become solids (capsules of `wallThick`), corners and buildings are cylinders; the gate gap is open unless `gateClosed`.
 - `settlement.surfaceAt(town, x, z)` returns a walkable top (wall walk band, bastion top, gatehouse top) or `null`; `walk.canLand` and `walk.step` use it before the terrain.
 - `castle.closeGate(town)` / `openGate(town)`: driven by the castle's alarm and search end; a closed gate is a solid.
+- As built (T03): `castle.pieces(def)` lists the solids in the castle's local frame (corners and inner buildings as
+  cylinders, wall runs as capsules of `wallThick / 2`, the gate run split into two wall stubs and a `portcullis` piece
+  that is a solid only while `town.gateClosed`). Landable tops are the wall walk and the bastion tops; the gatehouse
+  keeps its hipped slate roof from the kit, so its top refuses landing like the keep, the spires and the towers.
+  `walk.canLand(p, region, solidAt, walkTop)` measures height from the walk top; low over any other roof it now says
+  'roof' instead of 'high'. Stone pieces do not burn until T06 adds charring. The Vyshgard plateau and cliff rim grew
+  from r 80 to 84 so the gatehouses (81 from the centre) stand on the flat top. Until T04's `castle-view`, the game
+  places the T01 kit at the castle site (LOD and night from the kit).
 
 ### 5.3 `map`
 
