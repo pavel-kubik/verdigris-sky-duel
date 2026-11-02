@@ -47,8 +47,30 @@ function bone(a,b,r0,r1,mat){
   const m=new THREE.Mesh(g,mat);m.position.copy(a);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.normalize());return m;
 }
 function membrane(tris,mat){
-  const arr=[];tris.forEach(t=>t.forEach(p=>arr.push(p.x,p.y,p.z)));
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));g.computeVertexNormals();
+  // Tessellated, subtly cambered wing skin. The extra surface resolution catches lighting
+  // smoothly and avoids the paper-flat look of a few oversized triangles.
+  const positions=[],indices=[],steps=8;
+  tris.forEach(t=>{
+    const [A,B,C]=t,rows=[];
+    for(let i=0;i<=steps;i++){
+      rows[i]=[];
+      for(let j=0;j<=steps-i;j++){
+        const u=i/steps,v=j/steps,w=1-u-v;
+        const p=A.clone().multiplyScalar(w).addScaledVector(B,u).addScaledVector(C,v);
+        p.y+=0.16*4*(u*v+v*w+w*u);
+        rows[i][j]=positions.length/3;
+        positions.push(p.x,p.y,p.z);
+      }
+    }
+    for(let i=0;i<steps;i++)for(let j=0;j<steps-i;j++){
+      const a=rows[i][j],b=rows[i+1][j],c=rows[i][j+1];
+      indices.push(a,b,c);
+      if(j<steps-i-1)indices.push(b,rows[i+1][j+1],c);
+    }
+  });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  g.setIndex(indices);g.computeVertexNormals();
   return new THREE.Mesh(g,mat);
 }
 function spike(parent,x,y,z,s,mat,tilt){
