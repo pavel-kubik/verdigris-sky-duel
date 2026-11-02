@@ -44,6 +44,19 @@ function makeDragon(c,opts){
   const torso=new THREE.Mesh(segGeo,mBody);torso.scale.set(1.15,1,2.05);body.add(torso);
   const belly=new THREE.Mesh(segGeo,mBelly);belly.scale.set(0.92,0.72,1.85);belly.position.set(0,-0.36,0.05);body.add(belly);
   for(let i=0;i<6;i++)spike(body,0,0.92-Math.abs(i-2.5)*0.04,1.3-i*0.52,0.55,mHorn);
+  // Layered scale armor: overlapping shoulder and flank plates catch the light and break up the smooth torso silhouette.
+  const scaleGeo=new THREE.SphereGeometry(1,7,5);
+  for(let row=0;row<2;row++)for(let i=0;i<7;i++)for(let side of [-1,1]){
+    const z=1.15-i*0.43, x=side*(0.72+row*0.12), y=0.22-row*0.27;
+    const plate=new THREE.Mesh(scaleGeo,row===0?mBody:mDark);
+    plate.scale.set(0.2,0.105,0.29);plate.position.set(x,y,z);plate.rotation.y=side*0.22;body.add(plate);
+  }
+  // Individual breast scutes give the underside a readable, crafted anatomy.
+  for(let i=0;i<5;i++){
+    const plate=new THREE.Mesh(new THREE.SphereGeometry(1,8,5),mBelly);
+    plate.scale.set(0.53-i*0.025,0.105,0.28);plate.position.set(0,-0.77,0.92-i*0.43);body.add(plate);
+  }
+
 
   // neck chain
   const neck=[];let j=new THREE.Group();j.position.set(0,0.35,1.65);j.rotation.x=j.userData.bx=-0.32;body.add(j);
@@ -64,7 +77,18 @@ function makeDragon(c,opts){
   [[-0.17,0.85],[0.17,0.85],[-0.22,0.55],[0.22,0.55]].forEach(t=>{const tt=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.16,4),toothM);tt.position.set(t[0],0.02,t[1]);jaw.add(tt);});
   [[-0.15,1.25],[0.15,1.25],[-0.25,0.95],[0.25,0.95]].forEach(t=>{const tt=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.16,4),toothM);tt.rotation.x=Math.PI;tt.position.set(t[0],-0.12,t[1]);head.add(tt);});
   [-1,1].forEach(s=>{
-    const e=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6),mEye);e.position.set(s*0.3,0.27,0.55);e.scale.set(1,0.7,1.3);head.add(e);
+    // Recessed socket, bright iris, slit pupil and catchlight make the gaze legible at game-camera distance.
+    const socket=new THREE.Mesh(new THREE.SphereGeometry(0.145,10,8),mDark);
+    socket.position.set(s*0.3,0.26,0.55);socket.scale.set(1,0.82,1.2);head.add(socket);
+    const e=new THREE.Mesh(new THREE.SphereGeometry(0.105,12,8),mEye);
+    e.position.set(s*0.3,0.275,0.635);e.scale.set(1,0.78,1.1);head.add(e);
+    const pupil=new THREE.Mesh(new THREE.SphereGeometry(0.043,8,6),mDark);
+    pupil.position.set(s*0.3,0.275,0.72);pupil.scale.set(0.42,1,0.65);head.add(pupil);
+    const glint=new THREE.Mesh(new THREE.SphereGeometry(0.018,6,5),new THREE.MeshBasicMaterial({color:0xffffff}));
+    glint.position.set(s*0.275,0.31,0.755);head.add(glint);
+    // Paired nostrils sit on the upper muzzle, aimed slightly forward.
+    const nostril=new THREE.Mesh(new THREE.SphereGeometry(0.045,7,5),mDark);
+    nostril.position.set(s*0.19,0.13,1.36);nostril.scale.set(0.72,0.55,1.15);head.add(nostril);
     const h1=new THREE.Mesh(new THREE.ConeGeometry(0.13,1.15,5),mHorn);h1.position.set(s*0.26,0.42,-0.15);h1.rotation.set(-1.05,0,-s*0.22);head.add(h1);
     const h2=new THREE.Mesh(new THREE.ConeGeometry(0.08,0.6,5),mHorn);h2.position.set(s*0.42,0.18,-0.2);h2.rotation.set(-1.25,0,-s*0.6);head.add(h2);
     const frill=new THREE.Mesh(new THREE.ConeGeometry(0.07,0.45,4),mDark);frill.position.set(s*0.42,-0.05,0.05);frill.rotation.set(-1.4,0,-s*0.9);head.add(frill);
