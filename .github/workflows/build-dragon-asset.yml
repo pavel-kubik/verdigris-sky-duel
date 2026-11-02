@@ -1,0 +1,60 @@
+name: Build dragon asset
+
+on:
+  push:
+    branches:
+      - feature/professional-dragon-upgrade
+    paths:
+      - 'tools/dragon/**'
+      - '.github/workflows/build-dragon-asset.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version
+          blender --background --python-expr "import bpy; assert bpy.app.version >= (4, 0, 0), bpy.app.version_string"
+
+      - name: Build dragon GLB and PBR maps
+        run: blender --background --python tools/dragon/build_dragon.py
+
+      - name: Validate exported files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          out = Path("assets/dragon")
+          expected = [
+              out / "verdigris_dragon.glb",
+              out / "dragon_basecolor.png",
+              out / "dragon_roughness.png",
+              out / "dragon_normal.png",
+          ]
+          for path in expected:
+              assert path.is_file() and path.stat().st_size > 100, f"Missing or empty: {path}"
+              print(f"{path}: {path.stat().st_size:,} bytes")
+          glb = (out / "verdigris_dragon.glb").read_bytes()
+          magic, version, length = struct.unpack("<4sII", glb[:12])
+          assert magic == b"glTF" and version == 2 and length == len(glb), "Invalid GLB header"
+          print("GLB container header validated")
+          PY
+
+      - name: Upload dragon asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdigris-dragon-build
+          path: assets/dragon/
+          if-no-files-found: error
+          retention-days: 14
