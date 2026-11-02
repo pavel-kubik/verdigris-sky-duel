@@ -17,6 +17,29 @@
 if(!root.THREE)return;
 const THREE=root.THREE,V3=THREE.Vector3;
 let segGeo=null;
+function makeWingTexture(base){
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
+  const ctx=canvas.getContext('2d'),rgb=[(base>>16)&255,(base>>8)&255,base&255];
+  const color=(k)=>'rgb('+rgb.map(v=>Math.max(0,Math.min(255,Math.round(v*k))).join(',')+')');
+  const grad=ctx.createLinearGradient(0,0,512,512);
+  grad.addColorStop(0,color(1.28));grad.addColorStop(.48,color(.92));grad.addColorStop(1,color(.58));
+  ctx.fillStyle=grad;ctx.fillRect(0,0,512,512);
+  // Fine branching collagen-like ribs, restrained enough to read as material rather than decoration.
+  for(let i=0;i<13;i++){
+    const x=24+i*39;
+    ctx.beginPath();ctx.moveTo(x,0);ctx.bezierCurveTo(x-34,150,x+34,340,x,512);
+    ctx.strokeStyle='rgba(8,18,14,.23)';ctx.lineWidth=3;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x-1,0);ctx.bezierCurveTo(x-31,150,x+31,340,x-1,512);
+    ctx.strokeStyle='rgba(235,255,235,.16)';ctx.lineWidth=1;ctx.stroke();
+    for(let y=90;y<470;y+=95){
+      ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+18,y+22,x+48,y+42);
+      ctx.strokeStyle='rgba(8,18,14,.16)';ctx.lineWidth=1.5;ctx.stroke();
+    }
+  }
+  const tex=new THREE.CanvasTexture(canvas);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.anisotropy=8;tex.colorSpace=THREE.SRGBColorSpace||THREE.sRGBEncoding;
+  return tex;
+}
 function makeScaleTexture(base,shade){
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
   const ctx=canvas.getContext('2d');
@@ -80,10 +103,10 @@ function makeDragon(c,opts){
   const toes=!opts||opts.toes!==false;
   if(!segGeo)segGeo=new THREE.SphereGeometry(1,32,24);
   const M=(col,o)=>new THREE.MeshStandardMaterial(Object.assign({color:col,roughness:.48,metalness:.04},o||{}));
-  const bodyTex=makeScaleTexture(c.body,c.dark),darkTex=makeScaleTexture(c.dark,c.body);
+  const bodyTex=makeScaleTexture(c.body,c.dark),darkTex=makeScaleTexture(c.dark,c.body),wingTex=makeWingTexture(c.wing);
   const mBody=M(0xffffff,{map:bodyTex,bumpMap:bodyTex,bumpScale:.075,roughness:.52,metalness:.03});
   const mDark=M(0xffffff,{map:darkTex,bumpMap:darkTex,bumpScale:.055,roughness:.58});
-  const mBelly=M(c.belly,{roughness:.72}),mWing=M(c.wing,{side:THREE.DoubleSide,roughness:.68,metalness:0}),mHorn=M(c.horn,{roughness:.32,metalness:.08}),mEye=new THREE.MeshPhysicalMaterial({color:c.eye,roughness:.18,metalness:.08,clearcoat:1,clearcoatRoughness:.08});
+  const mBelly=M(c.belly,{roughness:.72}),mWing=M(0xffffff,{map:wingTex,bumpMap:wingTex,bumpScale:.018,side:THREE.DoubleSide,roughness:.68,metalness:0}),mHorn=M(c.horn,{roughness:.32,metalness:.08}),mEye=new THREE.MeshPhysicalMaterial({color:c.eye,roughness:.18,metalness:.08,clearcoat:1,clearcoatRoughness:.08});
   const mats=[mBody,mDark,mBelly,mWing,mHorn,mEye];
   const root=new THREE.Group(),body=new THREE.Group();root.add(body);
 
@@ -257,7 +280,7 @@ function makeDragon(c,opts){
     if(root.parent)root.parent.remove(root);
     const ms=new Set();
     root.traverse(o=>{if(o.isMesh){if(o.geometry!==segGeo)o.geometry.dispose();ms.add(o.material);}});
-    ms.forEach(m=>m.dispose());bodyTex.dispose();darkTex.dispose();
+    ms.forEach(m=>m.dispose());bodyTex.dispose();darkTex.dispose();wingTex.dispose();
   };
   return d;
 }
