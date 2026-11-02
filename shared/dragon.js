@@ -17,12 +17,33 @@
 if(!root.THREE)return;
 const THREE=root.THREE,V3=THREE.Vector3;
 let segGeo=null;
+function makeScaleTexture(base,shade){
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#'+base.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);
+  const rgb=[(base>>16)&255,(base>>8)&255,base&255];
+  for(let row=-1;row<18;row++)for(let col=-1;col<14;col++){
+    const x=col*40+(row%2)*20,y=row*30;
+    const g=ctx.createLinearGradient(x,y-15,x+20,y+18);
+    const k=((row*17+col*13)%7+7)%7;
+    const a=rgb.map(v=>Math.max(0,Math.min(255,v+18+k*2)));
+    const b=rgb.map(v=>Math.max(0,Math.min(255,v-22-k*2)));
+    g.addColorStop(0,'rgb('+a.join(',')+')');g.addColorStop(1,'rgb('+b.join(',')+')');
+    ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(x-19,y-12);ctx.quadraticCurveTo(x,y-23,x+19,y-12);
+    ctx.quadraticCurveTo(x+17,y+8,x,y+17);ctx.quadraticCurveTo(x-17,y+8,x-19,y-12);ctx.fill();
+    ctx.strokeStyle='rgba(8,18,12,.34)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.13)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x-11,y-10);ctx.quadraticCurveTo(x,y-17,x+10,y-10);ctx.stroke();
+  }
+  const tex=new THREE.CanvasTexture(canvas);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(2,2);tex.anisotropy=8;tex.colorSpace=THREE.SRGBColorSpace||THREE.sRGBEncoding;
+  return tex;
+}
 /* Ground pose (T07): soles STAND model units under the root (campaign data walk.stand matches it), front legs reach
    FRONT_REACH x further while standing, FOLD = folded wing joint angles. */
 const STAND=1.6,FRONT_REACH=1.3,FOLD={arm:1.0,foreZ:-0.15,foreY:1.75,sweep:0.35,tilt:0};
 function bone(a,b,r0,r1,mat){
   const d=new V3().subVectors(b,a),len=d.length();
-  const g=new THREE.CylinderGeometry(r1,r0,len,5);g.translate(0,len/2,0);
+  const g=new THREE.CylinderGeometry(r1,r0,len,12,2);g.translate(0,len/2,0);
   const m=new THREE.Mesh(g,mat);m.position.copy(a);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.normalize());return m;
 }
 function membrane(tris,mat){
@@ -35,13 +56,21 @@ function spike(parent,x,y,z,s,mat,tilt){
 }
 function makeDragon(c,opts){
   const toes=!opts||opts.toes!==false;
-  if(!segGeo)segGeo=new THREE.IcosahedronGeometry(1,1);
-  const M=(col,o)=>new THREE.MeshStandardMaterial(Object.assign({color:col,flatShading:true,roughness:.55,metalness:.12},o||{}));
-  const mBody=M(c.body),mDark=M(c.dark),mBelly=M(c.belly,{roughness:.8}),mWing=M(c.wing,{side:THREE.DoubleSide,roughness:.85,metalness:0}),mHorn=M(c.horn,{roughness:.35}),mEye=new THREE.MeshBasicMaterial({color:c.eye});
-  const mats=[mBody,mDark,mBelly,mWing,mHorn];
+  if(!segGeo)segGeo=new THREE.SphereGeometry(1,32,24);
+  const M=(col,o)=>new THREE.MeshStandardMaterial(Object.assign({color:col,roughness:.48,metalness:.04},o||{}));
+  const bodyTex=makeScaleTexture(c.body,c.dark),darkTex=makeScaleTexture(c.dark,c.body);
+  const mBody=M(0xffffff,{map:bodyTex,bumpMap:bodyTex,bumpScale:.075,roughness:.52,metalness:.03});
+  const mDark=M(0xffffff,{map:darkTex,bumpMap:darkTex,bumpScale:.055,roughness:.58});
+  const mBelly=M(c.belly,{roughness:.72}),mWing=M(c.wing,{side:THREE.DoubleSide,roughness:.68,metalness:0}),mHorn=M(c.horn,{roughness:.32,metalness:.08}),mEye=new THREE.MeshPhysicalMaterial({color:c.eye,roughness:.18,metalness:.08,clearcoat:1,clearcoatRoughness:.08});
+  const mats=[mBody,mDark,mBelly,mWing,mHorn,mEye];
   const root=new THREE.Group(),body=new THREE.Group();root.add(body);
 
-  const torso=new THREE.Mesh(segGeo,mBody);torso.scale.set(1.15,1,2.05);body.add(torso);
+  const torso=new THREE.Mesh(new THREE.SphereGeometry(1,48,36),mBody);torso.scale.set(1.2,1.02,2.08);body.add(torso);
+  // Sculpted shoulder, haunch and chest masses create a more believable continuous anatomy.
+  [[-.78,.16,1.05,.48,.62,.72],[.78,.16,1.05,.48,.62,.72],[-.72,-.02,-1.05,.48,.62,.82],[.72,-.02,-1.05,.48,.62,.82],[0,.38,1.28,.76,.68,.68]].forEach(v=>{
+    const muscle=new THREE.Mesh(new THREE.SphereGeometry(1,28,20),mBody);
+    muscle.position.set(v[0],v[1],v[2]);muscle.scale.set(v[3],v[4],v[5]);body.add(muscle);
+  });
   const belly=new THREE.Mesh(segGeo,mBelly);belly.scale.set(0.92,0.72,1.85);belly.position.set(0,-0.36,0.05);body.add(belly);
   for(let i=0;i<6;i++)spike(body,0,0.92-Math.abs(i-2.5)*0.04,1.3-i*0.52,0.55,mHorn);
   // Layered scale armor: overlapping shoulder and flank plates catch the light and break up the smooth torso silhouette.
@@ -68,11 +97,17 @@ function makeDragon(c,opts){
   }
   // head
   const head=new THREE.Group();head.rotation.x=0.85;j.add(head);
-  const skull=new THREE.Mesh(segGeo,mBody);skull.scale.set(0.56,0.46,0.72);skull.position.set(0,0.12,0.2);head.add(skull);
-  const snout=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.38,1.05,6),mBody);snout.rotation.x=Math.PI/2;snout.position.set(0,0.05,0.95);head.add(snout);
+  const skull=new THREE.Mesh(new THREE.SphereGeometry(1,36,28),mBody);skull.scale.set(0.56,0.46,0.72);skull.position.set(0,0.12,0.2);head.add(skull);
+  const snout=new THREE.Mesh(new THREE.SphereGeometry(1,32,22),mBody);snout.scale.set(.34,.28,.82);snout.position.set(0,.04,.86);head.add(snout);
+  [-1,1].forEach(side=>{
+    const cheek=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),mBody);
+    cheek.position.set(side*.34,-.04,.48);cheek.scale.set(.28,.25,.48);head.add(cheek);
+    const jawRidge=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),mDark);
+    jawRidge.position.set(side*.22,-.16,.8);jawRidge.scale.set(.1,.09,.46);head.add(jawRidge);
+  });
   const brow=new THREE.Mesh(new THREE.BoxGeometry(0.85,0.12,0.35),mDark);brow.position.set(0,0.36,0.5);brow.rotation.x=0.25;head.add(brow);
   const jaw=new THREE.Group();jaw.position.set(0,-0.14,0.3);head.add(jaw);
-  const jm=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.3,0.95,6),mBelly);jm.rotation.x=Math.PI/2;jm.position.set(0,-0.08,0.5);jaw.add(jm);
+  const jm=new THREE.Mesh(new THREE.SphereGeometry(1,28,18),mBelly);jm.scale.set(.31,.16,.65);jm.position.set(0,-.08,.48);jaw.add(jm);
   const toothM=M(0xf2ead8,{roughness:.3});
   [[-0.17,0.85],[0.17,0.85],[-0.22,0.55],[0.22,0.55]].forEach(t=>{const tt=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.16,4),toothM);tt.position.set(t[0],0.02,t[1]);jaw.add(tt);});
   [[-0.15,1.25],[0.15,1.25],[-0.25,0.95],[0.25,0.95]].forEach(t=>{const tt=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.16,4),toothM);tt.rotation.x=Math.PI;tt.position.set(t[0],-0.12,t[1]);head.add(tt);});
@@ -200,7 +235,7 @@ function makeDragon(c,opts){
     if(root.parent)root.parent.remove(root);
     const ms=new Set();
     root.traverse(o=>{if(o.isMesh){if(o.geometry!==segGeo)o.geometry.dispose();ms.add(o.material);}});
-    ms.forEach(m=>m.dispose());
+    ms.forEach(m=>m.dispose());bodyTex.dispose();darkTex.dispose();
   };
   return d;
 }
