@@ -20,15 +20,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Blender
+      - name: Install Blender and exporter dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender
+          sudo apt-get install -y blender python3-numpy
           blender --version
           blender --background --python-expr "import bpy; assert bpy.app.version >= (4, 0, 0), bpy.app.version_string"
 
       - name: Build dragon GLB and PBR maps
-        run: blender --background --python tools/dragon/build_dragon.py
+        env:
+          PYTHONPATH: /usr/lib/python3/dist-packages
+        run: |
+          blender --background --python-expr "import numpy; print('NumPy:', numpy.__version__)" --python tools/dragon/build_dragon.py
 
       - name: Validate exported files
         run: |
