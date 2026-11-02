@@ -104,9 +104,9 @@ N=1024
 def make_maps():
     import random
     random.seed(17)
-    color=bpy.data.images.new("Dragon_BaseColor_2K",width=N,height=N)
-    rough=bpy.data.images.new("Dragon_Roughness_2K",width=N,height=N)
-    normal=bpy.data.images.new("Dragon_Normal_2K",width=N,height=N)
+    color=bpy.data.images.new("Dragon_BaseColor_1K",width=N,height=N)
+    rough=bpy.data.images.new("Dragon_Roughness_1K",width=N,height=N)
+    normal=bpy.data.images.new("Dragon_Normal_1K",width=N,height=N)
     cp=[]; rp=[]; np=[]
     for y in range(N):
         for x in range(N):

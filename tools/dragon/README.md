@@ -22,4 +22,4 @@ The armature includes `root`, `pelvis`, `spine_01`, `spine_02`, `neck_01`, `neck
 
 ## Important quality note
 
-This is an automated high-density starter asset, not a human sculpt, retopology pass, hand-painted texture set, or animation-polished production character. The script gives the project a reproducible skinned GLB and editable source maps to iterate on. A character artist should still refine anatomy, topology, UVs, facial forms, wing attachment, weights, and paint final 2K/4K maps before calling it final-game quality.
+This is an automated high-density starter asset, not a human sculpt, retopology pass, hand-painted texture set, or animation-polished production character. The script gives the project a reproducible skinned GLB and editable source maps to iterate on. A character artist should still refine anatomy, topology, UVs, facial forms, wing attachment, weights, and paint final 1K/4K maps before calling it final-game quality.
