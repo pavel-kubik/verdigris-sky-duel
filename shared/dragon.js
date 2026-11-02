@@ -20,7 +20,7 @@ let segGeo=null;
 function makeWingTexture(base){
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
   const ctx=canvas.getContext('2d'),rgb=[(base>>16)&255,(base>>8)&255,base&255];
-  const color=(k)=>'rgb('+rgb.map(v=>Math.max(0,Math.min(255,Math.round(v*k))).join(',')+')');
+  const color=k=>'rgb('+rgb.map(v=>Math.round(Math.max(0,Math.min(255,v*k)))).join(',')+')';
   const grad=ctx.createLinearGradient(0,0,512,512);
   grad.addColorStop(0,color(1.28));grad.addColorStop(.48,color(.92));grad.addColorStop(1,color(.58));
   ctx.fillStyle=grad;ctx.fillRect(0,0,512,512);
