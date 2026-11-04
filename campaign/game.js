@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't212.1 2026-11-04 relics: Ember Chalice at the chapel door, carry rules, trophy wall';
+  const BUILD = 't212.2 2026-11-04 cave station prompts: board, map stone, trophy wall (EN, CS)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */

@@ -29,6 +29,10 @@ for (const st of D.stages) used.add('c.stage.' + st.id);
 for (const type in D.prey) used.add('c.prey.' + type);
 for (const kind in D.loot) if (D.loot[kind] && D.loot[kind].gold) used.add('c.loot.' + kind);   // T19: tithe chest, strongbox
 used.add('c.prey.roast');
+for (const id in D.cave.stations) {                      // the cave prompt is built from the station id (game.js 'c.prompt.station.' + id)
+  used.add('c.prompt.station.' + id); used.add('c.prompt.station.' + id + 'Touch'); 
+  if (id !== 'exit') { used.add('c.cave.' + id); used.add('c.btn.' + id); }   // exit: no panel, its button is Leave
+}
 const hatchSrc = fs.readFileSync(path.join(root, 'campaign', 'render', 'hatch-scene.js'), 'utf8');   // scene captions: LINES [['p1', ...]] -> c.hatch.p1
 for (const m of hatchSrc.matchAll(/\['(p\d)'/g)) used.add('c.hatch.' + m[1]);
 ok(used.has('c.hatch.p4'), 'hatching scene captions collected');

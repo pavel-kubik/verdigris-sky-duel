@@ -326,6 +326,9 @@
       'c.prompt.station.nest': 'Nest - press E to rest', 'c.prompt.station.nestTouch': 'Nest - tap Nest to rest',
       'c.prompt.station.larder': 'Larder - press E for the stored prey', 'c.prompt.station.larderTouch': 'Larder - tap Larder for the stored prey',
       'c.prompt.station.exit': 'Tunnel - press E or walk on to leave the lair', 'c.prompt.station.exitTouch': 'Tunnel - tap Leave or walk on to leave the lair',
+      'c.prompt.station.board': 'Mission board - press E to read the missions', 'c.prompt.station.boardTouch': 'Mission board - tap Missions to read the missions',
+      'c.prompt.station.mapStone': 'Map stone - press E for the map and fast travel', 'c.prompt.station.mapStoneTouch': 'Map stone - tap Map stone for the map and fast travel',
+      'c.prompt.station.trophy': 'Trophy wall - press E to see your relics', 'c.prompt.station.trophyTouch': 'Trophy wall - tap Trophies to see your relics',
       /* the mother dragon (Phase 2 T05) */
       'c.mother.name': 'Mother',
       'c.mother.lair': 'Come, little one. Walk out through the tunnel - I will wait outside.',
@@ -708,6 +711,9 @@
       'c.prompt.station.nest': 'Hnízdo - E a odpočineš si', 'c.prompt.station.nestTouch': 'Hnízdo - klepni na Hnízdo a odpočiň si',
       'c.prompt.station.larder': 'Spižírna - E pro uloženou kořist', 'c.prompt.station.larderTouch': 'Spižírna - klepni na Spižírna pro uloženou kořist',
       'c.prompt.station.exit': 'Tunel - E nebo jdi dál a opustíš doupě', 'c.prompt.station.exitTouch': 'Tunel - klepni na Ven nebo jdi dál a opustíš doupě',
+      'c.prompt.station.board': 'Tabule misí - E a přečteš si mise', 'c.prompt.station.boardTouch': 'Tabule misí - klepni na Mise a přečti si mise',
+      'c.prompt.station.mapStone': 'Mapový kámen - E pro mapu a rychlý let', 'c.prompt.station.mapStoneTouch': 'Mapový kámen - klepni na Mapový kámen pro mapu a rychlý let',
+      'c.prompt.station.trophy': 'Stěna trofejí - E a uvidíš své relikvie', 'c.prompt.station.trophyTouch': 'Stěna trofejí - klepni na Trofeje a uvidíš své relikvie',
       /* matka (fáze 2 T05) */
       'c.mother.name': 'Matka',
       'c.mother.lair': 'Pojď, maličký. Vyjdi tunelem ven - počkám venku.',
