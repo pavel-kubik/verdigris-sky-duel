@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'bend.1 2026-11-01 Veltava Bend un-mirrored: real Prague east-west';
+  const BUILD = 't210.1 2026-11-04 missions core, debug Shift+3 / J / K';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
