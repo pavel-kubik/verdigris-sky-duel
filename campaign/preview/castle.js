@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't211.1 2026-11-04 mission board, briefing, mission HUD, gold target marker';
+  const BUILD = 't212.1 2026-11-04 relics: Ember Chalice at the chapel door, carry rules, trophy wall';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
