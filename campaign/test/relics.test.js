@@ -213,3 +213,21 @@ const relicItem = cs => cs.town.items.find(it => it.kind === 'relic');
 }
 
 void WK;
+
+// 12. Pavel's question: after a death the mission is failed and locked until a rest at the nest, then Accept works again
+{
+  const cs = make();
+  S.step(cs, {}, dt);
+  MS.accept(cs, 'a2_chalice'); S.step(cs, {}, dt);
+  ok(cs.mission && cs.mission.state === 'running', 'running');
+  cs.dragon.hp = 0;
+  const ev = [];
+  for (let i = 0; i < 5; i++) ev.push(...S.step(cs, {}, dt));
+  const order = ev.map(e => e.e);
+  ok(order.indexOf('mission:failed') > order.indexOf('lair:enter'), 'mission:failed comes after the cave cut (the death card shows it)');
+  ok(ofType(ev, 'mission:failed')[0].why === 'death' && cs.mission === null, 'death ends the mission as failed');
+  ok(MS.list(cs).find(r => r.id === 'a2_chalice').why === 'retry', 'locked until a rest');
+  S.caveAct(cs, 'nest');
+  ok(MS.list(cs).find(r => r.id === 'a2_chalice').ok, 'after Rest on the nest it can be accepted again');
+  ok(ofType(S.caveAct(cs, 'board', 'a2_chalice'), 'mission:accepted').length === 1, 'Accept at the board works');
+}

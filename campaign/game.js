@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't212.3 2026-11-04 Accept greyed out when locked, gold ring + beam around the mission objective';
+  const BUILD = 't212.4 2026-11-04 death card says the mission failed and how to retry';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -817,6 +817,11 @@
       else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5);
       else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3);
       else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5); }
+      else if (e.e === 'mission:failed' && e.why === 'death' && !$('#lairDeath').hidden) {   // T12: the death card covers the toast - say it there
+        const b = document.createElement('b'), sm = document.createElement('small');
+        b.className = 'mFail'; b.textContent = t('c.mission.failed', { m: missionName(e.id) }); sm.textContent = t('c.lair.diedMission');
+        $('#lairDeath').append(b, sm);
+      }
       else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5);
       else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2);
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
