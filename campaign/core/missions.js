@@ -19,6 +19,11 @@
  *                                             retry after the next rest (failedAt[id] = cs.flags.rested): 'mission:failed' { id, why }
  *   finish(cs) -> events[]                    debug: the objective counts as met ('mission:done')
  *   timerState(cs) -> null | { left, level: 'ok' | 'warn' | 'danger', running }   for the HUD (T11)
+ *   target(cs) -> null | { id, region, x, z, kind }   T11: where the objective is (the compass and map gold marker) while
+ *                                             the mission is accepted or running; null once done (fly home) or for an
+ *                                             intercept before the caravan exists (T15 sets cs.caravan... { pos })
+ *   objective(cs) -> null | { key, p }        T11: i18n key of the HUD objective line ('c.mission.obj.<type>' while
+ *                                             accepted / running, 'c.mission.obj.home' once done)
  * cs.missions = { completed: [ids], failedAt: { id: rested count at the fail } } (saved).
  * Pure: no DOM, no THREE.
  */
@@ -154,5 +159,34 @@
     return { id: a.id, left: a.left, level: lv, running: a.state !== 'accepted' && !inside(cs), state: a.state };
   }
 
-  M.define('missions', { def, list, accept, cancel, step, fail, finish, reward, timerState, active });
+  /* ---------- T11: target marker and objective line ---------- */
+  const towns = {};                                       // region -> settlement.build (positions are seeded, so cached)
+  function buildingPos(cs, region, id) {
+    const SE = M.need('settlement');
+    const town = cs.town && cs.town.region === region ? cs.town : (towns[region] = towns[region] || SE.build(region));
+    const b = town.buildings.find(x => x.id === id);
+    return b ? [b.pos[0], b.pos[2]] : null;
+  }
+  function target(cs) {
+    const a = active(cs);
+    if (!a || a.state === 'done') return null;
+    const m = def(a.id);
+    if (!m) return null;
+    if (m.type === 'intercept') {                          // T15: the moving wagon
+      const cv = cs.caravans && cs.caravans[m.caravan];
+      return cv && cv.pos ? { id: a.id, region: cv.region || m.region, x: cv.pos[0], z: cv.pos[2], kind: m.type } : null;
+    }
+    const q = m.target && buildingPos(cs, m.region, m.target);
+    return q ? { id: a.id, region: m.region, x: q[0], z: q[1], kind: m.type } : null;
+  }
+  function objective(cs) {
+    const a = active(cs);
+    if (!a) return null;
+    const m = def(a.id);
+    if (!m) return null;
+    if (a.state === 'done') return { key: 'c.mission.obj.home' };
+    return { key: 'c.mission.obj.' + m.type, p: { region: 'c.region.' + m.region } };
+  }
+
+  M.define('missions', { def, list, accept, cancel, step, fail, finish, reward, timerState, active, target, objective });
 })(typeof self !== 'undefined' ? self : this);

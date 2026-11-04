@@ -7,6 +7,8 @@
  *   seesPlace(regionId, pos, place) -> bool within nav.discover and in line of sight over the terrain
  *   markers(cs) -> [{ kind, key, bearing, dist, label, via?, dim? }]
  *       kind: lair | exit | settlement (discovered ones, T12) | castle (T04) | aerie (found, Phase 3 T08) | scent | scentLivestock
+ *             | mission (Phase 3 T11: the gold target marker - the objective in this region, or the exit toward its region;
+ *               always first, so it is never cut by data.nav.markers)
  *       bearing: world bearing from the dragon (0 = +Z, the yaw convention); the strip subtracts the heading
  *       label: i18n key (+ params) for the tap-to-name tag; via: region id when the lair is reached through an exit
  * Scents: strength = herd size x (1 - distance / range); the strongest data.smell.max herds get a marker.
@@ -138,6 +140,15 @@
       out.push(Object.assign({ kind, key, bearing: Math.atan2(x - x0, z - z0), dist: Math.hypot(x - x0, z - z0), label }, extra || {}));
     };
     // the lair: straight to the mouth, or to the exit on the way home
+    // T11: the mission target (gold), straight to it in its region or to the exit on the way there
+    const MS = M.need('missions'), tg = !cs.inLair && MS.target ? MS.target(cs) : null;
+    if (tg) {
+      if (tg.region === cs.region) add('mission', 'mission', tg.x, tg.z, { key: 'c.nav.mission', p: { m: 'c.mission.' + tg.id } });
+      else {
+        const ex = routeExit(cs.region, tg.region);
+        if (ex) { const q = exitPoint(cs.region, ex); add('mission', 'mission', q[0], q[1], { key: 'c.nav.missionVia', p: { m: 'c.mission.' + tg.id, region: D.regions[ex.to].nameKey } }, { via: ex.to }); }
+      }
+    }
     const home = lairRegion();
     let via = null;
     if (home === cs.region) { const m = T.lairPos(cs.region); add('lair', 'lair', m[0], m[2], { key: 'c.nav.lair' }); }
