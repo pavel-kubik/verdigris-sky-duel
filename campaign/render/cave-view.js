@@ -223,6 +223,36 @@
       bd.position.set(BD[0], K.floor, BD[1]); bd.rotation.y = face;
       group.add(bd);
     }
+    // Phase 3 T12: the trophy wall - a dark rock slab with a row of arched niches (data.trophy.niches); a banked relic
+    // sits in its niche with a warm glow (relics.wall); empty niches stay dark
+    const TW = K.stations.trophy, niches = [];
+    if (TW) {
+      const tw = new THREE.Group(), face = Math.atan2(-TW[0], -TW[1]), u = TW[2], n = (D.trophy && D.trophy.niches) || 3;
+      const rock = new THREE.MeshStandardMaterial({ color: 0x3e352e, flatShading: true, roughness: 1 });
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(u * 2.6, u * 1.9, u * 0.5), rock);
+      slab.position.set(0, u * 0.95, -u * 0.1); tw.add(slab);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(u * 2.8, u * 0.18, u * 0.66), new THREE.MeshStandardMaterial({ color: 0x55483d, flatShading: true, roughness: 1 }));
+      cap.position.set(0, u * 1.95, -u * 0.04); tw.add(cap);
+      const holeMat = new THREE.MeshBasicMaterial({ color: 0x0d0907 });
+      for (let i = 0; i < n; i++) {
+        const x = (i - (n - 1) / 2) * u * 0.8;
+        const hole = new THREE.Mesh(new THREE.PlaneGeometry(u * 0.56, u * 0.8), holeMat);
+        hole.position.set(x, u * 1.05, u * 0.16); tw.add(hole);
+        const arch = new THREE.Mesh(new THREE.CircleGeometry(u * 0.28, 12, 0, Math.PI), holeMat);
+        arch.position.set(x, u * 1.45, u * 0.16); tw.add(arch);
+        const sill = new THREE.Mesh(new THREE.BoxGeometry(u * 0.62, u * 0.07, u * 0.3), rock);
+        sill.position.set(x, u * 0.66, u * 0.2); tw.add(sill);
+        const id = Object.keys(D.relics || {}).find(r => D.relics[r].niche === i) || null, col = id ? D.relics[id].color : 0xffb066;
+        const glowM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+        const halo = new THREE.Mesh(new THREE.PlaneGeometry(u * 0.56, u * 0.8), glowM);
+        halo.position.set(x, u * 1.05, u * 0.17); halo.visible = false; tw.add(halo);
+        let relic = null;
+        if (id && VR.chalice) { relic = VR.chalice(col); relic.scale.setScalar(u * 0.3); relic.position.set(x, u * 0.7, u * 0.2); relic.visible = false; tw.add(relic); }
+        niches.push({ id, halo, relic });                               // no lights: the halo is additive (no shader variants)
+      }
+      tw.position.set(TW[0], K.floor, TW[1]); tw.rotation.y = face;
+      group.add(tw);
+    }
     // station ring (the one in reach)
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x62c48a, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), ringMat);
@@ -235,13 +265,21 @@
       if (s) {
         ring.position.set(s[0], K.floor + 0.12, s[1]);
         ring.scale.setScalar(s[2] + 1.5 + 0.25 * Math.sin(time * 4));
-        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : st === 'altar' ? 0xff9447 : st === 'mapStone' ? 0xffb066 : st === 'board' ? 0xffd34d : 0x62c48a);
+        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : st === 'altar' ? 0xff9447 : st === 'mapStone' ? 0xffb066 : st === 'board' ? 0xffd34d : st === 'trophy' ? 0xff9a3c : 0x62c48a);
       }
       if (cs) ups.forEach((id, i) => { runes[i].material = UP.has(cs, id) ? runeMat.owned : UP.canBuy(cs, id).ok ? runeMat.can : runeMat.dark; });
       runeMat.can.color.setHex(0xff7a2e).lerp(canHot, 0.5 + 0.5 * Math.sin(time * 3));   // affordable: an ember pulse
       if (cs && notes.length) {                                       // T11: the accepted mission's note glows gold, won ones are dim
         const ms = D.missions || [], on = cs.mission && cs.mission.id, done = (cs.missions && cs.missions.completed) || [];
         notes.forEach((m, i) => { const id = ms[i] && ms[i].id; m.material.color.setHex(id && id === on ? 0xffd34d : id && done.indexOf(id) >= 0 ? 0x8a8070 : 0xe9dcb8); });
+      }
+      if (niches.length) {                                            // T12: banked relics glow in their niches
+        const own = (cs && cs.hoard && cs.hoard.relics) || [];
+        niches.forEach((nc, i) => {
+          const on = !!(nc.id && own.indexOf(nc.id) >= 0), pulse = 0.85 + 0.15 * Math.sin(time * 2.2 + i);
+          nc.halo.visible = on; if (nc.relic) { nc.relic.visible = on; nc.relic.rotation.y = time * 0.4; }
+          nc.halo.material.opacity = 0.32 * pulse;
+        });
       }
       const gold = cs && cs.hoard ? cs.hoard.gold : 0;
       if (gold !== coinGold) pile(gold);

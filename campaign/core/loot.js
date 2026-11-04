@@ -17,6 +17,10 @@
  *   drop(cs, pos) -> events              claws too weak (starving): the item lies at pos again, no longer taken
  *   refill(town, rs, now, carriedId?) -> events   taken items older than fire.rebuild come back ('loot:back'), not the carried one
  *   tier(gold) -> 0..   coins(gold) -> n the coin pile (data.cave.hoardTiers, maxCoins)
+ * Phase 3 T12: kind 'relic' (data.loot.relic, mission: true) - one item per building of a mission with `relic` and that
+ * building as `target` (item.relic = the relic id); core/relics.js hides it (item.hidden) unless its mission is on.
+ * Mission items are not written to lootTaken: lost, dropped or vanished, they are back at the door at the next refill.
+ * Banking a relic puts it into hoard.relics ('relic:banked' { relic }) instead of gold.
  * Pure: no DOM, no THREE.
  */
 (function (root) {
@@ -55,14 +59,18 @@
       for (const kind of B.loot) {
         const K = L[kind];
         if (!K) continue;
+        const m = kind === 'relic' ? (D.missions || []).find(q => q.relic && q.target === b.id) : null;
+        if (kind === 'relic' && !m) continue;                     // T12: a relic only where a mission hides one
         const home = doorPos(town, b), id = b.id + '.' + kind;
-        out.push({ id, kind, building: b.id, place: b.place, size: K.size, gold: K.gold, r: 1, home, pos: home.slice(), taken: !!taken[id] });
+        const it = { id, kind, building: b.id, place: b.place, size: K.size, gold: K.gold, r: 1, home, pos: home.slice(), taken: !K.mission && !!taken[id] };
+        if (m) Object.assign(it, { relic: m.relic, mission: m.id, hidden: true });
+        out.push(it);
       }
     }
     return out;
   }
 
-  const available = items => (items || []).filter(it => !it.taken);
+  const available = items => (items || []).filter(it => !it.taken && !it.hidden);
 
   function inFront(items, pick, limit) {
     const can = available(items);
@@ -74,9 +82,15 @@
     if (!item || item.taken || cs.carriedLoot) return [];
     item.taken = true;
     cs.carriedLoot = { id: item.id, kind: item.kind, gold: item.gold, size: item.size, region: cs.region };
-    const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {};
-    rs.lootTaken = (rs.lootTaken || []).filter(r => r.id !== item.id).concat([{ id: item.id, at: now }]);
-    return [{ e: 'loot:taken', id: item.id, kind: item.kind, gold: item.gold, place: item.place }];
+    if (item.relic) Object.assign(cs.carriedLoot, { relic: item.relic, mission: item.mission });
+    const K = L[item.kind];
+    if (!(K && K.mission)) {                                    // T12: mission loot is back as soon as it is not carried
+      const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {};
+      rs.lootTaken = (rs.lootTaken || []).filter(r => r.id !== item.id).concat([{ id: item.id, at: now }]);
+    }
+    const e = { e: 'loot:taken', id: item.id, kind: item.kind, gold: item.gold, place: item.place };
+    if (item.relic) e.relic = item.relic;
+    return [e];
   }
 
   function effects(eff, loot) {
@@ -98,6 +112,12 @@
     const it = cs.carriedLoot;
     if (!it) return [];
     cs.hoard = cs.hoard || { gold: 0, relics: [] };
+    if (it.relic) {                                             // T12: a relic goes into its trophy niche, not onto the gold
+      cs.hoard.relics = cs.hoard.relics || [];
+      if (cs.hoard.relics.indexOf(it.relic) < 0) cs.hoard.relics.push(it.relic);
+      cs.carriedLoot = null;
+      return [{ e: 'relic:banked', relic: it.relic, kind: it.kind, mission: it.mission || null }];
+    }
     const from = tier(cs.hoard.gold);
     cs.hoard.gold += it.gold;
     cs.carriedLoot = null;
@@ -109,7 +129,9 @@
     const it = cs.carriedLoot;
     if (!it) return [];
     cs.carriedLoot = null;
-    return [{ e: 'loot:lost', kind: it.kind, gold: it.gold }];
+    const e = { e: 'loot:lost', kind: it.kind, gold: it.gold };
+    if (it.relic) e.relic = it.relic;
+    return [e];
   }
 
   function drop(cs, pos) {

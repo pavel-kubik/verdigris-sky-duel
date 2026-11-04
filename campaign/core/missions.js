@@ -19,7 +19,7 @@
  *                                             retry after the next rest (failedAt[id] = cs.flags.rested): 'mission:failed' { id, why }
  *   finish(cs) -> events[]                    debug: the objective counts as met ('mission:done')
  *   timerState(cs) -> null | { left, level: 'ok' | 'warn' | 'danger', running }   for the HUD (T11)
- *   target(cs) -> null | { id, region, x, z, kind }   T11: where the objective is (the compass and map gold marker) while
+ *   target(cs) -> null | { id, region, x, z, kind, r }   r: the world ring radius (building r + mission.ring.pad, at least ring.min)   T11: where the objective is (the compass and map gold marker) while
  *                                             the mission is accepted or running; null once done (fly home) or for an
  *                                             intercept before the caravan exists (T15 sets cs.caravan... { pos })
  *   objective(cs) -> null | { key, p }        T11: i18n key of the HUD objective line ('c.mission.obj.<type>' while
@@ -165,7 +165,7 @@
     const SE = M.need('settlement');
     const town = cs.town && cs.town.region === region ? cs.town : (towns[region] = towns[region] || SE.build(region));
     const b = town.buildings.find(x => x.id === id);
-    return b ? [b.pos[0], b.pos[2]] : null;
+    return b ? [b.pos[0], b.pos[2], b.r] : null;
   }
   function target(cs) {
     const a = active(cs);
@@ -174,10 +174,10 @@
     if (!m) return null;
     if (m.type === 'intercept') {                          // T15: the moving wagon
       const cv = cs.caravans && cs.caravans[m.caravan];
-      return cv && cv.pos ? { id: a.id, region: cv.region || m.region, x: cv.pos[0], z: cv.pos[2], kind: m.type } : null;
+      return cv && cv.pos ? { id: a.id, region: cv.region || m.region, x: cv.pos[0], z: cv.pos[2], kind: m.type, r: MS().ring.min } : null;
     }
     const q = m.target && buildingPos(cs, m.region, m.target);
-    return q ? { id: a.id, region: m.region, x: q[0], z: q[1], kind: m.type } : null;
+    return q ? { id: a.id, region: m.region, x: q[0], z: q[1], kind: m.type, r: Math.max(MS().ring.min, (q[2] || 0) + MS().ring.pad) } : null;
   }
   function objective(cs) {
     const a = active(cs);

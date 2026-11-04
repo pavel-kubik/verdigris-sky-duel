@@ -38,9 +38,11 @@
       dragon: {
         growth: round(G.growthValue(d.foodXp), 1e4), stage: d.stage, foodXp: round(d.foodXp, 100),
         hp: round(d.hp, 100), hunger: round(d.hunger, 100), deaths: d.deaths || 0, upgrades: (cs.upgrades || []).filter(id => D.upgrades[id]),   // T20
-        loot: cs.carriedLoot ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,   // T19: in the claws
+        // T19: in the claws. Phase 3 T12: not mission loot (a relic) - the running mission is only saved with v3 (T18),
+        // so a reload puts the relic back at its door with the mission
+        loot: cs.carriedLoot && !(D.loot[cs.carriedLoot.kind] && D.loot[cs.carriedLoot.kind].mission) ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,
       },
-      hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: [] },   // T19
+      hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: ((cs.hoard && cs.hoard.relics) || []).filter(id => D.relics && D.relics[id]) },   // T19, relics: Phase 3 T12
       larder: cs.larder.map(it => ({ prey: it.type, food: round(it.food, 100) })),
       renown: 0,
       regions: Object.keys(D.regions).reduce((o, id) => {              // T12: discovered settlements (the rest of v2 in T22)
@@ -162,9 +164,9 @@
                  civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0,
                  livestockTaken: num(s.livestockTaken) ? s.livestockTaken : 0, lootBanked: num(s.lootBanked) ? s.lootBanked : 0 };
     const h = o.hoard || {};                                     // T19: banked gold, never negative
-    cs.hoard = { gold: num(h.gold) ? Math.max(0, Math.floor(h.gold)) : 0, relics: Array.isArray(h.relics) ? h.relics.slice() : [] };
+    cs.hoard = { gold: num(h.gold) ? Math.max(0, Math.floor(h.gold)) : 0, relics: Array.isArray(h.relics) ? h.relics.filter(id => typeof id === 'string' && D.relics && D.relics[id]) : [] };   // T12: known relics
     const dl = o.dragon.loot;                                    // T19: loot in the claws
-    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && D.regions[dl.region]
+    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && !D.loot[dl.kind].mission && D.regions[dl.region]
       ? { id: dl.id, kind: dl.kind, gold: D.loot[dl.kind].gold, size: D.loot[dl.kind].size, region: dl.region } : null;
     cs.lootTarget = null;
     const ups = Array.isArray(o.dragon.upgrades) ? o.dragon.upgrades : [];   // T20: owned upgrades, known ids once each

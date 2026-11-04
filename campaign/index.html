@@ -40,6 +40,7 @@ h1{font-size:60px}
 p{margin:0;color:var(--mute);line-height:1.45}
 .cta{background:var(--verd);color:#08130d;border:0;border-radius:4px;padding:12px 16px;font-size:16px;font-weight:700;letter-spacing:.04em}
 .cta:hover{filter:brightness(1.08)}
+.cta:disabled,.cta:disabled:hover{background:#4a524d;color:#9aa79f;filter:none;cursor:default;opacity:.7}
 .ghost{background:transparent;color:var(--bone);border:1px solid var(--line);border-radius:4px;padding:10px 16px;font-size:15px;font-weight:600;text-align:center;text-decoration:none}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px}
@@ -183,6 +184,18 @@ h2{font-size:42px}
 #lair .boardInfo{display:none}
 #lair[data-station=board] .boardInfo{display:block}
 #lair[data-station=board] .larder,#lair[data-station=board] #lairStage,#lair[data-station=board] #lairVitals,#lair[data-station=board] #lairTime,#lair[data-station=board] .restRow{display:none}
+/* Phase 3 T12: the trophy wall - one row per niche */
+#lair .trophyInfo{display:none}
+#lair[data-station=trophy] .trophyInfo{display:block}
+#lair[data-station=trophy] .larder,#lair[data-station=trophy] #lairStage,#lair[data-station=trophy] #lairVitals,#lair[data-station=trophy] #lairTime,#lair[data-station=trophy] .restRow{display:none}
+#trophyCount{font-family:var(--f-ui);font-size:18px;font-weight:700;color:#ff9a3c;margin:2px 0 8px}
+#trophyList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#trophyList li{border:1px solid var(--line);border-radius:4px;padding:8px 12px;opacity:.6}
+#trophyList li.has{opacity:1;border-color:rgba(255,154,60,.6);box-shadow:inset 0 0 18px rgba(255,122,46,.18)}
+#trophyList li b{display:block;font-family:var(--f-ui);font-size:16px;color:var(--bone)}
+#trophyList li.has b{color:#ffb066}
+#trophyList li small{display:block;font-size:12px;line-height:1.35;color:var(--mute)}
+.trophyNote{font-size:13px;color:var(--mute)}
 #boardList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 #boardList button{display:block;width:100%;text-align:left;min-height:52px;padding:8px 12px;border:1px solid var(--line);border-radius:4px;background:rgba(233,225,204,.04);color:var(--bone);font:inherit;cursor:pointer}
 #boardList button b{display:block;font-family:var(--f-ui);font-size:16px}
@@ -215,6 +228,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
 #goldRow small{font-family:var(--f-ui);font-size:12px;font-weight:700;letter-spacing:.06em;color:#f2c14e}
 #goldRow .coin{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe08a,#c8901e);box-shadow:0 0 0 1px #6a4a10}
 #goldLoot{width:16px;height:11px;border-radius:2px;background:#7a4a24;box-shadow:inset 0 -3px 0 #d9a63a,0 0 0 1px #2a1d08}
+#goldLoot.relic{width:12px;height:14px;border-radius:2px 2px 6px 6px;background:#e0b040;box-shadow:inset 0 3px 0 #ff7a2e,0 0 6px #ff7a2e}
 #goldLoot.strongbox{background:#3b3f45;box-shadow:inset 0 -3px 0 #8a8f96,0 0 0 1px #111}
 #goldRow.pulse small{animation:goldPulse .5s ease-in-out 4}
 @keyframes goldPulse{50%{color:#fff3c4;text-shadow:0 0 8px #f2c14e}}
@@ -235,6 +249,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
 #saveBad p{margin:0 0 10px;font-size:14px;color:var(--ember)}
 #newBtn.confirm{border-color:var(--ember);color:var(--ember)}
 #lairDeath small{display:block;font-weight:400;color:var(--mute);margin-top:2px}
+#lairDeath .mFail{display:block;margin-top:8px;color:var(--ember)}
 #lairStage.ready{color:var(--verd);font-weight:700}
 #hatchLine{position:fixed;left:50%;top:30%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));margin:0;text-align:center;font:500 clamp(20px,4.6vw,30px)/1.25 var(--f-display);color:var(--bone);text-shadow:0 2px 18px rgba(0,0,0,.8);opacity:0;transition:opacity .6s;pointer-events:none;text-wrap:balance}
 #hatchLine.on{opacity:1}
@@ -328,6 +343,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   <div class="row restRow"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button><button class="ghost" id="sleepDuskBtn" data-i18n="c.clock.sleepDusk">Sleep until dusk</button><button class="ghost" id="sleepDawnBtn" data-i18n="c.clock.sleepDawn">Sleep until dawn</button></div>
   <div class="hoardInfo"><p id="hoardGold"></p><p id="hoardTier"></p><p class="hoardCarry" data-i18n="c.hoard.carry">Loot is banked the moment you enter the lair. If you die on the way, it is lost.</p></div>
   <div class="altarInfo"><p id="altarGold"></p><ul id="altarList"></ul></div>
+  <div class="trophyInfo"><p id="trophyCount"></p><ul id="trophyList"></ul><p class="trophyNote" data-i18n="c.trophy.note">Relics are mission prizes.</p></div>
   <div class="boardInfo"><ul id="boardList"></ul>
     <div id="boardBrief" hidden><h3 id="briefName"></h3><p id="briefText"></p><div class="facts"><div><span data-i18n="c.board.time">Time</span> <b id="briefTime"></b></div><div><span data-i18n="c.board.reward">Reward</span> <b id="briefReward"></b></div></div><p class="why" id="briefWhy" hidden></p>
       <div class="row"><button class="cta" id="briefAccept" data-i18n="c.board.accept">Accept</button><button class="ghost" id="briefDrop" hidden data-i18n="c.board.drop">Drop mission</button><button class="ghost" id="briefBack" data-i18n="c.board.back">Back</button></div></div>
@@ -370,9 +386,9 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
-     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/loot.js',
+     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/loot.js', 'core/relics.js',
      'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/tips.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
-     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
+     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>

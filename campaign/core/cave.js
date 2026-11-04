@@ -12,7 +12,7 @@
  *                                  tunnel (z > tunnel.out) leaves the lair (lair.leave, events tagged via: 'tunnel')
  *   act(cs, id, arg) -> events     nest: rest; larder: eat item arg; exit: leave (lair.js does the rules); hoard (T19): none;
  *                                  altar (T20): buy upgrade arg (core/upgrades.js); board (Phase 3 T11): accept mission arg,
- *                                  or arg null: drop the accepted mission (core/missions.js)
+ *                                  or arg null: drop the accepted mission (core/missions.js); trophy (Phase 3 T12): none (panel)
  *   inside(p, pad) -> bool         a point inside the dome or the tunnel, pad away from the rock
  *   camera(pos, yaw, scale) -> { pos, look }   chase camera that never leaves the dome / tunnel
  * state.step runs step() while cs.inLair; hunger, prey and the mother are paused, the larder spoils (lair.spoil).
@@ -89,7 +89,7 @@
     if (id === 'nest') return LR.rest(cs).events;
     if (id === 'larder') return LR.eatFromLarder(cs, arg | 0);
     if (id === 'exit') { cs.station = null; return LR.leave(cs); }
-    if (id === 'hoard') return [];                               // T19: the panel only shows the gold
+    if (id === 'hoard' || id === 'trophy') return [];            // T19 hoard, Phase 3 T12 trophy wall: the panels only show                               // T19: the panel only shows the gold
     if (id === 'board') return arg ? M.need('missions').accept(cs, arg, { force: cs.debugForce }) : M.need('missions').cancel(cs);   // Phase 3 T11
     if (id === 'altar') return UP.buy(cs, arg).events;           // T20: buy upgrade arg with hoard gold ('upgrade:bought')
     return [];

@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't211.1 2026-11-04 mission board, briefing, mission HUD, gold target marker';
+  const BUILD = 't212.4 2026-11-04 death card says the mission failed and how to retry';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -134,6 +134,8 @@
   scene.add(caveView.group);
   const lootView = VRender.loot.build();                           // T19: tithe chests and strongboxes, the carried one
   scene.add(lootView.group);
+  const targetView = VRender.target.build();                       // T12: gold ring + beam around the mission objective
+  scene.add(targetView.group);
   /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap.
    *  Outside, render/sky.js sets the lights and the fog colour from the clock every frame (T21). */
   function syncScene() {
@@ -795,7 +797,9 @@
       else if (e.e === 'breath:blocked') flashPrompt(t('c.breath.' + e.why), 2.2);
       else if (e.e === 'dragon:landed') shake = Math.max(shake, 0.25 * heroScale);
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
+      else if (e.e === 'loot:taken' && e.relic) { flashPrompt(null); toast(t('c.toast.relicTaken', { relic: lootName(e) }), t('c.toast.relicTakenSub'), 3.5); }   // Phase 3 T12
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
+      else if (e.e === 'relic:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.trophy.bankedAerie', { relic: lootName(e) })); toast(t('c.toast.relicBanked', { relic: lootName(e) }), t('c.toast.relicBankedSub'), 3.5); }   // Phase 3 T12
       else if (e.e === 'loot:tooHeavy') flashPrompt(t('c.prompt.lootHeavy', { loot: lootName(e) }), 2.2);
       else if (e.e === 'loot:dropped') toast(t('c.toast.lootDropped'), t('c.toast.lootDroppedSub', { loot: lootName(e) }), 2.5);
       else if (e.e === 'hoard:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.aerie.banked', { gold: e.gold, total: e.total })); toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
@@ -813,6 +817,11 @@
       else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5);
       else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3);
       else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5); }
+      else if (e.e === 'mission:failed' && e.why === 'death' && !$('#lairDeath').hidden) {   // T12: the death card covers the toast - say it there
+        const b = document.createElement('b'), sm = document.createElement('small');
+        b.className = 'mFail'; b.textContent = t('c.mission.failed', { m: missionName(e.id) }); sm.textContent = t('c.lair.diedMission');
+        $('#lairDeath').append(b, sm);
+      }
       else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5);
       else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2);
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
@@ -851,6 +860,7 @@
     hoard: '<path d="M3 19h18M5 19c0-4 3-7 7-7s7 3 7 7M8 12l1-3h6l1 3M10 9V7h4v2"/>',
     altar: '<path d="M5 20h14M7 20l1-8h8l1 8M6 12h12M12 4l2 3-2 3-2-3z"/>',
     board: '<path d="M7 21V4M17 21V4M4 6h16v9H4zM7 9h4M7 12h3M13 9h4"/>',   // Phase 3 T11: the mission board
+    trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 12v5M8 20h8l-1-3H9z"/>',   // Phase 3 T12: the trophy wall (a cup)
     mapStone: '<path d="M6 21l2-17h8l2 17zM9 9h6M11 9v5M9 14h5"/>',
   };
   const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
@@ -883,7 +893,9 @@
     else if (cs.hint === 'aerieBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieBankTouch' : 'c.prompt.aerieBank');   // T08
     else if (cs.hint === 'aerie') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieTouch' : 'c.prompt.aerie');
     else if (cs.hint === 'lairBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairBankTouch' : 'c.prompt.lairBank');   // T19
+    else if (cs.hint === 'lootCarry' && cs.carriedLoot && cs.carriedLoot.relic) text = t('c.prompt.relicCarry', { relic: lootName(cs.carriedLoot) });   // Phase 3 T12
     else if (cs.hint === 'lootCarry') text = t('c.prompt.lootCarry', { loot: lootName(cs.carriedLoot) });
+    else if (cs.hint === 'lootGrab' && (lootItem(cs.lootTarget) || {}).relic) text = t(isTouch ? 'c.prompt.relicGrabTouch' : 'c.prompt.relicGrab', { relic: lootName(lootItem(cs.lootTarget)) });   // T12
     else if (cs.hint === 'lootGrab') text = t(isTouch ? 'c.prompt.lootGrabTouch' : 'c.prompt.lootGrab', { loot: lootName(lootItem(cs.lootTarget)) });
     else if (cs.hint === 'lootHeavy') text = t('c.prompt.lootHeavy', { loot: lootName(lootItem(cs.lootTarget)) });
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
@@ -906,7 +918,7 @@
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
   }
   /** T19: loot names (kind of a carried or lying item) and the item lying in this town by id. */
-  const lootName = it => t('c.loot.' + ((it && it.kind) || 'tithe'));
+  const lootName = it => (it && it.relic ? t('c.relic.' + it.relic) : t('c.loot.' + ((it && it.kind) || 'tithe')));   // T12: a relic by its name
   const lootItem = id => (id && cs.town && cs.town.items ? cs.town.items.find(it => it.id === id) : null);
   function toast(title, sub, secs) {
     toastEl.innerHTML = '';
@@ -970,6 +982,23 @@
     }
     if (stationOpen === 'altar') renderAltar();
     if (stationOpen === 'board') renderBoard();
+    if (stationOpen === 'trophy') renderTrophy();
+  }
+  /* ---------- Phase 3 T12: the trophy wall - one row per niche: the relic and its story line, or an empty niche ---------- */
+  let trophyShown = '';
+  function renderTrophy() {
+    const w = RL.wall(cs), key = w.map(n => n.id + ':' + n.has).join(',');
+    if (key === trophyShown) return;
+    trophyShown = key;
+    const list = $('#trophyList'); list.innerHTML = '';
+    for (const n of w) {
+      const li = document.createElement('li'), b = document.createElement('b'), sm = document.createElement('small');
+      li.className = n.has ? 'has' : '';
+      b.textContent = n.has ? t('c.relic.' + n.id) : t('c.trophy.empty');
+      sm.textContent = n.has ? t('c.relic.' + n.id + '.story') : n.id ? t('c.trophy.hint', { m: t('c.mission.' + RL.missionOf(n.id).id) }) : t('c.trophy.later');
+      li.append(b, sm); list.append(li);
+    }
+    $('#trophyCount').textContent = t('c.trophy.count', { n: w.filter(n => n.has).length, max: w.length });
   }
   /* ---------- Phase 3 T11: the mission board - list (locked ones greyed with the reason), briefing, Accept / Drop ---------- */
   const boardList = $('#boardList'), boardBrief = $('#boardBrief');
@@ -1077,7 +1106,7 @@
     lairEl.dataset.station = id;
     $('#lairTitle').dataset.i18n = 'c.cave.' + id; $('#lairTitle').textContent = t('c.cave.' + id);
     deathCard(death || null); if (death) { toastEl.style.opacity = 0; toastT = 0; }
-    lairShown = ''; altarShown = ''; boardShown = ''; briefId = null; renderLair();
+    lairShown = ''; altarShown = ''; boardShown = ''; trophyShown = ''; briefId = null; renderLair();
     lairEl.hidden = false;
     if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || id === 'board' && boardList.querySelector('button') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
   }
@@ -1199,6 +1228,7 @@
     ['Shift+3', 'mission: accept the next one of the catalogue that is open (any stage; won ones and ones waiting for a rest are skipped; the timer starts outside the lair region or an aerie), T10', 'ShiftDigit3', 'mission'],
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
+    ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1284,18 +1314,31 @@
       Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: a + Math.PI, pitch: 0, speed: stats.cruise });
       snapCam(); flashPrompt(t('c.dbg.town', { place: t(NV.placeKey(pl)) }), 1.5);
     }
+    /** T19: landed in front of a loot item, facing it (also the chalice, Phase 3 T12) */
+    const standAtLoot = it => {
+      const b = cs.town.buildings.find(q => q.id === it.building) || { pos: it.home };
+      let dx = it.pos[0] - b.pos[0], dz = it.pos[2] - b.pos[2];
+      const l = Math.hypot(dx, dz) || 1, sc = ST.scaleOf(cs), f = 1.5 + D.settlement.pad * sc;
+      dx /= l; dz /= l;
+      const x = it.pos[0] + dx * f, z = it.pos[2] + dz * f;
+      Object.assign(pilot, { mode: 'ground', tr: null, vel: [0, 0, 0], pos: [x, TR.surfaceAt(regionId, x, z) + D.walk.stand * sc, z], yaw: Math.atan2(-dx, -dz), pitch: 0, roll: 0, rollX: 0, speed: 0, boosting: false });
+      snapCam(); flashPrompt(t('c.dbg.loot', { loot: lootName(it) }), 1.5);
+    };
     if (code === 'Comma' && !cs.inLair && cs.town) {              // T19: landed in front of the next tithe chest / strongbox
-      const list = (cs.town.items || []).filter(it => !it.taken);
+      const list = (cs.town.items || []).filter(it => !it.taken && !it.hidden);
       if (!list.length) flashPrompt(t('c.dbg.noLoot'), 1.5);
+      else { dbgLoot = (dbgLoot + 1) % list.length; standAtLoot(list[dbgLoot]); }
+    }
+    if (code === 'ShiftKeyL' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
+      const m = RL.missionOf('ember_chalice'), a = MS.active(cs);
+      if (RL.has(cs, 'ember_chalice')) flashPrompt(t('c.dbg.relicOwned'), 1.5);
+      else if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
       else {
-        dbgLoot = (dbgLoot + 1) % list.length;
-        const it = list[dbgLoot], b = cs.town.buildings.find(q => q.id === it.building) || { pos: it.home };
-        let dx = it.pos[0] - b.pos[0], dz = it.pos[2] - b.pos[2];
-        const l = Math.hypot(dx, dz) || 1, sc = ST.scaleOf(cs), f = 1.5 + D.settlement.pad * sc;
-        dx /= l; dz /= l;
-        const x = it.pos[0] + dx * f, z = it.pos[2] + dz * f;
-        Object.assign(pilot, { mode: 'ground', tr: null, vel: [0, 0, 0], pos: [x, TR.surfaceAt(regionId, x, z) + D.walk.stand * sc, z], yaw: Math.atan2(-dx, -dz), pitch: 0, roll: 0, rollX: 0, speed: 0, boosting: false });
-        snapCam(); flashPrompt(t('c.dbg.loot', { loot: lootName(it) }), 1.5);
+        if (!a) { cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', m.id)); cs.debugForce = false; }
+        RL.sync(cs);
+        const it = (cs.town.items || []).find(q => q.relic === 'ember_chalice' && !q.taken && !q.hidden);
+        if (it) standAtLoot(it);
+        else if (!cs.carriedLoot) { onEvents(RL.giveDebug(cs)); flashPrompt(t('c.dbg.relicClaws'), 1.5); }
       }
     }
     if (code === 'Quote') {                                       // T20: every upgrade at once, or none (refunded)
@@ -1504,6 +1547,7 @@
     missionHud();                                                // Phase 3 T11
     preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
+    targetView.update(cs, pilot && !cs.inLair ? pilot.pos : null, time);
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
@@ -1577,7 +1621,7 @@
       ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
-      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL']]]],
       ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];
@@ -1664,7 +1708,7 @@
       '  px ' + f2(renderer.getPixelRatio()) + '  flora x' + f2(qSet.flora) + '  fog ' + Math.round(qSet.fogFar));
     if (pilot) {
       const st = D.stages[dragon.stage], next = D.stages[dragon.stage + 1];
-      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = HN.effects(dragon.hunger);
+      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = LT.effects(HN.effects(dragon.hunger), cs.carriedLoot);   // T12: with the carry penalty (strongbox, relic)
       L.push('DRAGON  ' + st.id + (ready > dragon.stage ? '  READY: ' + D.stages[ready].id : ''));
       L.push('        food ' + Math.round(dragon.foodXp) + (next ? '/' + next.foodFrom : ' max') + '  growth ' + f2(G.growthValue(dragon.foodXp)) + '  scale ' + f2(heroScale));
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
@@ -1700,7 +1744,7 @@
       { const pl = (cs.town && cs.town.pens) || [];
         L.push('STOCK   ' + (pl.map(pn => { const c = PR.penCount(cs.field, pn.id); return pn.id.split('.').slice(1).join('.') + ' ' + pn.type + ' ' + (c ? c.penned + (c.inside ? ' +' + c.inside + ' in barn' : '') : '-'); }).join(', ') || '-') + '  taken ' + (cs.stats.livestockTaken || 0)); }
       { const its = (cs.town && cs.town.items) || [], cl = cs.carriedLoot;
-        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + cl.gold : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0));
+        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + (cl.relic || cl.gold) : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0) + '  relics ' + (((cs.hoard && cs.hoard.relics) || []).join(',') || '-'));
         L.push('UPGRADE ' + ((cs.upgrades || []).join(', ') || '-') + '  can buy ' + (UP.affordable(cs).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');

@@ -4,6 +4,7 @@
  * a slow gold ring on the ground so they read from the air; the loot item Grab would pick up gets a bright pulsing
  * ring; the carried one hangs under the claws in the air and sits in the jaws on the ground. Drawn larger than life
  * (VIS), as the prey are. One mesh per item (a region has at most a few), 2 shared geometries per kind.
+ * Phase 3 T12: a relic (kind 'relic') is the Ember Chalice; VRender.chalice(color) is also used by the trophy wall.
  *   VRender.loot.build() -> { group, update(cs, carry, time), dispose() }
  *   carry: { pos: Vector3 (claw or mouth anchor), yaw, jaws } or null
  */
@@ -15,7 +16,23 @@
   const D = C.need('data');
   const VIS = 1.6;
 
+  /** Phase 3 T12: a relic - the Ember Chalice, a gold cup with an ember glowing in it, on a small dark cloth. */
+  function chalice(color) {
+    const g = new THREE.Group();
+    const gold = new THREE.MeshStandardMaterial({ color: 0xe0b040, flatShading: true, roughness: 0.3, metalness: 0.85, emissive: 0x3a2400 });
+    const pts = [[0.42, 0], [0.4, 0.06], [0.12, 0.14], [0.08, 0.5], [0.16, 0.62], [0.38, 0.78], [0.5, 1.15], [0.46, 1.18], [0.34, 0.86], [0.0, 0.8]].map(([x, y]) => new THREE.Vector2(x, y));
+    const cup = new THREE.Mesh(new THREE.LatheGeometry(pts, 10), gold); g.add(cup);
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshBasicMaterial({ color: color || 0xff7a2e }));
+    ember.position.y = 1.0; ember.scale.y = 0.45; g.add(ember);
+    const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.8, 0.06, 8), new THREE.MeshStandardMaterial({ color: 0x5a1a1a, flatShading: true, roughness: 1 }));
+    cloth.position.y = 0.03; g.add(cloth);
+    g.scale.setScalar(VIS);
+    return g;
+  }
+  VR.chalice = chalice;
+
   function chest(kind) {
+    if (kind === 'relic') return chalice(D.relics && D.relics.ember_chalice && D.relics.ember_chalice.color);
     const g = new THREE.Group(), strong = kind === 'strongbox';
     const w = strong ? 1.8 : 1.4, h = strong ? 1.15 : 0.9, dpt = strong ? 1.25 : 0.95;
     const body = new THREE.MeshStandardMaterial({ color: strong ? 0x3b3f45 : 0x7a4a24, flatShading: true, roughness: strong ? 0.5 : 0.9, metalness: strong ? 0.6 : 0 });
@@ -41,7 +58,7 @@
     const ringGeo = new THREE.RingGeometry(1.7, 2.1, 32);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const hotMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, fog: false });
-    const carried = { tithe: chest('tithe'), strongbox: chest('strongbox') };
+    const carried = { tithe: chest('tithe'), strongbox: chest('strongbox'), relic: chest('relic') };
     for (const k in carried) { carried[k].visible = false; group.add(carried[k]); }
 
     function entry(it) {
@@ -62,7 +79,7 @@
       for (const it of items) {
         const s = entry(it);
         live.add(it.id);
-        const on = !it.taken;
+        const on = !it.taken && !it.hidden;            // Phase 3 T12: a relic only while its mission is on
         s.mesh.visible = s.ring.visible = on;
         if (!on) continue;
         s.mesh.position.set(it.pos[0], it.pos[1], it.pos[2]);
