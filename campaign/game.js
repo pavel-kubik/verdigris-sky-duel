@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't210.1 2026-11-04 missions core, debug Shift+3 / J / K';
+  const BUILD = 't210.2 2026-11-04 missions core, debug Shift+3 / J / K';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -1130,7 +1130,7 @@
     ['Shift+9', 'castle fire: every wooden roof and hoarding of the castle catches fire now (they burn out in about a minute; stone stays, charred), T06', 'ShiftDigit9', 'castle fire'],
     ['Shift+1', 'aerie of this region: found, fly in from 120 out, facing the mouth (T08)', 'ShiftDigit1', 'to aerie'],
     ['Shift+2', 'find every aerie (fast travel test, T09)', 'ShiftDigit2', 'all aeries'],
-    ['Shift+3', 'mission: accept the next one of the catalogue (any stage; the timer starts outside the lair region or an aerie), T10', 'ShiftDigit3', 'mission'],
+    ['Shift+3', 'mission: accept the next one of the catalogue that is open (any stage; won ones and ones waiting for a rest are skipped; the timer starts outside the lair region or an aerie), T10', 'ShiftDigit3', 'mission'],
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
@@ -1351,7 +1351,10 @@
     if (code === 'ShiftDigit3') {                                 // T10: accept the next mission of the catalogue (forced)
       if (MS.active(cs)) flashPrompt(t('c.mission.refused.busy'), 1.5);
       else {
-        dbgMission = (dbgMission + 1) % D.missions.length;
+        const n = D.missions.length, rows = MS.list(cs);           // the next one that can be accepted (stage lock ignored), else show why not
+        let k = 1;
+        while (k < n && rows[(dbgMission + k) % n].why && rows[(dbgMission + k) % n].why !== 'stage') k++;
+        dbgMission = (dbgMission + k) % n;
         cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', D.missions[dbgMission].id)); cs.debugForce = false;
       }
       if (travelOn) renderTravel();

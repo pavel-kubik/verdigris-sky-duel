@@ -3,8 +3,8 @@
  *   def(id) -> mission data | null            from data.missions
  *   list(cs) -> [{ id, def, ok, why }]        the board: why 'stage' (dragon too small), 'done' (completed), 'retry'
  *                                             (failed, needs a rest first), 'busy' (another mission is on), null = can accept
- *   accept(cs, id, opts?) -> events[]         'mission:accepted' or 'mission:refused' { why }; opts.force (debug) skips the rules
- *                                             except 'busy'. cs.mission = { id, state: 'accepted', t, left, viaAerie }
+ *   accept(cs, id, opts?) -> events[]         'mission:accepted' or 'mission:refused' { why }; opts.force (debug) skips the stage lock
+ *                                             only. cs.mission = { id, state: 'accepted', t, left, viaAerie }
  *   cancel(cs) -> events[]                    only before the timer runs (state 'accepted'): 'mission:cancelled'
  *   step(cs, dt, ev) -> events[]              once per frame after the rest of state.step, with that frame's events ev:
  *     - accepted -> running when the dragon is outside and has left the lair region or an aerie ('mission:started')
@@ -52,7 +52,7 @@
     const m = def(id);
     if (!m) return [{ e: 'mission:refused', id, why: 'unknown' }];
     const w = why(cs, m);
-    if (w && (w === 'busy' || !(opts && opts.force))) return [{ e: 'mission:refused', id, why: w }];
+    if (w && !(w === 'stage' && opts && opts.force)) return [{ e: 'mission:refused', id, why: w }];
     cs.mission = { id, state: 'accepted', t: m.time, left: m.time, viaAerie: !!cs.inAerie, stopped: false };
     return [{ e: 'mission:accepted', id, time: m.time }];
   }
