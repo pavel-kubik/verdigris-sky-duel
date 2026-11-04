@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't210.4 2026-11-04 missions core, rebased onto the Bend fix';
+  const BUILD = 't210.5 2026-11-04 debug buttons in category tabs, rebased';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -1481,20 +1481,88 @@
     tog.style.cssText = 'pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;padding:0 10px;border-radius:20px;font:700 12px/1 ui-monospace,Menlo,monospace;margin-right:8px';
     $('#pauseBtn').before(tog);
     tog.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleDebug(); });
+    // tabs by category (one open at a time, tap again to close) so a phone shows only a few buttons; 'info' shows / hides the readout
     const bar = document.createElement('div');
     bar.id = 'debugBar';
-    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;pointer-events:auto;margin-bottom:6px';
-    for (const [, what, code, label] of DEBUG_KEYS) {
-      if (!label) continue;
+    bar.style.cssText = 'display:grid;gap:6px;pointer-events:auto;margin-bottom:6px;justify-items:end';
+    const tabs = document.createElement('div'), body = document.createElement('div');
+    tabs.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end';
+    body.style.cssText = 'display:grid;gap:6px;background:rgba(6,10,8,.6);border:1px solid rgba(233,225,204,.16);border-radius:6px;padding:6px;max-width:100%';
+    const BTN = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+    const byCode = new Map(DEBUG_KEYS.filter(k => k[3]).map(k => [k[2], k]));
+    const keyBtn = code => {
+      const k = byCode.get(code);
+      if (!k) return null;
+      byCode.delete(code);
       const b = document.createElement('button');
-      b.textContent = label; b.title = what;
-      b.style.cssText = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+      b.textContent = k[3]; b.title = k[1]; b.style.cssText = BTN;
       b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.style.background = 'rgba(255,148,71,.45)'; debugKey(code); });
       const up = () => { b.style.background = 'rgba(6,10,8,.8)'; };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
-      bar.appendChild(b);
+      return b;
+    };
+    const regionCodes = Object.keys(D.regions).map((id, i) => DBG_REGION_KEYS[i] && DBG_REGION_KEYS[i][1]).filter(Boolean);
+    const GROUPS = [                                               // [tab, [[row title, codes]]]; codes left over land in 'more'
+      ['go to', [['regions', ['KeyL', ...regionCodes, 'KeyT', 'ShiftDigit1']],
+                 ['places', ['Digit1', 'Digit9', 'Equal', 'Comma', 'Period', 'Digit0']],
+                 ['prey', ['KeyP', 'KeyI', 'KeyO']],
+                 ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
+      ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
+      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']]]],
+      ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK']]]],
+      ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
+    ];
+    const panes = [];
+    for (const [name, rows] of GROUPS) {
+      const pane = document.createElement('div');
+      pane.style.cssText = 'display:grid;gap:6px'; pane.hidden = true;
+      for (const [title, codes] of rows) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+        if (title) { const h = document.createElement('span'); h.textContent = title; h.style.cssText = 'font:500 10px/1 ui-monospace,Menlo,monospace;color:#9aa79f;text-transform:uppercase;letter-spacing:.08em;min-width:52px'; row.appendChild(h); }
+        for (const c of codes) { const b = keyBtn(c); if (b) row.appendChild(b); }
+        if (row.querySelector('button')) pane.appendChild(row);
+      }
+      panes.push([name, pane]);
     }
+    if (byCode.size) {                                             // a new debug key without a group still gets a button
+      const pane = document.createElement('div'), row = document.createElement('div');
+      pane.hidden = true; row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+      for (const c of [...byCode.keys()]) row.appendChild(keyBtn(c));
+      pane.appendChild(row); panes.push(['more', pane]);
+    }
+    let open = null, info = true;
+    try { const sv = JSON.parse(localStorage.getItem('vcamp-dbg-ui') || '{}'); open = sv.open || null; info = sv.info !== false; } catch (_) {}
+    const tabBtns = [];
+    const paint = () => {
+      for (const [name, pane] of panes) pane.hidden = name !== open;
+      body.hidden = !panes.some(([n]) => n === open);
+      for (const [name, b] of tabBtns) {
+        const on = name === 'info' ? info : name === open;
+        b.style.background = on ? 'rgba(255,148,71,.35)' : 'rgba(6,10,8,.8)';
+        b.style.borderColor = on ? 'rgba(255,148,71,.8)' : 'rgba(233,225,204,.25)';
+      }
+      if (dbgEl) dbgEl.hidden = !info;
+      try { localStorage.setItem('vcamp-dbg-ui', JSON.stringify({ open, info })); } catch (_) {}
+    };
+    for (const name of [...panes.map(p => p[0]), 'info']) {
+      const b = document.createElement('button');
+      b.textContent = name === 'info' ? 'info' : name + ' ▾';
+      b.style.cssText = BTN + ';font-weight:700';
+      b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        if (name === 'info') info = !info; else open = open === name ? null : name;
+        for (const [n, x] of tabBtns) x.setAttribute('aria-expanded', String(n === open));
+        paint();
+      });
+      tabBtns.push([name, b]); tabs.appendChild(b);
+    }
+    for (const [, pane] of panes) body.appendChild(pane);
+    bar.append(tabs, body);
     dbgBox.prepend(bar);
+    paint();
   }
   const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2);
   function debugHud() {
@@ -1502,7 +1570,7 @@
       // a fixed box holds the (touch) action buttons and the read-only panel
       dbgBox = document.createElement('div');
       dbgBox.id = 'debugBox';
-      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:5;max-width:calc(100vw - 16px);pointer-events:none';
+      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:8;max-width:calc(100vw - 16px);pointer-events:none';
       dbgEl = document.createElement('div');
       dbgEl.id = 'debugPanel';
       dbgEl.style.cssText = 'font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;overflow:hidden;opacity:.92';
