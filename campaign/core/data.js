@@ -136,7 +136,7 @@
         altar:  [0, 8, 5],                    // T20: upgrades for hoard gold (core/upgrades.js)
         mapStone: [-22, 32, 3],               // Phase 3 T09: the map in travel mode (fast travel to found aeries), off the entry line
         board:  [40, 20, 4],                  // Phase 3 T11: the mission board (core/missions.js), right of the entry
-        // Phase 3: trophy [-40, 20]
+        trophy: [-40, 20, 5],                 // Phase 3 T12: the trophy wall, a niche per relic (data.relics niche), left of the entry
       },
       hoardTiers: [0, 100, 300, 700, 1500],   // T19: coin pile size steps (tier = steps reached - 1); coins = min(maxCoins, gold / 2)
       maxCoins: 800,
@@ -242,6 +242,10 @@
     loot: {
       tithe:     { size: 1, gold: 50,  carry: { speedMult: 0.85, breath: true } },
       strongbox: { size: 2, gold: 150, carry: { speedMult: 0.8,  breath: false } },
+      // Phase 3 T12 (core/relics.js): a relic lies at the door of the building its mission targets (data.missions
+      // relic + target) only while that mission is on and the relic is not in the hoard yet; mission loot: not kept in
+      // lootTaken (it is back at the door as soon as it is lost or vanishes), no gold, banked into hoard.relics.
+      relic:     { size: 1, gold: 0,   carry: { speedMult: 0.8,  breath: false }, mission: true },
       door: 2, clear: 3,
     },
 
@@ -523,6 +527,13 @@
         reward: { gold: 300 } },
     ],
     mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1 },
+    /* Relics (Phase 3 T12, core/relics.js; 003_task_missions.md 4.5, 5.5). Mission prizes carried as loot kind 'relic'
+       (data.loot.relic: speed x0.8, no breath), lost on death or timeout, kept in hoard.relics once banked and shown
+       in their niche of the trophy wall (niche: 0..niches-1, left to right; colour of the relic's glow). */
+    relics: {
+      ember_chalice: { niche: 1, color: 0xff7a2e },
+    },
+    trophy: { niches: 3 },
 
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
   };
