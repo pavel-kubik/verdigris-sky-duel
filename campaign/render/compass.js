@@ -119,7 +119,7 @@
           g.save(); g.font = '700 10px "Barlow Semi Condensed", "Arial Narrow", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
           g.fillStyle = col; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 3;
           const tx = distText(m.dist);
-          const right = edge ? rel < 0 : x + s + 3 + g.measureText(tx).width < W - 12;
+          const right = edge ? rel < 0 : m.kind === 'mission' ? x - s - 3 - g.measureText(tx).width < 12 : x + s + 3 + g.measureText(tx).width < W - 12;   // T11: the mission distance on the left, clear of the lair's
           g.textAlign = right ? 'left' : 'right'; const pad = edge ? 16 : s + 3;
           g.fillText(tx, right ? x + pad : x - pad, y + 1); g.restore();
         }

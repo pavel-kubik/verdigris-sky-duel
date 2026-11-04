@@ -207,6 +207,9 @@ h2{font-size:42px}
 @keyframes mPulse{50%{transform:scale(1.12);text-shadow:0 0 10px #ff4d4d}}
 #missionObj{margin-top:3px;font-size:12px;font-weight:600;color:var(--bone);text-shadow:0 1px 2px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.mHud #compassTag{top:calc(196px + env(safe-area-inset-top,0px))}
+body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
+@media (max-width:720px){body.mHud #hint{top:calc(198px + env(safe-area-inset-top,0px))}}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:560px){body.mHud #hint{top:calc(198px + env(safe-area-inset-top,0px))}#missionHud{top:calc(140px + env(safe-area-inset-top,0px))}#missionTimer{font-size:24px}}
 /* T19: gold under the stage row; the carried chest as a small icon */
 #goldRow{display:flex;width:max-content;margin:4px auto 0;gap:5px;align-items:center}
 #goldRow small{font-family:var(--f-ui);font-size:12px;font-weight:700;letter-spacing:.06em;color:#f2c14e}
