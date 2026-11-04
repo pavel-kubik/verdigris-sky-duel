@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't212.2 2026-11-04 cave station prompts: board, map stone, trophy wall (EN, CS)';
+  const BUILD = 't212.3 2026-11-04 Accept greyed out when locked, gold ring + beam around the mission objective';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);

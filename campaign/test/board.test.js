@@ -89,6 +89,8 @@ const ofType = (ev, name) => ev.filter(e => e.e === name);
   cs.mission = null; MS.accept(cs, 'a2_workshop');
   const ws = bend.buildings.find(b => b.id === 'bend.castle.workshop1');
   ok(ws && Math.abs(MS.target(cs).x - ws.pos[0]) < 1e-9, 'destroy target = the workshop');
+  ok(MS.target(cs).r === Math.max(D.mission.ring.min, ws.r + D.mission.ring.pad), 'world ring around the workshop: its r + pad');
+  ok(tg.r >= D.mission.ring.min && tg.r > chapel.r, 'chapel ring encloses the chapel');
   let mk = NV.markers(cs);
   ok(mk[0].kind === 'mission' && mk[0].label.key === 'c.nav.mission', 'compass: mission marker first, in the target region');
   const p = cs.dragon.pilot;

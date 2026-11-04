@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't212.2 2026-11-04 cave station prompts: board, map stone, trophy wall (EN, CS)';
+  const BUILD = 't212.3 2026-11-04 Accept greyed out when locked, gold ring + beam around the mission objective';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -134,6 +134,8 @@
   scene.add(caveView.group);
   const lootView = VRender.loot.build();                           // T19: tithe chests and strongboxes, the carried one
   scene.add(lootView.group);
+  const targetView = VRender.target.build();                       // T12: gold ring + beam around the mission objective
+  scene.add(targetView.group);
   /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap.
    *  Outside, render/sky.js sets the lights and the fog colour from the clock every frame (T21). */
   function syncScene() {
@@ -1540,6 +1542,7 @@
     missionHud();                                                // Phase 3 T11
     preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
+    targetView.update(cs, pilot && !cs.inLair ? pilot.pos : null, time);
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);

@@ -526,7 +526,10 @@
       { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
         reward: { gold: 300 } },
     ],
-    mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1 },
+    mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1,
+      // T12 (Pavel's feedback): a gold ring on the ground around the objective (building r + pad, at least min) and a light
+      // beam over it seen from afar (beam high, fading out inside fadeNear .. fadeFar of the dragon) - render/target-view.js
+      ring: { pad: 6, min: 10, beam: 140, fadeNear: 40, fadeFar: 110 } },
     /* Relics (Phase 3 T12, core/relics.js; 003_task_missions.md 4.5, 5.5). Mission prizes carried as loot kind 'relic'
        (data.loot.relic: speed x0.8, no breath), lost on death or timeout, kept in hoard.relics once banked and shown
        in their niche of the trophy wall (niche: 0..niches-1, left to right; colour of the relic's glow). */

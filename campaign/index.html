@@ -40,6 +40,7 @@ h1{font-size:60px}
 p{margin:0;color:var(--mute);line-height:1.45}
 .cta{background:var(--verd);color:#08130d;border:0;border-radius:4px;padding:12px 16px;font-size:16px;font-weight:700;letter-spacing:.04em}
 .cta:hover{filter:brightness(1.08)}
+.cta:disabled,.cta:disabled:hover{background:#4a524d;color:#9aa79f;filter:none;cursor:default;opacity:.7}
 .ghost{background:transparent;color:var(--bone);border:1px solid var(--line);border-radius:4px;padding:10px 16px;font-size:15px;font-weight:600;text-align:center;text-decoration:none}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px}
@@ -386,7 +387,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/loot.js', 'core/relics.js',
      'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/tips.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
-     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
+     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>
