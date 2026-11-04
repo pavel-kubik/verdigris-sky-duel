@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't210.4 2026-11-04 missions core, rebased onto the Bend fix';
+  const BUILD = 't210.5 2026-11-04 debug buttons in category tabs, rebased';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
