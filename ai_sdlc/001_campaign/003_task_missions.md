@@ -405,6 +405,7 @@ v2 -> v3: empty missions, no relics, nothing explored except the cells around di
 | Mission board | Wooden board with parchment notes in the cave; panel lists missions (locked ones greyed with the reason), briefing, time limit, reward, Accept |
 | Trophy wall | Rock wall with niches; each recovered relic sits in its niche with a glow; panel names it and its story line |
 | Mission HUD | Timer under the compass, centred, 28 px; amber at 60 s, red and pulsing at 20 s; one objective line; mission target marker on the compass in gold |
+| Messages and log | Added on Pavel's request (2026-11-04, after T12; `core/msglog.js`, `data.messages`): the big message lines wait in a queue instead of replacing each other; each stays by its length (chars / 12 s, 4 - 9 s), cut to 70% while others wait, a tap closes it; below the mother's caption while she speaks. Message log panel (button under pause on touch, L on desktop, tap on the mission timer; the world pauses while open): the current mission (state, time left, objective, briefing) on top, then the last 40 messages with the time of day, newest first, mother lines and mission outcomes included. Debug "to lair" moved from L to Shift+Z |
 | Story cards | Act cards: full screen panel drawn with the game's own render (Act 2: Vyshgard over the river at dusk) with 2-4 lines and Continue; briefings as a bottom sheet over the board panel |
 | Aerie | Outside: a dark cleft in a cliff with a ledge and bones; inside: a small round cave with a nest of branches |
 

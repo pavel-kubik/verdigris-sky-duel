@@ -233,6 +233,7 @@
     if (tk === momShown) return;
     momShown = tk;
     momEl.hidden = !tk;
+    document.body.classList.toggle('mom', !!tk);                 // the message lines move below her caption
     if (tk) ML.push(msgs, { title: t(tk), kind: 'mother', show: false }, stamp());   // the message log keeps her lines
     if (tk) { momText.textContent = t(tk); momEl.classList.toggle('good', tk.indexOf('.good.') > 0 || tk === 'c.mother.visit'); }
     if (tk) $('#hint').hidden = true;                             // she replaces the old hunting tip
@@ -1746,7 +1747,7 @@
       // a fixed box holds the (touch) action buttons and the read-only panel
       dbgBox = document.createElement('div');
       dbgBox.id = 'debugBox';
-      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:8;max-width:calc(100vw - 16px);pointer-events:none';
+      dbgBox.style.cssText = 'position:fixed;right:58px;top:calc(60px + env(safe-area-inset-top,0px));z-index:8;max-width:calc(100vw - 66px);pointer-events:none';
       dbgEl = document.createElement('div');
       dbgEl.id = 'debugPanel';
       dbgEl.style.cssText = 'font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;overflow:hidden;opacity:.92';
