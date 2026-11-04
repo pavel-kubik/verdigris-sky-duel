@@ -141,6 +141,15 @@
         if (icon) icon(g, p.kind, sx, sy, 9, col || '#fff', 1);
         hits.push({ x: sx, y: sy, name: t(p.key) });
       }
+      // T11: the mission target - a pulsing gold ring
+      if (model.target) {
+        const [sx, sy] = toScreen(model.target.x, model.target.z), pr = 20 + 3 * Math.sin(Date.now() / 250);
+        g.strokeStyle = '#ffd34d'; g.lineWidth = 3; g.beginPath(); g.arc(sx, sy, pr, 0, TAU); g.stroke();
+        g.lineWidth = 1.5; g.beginPath(); g.arc(sx, sy, pr + 6, 0, TAU); g.stroke();
+        const name = t('c.map.target', { m: t('c.mission.' + model.target.id) });
+        label(name, sx, sy + pr + 16, '#ffd34d');
+        hits.push({ x: sx, y: sy, name });
+      }
       // the dragon: an arrow along its heading (world direction (sin yaw, cos yaw) -> screen (-sin, -cos))
       if (model.dragon) {
         const [sx, sy] = toScreen(model.dragon.x, model.dragon.z), y = model.dragon.yaw;
@@ -192,6 +201,7 @@
         g.beginPath(); for (let k = 0; k <= 12; k++) { const a = (k / 12) * TAU, w = rr * (0.88 + 0.12 * Math.sin(k * 2.7 + q.col * 3 + q.row)); k ? g.lineTo(x + Math.cos(a) * w, y + Math.sin(a) * w) : g.moveTo(x + Math.cos(a) * w, y + Math.sin(a) * w); } g.closePath(); g.fill();
         g.strokeStyle = q.alert ? ALERT[Math.min(3, q.alert)] : 'rgba(233,225,204,.5)'; g.lineWidth = q.alert ? 3 : 1.5; g.stroke();
         if (q.id === 'ash') { g.fillStyle = '#3a2a22'; g.beginPath(); g.moveTo(x - rr * 0.35, y + rr * 0.2); g.lineTo(x, y - rr * 0.35); g.lineTo(x + rr * 0.35, y + rr * 0.2); g.closePath(); g.fill(); g.fillStyle = '#e06a2a'; g.beginPath(); g.arc(x, y - rr * 0.3, rr * 0.08, 0, TAU); g.fill(); }
+        if (q.mission) { g.strokeStyle = '#ffd34d'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(x, y, rr * 1.05, 0, TAU); g.stroke(); g.setLineDash([]); }   // T11
         if (q.here) { g.fillStyle = '#ff9447'; g.beginPath(); g.arc(x + rr * 0.55, y - rr * 0.55, 7, 0, TAU); g.fill(); g.strokeStyle = INK; g.lineWidth = 2; g.stroke(); }
         let name = t(q.nameKey);
         label(name, x, y + rr * 0.62, '#ebe3cd');

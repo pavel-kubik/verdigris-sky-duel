@@ -205,6 +205,24 @@
       stone.position.set(MS[0], K.floor, MS[1]); stone.rotation.y = face; stone.rotation.x = -0.12;
       group.add(stone);
     }
+    // Phase 3 T11: the mission board - two posts, a plank board and one parchment note per mission (gold when accepted)
+    const BD = K.stations.board, notes = [];
+    if (BD) {
+      const bd = new THREE.Group(), face = Math.atan2(-BD[0], -BD[1]), u = BD[2];
+      const wood = new THREE.MeshStandardMaterial({ color: 0x5a3b22, flatShading: true, roughness: 1 });
+      for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(u * 0.18, u * 2.6, u * 0.18), wood); post.position.set(sx * u * 0.95, u * 1.3, 0); bd.add(post); }
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(u * 2.2, u * 1.3, u * 0.12), new THREE.MeshStandardMaterial({ color: 0x7a5232, flatShading: true, roughness: 1 }));
+      plank.position.set(0, u * 1.75, 0); bd.add(plank);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(u * 2.5, u * 0.12, u * 0.5), wood); roof.position.set(0, u * 2.5, u * 0.08); roof.rotation.x = 0.25; bd.add(roof);
+      const noteGeo = new THREE.PlaneGeometry(u * 0.5, u * 0.62), n = Math.max(1, (D.missions || []).length);
+      for (let i = 0; i < n; i++) {
+        const m = new THREE.Mesh(noteGeo, new THREE.MeshBasicMaterial({ color: 0xe9dcb8, fog: false }));
+        m.position.set((i - (n - 1) / 2) * u * 0.66, u * 1.75 + (i % 2 ? -0.08 : 0.1) * u, u * 0.07); m.rotation.z = (i % 2 ? 0.08 : -0.06);
+        bd.add(m); notes.push(m);
+      }
+      bd.position.set(BD[0], K.floor, BD[1]); bd.rotation.y = face;
+      group.add(bd);
+    }
     // station ring (the one in reach)
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x62c48a, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false });
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), ringMat);
@@ -217,10 +235,14 @@
       if (s) {
         ring.position.set(s[0], K.floor + 0.12, s[1]);
         ring.scale.setScalar(s[2] + 1.5 + 0.25 * Math.sin(time * 4));
-        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : st === 'altar' ? 0xff9447 : st === 'mapStone' ? 0xffb066 : 0x62c48a);
+        ringMat.color.set(st === 'exit' ? 0xffd2a0 : st === 'hoard' ? 0xf2c14e : st === 'altar' ? 0xff9447 : st === 'mapStone' ? 0xffb066 : st === 'board' ? 0xffd34d : 0x62c48a);
       }
       if (cs) ups.forEach((id, i) => { runes[i].material = UP.has(cs, id) ? runeMat.owned : UP.canBuy(cs, id).ok ? runeMat.can : runeMat.dark; });
       runeMat.can.color.setHex(0xff7a2e).lerp(canHot, 0.5 + 0.5 * Math.sin(time * 3));   // affordable: an ember pulse
+      if (cs && notes.length) {                                       // T11: the accepted mission's note glows gold, won ones are dim
+        const ms = D.missions || [], on = cs.mission && cs.mission.id, done = (cs.missions && cs.missions.completed) || [];
+        notes.forEach((m, i) => { const id = ms[i] && ms[i].id; m.material.color.setHex(id && id === on ? 0xffd34d : id && done.indexOf(id) >= 0 ? 0x8a8070 : 0xe9dcb8); });
+      }
       const gold = cs && cs.hoard ? cs.hoard.gold : 0;
       if (gold !== coinGold) pile(gold);
       // carcasses: one per stored item, side by side across the slab (carcHold local: x = world up, y = across, z = along)

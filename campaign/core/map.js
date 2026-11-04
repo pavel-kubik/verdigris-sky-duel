@@ -16,7 +16,8 @@
  *         a region of a later phase is always locked (later: true once the dragon has the stage)
  *       places of regionId (default the current region): only discovered ones, plus the lair (always known):
  *         [{ id, kind: 'lair' | 'settlement' | 'castle' | 'aerie' (T08), type, x, z, key, discovered: true, alert, freed }]
- *       dragon: { x, z, yaw } when the dragon is in regionId (and not in the cave), else null; target: null (T11)
+ *       dragon: { x, z, yaw } when the dragon is in regionId (and not in the cave), else null;
+ *       target: { x, z, id } the mission target (T11, missions.target) when it lies in regionId, else null
  * Fast travel (T09, 003_task_missions.md 5.3):
  *   here(cs) -> 'lair' | '<region>.aerie' | null      the travel station the dragon is at (inside the lair or an aerie)
  *   destinations(cs) -> [{ id, kind: 'lair' | 'aerie', region, key }]   the lair and every found aerie
@@ -174,7 +175,9 @@
     }
     const p = cs.dragon.pilot;
     const dragon = p && rid === cs.region && !cs.inLair ? { x: p.pos[0], z: p.pos[2], yaw: p.yaw } : null;
-    return { region: rid, regions, places, dragon, target: null };
+    const tg = M.need('missions').target(cs), target = tg && tg.region === rid ? { x: tg.x, z: tg.z, id: tg.id } : null;   // T11
+    if (tg) { const r = regions.find(x => x.id === tg.region); if (r) r.mission = true; }   // T11: the world view rings that region
+    return { region: rid, regions, places, dragon, target };
   }
 
   /* ---------- fast travel (T09) ---------- */

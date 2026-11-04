@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't210.5 2026-11-04 debug buttons in category tabs, rebased';
+  const BUILD = 't211.1 2026-11-04 mission board, briefing, mission HUD, gold target marker';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -850,6 +850,8 @@
     exit: '<path d="M4 20c0-9 3-15 8-15s8 6 8 15M12 20v-6M9 17l3-3 3 3"/>',
     hoard: '<path d="M3 19h18M5 19c0-4 3-7 7-7s7 3 7 7M8 12l1-3h6l1 3M10 9V7h4v2"/>',
     altar: '<path d="M5 20h14M7 20l1-8h8l1 8M6 12h12M12 4l2 3-2 3-2-3z"/>',
+    board: '<path d="M7 21V4M17 21V4M4 6h16v9H4zM7 9h4M7 12h3M13 9h4"/>',   // Phase 3 T11: the mission board
+    mapStone: '<path d="M6 21l2-17h8l2 17zM9 9h6M11 9v5M9 14h5"/>',
   };
   const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
   function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
@@ -967,6 +969,70 @@
       $('#hoardTier').textContent = g ? t('c.hoard.tier', { tier: tr + 1, max: T0.length }) + (nx ? ' - ' + t('c.hoard.next', { next: nx }) : '') : t('c.hoard.empty');
     }
     if (stationOpen === 'altar') renderAltar();
+    if (stationOpen === 'board') renderBoard();
+  }
+  /* ---------- Phase 3 T11: the mission board - list (locked ones greyed with the reason), briefing, Accept / Drop ---------- */
+  const boardList = $('#boardList'), boardBrief = $('#boardBrief');
+  let boardShown = '', briefId = null;
+  function boardWhy(r) { return r.why === 'stage' ? t('c.board.locked.stage', { stage: stageName(r.def.minStage || 0) }) : t('c.board.locked.' + r.why); }
+  function renderBoard() {
+    const rows = MS.list(cs), on = MS.active(cs);
+    const key = rows.map(r => r.id + ':' + r.why).join(',') + '|' + (on ? on.id + on.state : '') + '|' + briefId + '|' + (window.I18N ? I18N.lang : '');
+    if (key === boardShown) return;
+    boardShown = key;
+    boardList.hidden = !!briefId; boardBrief.hidden = !briefId;
+    if (briefId) return renderBrief(rows.find(r => r.id === briefId), on);
+    boardList.innerHTML = '';
+    for (const r of rows) {
+      const li = document.createElement('li'), b = document.createElement('button'), nm = document.createElement('b'), sm = document.createElement('small');
+      const mine = on && on.id === r.id;
+      nm.textContent = t('c.mission.' + r.id);
+      sm.textContent = mine ? t('c.board.yours') : r.why && r.why !== 'busy' ? boardWhy(r) : t('c.board.line', { time: mmss(r.def.time), gold: (r.def.reward && r.def.reward.gold) || 0 });
+      b.dataset.id = r.id; b.classList.toggle('locked', !!r.why && !mine && r.why !== 'busy'); b.classList.toggle('on', !!mine);
+      b.append(nm, sm); li.append(b); boardList.append(li);
+    }
+  }
+  function renderBrief(r, on) {
+    if (!r) { briefId = null; boardShown = ''; renderBoard(); return; }
+    const mine = on && on.id === r.id;
+    $('#briefName').textContent = t('c.mission.' + r.id);
+    $('#briefText').textContent = t('c.brief.' + r.id);
+    $('#briefTime').textContent = mmss(r.def.time);
+    $('#briefReward').textContent = t('c.board.gold', { gold: (r.def.reward && r.def.reward.gold) || 0 });
+    const why = mine ? (on.state === 'accepted' ? t('c.board.accepted') : t('c.board.yours')) : r.why ? boardWhy(r) : '';
+    $('#briefWhy').textContent = why; $('#briefWhy').hidden = !why;
+    $('#briefAccept').hidden = !!mine; $('#briefAccept').disabled = !!r.why;
+    $('#briefDrop').hidden = !(mine && on.state === 'accepted');
+    if (!isTouch) setTimeout(() => (r.why ? $('#briefBack') : $('#briefAccept')).focus({ preventScroll: true }), 0);
+  }
+  boardList.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !cs.inLair || state !== 'play') return;
+    briefId = b.dataset.id; boardShown = ''; renderBoard();
+  });
+  $('#briefBack').onclick = () => { briefId = null; boardShown = ''; renderBoard(); };
+  $('#briefAccept').onclick = () => {
+    if (!briefId || !cs.inLair || state !== 'play') return;
+    const ev = ST.caveAct(cs, 'board', briefId);
+    if (ev.some(x => x.e === 'mission:accepted')) lairMsg(t('c.board.go'));
+    onEvents(ev); boardShown = ''; renderBoard();
+  };
+  $('#briefDrop').onclick = () => {
+    if (!cs.inLair || state !== 'play') return;
+    onEvents(ST.caveAct(cs, 'board', null)); boardShown = ''; renderBoard();
+  };
+  /* ---------- Phase 3 T11: mission HUD - timer under the compass, objective line ---------- */
+  const mHud = $('#missionHud'), mTimer = $('#missionTimer'), mObj = $('#missionObj');
+  let mShown = '';
+  function missionHud() {
+    const ms = state === 'play' && pilot && !cs.inLair && !cs.inAerie ? MS.timerState(cs) : null;
+    if (!ms) { if (mShown) { mHud.hidden = true; document.body.classList.remove('mHud'); mShown = ''; } return; }
+    const ob = MS.objective(cs), p = {};
+    if (ob) for (const k in ob.p || {}) p[k] = t(ob.p[k]);
+    const txt = mmss(ms.left), cls = ms.level + (ms.running ? '' : ' paused'), line = ob ? t(ob.key, p) : '';
+    const key = txt + '|' + cls + '|' + line;
+    if (key === mShown) return;
+    if (!mShown) { mHud.hidden = false; document.body.classList.add('mHud'); }
+    mShown = key; mTimer.textContent = txt; mTimer.className = cls; mObj.textContent = line;
   }
   /** T20: the altar panel - every upgrade with its effect and cost; Buy while the hoard has the gold (core/upgrades.js). */
   const altarList = $('#altarList');
@@ -1011,9 +1077,9 @@
     lairEl.dataset.station = id;
     $('#lairTitle').dataset.i18n = 'c.cave.' + id; $('#lairTitle').textContent = t('c.cave.' + id);
     deathCard(death || null); if (death) { toastEl.style.opacity = 0; toastT = 0; }
-    lairShown = ''; altarShown = ''; renderLair();
+    lairShown = ''; altarShown = ''; boardShown = ''; briefId = null; renderLair();
     lairEl.hidden = false;
-    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
+    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || id === 'board' && boardList.querySelector('button') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
   }
   function closeStation() {
     stationOpen = null;
@@ -1435,6 +1501,7 @@
     motherHud();
     motherArrow();
     compassHud(dt);
+    missionHud();                                                // Phase 3 T11
     preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)

@@ -135,7 +135,8 @@
         hoard:  [30, -8, 10],                 // T19: the coin pile (hoardTiers), its panel shows the gold
         altar:  [0, 8, 5],                    // T20: upgrades for hoard gold (core/upgrades.js)
         mapStone: [-22, 32, 3],               // Phase 3 T09: the map in travel mode (fast travel to found aeries), off the entry line
-        // Phase 3: trophy [-40, 20], board [40, 20]
+        board:  [40, 20, 4],                  // Phase 3 T11: the mission board (core/missions.js), right of the entry
+        // Phase 3: trophy [-40, 20]
       },
       hoardTiers: [0, 100, 300, 700, 1500],   // T19: coin pile size steps (tier = steps reached - 1); coins = min(maxCoins, gold / 2)
       maxCoins: 800,
