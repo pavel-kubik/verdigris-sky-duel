@@ -73,7 +73,7 @@
     if (isMissionLoot(cs, cs.carriedLoot)) { ev.push({ e: 'loot:vanished', kind: cs.carriedLoot.kind, id: cs.carriedLoot.id }); cs.carriedLoot = null; }
     const reg = (m && m.region) || cs.region;
     const rs = cs.regionStates[reg] = cs.regionStates[reg] || {};
-    ev.push(...AL.add(rs, 'mission', cs.stats.played, MS().alertOnFail));
+    for (const e of AL.add(rs, 'mission', cs.stats.played, MS().alertOnFail)) ev.push(Object.assign(e, { region: reg }));
     book(cs).failedAt[a.id] = rested(cs);
     cs.mission = null;
     ev.push({ e: 'mission:failed', id: a.id, why: reason || 'timeout', left: Math.max(0, a.left) });

@@ -144,6 +144,7 @@ const ofType = (ev, name) => ev.filter(e => e.e === name);
   ok(!!f && f.why === 'timeout' && f.left === 0, 'timeout fails');
   ok(cs.carriedLoot && cs.carriedLoot.kind === 'chest', 'ordinary loot is kept on a fail');
   near(cs.regionStates.bend.heat, heat0 + D.mission.alertOnFail, 1e-9, 'region heat + alertOnFail');
+  ok(ev.filter(e => e.e === 'alert:level').every(e => e.region === 'bend') && ev.some(e => e.e === 'alert:level'), 'alert:level names the region');
   ok(MS.list(cs).find(r => r.id === 'a2_chalice').why === 'retry', 'retry needs a rest');
   ok(ofType(MS.accept(cs, 'a2_chalice'), 'mission:refused')[0].why === 'retry', 'accept refused until a rest');
   ok(MS.list(cs).find(r => r.id === 'a2_workshop').ok, 'other missions stay open');

@@ -813,7 +813,7 @@
       else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5);
       else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3);
       else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5); }
-      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' ? 'death' : 'timeout')), 4.5);
+      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5);
       else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2);
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
       else if (e.e === 'aerie:enter') openAerie();
