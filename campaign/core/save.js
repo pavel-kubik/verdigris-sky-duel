@@ -61,7 +61,7 @@
         }
         return o;
       }, {}),
-      missions: { completed: [], active: null },
+      missions: { completed: ((cs.missions && cs.missions.completed) || []).slice(), active: null, failedAt: Object.assign({}, cs.missions && cs.missions.failedAt) },   // T10 (the running mission: T18)
       story: storyOf(cs.story),
       world: {
         region: cs.region,
@@ -169,6 +169,10 @@
     cs.lootTarget = null;
     const ups = Array.isArray(o.dragon.upgrades) ? o.dragon.upgrades : [];   // T20: owned upgrades, known ids once each
     cs.upgrades = ups.filter((id, i) => typeof id === 'string' && D.upgrades[id] && ups.indexOf(id) === i);
+    const mo = o.missions || {}, known = id => typeof id === 'string' && D.missions.some(m => m.id === id);   // T10
+    cs.missions = { completed: Array.isArray(mo.completed) ? mo.completed.filter((id, i) => known(id) && mo.completed.indexOf(id) === i) : [], failedAt: {} };
+    for (const id of Object.keys(mo.failedAt || {})) if (known(id) && num(mo.failedAt[id])) cs.missions.failedAt[id] = mo.failedAt[id] | 0;
+    cs.mission = null;
     cs.story = storyOf(o.story);
     cs.discovered = {}; cs.regionStates = {};
     for (const id of Object.keys(o.regions || {})) {

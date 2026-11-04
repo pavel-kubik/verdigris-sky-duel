@@ -509,6 +509,20 @@
       discover: 200, enterRange: 40, nearRange: 110, mouthR: 9, above: 6, out: 26, outY: 22, room: { r: 22, h: 14 },
     },
 
+    /* Missions (Phase 3 T10, core/missions.js; 003_task_missions.md 4.5, 5.5). Accepted at the board (T11); the timer
+       (`time` s) starts when the dragon leaves the lair region or an aerie and does not run inside either. Success =
+       objective met, then into the lair or an aerie: reward.gold x (1 + bonus per bonusPer s left). Fail (timeout,
+       death): mission loot vanishes, region heat + alertOnFail, retry after the next rest. T19 tunes the numbers. */
+    missions: [
+      { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
+        relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
+      { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
+        time: 420, reward: { gold: 200 } },
+      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
+        reward: { gold: 300 } },
+    ],
+    mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1 },
+
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
   };
 

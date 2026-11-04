@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 'bend.1 2026-11-01 Veltava Bend un-mirrored: real Prague east-west';
+  const BUILD = 't210.4 2026-11-04 missions core, rebased onto the Bend fix';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -397,7 +397,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^Digit[0-9]$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JK])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -760,6 +760,8 @@
   let goldPulse = 0;                                             // T19: HUD gold pulse after banking
   const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
+  const missionName = id => t('c.mission.' + id);                 // T10
+  const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   function onEvents(ev) {
     for (const e of ev) {
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
@@ -805,6 +807,14 @@
       else if (e.e === 'region:enter') swapRegion(e.respawn || e.travel);
       else if (e.e === 'travel:done') { leaveCave(); toast(t('c.travel.done', { place: destName(MP.destinations(cs).find(d => d.id === e.to) || { kind: 'lair' }) }), t(e.to === 'lair' ? 'c.travel.doneLair' : 'c.travel.doneAerie'), 3); }   // T09
       else if (e.e === 'save') saveNow(e.why);
+      else if (e.e === 'mission:accepted') toast(t('c.mission.accepted', { m: missionName(e.id) }), t('c.mission.acceptedSub', { time: mmss(e.time) }), 3.5);   // T10 (the board and the HUD come with T11)
+      else if (e.e === 'mission:refused') flashPrompt(t('c.mission.refused.' + e.why), 2);
+      else if (e.e === 'mission:started') toast(t('c.mission.started', { m: missionName(e.id) }), t('c.mission.startedSub', { time: mmss(e.time) }), 3);
+      else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5);
+      else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3);
+      else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5); }
+      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5);
+      else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2);
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
       else if (e.e === 'aerie:enter') openAerie();
       else if (e.e === 'aerie:leave') closeAerie();
@@ -1120,13 +1130,16 @@
     ['Shift+9', 'castle fire: every wooden roof and hoarding of the castle catches fire now (they burn out in about a minute; stone stays, charred), T06', 'ShiftDigit9', 'castle fire'],
     ['Shift+1', 'aerie of this region: found, fly in from 120 out, facing the mouth (T08)', 'ShiftDigit1', 'to aerie'],
     ['Shift+2', 'find every aerie (fast travel test, T09)', 'ShiftDigit2', 'all aeries'],
-    ['Shift+3', 'stand-in mission on / off: fast travel is blocked while it runs (T09, until the T10 missions)', 'ShiftDigit3', 'mission'],
+    ['Shift+3', 'mission: accept the next one of the catalogue that is open (any stage; won ones and ones waiting for a rest are skipped; the timer starts outside the lair region or an aerie), T10', 'ShiftDigit3', 'mission'],
+    ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
+    ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
   let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
   let fastTime = false;                                          // T21: debug / - the clock runs x40
+  let dbgMission = -1;                                           // T10: catalogue index of the last Shift+3 accept
   let dbgPen = -1, dbgLoot = -1;                                 // T19: item index of the last ',' press                                               // T18: pen index of the last '.' press
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1, dbgBal = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
@@ -1335,10 +1348,19 @@
       for (const id of Object.keys(D.regions)) { const s = AE.site(id); if (s) cs.discovered[s.id] = true; }
       flashPrompt(t('c.dbg.allAeries'), 1.5); if (travelOn) renderTravel();
     }
-    if (code === 'ShiftDigit3') {                                 // T09: a stand-in running mission (T10 brings the real ones)
-      cs.mission = cs.mission ? null : { id: 'debug', state: 'running' };
-      flashPrompt(t(cs.mission ? 'c.dbg.missionOn' : 'c.dbg.missionOff'), 1.5); if (travelOn) renderTravel();
+    if (code === 'ShiftDigit3') {                                 // T10: accept the next mission of the catalogue (forced)
+      if (MS.active(cs)) flashPrompt(t('c.mission.refused.busy'), 1.5);
+      else {
+        const n = D.missions.length, rows = MS.list(cs);           // the next one that can be accepted (stage lock ignored), else show why not
+        let k = 1;
+        while (k < n && rows[(dbgMission + k) % n].why && rows[(dbgMission + k) % n].why !== 'stage') k++;
+        dbgMission = (dbgMission + k) % n;
+        cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', D.missions[dbgMission].id)); cs.debugForce = false;
+      }
+      if (travelOn) renderTravel();
     }
+    if (code === 'ShiftKeyJ') { if (!MS.active(cs)) flashPrompt(t('c.dbg.noMission'), 1.5); else onEvents(ST.missionAct(cs, 'finish')); }   // T10
+    if (code === 'ShiftKeyK') { if (!MS.active(cs)) flashPrompt(t('c.dbg.noMission'), 1.5); else onEvents(ST.missionAct(cs, 'fail')); if (travelOn) renderTravel(); }   // T10
     if (code === 'ShiftDigit1') {                                 // T08: in front of this region's aerie, already found
       const s = AE.site(cs.region);
       if (!s || cs.inLair || cs.inAerie) flashPrompt(t('c.dbg.noAerie'), 1.5);
@@ -1521,6 +1543,7 @@
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
+      { const ms = MS.timerState(cs); L.push('MISSION ' + (!ms ? '-  (Shift+3: accept next)' : ms.id + '  ' + ms.state + '  left ' + mmss(ms.left) + '  ' + ms.level + (ms.running ? '' : '  paused') + '  (Shift+J done, Shift+K fail)') + '  completed ' + ((cs.missions && cs.missions.completed.length) || 0)); }   // T10
       { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+1: to aerie)')); }   // T08
       L.push('TRAVEL  at ' + (MP.here(cs) || '-') + '  to ' + MP.destinations(cs).map(d => d.id).join(', ') + (cs.mission ? '  mission ' + cs.mission.state : '') + '  (Shift+2 all aeries, Shift+3 mission)');   // T09
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }

@@ -333,6 +333,18 @@ Mission times are longer than in the first draft because the Bend is one region 
 - `missions.step(cs, dt)`: timer, objective checks through events (`loot:taken` of the relic, `building:ruined` of the target, `caravan:stopped` + chest taken), fail on 0 or `dragon:died`; the timer pauses during region loading and does not run inside the lair or an aerie.
 - Rewards: gold + `bonus` per `bonusPer` s left; relics go to `hoard.relics` and the trophy wall. Fail: mission loot vanishes, region heat + `alertOnFail`, retry after the next rest.
 - `relics.carry(cs)` applies `loot.relic.carry` while a relic is in the claws.
+- As built (T10): `core/missions.js` (API in its header). `cs.mission = { id, state, t, left, viaAerie, stopped }` holds the
+  accepted / running / done mission; after success or fail it is `null` and the outcome is the event
+  (`mission:success` { gold, base, bonus, left }, `mission:failed` { why: 'timeout' | 'death' | 'debug' }). One mission at
+  a time ('busy'). "Leaves the lair region" = outside and in another region than the lair's, or after being inside an
+  aerie with the mission accepted. The timer also stops in a frame with `region:enter` and while `cs.loading`.
+  Objective hooks for the later tasks: T12 emits `loot:taken` with `kind: 'relic'` and `relic: '<relic id>'`; T15 emits
+  `caravan:stopped` { caravan } and the chest's `loot:taken` with `mission: '<mission id>'`. `loot:lost` / `loot:dropped`
+  of the prize sets a done steal / intercept back to running. Bonus = `round(gold x (1 + bonus x floor(left / bonusPer)))`.
+  `cs.missions = { completed, failedAt }` is already written into the v2 save's `missions` block (failedAt = the
+  `flags.rested` count at the fail; a later rest at the nest or an aerie allows the retry); the running mission is
+  saved with v3 (T18). Debug: Shift+3 accept next (any stage), Shift+J objective done, Shift+K fail (DBG buttons
+  mission, mission done, mission fail).
 
 ### 5.6 `caravan`
 

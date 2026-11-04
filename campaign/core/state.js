@@ -57,7 +57,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -73,6 +73,8 @@
       },
       field: null,
       larder: [],                    // stored prey in the lair: { type, food }
+      mission: null,                 // Phase 3 T10: the accepted / running mission (core/missions.js), not saved yet (T18)
+      missions: { completed: [], failedAt: {} },   // T10: finished missions and retry marks, saved
       inAerie: null,                 // Phase 3 T08: region id while inside its aerie (core/aerie.js)
       inLair: false,                 // inside the cave (T10: the dragon walks in the hall, core/cave.js); location reads it
       station: null,                 // T10: the cave station in reach ('nest' | 'larder' | 'exit'), the Action slot / E
@@ -163,7 +165,7 @@
     if (!cs.dragon.pilot) return ev;
     ensureTown(cs);
     for (const e of CK.step(cs, dt)) emit(cs, ev, e);           // T21: time of day first; sets cs.light for the defenders
-    if (cs.inAerie) { cs.stats.played += dt; for (const e of LR.spoil(cs, dt)) emit(cs, ev, e); return autosave(cs, ev, dt); }   // Phase 3 T08: inside an aerie the world waits
+    if (cs.inAerie) { cs.stats.played += dt; for (const e of LR.spoil(cs, dt)) emit(cs, ev, e); for (const e of MS.step(cs, dt, ev.slice())) emit(cs, ev, e); return autosave(cs, ev, dt); }   // Phase 3 T08: inside an aerie the world waits
     run(cs, inp, dt, ev);
     defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
     alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
@@ -172,6 +174,7 @@
     for (const e of MP.step(cs, dt)) emit(cs, ev, e);           // Phase 3 T07: cells around the dragon become explored (map fog)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     for (const e of TP.step(cs, ev, dt)) emit(cs, ev, e);      // T23: one-time tips (landing, compass, cave, raid, alert, altar)
+    for (const e of MS.step(cs, dt, ev.slice())) emit(cs, ev, e);   // Phase 3 T10: mission timer, objectives, success / fail
     return autosave(cs, ev, dt);
   }
 
@@ -179,7 +182,7 @@
    * Autosave triggers (5.9): rest, region change, death (wake in the lair), a discovered settlement (T12) and every save.every s of play.
    * Core only emits { e: 'save', why }; game.js writes it to localStorage (and on visibilitychange to hidden).
    */
-  const SAVE_ON = { 'aerie:rest': 'rest', 'aerie:found': 'discovered', 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade', 'dragon:landed': 'landed', 'lair:enter': 'cave' };   // T12: a new place, T20: a bought upgrade, T22: landed / in the cave (save v2 keeps both)
+  const SAVE_ON = { 'aerie:rest': 'rest', 'aerie:found': 'discovered', 'lair:rest': 'rest', 'region:enter': 'region', 'dragon:died': 'death', 'place:discovered': 'discovered', 'upgrade:bought': 'upgrade', 'dragon:landed': 'landed', 'lair:enter': 'cave', 'mission:success': 'mission', 'mission:failed': 'mission' };   // T12: a new place, T20: a bought upgrade, T22: landed / in the cave (save v2 keeps both)
   function autosave(cs, ev, dt) {
     cs.saveT = (cs.saveT || 0) + dt;
     let why = null;
@@ -502,5 +505,7 @@
   const travel = (cs, to) => { const ev = relay(cs, MP.travel(cs, to)); ensureTown(cs); return autosave(cs, ev, 0); };
   const caveAct = (cs, id, arg) => (id === 'nest' ? lairRest(cs, arg) : id === 'altar' ? autosave(cs, relay(cs, CV.act(cs, id, arg)), 0) : relay(cs, CV.act(cs, id, arg)));
 
-  M.define('state', { create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct, aerieAct, travel });
+  /** Phase 3 T10: mission actions (the board in T11, debug buttons): accept id, cancel, finish (debug), fail (debug). */
+  const missionAct = (cs, id, arg) => autosave(cs, relay(cs, id === 'accept' ? MS.accept(cs, arg, { force: cs.debugForce }) : id === 'cancel' ? MS.cancel(cs) : id === 'finish' ? MS.finish(cs) : id === 'fail' ? MS.fail(cs, 'debug') : []), 0);
+  M.define('state', { missionAct, create, enterRegion, ensureTown, refreshTown, ensureCrops, solids, step, autosave, scaleOf, carriedPrey, eatTime, lairRest, lairEat, lairLeave, caveAct, aerieAct, travel });
 })(typeof self !== 'undefined' ? self : this);
