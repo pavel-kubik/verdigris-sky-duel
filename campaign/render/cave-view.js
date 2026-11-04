@@ -247,7 +247,7 @@
         const halo = new THREE.Mesh(new THREE.PlaneGeometry(u * 0.56, u * 0.8), glowM);
         halo.position.set(x, u * 1.05, u * 0.17); halo.visible = false; tw.add(halo);
         let relic = null;
-        if (id && VR.chalice) { relic = VR.chalice(col); relic.scale.setScalar(u * 0.22); relic.position.set(x, u * 0.7, u * 0.2); relic.visible = false; tw.add(relic); }
+        if (id && VR.chalice) { relic = VR.chalice(col); relic.scale.setScalar(u * 0.3); relic.position.set(x, u * 0.7, u * 0.2); relic.visible = false; tw.add(relic); }
         niches.push({ id, halo, relic });                               // no lights: the halo is additive (no shader variants)
       }
       tw.position.set(TW[0], K.floor, TW[1]); tw.rotation.y = face;

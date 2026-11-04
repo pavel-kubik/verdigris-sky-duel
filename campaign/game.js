@@ -1700,7 +1700,7 @@
       '  px ' + f2(renderer.getPixelRatio()) + '  flora x' + f2(qSet.flora) + '  fog ' + Math.round(qSet.fogFar));
     if (pilot) {
       const st = D.stages[dragon.stage], next = D.stages[dragon.stage + 1];
-      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = HN.effects(dragon.hunger);
+      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = LT.effects(HN.effects(dragon.hunger), cs.carriedLoot);   // T12: with the carry penalty (strongbox, relic)
       L.push('DRAGON  ' + st.id + (ready > dragon.stage ? '  READY: ' + D.stages[ready].id : ''));
       L.push('        food ' + Math.round(dragon.foodXp) + (next ? '/' + next.foodFrom : ' max') + '  growth ' + f2(G.growthValue(dragon.foodXp)) + '  scale ' + f2(heroScale));
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
@@ -1736,7 +1736,7 @@
       { const pl = (cs.town && cs.town.pens) || [];
         L.push('STOCK   ' + (pl.map(pn => { const c = PR.penCount(cs.field, pn.id); return pn.id.split('.').slice(1).join('.') + ' ' + pn.type + ' ' + (c ? c.penned + (c.inside ? ' +' + c.inside + ' in barn' : '') : '-'); }).join(', ') || '-') + '  taken ' + (cs.stats.livestockTaken || 0)); }
       { const its = (cs.town && cs.town.items) || [], cl = cs.carriedLoot;
-        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + cl.gold : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0));
+        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + (cl.relic || cl.gold) : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0) + '  relics ' + (((cs.hoard && cs.hoard.relics) || []).join(',') || '-'));
         L.push('UPGRADE ' + ((cs.upgrades || []).join(', ') || '-') + '  can buy ' + (UP.affordable(cs).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');

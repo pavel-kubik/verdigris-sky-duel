@@ -345,6 +345,17 @@ Mission times are longer than in the first draft because the Bend is one region 
   `flags.rested` count at the fail; a later rest at the nest or an aerie allows the retry); the running mission is
   saved with v3 (T18). Debug: Shift+3 accept next (any stage), Shift+J objective done, Shift+K fail (DBG buttons
   mission, mission done, mission fail).
+- As built (T12): `core/relics.js` (API in its header). The relic is loot kind `relic` (`data.loot.relic`: carry
+  `{ speedMult: 0.8, breath: false }` - the existing loot carry key, not `speed`; `mission: true`, no gold). It lies at
+  the door of the building that a mission names as `target` with a `relic` (chapel1 -> Ember Chalice), but only while
+  that mission is accepted, running or done and the relic is not in `hoard.relics` (`relics.sync` sets `item.hidden`
+  every frame). Mission loot is never written to `lootTaken`: lost on death (`loot:lost`) or vanished on a timeout, it is
+  back at the door at once. Banked in the lair or an aerie it goes into `hoard.relics` ('relic:banked', no gold; the
+  reward comes from `mission:success`). The save keeps `hoard.relics` now (v2 shape); a relic in the claws is not saved
+  until the running mission is (v3, T18) - a reload puts it back at the door. Trophy wall: cave station `trophy`
+  [-40, 20, 5], `data.trophy.niches` 3 arched niches, the Ember Chalice in niche 1 with an additive glow; its panel lists
+  each niche with the relic's story line. Debug: Shift+L (DBG mission tab, "chalice") accepts the chalice mission and
+  stands at the chapel door in the Bend, elsewhere puts the chalice straight into the claws.
 
 ### 5.6 `caravan`
 
