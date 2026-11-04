@@ -20,7 +20,8 @@ def river_path(G, X, Z, rc, R):
         return tuple(idx[int(np.argmin([G[r, c] for r, c in idx]))])
     s, g = rc['start'], rc['goal']
     start = edge_min((Z < s['zBelow']) & (np.abs(X - s['xNear']) < s['xWithin']) & inside)
-    goal = edge_min((Z > g['zAbove']) & (X < g['xBelow']) & inside & (X ** 2 + Z ** 2 > g['minRadius'] ** 2))
+    xside = (X > g['xAbove']) if 'xAbove' in g else (X < g['xBelow'])
+    goal = edge_min((Z > g['zAbove']) & xside & inside & (X ** 2 + Z ** 2 > g['minRadius'] ** 2))
     cost = np.exp((G - G.min()) / rc['costScale'])
     N = G.shape[0]
     dist = np.full(G.shape, np.inf); prev = {}; dist[start] = 0; pq = [(0, start)]
@@ -74,7 +75,8 @@ TPL = """/*
  * (config tools/terrain/regions/%(id)s.json, source tools/terrain/sources/%(id)s_dtm.png).
  * Source: %(source)s.
  * Licence: %(licence)s.
- * Projection around %(lon0)s E, %(lat0)s N at %(mpu)s m per unit, +X = east, +Z = north.
+ * Projection around %(lon0)s E, %(lat0)s N at %(mpu)s m per unit, +X = west, +Z = north (the game's axes:
+ * facing north, +X is on the left; the compass says W toward +X).
  *   size x size samples, `cell` units apart, x and z from -radius to +radius (row = z, column = x);
  *   h: base64 Uint8, metres above `base` (1 m steps); water: base64 bitset (row-major, MSB first), 1 = river;
  *   river: centre line polyline (units) in flow direction.

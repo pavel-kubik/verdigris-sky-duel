@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't209.2 2026-11-01 fast travel, rebased; debug Shift+1 / 2 / 3';
+  const BUILD = 'bend.1 2026-11-01 Veltava Bend un-mirrored: real Prague east-west';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */

@@ -20,7 +20,7 @@ for (const id of ids) {
 for (const id of ids) {
   for (let i = 0; i < 2000; i++) {
     const gx = Math.round((rng() * 2 - 1) * 140) * T.GRID, gz = Math.round((rng() * 2 - 1) * 140) * T.GRID;
-    near(T.surfaceAt(id, gx, gz), T.heightAt(id, gx, gz), 1e-9, 'surface exact at grid corner');
+    if (!T.deckAt(id, gx, gz)) near(T.surfaceAt(id, gx, gz), T.heightAt(id, gx, gz), 1e-9, 'surface exact at grid corner');   // a bridge deck (T02) lies over the ground
     const x = gx + rng() * T.GRID, z = gz + rng() * T.GRID, e = 1e-6;
     // stepping a hair in any direction moves the surface by at most a hair times the steepest slope seen
     ok(Math.abs(T.surfaceAt(id, x + e, z) - T.surfaceAt(id, x, z)) < 1e-3 && Math.abs(T.surfaceAt(id, x, z + e) - T.surfaceAt(id, x, z)) < 1e-3, 'surface continuous');

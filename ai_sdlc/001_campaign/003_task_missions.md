@@ -142,7 +142,7 @@ castle: {
   lights: { torches: 16, windows: true },           // night: emissive torch sprites + window emissive, no extra real lights
 },
 settlements: {
-  castle: {                                         // local frame: +X = east (land side), the cliff on local -X (west, the river)
+  castle: {                                         // local frame: +X = the land side (gate), the cliff on local -X (the river); site yaw PI in the Bend
     walls: [[-60, -30], [-20, -42], [30, -38], [70, -14], [72, 14], [30, 38], [-20, 42], [-62, 26]],
     corners: ['bastion', 'ctower', 'bastion', 'gatehouse', 'gatehouse', 'bastion', 'ctower', 'bastion'],  // gate gap between 4 and 5
     buildings: [['keep', -36, 0], ['chapel', 8, 12], ['rotunda', 40, -22], ['hall', 10, -18], ['workshop', 42, 18],
@@ -154,7 +154,7 @@ settlements: {
 
 ### 4.2 Veltava Bend (real Prague terrain)
 
-The terrain is **real Prague**, not noise: `core/dem-bend.js` holds a 241 x 241 height grid (every 10 units, radius 1200) and a river mask, baked by `tools/terrain/bake.py bend` (PR #41; sources, config and the committed source crop in `tools/terrain/`) from Sonny's LiDAR DTM Europe (1 arc second, tile N50E014, based on the ČÚZK DMR 5G). Projection around 14.4325 E, 50.0905 N at 3.6 m per unit, +X = east, +Z = north. The river and its islands come from the terrain itself (least-cost path along the valley floor + cells at river level), so its shape is the real Vltava: north past the rock, east under the plateau, around the peninsula, back west and north-west. Checked heights: Vyshgard rock 236 m, Petrovel 326 m, Lethna 229 m, Vitkar 253 m, river 175-190 m.
+The terrain is **real Prague**, not noise: `core/dem-bend.js` holds a 241 x 241 height grid (every 10 units, radius 1200) and a river mask, baked by `tools/terrain/bake.py bend` (PR #41; sources, config and the committed source crop in `tools/terrain/`) from Sonny's LiDAR DTM Europe (1 arc second, tile N50E014, based on the ČÚZK DMR 5G). Projection around 14.4325 E, 50.0905 N at 3.6 m per unit, +X = west, +Z = north (the game's axes: facing north, +X is on the left and the compass says W toward +X; until the mirror fix after T09 the bake had +X = east, so the Bend was drawn mirrored east-west). The river and its islands come from the terrain itself (least-cost path along the valley floor + cells at river level), so its shape is the real Vltava: north past the rock, east under the plateau, around the peninsula, back west and north-west. Checked heights: Vyshgard rock 236 m, Petrovel 326 m, Lethna 229 m, Vitkar 253 m, river 175-190 m.
 
 ![Veltava Bend terrain](img/bend-terrain.png)
 
@@ -164,16 +164,16 @@ The terrain is **real Prague**, not noise: `core/dem-bend.js` holds a 241 x 241 
 | --- | --- | --- | --- |
 | Veltava Bend (region) | Ohyb Veltavy | Prague basin, Vltava | - |
 | Veltava (river) | Veltava | Vltava | `demBend.river` |
-| Vyshgard Castle | hrad Vyšegrad | Vyšehrad | -220, -815 (rock top) |
-| Hradchan ruins | zřícenina Hradčín | Hradčany, Prague Castle | -645, 0 |
-| Petrovel (hill, Order watch tower) | Petrovel | Petřín | -745, -230 |
-| Lethna Heights (Order outpost) | Letenské výšiny | Letná | -190, 250 |
-| Vitkar Ridge | hřbet Vítkar | Vítkov | 345, -45 |
-| Holeshwick (village) | Holešín | Holešovice | 250, 450 |
-| Troyvale (hamlet, aerie) | Troyvaleny | Troyvale | -230, 930 |
-| Staromark (the burned royal city) | Staroměst | Staré Město | -230, -200 |
-| Karlsbridge (stone bridge) | Karlomost | Charles Bridge | -410, -125 |
-| Archer's Isle | Střelčí ostrov | Střelecký ostrov | island at -430, -300 |
+| Vyshgard Castle | hrad Vyšegrad | Vyšehrad | 220, -815 (rock top) |
+| Hradchan ruins | zřícenina Hradčín | Hradčany, Prague Castle | 645, 0 |
+| Petrovel (hill, Order watch tower) | Petrovel | Petřín | 745, -230 |
+| Lethna Heights (Order outpost) | Letenské výšiny | Letná | 190, 250 |
+| Vitkar Ridge | hřbet Vítkar | Vítkov | -345, -45 |
+| Holeshwick (village) | Holešín | Holešovice | -250, 450 |
+| Troyvale (hamlet, aerie) | Troyvaleny | Troyvale | 230, 930 |
+| Staromark (the burned royal city) | Staroměst | Staré Město | 230, -200 |
+| Karlsbridge (stone bridge) | Karlomost | Charles Bridge | 410, -125 |
+| Archer's Isle | Střelčí ostrov | Střelecký ostrov | island at 430, -300 |
 | Prahold (the Order's capital, Phase 6 proposal) | Prahold | Prague | later region |
 
 **Overlays** on the baked heights (`terrain.features`, applied after the grid): settlement `plateau`s flatten footprints (castle top, outpost, village, hamlet, watch tower), the `cliff` sharpens the Vyshgard rock face toward the river (the 36 m grid smooths it), `ruins` marks Staromark, `bridge` decks cross the river, roads are painted and levelled.
@@ -185,30 +185,30 @@ regions.bend: {
     dem: 'demBend', exag: 1.6, offset: 4,           // height = (metres above base) / metresPerUnit x exag + offset
     water: 'mask',                                  // liquidAt from the mask (river level falls downstream), no waterLevel
     features: [
-      { type: 'plateau', x: -220, z: -815, r: 80, edge: 20, level: 'top' },                       // Vyshgard top (T02: level with the rock top)
-      { type: 'cliff', x: -220, z: -815, r: 80, face: -PI / 2, drop: 12, width: 60 },             // rock face west, down to the shore
-      { type: 'plateau', x: -190, z: 250, r: 34 }, { type: 'plateau', x: 250, z: 450, r: 60 },
-      { type: 'plateau', x: -230, z: 930, r: 34 }, { type: 'plateau', x: -745, z: -230, r: 24 },
-      { type: 'ruins', x: -230, z: -200, r: 150 },
-      { type: 'road', width: 8, points: [[-255, -1190], [-245, -1000], [-230, -870]] },             // south entry -> gate (T02: east bank, the old line was in the river)
-      { type: 'road', width: 7, points: [[-640, 40], [-460, -125], [-360, -125], [-280, -300], [-250, -600], [-230, -870]] },
-      { type: 'road', width: 7, points: [[-280, -300], [-100, 20], [150, 212], [250, 450]] },        // to Holeshwick
-      { type: 'bridge', x: -418, z: -125, yaw: PI / 2, len: 104, width: 10, towers: true },         // Karlsbridge (T02: bank to bank)
-      { type: 'bridge', x: 150, z: 212, yaw: 0.5, len: 60, width: 7, kind: 'wood' },
+      { type: 'plateau', x: 220, z: -815, r: 80, edge: 20, level: 'top' },                       // Vyshgard top (T02: level with the rock top)
+      { type: 'cliff', x: 220, z: -815, r: 80, face: PI / 2,  drop: 12, width: 60 },             // rock face west, down to the shore
+      { type: 'plateau', x: 190, z: 250, r: 34 }, { type: 'plateau', x: -250, z: 450, r: 60 },
+      { type: 'plateau', x: 230, z: 930, r: 34 }, { type: 'plateau', x: 745, z: -230, r: 24 },
+      { type: 'ruins', x: 230, z: -200, r: 150 },
+      { type: 'road', width: 8, points: [[255, -1190], [245, -1000], [230, -870]] },             // south entry -> gate (T02: east bank, the old line was in the river)
+      { type: 'road', width: 7, points: [[640, 40], [460, -125], [360, -125], [280, -300], [250, -600], [230, -870]] },
+      { type: 'road', width: 7, points: [[280, -300], [100, 20], [-150, 212], [-250, 450]] },        // to Holeshwick
+      { type: 'bridge', x: 418, z: -125, yaw: -PI / 2, len: 104, width: 10, towers: true },         // Karlsbridge (T02: bank to bank)
+      { type: 'bridge', x: -150, z: 212, yaw: -0.5, len: 60, width: 7, kind: 'wood' },
     ],
   },
   flora: { trees: 700, rocks: 90, fields: 14, vines: 'troyvale' },
-  vines: { x: -230, z: 880, r: 110, rows: 9 },                                                       // T02: Troyvale vineyard rows
+  vines: { x: 230, z: 880, r: 110, rows: 9 },                                                       // T02: Troyvale vineyard rows
   herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
   settlements: [
-    { type: 'castle',   x: -220, z: -815, yaw: 0, name: 'vyshgard' },                                // added in T03 / T04 (T02 keeps its plateau)
-    { type: 'outpost',  x: -190, z: 250, yaw: PI, name: 'lethna' },
-    { type: 'village',  x: 250, z: 450, yaw: 0.6, name: 'holeshwick' },
-    { type: 'hamlet',   x: -230, z: 930, yaw: 2.2, name: 'troyvale' },
-    { type: 'outpostS', x: -745, z: -230, yaw: 1.4, name: 'petrovel' },
+    { type: 'castle',   x: 220, z: -815, yaw: PI, name: 'vyshgard' },                                 // added in T03 / T04 (T02 keeps its plateau)
+    { type: 'outpost',  x: 190, z: 250, yaw: PI, name: 'lethna' },
+    { type: 'village',  x: -250, z: 450, yaw: -0.6, name: 'holeshwick' },
+    { type: 'hamlet',   x: 230, z: 930, yaw: -2.2, name: 'troyvale' },
+    { type: 'outpostS', x: 745, z: -230, yaw: -1.4, name: 'petrovel' },
   ],
   exits: [{ to: 'farm', angleFrom: PI - 0.5, angleTo: PI + 0.5 }],
-  entries: { farm: { angle: PI + 0.27 } },                                                          // over the river, south
+  entries: { farm: { angle: PI - 0.27 } },                                                          // over the river, south
 },
 regions.farm.exits += [{ to: 'bend', angleFrom: -0.5, angleTo: 0.5, minStage: 1 }],
 regions.farm.entries.bend = { angle: 0 },
@@ -235,7 +235,7 @@ map: {
 aeries: {
   wild: { x: -620, z: -480, facing: 1.9 },
   farm: { x: 720, z: 560, facing: -2.4 },
-  bend: { x: -120, z: 1010, facing: PI },          // a cleft in the Troyvale rocks, facing the river
+  bend: { x: 120, z: 1010, facing: PI },           // a cleft in the Troyvale rocks, facing the river
   discover: 200, enterRange: 40, room: { r: 22, h: 14 },
 },
 ```
