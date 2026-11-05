@@ -136,7 +136,8 @@
       for (const p of model.places) {
         const [sx, sy] = toScreen(p.x, p.z);
         g.fillStyle = 'rgba(12,19,16,.7)'; g.beginPath(); g.arc(sx, sy, 15, 0, TAU); g.fill();
-        g.strokeStyle = p.alert ? ALERT[Math.min(3, p.alert)] : 'rgba(233,225,204,.6)'; g.lineWidth = 1.5; g.stroke();
+        g.strokeStyle = p.freed ? '#62c48a' : p.alert ? ALERT[Math.min(3, p.alert)] : 'rgba(233,225,204,.6)'; g.lineWidth = p.freed ? 3 : 1.5; g.stroke();   // Phase 3 T16: a freed village has a green rim
+        if (p.freed) label(t('c.map.freed'), sx, sy + 26, '#62c48a');
         const col = p.kind === 'lair' ? COL.lair : p.kind === 'castle' ? COL.castle : p.kind === 'aerie' ? COL.aerie : COL.settlement;
         if (icon) icon(g, p.kind, sx, sy, 9, col || '#fff', 1);
         hits.push({ x: sx, y: sy, name: t(p.key) });

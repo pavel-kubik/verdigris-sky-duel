@@ -168,7 +168,8 @@
       for (const pl of placesOf(rid)) {
         if (!(cs.discovered && cs.discovered[pl.id])) continue;
         places.push({ id: pl.id, kind: pl.castle ? 'castle' : 'settlement', type: pl.type, x: pl.x, z: pl.z,
-                      key: pl.name ? 'c.placeName.' + pl.name : 'c.place.' + pl.type, discovered: true, alert, freed: false });
+                      key: pl.name ? 'c.placeName.' + pl.name : 'c.place.' + pl.type, discovered: true, alert,
+                      freed: !!(rs && Array.isArray(rs.freed) && rs.freed.indexOf(pl.id) >= 0) });   // Phase 3 T16
       }
       const ae = AE.site(rid);                                    // T08: the region's aerie once found
       if (ae && AE.found(cs, rid)) places.push({ id: ae.id, kind: 'aerie', type: 'aerie', x: ae.x, z: ae.z, key: 'c.place.aerie', discovered: true, alert: 0, freed: false });
