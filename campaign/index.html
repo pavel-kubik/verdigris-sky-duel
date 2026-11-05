@@ -117,6 +117,34 @@ p{margin:0;color:var(--mute);line-height:1.45}
 #mapTravelWhy{margin:0;font-size:13px;color:#e0b040}
 #map.travel #mapHelp{display:none}
 #mapHelp{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));font-size:12px;color:var(--mute);max-width:60%;pointer-events:none}
+/* message log (Pavel's request): button under pause, panel over the paused game */
+#hudBtns{position:relative}
+#logBtn{position:absolute;right:0;top:48px;pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center}
+#logBtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+#logBtn.on{border-color:var(--ember);color:var(--ember)}
+#logPanel{left:50%;top:calc(60px + env(safe-area-inset-top,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(460px,calc(100% - 24px));padding:14px 16px;gap:10px;grid-template-rows:auto auto auto 1fr auto;z-index:30;text-align:left}
+#logPanel h2{margin:0;font-size:24px}
+#logMission{border:1px solid rgba(255,211,77,.45);border-radius:4px;padding:8px 12px;background:rgba(255,211,77,.06)}
+#logMission b{display:block;font-family:var(--f-ui);font-size:16px;color:#ffd34d}
+#logMission p{margin:3px 0 0;font-size:13px;line-height:1.35}
+#logMission .state{color:var(--ember);font-weight:600}
+#logMission .obj{color:var(--bone);font-weight:600}
+#logMission .brief,#logMission .none{color:var(--mute)}
+#logScroll{overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch}
+#logList{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+#logList li{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+#logList .tm{font:500 12px/1.4 var(--f-ui);color:var(--mute);font-variant-numeric:tabular-nums}
+#logList b{display:block;font-family:var(--f-ui);font-size:14px;font-weight:600;color:var(--bone)}
+#logList small{display:block;font-size:12px;line-height:1.35;color:var(--mute)}
+#logList i{display:block;font:500 10px/1.3 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;font-style:normal;color:var(--mute)}
+#logList li.mission i,#logList li.mission b{color:#ffd34d}
+#logList li.mother i{color:var(--verd)}
+#logEmpty{color:var(--mute);font-size:13px;margin:0}
+#logClose{min-height:44px}
+#toast.tap{pointer-events:auto;cursor:pointer}
+body.mom #toast{top:calc(26% + 72px)}
+#toast.mission small{color:#ffd34d}
+#missionHud{cursor:pointer}
 #pauseBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(620px,70vw);font-size:12px;color:var(--mute);pointer-events:none}
 kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin-right:4px;background:rgba(12,19,16,.5)}
@@ -212,7 +240,7 @@ h2{font-size:42px}
 #boardBrief .row{gap:8px;flex-wrap:wrap}
 #boardBrief button{min-height:44px}
 /* Phase 3 T11: mission HUD - timer under the compass (28 px, amber at warn, red pulsing at danger) + objective line */
-#missionHud{position:fixed;left:50%;top:calc(142px + env(safe-area-inset-top,0px));transform:translateX(-50%);text-align:center;pointer-events:none;z-index:6;max-width:calc(100% - 28px)}
+#missionHud{position:fixed;left:50%;top:calc(142px + env(safe-area-inset-top,0px));transform:translateX(-50%);text-align:center;pointer-events:auto;z-index:6;max-width:calc(100% - 28px)}
 #missionTimer{display:inline-block;font-family:var(--f-ui);font-size:28px;font-weight:700;line-height:1;letter-spacing:.04em;color:#ffd34d;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:2px 10px;border-radius:4px;background:rgba(12,19,16,.55)}
 #missionTimer.warn{color:#f0a030}
 #missionTimer.danger{color:#ff4d4d;animation:mPulse .8s ease-in-out infinite}
@@ -298,10 +326,11 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   <div id="regionName"><i id="todIcon" data-phase="day" role="img" aria-label="day"></i><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span><span id="goldRow" hidden aria-label="Gold" data-i18n-attr="aria-label:c.hud.gold"><i class="coin"></i><small id="goldText">0</small><i id="goldLoot" hidden></i></span></div>
   <div id="hudBtns"><button id="mapBtn" aria-label="Map" data-i18n-attr="aria-label:c.map.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14"/></svg></button>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
+  <button id="logBtn" aria-label="Messages" data-i18n-attr="aria-label:c.log.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h10l3 3v15H6z M9 9h7 M9 13h7 M9 17h4"/></svg></button>
   </div>
 </div>
 <div id="legend" hidden>
-  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>G</kbd><span data-i18n="c.legend.grab">Grab (hold)</span></span><span><kbd>X</kbd><span data-i18n="c.legend.eat">Eat (hold)</span></span><span><kbd>F</kbd><span data-i18n="c.legend.land">Land / fly</span></span><span><kbd>E</kbd><span data-i18n="c.legend.station">Use (in the cave)</span></span><span><kbd>Tab</kbd><span data-i18n="c.legend.map">Map</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
+  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>G</kbd><span data-i18n="c.legend.grab">Grab (hold)</span></span><span><kbd>X</kbd><span data-i18n="c.legend.eat">Eat (hold)</span></span><span><kbd>F</kbd><span data-i18n="c.legend.land">Land / fly</span></span><span><kbd>E</kbd><span data-i18n="c.legend.station">Use (in the cave)</span></span><span><kbd>Tab</kbd><span data-i18n="c.legend.map">Map</span></span><span><kbd>L</kbd><span data-i18n="c.legend.log">Messages</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
 </div>
 <div id="prompt" hidden><div id="promptText"></div><div id="promptBar" hidden><i></i></div></div>
 <div id="fade"></div>
@@ -331,6 +360,14 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   <p data-i18n="c.hatch.l2">Your mother is right beside you, and your belly already aches with hunger.</p>
   <p data-i18n="c.hatch.l3">She will show you how to hunt beyond the volcano. Come back to the lair to rest.</p>
   <div class="row"><button class="cta" id="hatchBtn" data-i18n="c.hatch.go">Open your eyes</button></div>
+</section>
+
+<section id="logPanel" class="panel" hidden aria-labelledby="logTitle">
+  <div class="eyebrow" data-i18n="c.log.eyebrow">Journal</div>
+  <h2 id="logTitle" data-i18n="c.log.title">Messages</h2>
+  <div id="logMission"></div>
+  <div id="logScroll"><ul id="logList"></ul><p id="logEmpty" data-i18n="c.log.empty">No messages yet.</p></div>
+  <button class="ghost" id="logClose" data-i18n="c.log.close">Close</button>
 </section>
 
 <section id="lair" class="panel station" hidden aria-labelledby="lairTitle">
@@ -387,7 +424,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/loot.js', 'core/relics.js',
-     'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/tips.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
+     'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/tips.js', 'core/msglog.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
      'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();

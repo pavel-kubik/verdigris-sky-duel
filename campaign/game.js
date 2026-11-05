@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), ML = C.need('msglog');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't212.4 2026-11-04 death card says the mission failed and how to retry';
+  const BUILD = 'msg.1 2026-11-04 message queue, reading time by length, tap to close, message log with the mission';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -233,6 +233,8 @@
     if (tk === momShown) return;
     momShown = tk;
     momEl.hidden = !tk;
+    document.body.classList.toggle('mom', !!tk);                 // the message lines move below her caption
+    if (tk) ML.push(msgs, { title: t(tk), kind: 'mother', show: false }, stamp());   // the message log keeps her lines
     if (tk) { momText.textContent = t(tk); momEl.classList.toggle('good', tk.indexOf('.good.') > 0 || tk === 'c.mother.visit'); }
     if (tk) $('#hint').hidden = true;                             // she replaces the old hunting tip
   }
@@ -384,6 +386,8 @@
       e.preventDefault(); return;
     }
     if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) openMap(); return; }
+    if (logOpen) { if (e.code === 'KeyL' || e.code === 'Escape') closeLog(); e.preventDefault(); return; }   // the log takes the keys while open
+    if (e.code === 'KeyL' && !e.shiftKey && !e.repeat && state === 'play') { e.preventDefault(); openLog(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
@@ -399,7 +403,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JK])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -487,7 +491,7 @@
   }
   function setState(s) {
     const prev = state; state = s;
-    if (s !== 'play') closeMap();                                 // T07: pause, menu, hatch close the map
+    if (s !== 'play') { closeMap(); closeLog(); }                 // T07: pause, menu, hatch close the map (and the message log)
     const inGame = s === 'play' || s === 'paused';
     $('#intro').hidden = s !== 'intro';
     $('#hatch').hidden = !(s === 'hatch' && hatchCard);
@@ -725,7 +729,7 @@
     hurt = Math.max(0, hurt - dt * 1.8);
     vig.style.opacity = Math.max(hurt, hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0);
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0 || stationOpen) { hintT = 0; $('#hint').hidden = true; } }   // T23: a station panel closes the tip
-    if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
+    msgHud(dt);                                                  // messages: queue, reading time, tap to close (core/msglog.js)
     promptHud(dt);
     alertHud(dt);
     goldHud(dt);
@@ -760,7 +764,8 @@
     if (alertPulse > 0) { alertRow.classList.add('pulse'); if ((alertPulse -= dt || 0.016) <= 0) alertRow.classList.remove('pulse'); }
   }
   let goldPulse = 0;                                             // T19: HUD gold pulse after banking
-  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
+  const logEl = $('#logPanel'); let logOpen = false;             // the message log (openLog below)
+  const toastEl = $('#toast'); let hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
   const missionName = id => t('c.mission.' + id);                 // T10
   const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -797,9 +802,9 @@
       else if (e.e === 'breath:blocked') flashPrompt(t('c.breath.' + e.why), 2.2);
       else if (e.e === 'dragon:landed') shake = Math.max(shake, 0.25 * heroScale);
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
-      else if (e.e === 'loot:taken' && e.relic) { flashPrompt(null); toast(t('c.toast.relicTaken', { relic: lootName(e) }), t('c.toast.relicTakenSub'), 3.5); }   // Phase 3 T12
+      else if (e.e === 'loot:taken' && e.relic) { flashPrompt(null); toast(t('c.toast.relicTaken', { relic: lootName(e) }), t('c.toast.relicTakenSub'), 3.5, 'mission'); }   // Phase 3 T12
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
-      else if (e.e === 'relic:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.trophy.bankedAerie', { relic: lootName(e) })); toast(t('c.toast.relicBanked', { relic: lootName(e) }), t('c.toast.relicBankedSub'), 3.5); }   // Phase 3 T12
+      else if (e.e === 'relic:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.trophy.bankedAerie', { relic: lootName(e) })); toast(t('c.toast.relicBanked', { relic: lootName(e) }), t('c.toast.relicBankedSub'), 3.5, 'mission'); }   // Phase 3 T12
       else if (e.e === 'loot:tooHeavy') flashPrompt(t('c.prompt.lootHeavy', { loot: lootName(e) }), 2.2);
       else if (e.e === 'loot:dropped') toast(t('c.toast.lootDropped'), t('c.toast.lootDroppedSub', { loot: lootName(e) }), 2.5);
       else if (e.e === 'hoard:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.aerie.banked', { gold: e.gold, total: e.total })); toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
@@ -811,19 +816,20 @@
       else if (e.e === 'region:enter') swapRegion(e.respawn || e.travel);
       else if (e.e === 'travel:done') { leaveCave(); toast(t('c.travel.done', { place: destName(MP.destinations(cs).find(d => d.id === e.to) || { kind: 'lair' }) }), t(e.to === 'lair' ? 'c.travel.doneLair' : 'c.travel.doneAerie'), 3); }   // T09
       else if (e.e === 'save') saveNow(e.why);
-      else if (e.e === 'mission:accepted') toast(t('c.mission.accepted', { m: missionName(e.id) }), t('c.mission.acceptedSub', { time: mmss(e.time) }), 3.5);   // T10 (the board and the HUD come with T11)
+      else if (e.e === 'mission:accepted') toast(t('c.mission.accepted', { m: missionName(e.id) }), t('c.mission.acceptedSub', { time: mmss(e.time) }), 3.5, 'mission');   // T10 (the board and the HUD come with T11)
       else if (e.e === 'mission:refused') flashPrompt(t('c.mission.refused.' + e.why), 2);
-      else if (e.e === 'mission:started') toast(t('c.mission.started', { m: missionName(e.id) }), t('c.mission.startedSub', { time: mmss(e.time) }), 3);
-      else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5);
-      else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3);
-      else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5); }
+      else if (e.e === 'mission:started') toast(t('c.mission.started', { m: missionName(e.id) }), t('c.mission.startedSub', { time: mmss(e.time) }), 3, 'mission');
+      else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5, 'mission');
+      else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3, 'mission');
+      else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5, 'mission'); }
       else if (e.e === 'mission:failed' && e.why === 'death' && !$('#lairDeath').hidden) {   // T12: the death card covers the toast - say it there
         const b = document.createElement('b'), sm = document.createElement('small');
         b.className = 'mFail'; b.textContent = t('c.mission.failed', { m: missionName(e.id) }); sm.textContent = t('c.lair.diedMission');
         $('#lairDeath').append(b, sm);
+        ML.push(msgs, { title: b.textContent, sub: sm.textContent, kind: 'mission', show: false }, stamp());
       }
-      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5);
-      else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2);
+      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5, 'mission');
+      else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2, 'mission');
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
       else if (e.e === 'aerie:enter') openAerie();
       else if (e.e === 'aerie:leave') closeAerie();
@@ -879,7 +885,7 @@
     const noFire = !HN.effects(dragon.hunger).canBreath || LT.blocksBreath(cs.carriedLoot);   // starving (T08) or a strongbox (T19): Breath dims
     if (noFire !== breathDim) { bBreath.classList.toggle('dim', noFire); breathDim = noFire; }
   }
-  function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }
+  function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? Math.max(secs || 0, Math.min(D.messages.max * 0.6, String(text).length / D.messages.perChar)) : 0; }   // long enough to read
   function promptHud(dt) {
     promptFlashT = Math.max(0, promptFlashT - dt);
     slotsHud();
@@ -920,12 +926,24 @@
   /** T19: loot names (kind of a carried or lying item) and the item lying in this town by id. */
   const lootName = it => (it && it.relic ? t('c.relic.' + it.relic) : t('c.loot.' + ((it && it.kind) || 'tithe')));   // T12: a relic by its name
   const lootItem = id => (id && cs.town && cs.town.items ? cs.town.items.find(it => it.id === id) : null);
-  function toast(title, sub, secs) {
+  /* ---------- messages (Pavel's request): the big lines wait in a queue instead of replacing each other, each stays by
+     its length (data.messages), a tap closes it; every one goes into the message log (logPanel) ---------- */
+  const msgs = ML.create();
+  const stamp = () => ({ t: cs.clock ? cs.clock.t : null, played: cs.stats ? cs.stats.played : 0 });
+  function toast(title, sub, secs, kind) { ML.push(msgs, { title, sub, secs, kind: kind || 'info' }, stamp()); if (logOpen) renderLog(); }
+  let msgShown = null;
+  function msgHud(dt) {
+    const cur = state === 'play' && !stationOpen ? ML.step(msgs, dt || 0.016) : (state === 'play' ? msgs.cur : null);
+    if (cur === msgShown) return;
+    msgShown = cur;
+    if (!cur) { toastEl.style.opacity = 0; toastEl.classList.remove('tap'); return; }
     toastEl.innerHTML = '';
-    toastEl.append(title);
-    if (sub) { const sm = document.createElement('small'); sm.textContent = sub; toastEl.append(sm); }
-    toastEl.style.opacity = 1; toastT = secs || 3;
+    toastEl.append(cur.title);
+    if (cur.sub) { const sm = document.createElement('small'); sm.textContent = cur.sub; toastEl.append(sm); }
+    toastEl.classList.toggle('mission', cur.kind === 'mission');
+    toastEl.style.opacity = 1; toastEl.classList.add('tap');
   }
+  toastEl.addEventListener('pointerdown', e => { if (!msgShown) return; e.preventDefault(); e.stopPropagation(); ML.dismiss(msgs); msgShown = undefined; msgHud(0); });
   const stageName = i => t('c.stage.' + D.stages[i].id);
 
   /* ---------- survival tick: hunger, its effects, growth moments ---------- */
@@ -1049,6 +1067,54 @@
     if (!cs.inLair || state !== 'play') return;
     onEvents(ST.caveAct(cs, 'board', null)); boardShown = ''; renderBoard();
   };
+  /* ---------- message log (Pavel's request): the current mission (timer, objective, briefing), then every message
+     newest first with the time of day; log button under pause, L on desktop, a tap on the mission timer ---------- */
+  function openLog() {
+    if (state !== 'play' || logOpen) return;
+    if (mapView.isOpen) closeMap();
+    for (const k in keys) keys[k] = false;
+    mouseBreath = false; touch.breath = touch.boost = touch.grab = touch.eat = false; touch.x = touch.y = 0;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    logOpen = true; logEl.hidden = false; $('#logBtn').classList.add('on');
+    renderLog();
+    if (!isTouch) setTimeout(() => $('#logClose').focus({ preventScroll: true }), 0);
+  }
+  function closeLog() {
+    if (!logOpen) return;
+    logOpen = false; logEl.hidden = true; $('#logBtn').classList.remove('on');
+    if (document.activeElement && logEl.contains(document.activeElement)) document.activeElement.blur();
+  }
+  const kindLabel = k => t('c.log.kind.' + k);
+  function renderLog() {
+    const a = MS.active(cs), box = $('#logMission');
+    box.innerHTML = '';
+    if (a) {
+      const ts = MS.timerState(cs), ob = MS.objective(cs);
+      const h = document.createElement('b'); h.textContent = missionName(a.id); box.append(h);
+      const st = document.createElement('p'); st.className = 'state';
+      st.textContent = t('c.log.state.' + a.state, { time: mmss(ts ? ts.left : a.left) }); box.append(st);
+      if (ob) { const o = document.createElement('p'); o.className = 'obj'; o.textContent = t(ob.key, ob.p ? Object.fromEntries(Object.entries(ob.p).map(([k, v]) => [k, t(v)])) : undefined); box.append(o); }
+      const br = document.createElement('p'); br.className = 'brief'; br.textContent = t('c.brief.' + a.id); box.append(br);
+    } else {
+      const p = document.createElement('p'); p.className = 'none'; p.textContent = t('c.log.noMission'); box.append(p);
+    }
+    const list = $('#logList'); list.innerHTML = '';
+    const all = ML.entries(msgs);
+    $('#logEmpty').hidden = all.length > 0;
+    for (const e of all) {
+      const li = document.createElement('li'); li.className = e.kind;
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = e.t == null ? '' : CK.hours(e.t);
+      const tx = document.createElement('div'), b = document.createElement('b');
+      b.textContent = e.title + (e.n > 1 ? ' (x' + e.n + ')' : '');
+      tx.append(b);
+      if (e.sub) { const sm = document.createElement('small'); sm.textContent = e.sub; tx.append(sm); }
+      if (e.kind !== 'info') { const k = document.createElement('i'); k.textContent = kindLabel(e.kind); tx.prepend(k); }
+      li.append(tm, tx); list.append(li);
+    }
+  }
+  $('#logBtn').addEventListener('click', e => { e.stopPropagation(); if (logOpen) closeLog(); else openLog(); });
+  $('#logClose').onclick = () => closeLog();
+  $('#missionHud').addEventListener('click', e => { e.stopPropagation(); openLog(); });
   /* ---------- Phase 3 T11: mission HUD - timer under the compass, objective line ---------- */
   const mHud = $('#missionHud'), mTimer = $('#missionTimer'), mObj = $('#missionObj');
   let mShown = '';
@@ -1105,7 +1171,7 @@
     stationOpen = id;
     lairEl.dataset.station = id;
     $('#lairTitle').dataset.i18n = 'c.cave.' + id; $('#lairTitle').textContent = t('c.cave.' + id);
-    deathCard(death || null); if (death) { toastEl.style.opacity = 0; toastT = 0; }
+    deathCard(death || null); if (death) ML.clear(msgs);
     lairShown = ''; altarShown = ''; boardShown = ''; trophyShown = ''; briefId = null; renderLair();
     lairEl.hidden = false;
     if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || id === 'board' && boardList.querySelector('button') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
@@ -1190,7 +1256,7 @@
     ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
     ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],
     ['Z', 'die now (wake in the lair)', 'KeyZ', 'die'],
-    ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
+    ['Shift+Z', 'fly into the lair (Ash Wastes)', 'ShiftKeyZ', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near a region exit (again: the next exit)', 'KeyT', 'to exit'],
     ['C', 'become a Drake now (Farmlands test)', 'KeyC', 'drake now'],
     ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
@@ -1265,7 +1331,7 @@
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK' && !cs.inLair) { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
     if (code === 'KeyZ' && !cs.inLair) dragon.hp = 0;               // core/state sees HP 0 on the next step: death
-    if (code === 'KeyL' && !cs.inLair) {
+    if (code === 'ShiftKeyZ' && !cs.inLair) {                   // was L (L opens the message log now)
       const m = LR.mouthPos(regionId);
       if (m) { const L0 = TR.region(regionId).lair; pilot.pos = [m[0], m[1], m[2] + L0.r * 0.5]; pilot.yaw = Math.PI; pilot.pitch = 0; snapCam(); }
       else rest();
@@ -1503,7 +1569,7 @@
     requestAnimationFrame(frame);
     const rawDt = (now - last) / 1000;
     let dt = Math.min(0.05, rawDt); last = now;
-    if (state === 'paused') dt = 0;
+    if (state === 'paused' || logOpen) dt = 0;                 // the message log pauses the world (it is drawn under the panel)
     if (mapView.isOpen) { mapView.tick(Math.min(0.1, rawDt)); return; }   // T07: the region scene is paused (not drawn) under the map
     time += reduceMotion ? dt * 0.3 : dt;
     if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
@@ -1614,7 +1680,7 @@
     };
     const regionCodes = Object.keys(D.regions).map((id, i) => DBG_REGION_KEYS[i] && DBG_REGION_KEYS[i][1]).filter(Boolean);
     const GROUPS = [                                               // [tab, [[row title, codes]]]; codes left over land in 'more'
-      ['go to', [['regions', ['KeyL', ...regionCodes, 'KeyT', 'ShiftDigit1']],
+      ['go to', [['regions', ['ShiftKeyZ', ...regionCodes, 'KeyT', 'ShiftDigit1']],
                  ['places', ['Digit1', 'Digit9', 'Equal', 'Comma', 'Period', 'Digit0']],
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
@@ -1681,7 +1747,7 @@
       // a fixed box holds the (touch) action buttons and the read-only panel
       dbgBox = document.createElement('div');
       dbgBox.id = 'debugBox';
-      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:8;max-width:calc(100vw - 16px);pointer-events:none';
+      dbgBox.style.cssText = 'position:fixed;right:58px;top:calc(60px + env(safe-area-inset-top,0px));z-index:8;max-width:calc(100vw - 66px);pointer-events:none';
       dbgEl = document.createElement('div');
       dbgEl.id = 'debugPanel';
       dbgEl.style.cssText = 'font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;overflow:hidden;opacity:.92';

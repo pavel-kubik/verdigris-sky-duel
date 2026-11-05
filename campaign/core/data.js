@@ -538,6 +538,11 @@
     },
     trophy: { niches: 3 },
 
+    /* Messages (Pavel's request 2026-11-04, core/msglog.js): the big message lines wait in a queue; each stays
+       chars / perChar s, at least min, at most max (a tap closes it sooner); with others waiting it is cut to waitCut of
+       its time (never under min). queueMax waiting at most (the oldest plain 'info' goes first); the log keeps logMax. */
+    messages: { perChar: 12, min: 4, max: 9, waitCut: 0.7, queueMax: 4, logMax: 40 },
+
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
   };
 
