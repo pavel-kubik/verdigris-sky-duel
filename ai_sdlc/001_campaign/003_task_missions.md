@@ -384,6 +384,7 @@ Mission times are longer than in the first draft because the Bend is one region 
 
 - A settlement with `order` buildings is freed when every `order` building is a ruin and its archers are dead at the same time: `settlement:freed`, saved in `regions.<id>.freed`; an Order flag mesh falls; freed buildings are not rebuilt as Order buildings, no archers spawn there, peasants stop ringing the bell at the dragon.
 - Tribute: while freed, every `tribute.every` s of play a carcass (`tribute.food`) appears in the larder, at most `tribute.max` waiting.
+- As built (T16, `core/freed.js`): the freeable places are listed in `data.freed.places` (only `farm.village` in this phase); an alert-3 ballista platform that stands at that moment is an Order building too and must burn as well; patrol archers do not count. Once freed the alert-3 platform is not built there. The tribute carcass is a `tribute.prey` (cow) marked `tribute: true` in the larder (saved), it spoils like other larder items, never fills the larder past `lair.larderSize` and waits for room; the timer (`cs.tributeT`, saved in `world.tribute`) also runs in the cave and in aeries. Freeing autosaves. The map shows a freed place with a green rim and "Freed".
 
 ### 5.8 `story`
 

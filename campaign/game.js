@@ -22,6 +22,7 @@
   const BUILD = 't215.1 2026-11-05 tithe wagon intercept mission';
   const BUILD = 't215.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const BUILD = 't216.1 2026-11-05 freed village: Order flag falls, food tribute in the larder';
+  const BUILD = 't216.2 2026-11-05 freed village: Order flag falls, food tribute in the larder';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -412,6 +413,7 @@
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
     if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
     if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLCZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+C wagon (T15), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[FGJKLZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+F / G: free the village, tribute now (Phase 3 T16); Shift+L chalice (T12), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
