@@ -404,7 +404,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1297,7 +1297,7 @@
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
     ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
-    ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (hold Fire to set it alight), T14', 'ShiftKeyW', 'workshop'],
+    ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyW', 'workshop'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
