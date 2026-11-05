@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'msg.1 2026-11-04 message queue, reading time by length, tap to close, message log with the mission';
+  const BUILD = 't213.2 2026-11-05 steal mission: escape line wording, spec as built';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
