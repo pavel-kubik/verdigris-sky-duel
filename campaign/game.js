@@ -23,6 +23,7 @@
   const BUILD = 't215.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const BUILD = 't216.1 2026-11-05 freed village: Order flag falls, food tribute in the larder';
   const BUILD = 't216.2 2026-11-05 freed village: Order flag falls, food tribute in the larder';
+  const BUILD = 't216.3 2026-11-05 rebased on campaign-phase-3 (message log)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
