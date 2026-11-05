@@ -23,7 +23,8 @@
  *                                             the mission is accepted or running; null once done (fly home) or for an
  *                                             intercept before the caravan exists (T15 sets cs.caravan... { pos })
  *   objective(cs) -> null | { key, p }        T11: i18n key of the HUD objective line ('c.mission.obj.<type>' while
- *                                             accepted / running, 'c.mission.obj.home' once done)
+ *                                             accepted / running, 'c.mission.obj.home' once done; T13: 'c.mission.obj.homeAerie'
+ *                                             { region } once done while the aerie of the current region is found - the escape)
  * cs.missions = { completed: [ids], failedAt: { id: rested count at the fail } } (saved).
  * Pure: no DOM, no THREE.
  */
@@ -184,7 +185,11 @@
     if (!a) return null;
     const m = def(a.id);
     if (!m) return null;
-    if (a.state === 'done') return { key: 'c.mission.obj.home' };
+    if (a.state === 'done') {                             // T13: the escape - a found aerie of this region is the near way out
+      const AE = M.need('aerie');
+      const s = !cs.inLair && !cs.inAerie && AE.site(cs.region);
+      return s && AE.found(cs, cs.region) ? { key: 'c.mission.obj.homeAerie', p: { region: 'c.region.' + cs.region } } : { key: 'c.mission.obj.home' };
+    }
     return { key: 'c.mission.obj.' + m.type, p: { region: 'c.region.' + m.region } };
   }
 

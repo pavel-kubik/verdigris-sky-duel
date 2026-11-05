@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'msg.1 2026-11-04 message queue, reading time by length, tap to close, message log with the mission';
+  const BUILD = 't213.3 2026-11-05 rebased on campaign-phase-3 (message log)';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
