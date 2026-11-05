@@ -290,7 +290,7 @@
       'c.brief.a2_caravan': 'A tithe wagon with three archers carries the Order gold from the Hradchan side across Karlsbridge to the castle gate. Stop it before it reaches the gate, take the chest and bank it.',
       'c.mission.obj.steal': 'Steal the chalice - Vyshgard chapel, {region}', 'c.mission.obj.destroy': 'Burn the siege workshop - Vyshgard, {region}', 'c.mission.obj.intercept': 'Stop the tithe wagon - {region}',
       'c.mission.obj.home': 'Fly into the lair or an aerie',
-      'c.mission.obj.homeAerie': 'Escape - fly into the aerie of {region} or the lair',
+      'c.mission.obj.homeAerie': 'Escape - fly into the {region} aerie or the lair',
       'c.nav.mission': 'Mission: {m}', 'c.nav.missionVia': 'Mission: {m} (through {region})', 'c.map.target': 'Mission: {m}',
       'c.place.aerie': 'Aerie', 'c.btn.aerie': 'Enter aerie', 'c.aerie.title': 'Aerie', 'c.aerie.rest': 'Rest', 'c.aerie.leave': 'Leave',
       'c.aerie.note': 'Loot you carry in is banked here, like in the lair. Growing up still needs the nest in the volcano.',

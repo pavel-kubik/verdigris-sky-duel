@@ -356,6 +356,13 @@ Mission times are longer than in the first draft because the Bend is one region 
   [-40, 20, 5], `data.trophy.niches` 3 arched niches, the Ember Chalice in niche 1 with an additive glow; its panel lists
   each niche with the relic's story line. Debug: Shift+L (DBG mission tab, "chalice") accepts the chalice mission and
   stands at the chapel door in the Bend, elsewhere puts the chalice straight into the claws.
+- As built (T13): the steal flow needed no new rules beyond T10-T12 (the chalice lies at the chapel1 door inside the
+  walls; Grab takes it on foot only). Added: once the chalice is taken, the HUD objective line names the escape -
+  `c.mission.obj.homeAerie` { region } while the aerie of the current region is found, else `c.mission.obj.home`.
+  Seeded mission bot: `test/mission-bot.js` (flies a mission from the board with the raid bot, generalised with
+  `dest`, `escape: 'lair' | 'aerie'`) and `test/mission.bot.test.js` (steal: every seed lands inside the castle walls,
+  succeeds in time and puts the chalice on the trophy wall; mean 7-8 min to the lair, about 5 min into the Farmlands
+  aerie). HP left is 11-46% per seed at full hunger; the 20% floor is T19's balancing pass.
 
 ### 5.6 `caravan`
 
