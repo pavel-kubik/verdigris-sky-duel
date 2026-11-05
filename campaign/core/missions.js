@@ -221,6 +221,8 @@
       const s = !cs.inLair && !cs.inAerie && AE.site(cs.region);
       return s && AE.found(cs, cs.region) ? { key: 'c.mission.obj.homeAerie', p: { region: 'c.region.' + cs.region } } : { key: 'c.mission.obj.home' };
     }
+    if (a.state === 'done') return { key: 'c.mission.obj.home' };
+    if (m.type === 'intercept' && a.stopped) return { key: 'c.mission.obj.chest' };   // T15: the wagon stands, take its chest
     return { key: 'c.mission.obj.' + m.type, p: { region: 'c.region.' + m.region } };
   }
 

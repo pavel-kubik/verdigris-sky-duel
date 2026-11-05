@@ -123,6 +123,7 @@ function distToRoad(r, x, z) {
   ok(stopped && stopped.caravan === 'tithe' && stopped.mission === 'a2_caravan', 'caravan:stopped');
   near(t, D.caravan.tithe.wagonHp / D.caravan.burn, 0.1, 'stops after wagonHp / burn s of fire');
   ok(cv.state === 'stopped' && cv.hp === 0, 'stopped at 0 hp');
+  ok(MS.objective(cs).key === 'c.mission.obj.chest', 'objective line: take the chest');
   const s = cv.s;
   for (let i = 0; i < 60; i++) CA.step(cs, dt);
   ok(cv.s === s, 'a stopped wagon stays');
