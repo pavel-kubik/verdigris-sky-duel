@@ -20,6 +20,7 @@
   const BUILD = 't214.1 2026-11-05 destroy mission: workshop held as a ruin, rebuilt at accept, debug run-in';
   const BUILD = 't214.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const BUILD = 't215.1 2026-11-05 tithe wagon intercept mission';
+  const BUILD = 't215.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
