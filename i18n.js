@@ -280,6 +280,9 @@
       'c.toast.relicBanked': 'The {relic} is yours', 'c.toast.relicBankedSub': 'It glows on your trophy wall in the lair',
       'c.prompt.relicGrab': 'Hold G to take the {relic}', 'c.prompt.relicGrabTouch': 'Hold Grab to take the {relic}',
       'c.prompt.relicCarry': '{relic} in your claws - no fire, slower. Fly to an aerie or your lair',
+      'c.toast.freed': 'Freed: {place}', 'c.toast.freedSub': 'The Order flag is down. The village will leave food for you in the lair',   // Phase 3 T16
+      'c.toast.tribute': 'Tribute in the larder', 'c.toast.tributeSub': 'The freed village left you food in the lair',
+      'c.map.freed': 'Freed', 'c.dbg.freedNone': 'No village to free in this region', 'c.dbg.tributeNone': 'No freed village yet',
       'c.dbg.relicOwned': 'The chalice is already on your trophy wall', 'c.dbg.relicClaws': 'The chalice is in your claws',
       'c.dbg.workshop': 'Run-in on the siege workshop - breathe fire on its roof', 'c.dbg.workshopRuin': 'The siege workshop is already a ruin', 'c.dbg.workshopBend': 'The siege workshop is in the Veltava Bend - jump there first',
       'c.board.time': 'Time', 'c.board.reward': 'Reward', 'c.board.accept': 'Accept', 'c.board.drop': 'Drop mission', 'c.board.back': 'Back',
@@ -681,6 +684,9 @@
       'c.toast.relicBanked': 'Relikvie {relic} je tvoje', 'c.toast.relicBankedSub': 'Září na stěně trofejí v doupěti',
       'c.prompt.relicGrab': 'Drž G a vezmi relikvii {relic}', 'c.prompt.relicGrabTouch': 'Drž Chyť a vezmi relikvii {relic}',
       'c.prompt.relicCarry': 'Relikvie {relic} v drápech - bez ohně, pomaleji. Leť do hnízdiště nebo do doupěte',
+      'c.toast.freed': 'Osvobozena: {place}', 'c.toast.freedSub': 'Vlajka Řádu padla. Vesnice ti bude nosit jídlo do doupěte',   // Phase 3 T16
+      'c.toast.tribute': 'Dávka ve spižírně', 'c.toast.tributeSub': 'Osvobozená vesnice ti nechala jídlo v doupěti',
+      'c.map.freed': 'Svobodná', 'c.dbg.freedNone': 'V tomto kraji není vesnice k osvobození', 'c.dbg.tributeNone': 'Zatím žádná osvobozená vesnice',
       'c.dbg.relicOwned': 'Kalich už je na stěně trofejí', 'c.dbg.relicClaws': 'Kalich je v drápech',
       'c.dbg.workshop': 'Nálet na obléhací dílnu - dýchni oheň na její střechu', 'c.dbg.workshopRuin': 'Obléhací dílna už je ruina', 'c.dbg.workshopBend': 'Obléhací dílna je v Ohybu Veltavy - nejdřív tam skoč',
       'c.board.time': 'Čas', 'c.board.reward': 'Odměna', 'c.board.accept': 'Přijmout', 'c.board.drop': 'Zrušit misi', 'c.board.back': 'Zpět',

@@ -8,6 +8,7 @@
  *     flame and smoke particles from fixed pools (two Points, one draw call each), smoke from fresh ruins for a while,
  *     and moves the two flicker lights (opts.lights, owned by game.js so the light count never changes) to the burning
  *     buildings nearest the camera (intensity 0 when nothing burns).
+ * Phase 3 T16: an Order flag (one mesh) at each freeable village (data.freed); it falls when the place is freed.
  * Models stand on their origin (the ground), local +Z = the building's yaw direction. Palisade pieces are scaled
  * along Z to their segment length.
  */
@@ -156,6 +157,37 @@
     const smoulder = new Map();                              // ruin id -> seconds of smoke left (fresh ruins)
     const wasRuin = new Set();
     let burning = 0;
+    // Phase 3 T16: the Order flag of a freeable village (data.freed): a pole with the red banner; it falls when the
+    // village is freed (fallTime s, a small bounce) and lies on the ground afterwards (a freed village loads with it down)
+    const FD = D.freed || { places: [] }, flags = new Map();      // place id -> { obj, fall (0 up .. 1 down), t }
+    let flagGeo = null;
+    function flagOf(t, pl) {
+      let f = flags.get(pl.id);
+      if (f) return f;
+      if (!flagGeo) {
+        const h = FD.flagH || 14;
+        flagGeo = merge([[cyl(0.3, 0.38, h, 6), COL.darkWood], [cyl(0.55, 0.55, 0.6, 6, 0, h, 0), COL.gold],
+                         [box(0.2, 3.6, 6, 0, h - 4.2, 3.2), COL.order], [box(0.24, 0.6, 6, 0, h - 2.8, 3.2), COL.gold], [box(0.24, 0.6, 6, 0, h - 4.6, 3.2), COL.gold]]);
+      }
+      const o = FD.flag || [0, 0], c = Math.cos(pl.yaw || 0), sn = Math.sin(pl.yaw || 0);
+      const x = pl.x + o[0] * c + o[1] * sn, z = pl.z - o[0] * sn + o[1] * c;
+      const T = C.need('terrain'), y = T.surfaceAt(t.region, x, z);
+      const pivot = new THREE.Group(), mesh = new THREE.Mesh(flagGeo, mat);
+      pivot.position.set(x, y, z); pivot.rotation.order = 'YXZ'; pivot.rotation.y = (pl.yaw || 0) + Math.PI / 2;
+      mesh.name = 'b:flag'; pivot.add(mesh); group.add(pivot);
+      f = { obj: pivot, fall: pl.freed ? 1 : 0, t: 0 };
+      flags.set(pl.id, f);
+      return f;
+    }
+    function flagsStep(t, dt) {
+      for (const pl of (t && t.places) || []) {
+        if (FD.places.indexOf(pl.id) < 0) continue;
+        const f = flagOf(t, pl);
+        if (pl.freed && f.fall < 1) f.fall = Math.min(1, f.fall + dt / (FD.fallTime || 1.6));
+        const k = f.fall, e = k < 0.8 ? Math.pow(k / 0.8, 2) : 1 - Math.sin((k - 0.8) / 0.2 * Math.PI) * 0.06;   // speeds up, a small bounce
+        f.obj.rotation.x = e * Math.PI / 2 * 0.97;
+      }
+    }
 
     function sync(t) {
       current = t; drawn = 0;
@@ -222,6 +254,7 @@
       for (const b of (t && t.buildings) || []) if (b.ruin) ruins++;
       if (t && ruins !== ruinsDrawn) sync(t);
       dt = dt || 0;
+      flagsStep(t, dt);
       const cam = o.cam, mult = o.particles == null ? 1 : o.particles, lights = o.lights || [];
       flames.mat.uniforms.scale.value = smoke.mat.uniforms.scale.value = o.pxScale || 400;
       const hot = [];
@@ -301,12 +334,14 @@
       for (const k of Object.keys(meshes)) meshes[k].geometry.dispose();
       if (pens) pens.geometry.dispose();
       if (ruinMesh) ruinMesh.geometry.dispose();
+      if (flagGeo) flagGeo.dispose();
       for (const P of [flames, smoke]) { P.geo.dispose(); P.mat.dispose(); }
       mat.dispose();
       if (group.parent) group.parent.remove(group);
     }
 
-    return { group, update, dispose, get info() { return { buildings: drawn, ruins: ruinsDrawn, burning, types: Object.keys(meshes).length, pens: pens ? 1 : 0 }; } };
+    return { group, update, dispose, get info() { return { buildings: drawn, ruins: ruinsDrawn, burning, types: Object.keys(meshes).length, pens: pens ? 1 : 0,
+      flags: [...flags].map(([id, f]) => ({ id, fall: f.fall })) }; } };
   }
 
   VR.settlements = { build, MODELS };
