@@ -522,7 +522,7 @@
       { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
         relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
       { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-        time: 420, reward: { gold: 200 } },
+        time: 540, reward: { gold: 200 } },
       { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
         reward: { gold: 300 } },
     ],

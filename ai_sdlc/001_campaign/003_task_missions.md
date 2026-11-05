@@ -247,7 +247,7 @@ missions: [
   { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
     relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
   { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-    time: 420, reward: { gold: 200 } },
+    time: 540, reward: { gold: 200 } },             // T14: 540 (was 420 - the Bend is 2.4 min from the cave each way)
   { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
     reward: { gold: 300 } },
 ],
@@ -363,6 +363,17 @@ Mission times are longer than in the first draft because the Bend is one region 
   `dest`, `escape: 'lair' | 'aerie'`) and `test/mission.bot.test.js` (steal: every seed lands inside the castle walls,
   succeeds in time and puts the chalice on the trophy wall; mean 7-8 min to the lair, about 5 min into the Farmlands
   aerie). HP left is 11-46% per seed at full hunger; the 20% floor is T19's balancing pass.
+
+- As built (T14): the destroy mission needs no new objective code (T10 already counts the target's `building:ruined`).
+  `missions.holds(cs, region, id)` is true for the target of the active destroy mission; `state.js` fireStep passes it to
+  `settlement.rebuild` as blocked, so the burned workshop stays a ruin (and in `rs.ruins`) until the mission succeeds or
+  fails, even when `fire.rebuild` has passed; afterwards the normal rebuild clock applies. Accepting the mission while the
+  workshop is still a ruin (or alight) from an earlier raid rebuilds it first ('building:rebuilt' { mission }, toast "The
+  Order has rebuilt the siege workshop"), loaded town or saved ruins, otherwise the objective could never be met. Mission
+  time 540 s (was 420): the seeded bot `test/destroy-bot.js` (careful pilot: hunts in the Wildwood, rounds the castle at
+  300 out to a run-in over the courtyard at bearing 0.75 from the workshop, a long glide at roof height with Fire held,
+  climbs out and circles 280 out until it is a ruin, then flies home) needed 6.5-9.4 min per seed, and 420 s timed out
+  4 of 8 seeds. Debug: Shift+W (DBG mission tab, "workshop") accepts it and puts the dragon on the run-in, 160 out.
 
 ### 5.6 `caravan`
 

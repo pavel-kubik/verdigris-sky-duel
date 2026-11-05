@@ -334,4 +334,4 @@ function raid(cs, opts) {
   return { minutes: t / 60, banked, gold: banked ? banked.gold : 0, died, hpLeft: cs.dragon.hp, log: bot.log, stats };
 }
 
-module.exports = { raid, input, createBot, insideSolid, pickLoot, standPoint, PROFILES };
+module.exports = { raid, input, createBot, insideSolid, pickLoot, standPoint, hunt, PROFILES };

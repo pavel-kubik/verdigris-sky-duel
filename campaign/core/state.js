@@ -450,7 +450,8 @@
       if (e.e === 'corn:regrown' && rs.corn) rs.corn = rs.corn.filter(r => r.id !== e.id);
     }
     for (const e of LT.refill(town, rs, now, cs.carriedLoot && cs.carriedLoot.region === cs.region ? cs.carriedLoot.id : null)) emit(cs, ev, e);   // T19
-    const blocked = b => SE.sd(b, p.pos[0], p.pos[2]).d < pad;  // never rebuild a house around the dragon
+    // never rebuild a house around the dragon; T14: the destroy mission's target stays a ruin until the mission is over
+    const blocked = b => SE.sd(b, p.pos[0], p.pos[2]).d < pad || MS.holds(cs, cs.region, b.id);
     for (const e of SE.rebuild(town, now, blocked)) {
       emit(cs, ev, e);
       if (rs.ruins) rs.ruins = rs.ruins.filter(r => r.id !== e.id);
