@@ -537,6 +537,17 @@
       ember_chalice: { niche: 1, color: 0xff7a2e },
     },
     trophy: { niches: 3 },
+    /* Caravans (Phase 3 T15, core/caravan.js, render/caravan-view.js; 003_task_missions.md 4.5, 5.6). The intercept
+       mission's wagon drives along road `road` (index of the region's road features) from `from` to `to` (fractions of
+       the polyline) at `speed` units/s, only while the dragon is in its region (the world elsewhere waits); `escort`
+       archers walk at the slots [side, ahead] beside it (catchUp x speed to get back to the slot). The breath on the
+       wagon or the oxen (`oxen` units ahead) costs `burn` hp/s; at 0 it stops and drops its `chest` on the road
+       `chestBack` units behind it. Road 1 of the Bend: the Hradchan side, Karlsbridge, the east bank, the castle gate. */
+    caravan: {
+      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'strongbox', wagonHp: 120 },
+      burn: 20, oxen: 5, catchUp: 2, chestBack: 4,
+      slots: [[-4, 1], [4, 1], [0, -7]],
+    },
 
     /* Messages (Pavel's request 2026-11-04, core/msglog.js): the big message lines wait in a queue; each stays
        chars / perChar s, at least min, at most max (a tap closes it sooner); with others waiting it is cut to waitCut of
