@@ -34,6 +34,8 @@ jobs:
           TARGET_BRANCH: ${{ matrix.branch }}
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin campaign-phase-3 "${TARGET_BRANCH}"
           expected_head="$(git rev-parse "origin/${TARGET_BRANCH}")"
           base_head="$(git rev-parse origin/campaign-phase-3)"
