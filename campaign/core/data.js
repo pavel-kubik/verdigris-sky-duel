@@ -480,6 +480,7 @@
       followRange: 60, divePitch: -0.32, showRange: 110, arrive: 60, loseRange: 320, showTime: 4.5, skim: 4,
       breathStand: 22, breathAlt: 9, circleR: 30, circleAlt: 34, circleRate: 0.45, praiseTime: 3.5,
       exitInset: 130, dangerPad: 40, hold: 0.5, teleport: 650, leaveFade: 5, drakeGap: 90,
+      escort: { side: 30, ahead: 6, up: 8 },   // Phase 3 T17: her place at the Drake's side on the first castle raid (x scale)
       visit: [{ away: 150, stay: 40 }, { away: 420, stay: 25 }],
       lessons: [
         { id: 'fly',   goal: 'self',  done: { follow: 6 } },
@@ -523,6 +524,14 @@
        (`time` s) starts when the dragon leaves the lair region or an aerie and does not run inside either. Success =
        objective met, then into the lair or an aerie: reward.gold x (1 + bonus per bonusPer s left). Fail (timeout,
        death): mission loot vanishes, region heat + alertOnFail, retry after the next rest. T19 tunes the numbers. */
+    /* Story (Phase 3 T17, core/story.js; 003_task_missions.md 5.8). Act cards (lines = i18n suffixes c.story.<id>.<n>,
+       scene = the backdrop render/story-card.js paints), story briefings of n lines (c.story.brief.<id>.1..n) the first time
+       a mission is accepted, one-line outcomes (c.story.out.<id>.ok / fail). The mother flies along on the first mission
+       into a raid region (firstRaidMother) and says raidLine; kingCityLine on her first flight into the Bend. */
+    story: { acts: [1, 2], firstRaidMother: true, raidRegions: ['bend'], sayTime: 7,
+      raidLine: 'c.mother.raid', kingCityLine: 'c.mother.kingCity', kingCityRegion: 'bend',
+      cards: { act1: { act: 1, scene: 'lair', lines: [1, 2, 3] }, act2: { act: 2, scene: 'castle', lines: [1, 2, 3] } },
+      briefs: { a2_chalice: 3, a2_workshop: 2, a2_caravan: 2 } },
     missions: [
       { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
         relic: 'ember_chalice', time: 480, reward: { gold: 250 } },

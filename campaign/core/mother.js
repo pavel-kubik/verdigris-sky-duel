@@ -12,6 +12,8 @@
  *
  * Saved: cs.story.mother = { lesson, at } (at: 'lair' with the hatchling in the cave, 'air' outside, 'done' after
  * the last lesson). Runtime only: cs.mom = { pos, vel, yaw, pitch, phase, t, prog, ... } (rebuilt next to the dragon).
+ * Phase 3 T17: escort - on the first castle raid (cs.story.raid, core/story.js) she flies at the Drake's side, kept
+ * outside every danger zone, and leaves (away) when the mission is over; line() returns cs.story.say first.
  * Phases: lead (flies ahead toward the goal), show (a demonstration over the goal), wait (circles over the goal until
  * the hatchling copies her), praise (wing to wing for a moment), away (flies off, hidden), visit (after the lessons).
  * She is never hit and never fights: nothing in core targets her.
@@ -230,6 +232,18 @@
     }
     checkDone(cs, ev, dt, out);
     const p = cs.dragon.pilot;
+    // Phase 3 T17: the first castle raid (core/story.js raid) - she flies at the Drake's side, outside every danger zone
+    const raid = cs.story && cs.story.raid;
+    if (!raid && cs.mom && cs.mom.phase === 'escort') { cs.mom.phase = 'away'; cs.mom.t = 0; cs.mom.awayT = MO.visit[1].away; }
+    if (raid && p && dt > 0 && !cs.inLair && !cs.inAerie) {
+      const zones = dangerZones(cs, ctx);
+      if (!cs.mom || !cs.mom.pos || cs.mom.phase !== 'escort' || Math.hypot(cs.mom.pos[0] - p.pos[0], cs.mom.pos[2] - p.pos[2]) > MO.teleport) placeBeside(cs, 'escort');
+      const m = cs.mom, k = Math.max(1, scaleOf(cs)), bx = Math.sin(p.yaw), bz = Math.cos(p.yaw);
+      m.hidden = false; m.t += dt; m.breath = false;
+      const x = p.pos[0] - bz * MO.escort.side * k + bx * MO.escort.ahead * k, z = p.pos[2] + bx * MO.escort.side * k + bz * MO.escort.ahead * k;
+      move(cs, [x, Math.max(p.pos[1] + MO.escort.up, T.surfaceAt(cs.region, x, z) + MO.alt), z], dt, zones);
+      return out;
+    }
     if (cs.inLair || !p || dt <= 0 || st.at === 'lair') return out;
     // outside: a run that started outside (or 'done' and between visits) gets her next to the dragon
     if (!cs.mom || !cs.mom.pos) placeBeside(cs, st.at === 'done' ? 'away' : 'lead');
@@ -246,6 +260,9 @@
     const st = cs.story && cs.story.mother;
     if (!st) return null;
     const m = cs.mom, L = lesson(cs);
+    const say = cs.story.say;                                  // Phase 3 T17: a story line (core/story.js) while she is in sight
+    if (say && say.t > 0 && m && !m.hidden && !cs.inLair) return say.key;
+    if (m && m.phase === 'escort') return null;
     if (m && m.praiseT > 0 && m.praise) return 'c.mother.good.' + m.praise;
     if (st.at === 'done') return m && m.phase === 'visit' && !m.hidden ? 'c.mother.visit' : null;
     if (cs.inLair || st.at === 'lair') return L && L.id === 'rest' ? 'c.mother.rest' : 'c.mother.lair';

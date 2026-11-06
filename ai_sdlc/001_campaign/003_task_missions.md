@@ -390,6 +390,17 @@ Mission times are longer than in the first draft because the Bend is one region 
 
 - `story.act(cs)`: Act 1 until Drake, Act 2 from Drake (Act 3 starts in Phase 4). Shows an act card once (`story.seen`).
 - Briefing card on accepting a mission, outcome line on success or fail; the mother flies with the Drake on its first castle mission (`firstRaidMother`), keeps out of the danger zones and leaves when the mission ends. Her first flight into the Bend comes with one line about the burned city below ("This was the King's city.").
+- As built (T17): `core/story.js` (API in its header), `data.story` (cards, briefs, raid lines), `render/story-card.js`.
+  Act cards show once each, when no panel is open (the world waits; Skip / Continue, a tap on the picture = Continue,
+  Enter / Space / Escape); a Drake that never saw Act 1 sees it first. The act backdrops are painted 2D silhouettes
+  (Act 1: the egg in the volcano glow, Act 2: Vyshgard on its rock over the river at dusk), not the 3D scene - cheaper
+  on a phone and ready before the region loads. The story briefing (2-3 lines, `c.story.brief.<id>.<n>`) is a bottom
+  sheet after Accept on the board, the first time only; the board's own briefing text (T11) stays. Outcome lines
+  (`c.story.out.<id>.ok | fail`) follow the mission's own message in the queue. The mother's raid: the first mission
+  into a `raidRegions` region with a mother (`cs.story.mother`) sets `cs.story.raid`; core/mother.js 'escort' phase
+  flies at the Drake's side (data.mother.escort), pushed out of every danger zone (cs.danger + region danger, + pad),
+  and leaves ('away') when the mission ends. Her raid line comes when she first flies out, the burned city line after it
+  in the Bend (`cs.story.say`, sayTime s). Saved now in the v2 shape: `story.seen`, `story.raid` (T18 makes it v3).
 
 ### 5.9 `save` v3
 
