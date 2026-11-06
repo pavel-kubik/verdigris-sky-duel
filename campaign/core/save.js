@@ -27,8 +27,8 @@
 
   /** The story part of the save: the act and the mother's lesson state (null = no teacher, e.g. a phase 1 run). */
   function storyOf(st) {
-    const m = st && st.mother;
-    return { act: (st && st.act) || 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null };
+    const m = st && st.mother, SY = M.need('story').saved(st);   // Phase 3 T17: seen cards / lines and the mother's raid
+    return { act: (st && st.act) || 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null, seen: SY.seen, raid: SY.raid };
   }
 
   function serialise(cs) {

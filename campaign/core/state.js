@@ -57,7 +57,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -180,6 +180,7 @@
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
     for (const e of TP.step(cs, ev, dt)) emit(cs, ev, e);      // T23: one-time tips (landing, compass, cave, raid, alert, altar)
     for (const e of MS.step(cs, dt, ev.slice())) emit(cs, ev, e);   // Phase 3 T10: mission timer, objectives, success / fail
+    for (const e of SY.step(cs, dt)) emit(cs, ev, e);           // Phase 3 T17: act change, the mother's first castle raid, her lines
     return autosave(cs, ev, dt);
   }
 
