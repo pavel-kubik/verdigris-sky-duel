@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog'), SY = C.need('story');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 'fix.1 2026-11-06 phase 3 base repaired (duplicate lines from the T14-T16 rebases)';
+  const BUILD = 't217.1 2026-11-06 story: act cards, story briefings, outcome lines, the mother on the first castle raid';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -385,6 +385,10 @@
       if (e.code === 'Tab' || e.code === 'Escape') closeMap();
       else if (e.code === 'Equal' || e.code === 'NumpadAdd') mapView.zoomBy(1.4);
       else if (e.code === 'Minus' || e.code === 'NumpadSubtract') mapView.zoomBy(1 / 1.4);
+      e.preventDefault(); return;
+    }
+    if (storyCard.open) {                                         // Phase 3 T17: a story card takes the keys while open
+      if (e.code === 'Escape' && storyCard.card.kind === 'act') storyCard.close(); else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') storyCard.next();
       e.preventDefault(); return;
     }
     if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) openMap(); return; }
@@ -766,6 +770,13 @@
     if (alertPulse > 0) { alertRow.classList.add('pulse'); if ((alertPulse -= dt || 0.016) <= 0) alertRow.classList.remove('pulse'); }
   }
   let goldPulse = 0;                                             // T19: HUD gold pulse after banking
+  /* Phase 3 T17: story cards (render/story-card.js). An act card shows once, when nothing else is open; the world waits. */
+  const storyCard = VRender.storyCard.build(document.body, { t });
+  function storyTick() {
+    if (stationOpen || logOpen || mapView.isOpen || !$('#lairDeath').hidden || !dragon.pilot) return;
+    const c = SY.pendingCard(cs);
+    if (c) storyCard.show(Object.assign({ kind: 'act' }, c), x => { SY.mark(cs, x.id); saveNow('story'); });
+  }
   const logEl = $('#logPanel'); let logOpen = false;             // the message log (openLog below)
   const toastEl = $('#toast'); let hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
@@ -773,6 +784,10 @@
   const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   function onEvents(ev) {
     for (const e of ev) {
+      if (e.e === 'mission:success' || e.e === 'mission:failed') {   // Phase 3 T17: the story outcome line, after the mission's own message
+        const k = SY.outcome(e.id, e.e === 'mission:success');
+        if (k) queueMicrotask(() => toast(t(k), '', 5, 'mission'));
+      }
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
       else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
       else if (e.e === 'clock:phase') {                          // T21: night falls / day breaks (outside only; the nest panel shows the time)
@@ -1067,9 +1082,11 @@
   $('#briefBack').onclick = () => { briefId = null; boardShown = ''; renderBoard(); };
   $('#briefAccept').onclick = () => {
     if (!briefId || !cs.inLair || state !== 'play') return;
-    const ev = ST.caveAct(cs, 'board', briefId);
+    const id = briefId, ev = ST.caveAct(cs, 'board', briefId);
     if (ev.some(x => x.e === 'mission:accepted')) lairMsg(t('c.board.go'));
     onEvents(ev); boardShown = ''; renderBoard();
+    const sb = ev.some(x => x.e === 'mission:accepted') && SY.brief(cs, id);   // Phase 3 T17: the story briefing, the first time
+    if (sb) storyCard.show(Object.assign({ kind: 'brief' }, sb), () => saveNow());
   };
   $('#briefDrop').onclick = () => {
     if (!cs.inLair || state !== 'play') return;
@@ -1622,7 +1639,8 @@
     requestAnimationFrame(frame);
     const rawDt = (now - last) / 1000;
     let dt = Math.min(0.05, rawDt); last = now;
-    if (state === 'paused' || logOpen) dt = 0;                 // the message log pauses the world (it is drawn under the panel)
+    if (state === 'paused' || logOpen || storyCard.open) dt = 0;   // the message log and story cards (T17) pause the world (drawn under the panel)
+    if (state === 'play' && !storyCard.open) storyTick();
     if (mapView.isOpen) { mapView.tick(Math.min(0.1, rawDt)); return; }   // T07: the region scene is paused (not drawn) under the map
     time += reduceMotion ? dt * 0.3 : dt;
     if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
