@@ -25,6 +25,10 @@
  *   objective(cs) -> null | { key, p }        T11: i18n key of the HUD objective line ('c.mission.obj.<type>' while
  *                                             accepted / running, 'c.mission.obj.home' once done; T13: 'c.mission.obj.homeAerie'
  *                                             { region } once done while the aerie of the current region is found - the escape)
+ *                                             accepted / running, 'c.mission.obj.home' once done)
+ *   holds(cs, region, id) -> bool            T14: the active destroy mission holds its target as a ruin (state.js skips
+ *                                             fire.rebuild for it until the mission succeeds or fails); accept() of a destroy
+ *                                             mission whose target is already a ruin rebuilds it first ('building:rebuilt' { mission })
  * cs.missions = { completed: [ids], failedAt: { id: rested count at the fail } } (saved).
  * Pure: no DOM, no THREE.
  */
@@ -60,7 +64,33 @@
     const w = why(cs, m);
     if (w && !(w === 'stage' && opts && opts.force)) return [{ e: 'mission:refused', id, why: w }];
     cs.mission = { id, state: 'accepted', t: m.time, left: m.time, viaAerie: !!cs.inAerie, stopped: false };
-    return [{ e: 'mission:accepted', id, time: m.time }];
+    const ev = [{ e: 'mission:accepted', id, time: m.time }];
+    if (m.type === 'destroy') for (const e of restore(cs, m)) ev.push(e);
+    return ev;
+  }
+
+  /* ---------- T14: the destroy target ---------- */
+  /** A destroy target that is already a ruin (or charred) when the mission is accepted: the Order has rebuilt it, so the
+   *  mission can be met ('building:rebuilt' { mission }). Clears it from the region's ruins and from the loaded town. */
+  function restore(cs, m) {
+    const ev = [], rs = cs.regionStates && cs.regionStates[m.region];
+    let was = false;
+    if (rs && rs.ruins && rs.ruins.some(r => r.id === m.target)) { rs.ruins = rs.ruins.filter(r => r.id !== m.target); was = true; }
+    const town = cs.town && cs.town.region === m.region ? cs.town : null;
+    const b = town && town.buildings.find(q => q.id === m.target);
+    if (b && (b.ruin || b.char || b.fire > 0)) {
+      const B = D.buildings[b.type] || {};
+      b.ruin = false; b.ruinAt = null; b.char = false; b.charAt = null; b.fire = 0; b.heat = 0;
+      b.hp = B.stone && B.woodHp > 0 ? B.woodHp : B.hp;
+      was = true;
+    }
+    if (was) ev.push({ e: 'building:rebuilt', id: m.target, region: m.region, mission: m.id });
+    return ev;
+  }
+  /** Is building `id` of `region` held as a ruin by the active destroy mission? (no fire.rebuild until it is over) */
+  function holds(cs, region, id) {
+    const a = active(cs), m = a && def(a.id);
+    return !!(m && m.type === 'destroy' && m.region === region && m.target === id);
   }
 
   function cancel(cs) {
@@ -193,5 +223,5 @@
     return { key: 'c.mission.obj.' + m.type, p: { region: 'c.region.' + m.region } };
   }
 
-  M.define('missions', { def, list, accept, cancel, step, fail, finish, reward, timerState, active, target, objective });
+  M.define('missions', { def, list, accept, cancel, step, fail, finish, reward, timerState, active, target, objective, holds });
 })(typeof self !== 'undefined' ? self : this);

@@ -17,6 +17,8 @@
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
   const BUILD = 't213.3 2026-11-05 rebased on campaign-phase-3 (message log)';
+  const BUILD = 't214.1 2026-11-05 destroy mission: workshop held as a ruin, rebuilt at accept, debug run-in';
+  const BUILD = 't214.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -403,7 +405,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -821,6 +823,7 @@
       else if (e.e === 'mission:started') toast(t('c.mission.started', { m: missionName(e.id) }), t('c.mission.startedSub', { time: mmss(e.time) }), 3, 'mission');
       else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5, 'mission');
       else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3, 'mission');
+      else if (e.e === 'building:rebuilt' && e.mission) toast(t('c.mission.rebuilt'), t('c.mission.rebuiltSub'), 3.5, 'mission');   // T14: the burned workshop stands again for the destroy mission
       else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5, 'mission'); }
       else if (e.e === 'mission:failed' && e.why === 'death' && !$('#lairDeath').hidden) {   // T12: the death card covers the toast - say it there
         const b = document.createElement('b'), sm = document.createElement('small');
@@ -1295,6 +1298,7 @@
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
     ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
+    ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyW', 'workshop'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1405,6 +1409,21 @@
         const it = (cs.town.items || []).find(q => q.relic === 'ember_chalice' && !q.taken && !q.hidden);
         if (it) standAtLoot(it);
         else if (!cs.carriedLoot) { onEvents(RL.giveDebug(cs)); flashPrompt(t('c.dbg.relicClaws'), 1.5); }
+      }
+    }
+    if (code === 'ShiftKeyW' && !cs.inLair) {                     // Phase 3 T14: run-in on the siege workshop (destroy mission)
+      const m = MS.def('a2_workshop'), a = MS.active(cs);
+      if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
+      else if (cs.region !== m.region || !cs.town) flashPrompt(t('c.dbg.workshopBend'), 2);
+      else {
+        if (!a) { cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', m.id)); cs.debugForce = false; }
+        const b = cs.town.buildings.find(q => q.id === m.target);
+        if (b) {
+          const ang = 0.75, x = b.pos[0] + Math.sin(ang) * 160, z = b.pos[2] + Math.cos(ang) * 160;   // as test/destroy-bot.js RUN_BEARING
+          const y = Math.max(TR.surfaceAt(regionId, x, z) + 20, b.pos[1] + b.h + 30);
+          Object.assign(pilot, { mode: 'air', tr: null, pos: [x, y, z], yaw: ang + Math.PI, pitch: -0.2, speed: stats.cruise });
+          snapCam(); flashPrompt(t(b.ruin ? 'c.dbg.workshopRuin' : 'c.dbg.workshop'), 2);
+        }
       }
     }
     if (code === 'Quote') {                                       // T20: every upgrade at once, or none (refunded)
@@ -1687,7 +1706,7 @@
       ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
-      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW']]]],
       ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];

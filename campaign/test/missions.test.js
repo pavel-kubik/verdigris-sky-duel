@@ -46,24 +46,24 @@ const ofType = (ev, name) => ev.filter(e => e.e === name);
   cs.inLair = true;
   MS.accept(cs, 'a2_workshop');
   MS.step(cs, 10, []);
-  ok(cs.mission.state === 'accepted' && cs.mission.left === 420, 'inside the lair: not running');
+  ok(cs.mission.state === 'accepted' && cs.mission.left === MS.def('a2_workshop').time, 'inside the lair: not running');
   cs.inLair = false;
   MS.step(cs, 10, []);
-  ok(cs.mission.state === 'accepted' && cs.mission.left === 420, 'outside but still in the lair region: not running');
+  ok(cs.mission.state === 'accepted' && cs.mission.left === MS.def('a2_workshop').time, 'outside but still in the lair region: not running');
   cs.region = 'wild';
   const ev = MS.step(cs, 1, []);
   ok(ofType(ev, 'mission:started').length === 1 && cs.mission.state === 'running', 'leaving the lair region starts it');
-  near(cs.mission.left, 419, 1e-9, 'timer runs from the start frame');
+  near(cs.mission.left, MS.def('a2_workshop').time - 1, 1e-9, 'timer runs from the start frame');
   MS.step(cs, 5, [{ e: 'region:enter', region: 'farm' }]);
-  near(cs.mission.left, 419, 1e-9, 'no time passes in a region swap frame (loading)');
+  near(cs.mission.left, MS.def('a2_workshop').time - 1, 1e-9, 'no time passes in a region swap frame (loading)');
   cs.loading = true; MS.step(cs, 5, []); cs.loading = false;
-  near(cs.mission.left, 419, 1e-9, 'paused while loading');
+  near(cs.mission.left, MS.def('a2_workshop').time - 1, 1e-9, 'paused while loading');
   cs.inLair = true; MS.step(cs, 30, []); cs.inLair = false;
-  near(cs.mission.left, 419, 1e-9, 'paused inside the lair');
+  near(cs.mission.left, MS.def('a2_workshop').time - 1, 1e-9, 'paused inside the lair');
   cs.inAerie = 'farm'; MS.step(cs, 30, []); cs.inAerie = null;
-  near(cs.mission.left, 419, 1e-9, 'paused inside an aerie');
+  near(cs.mission.left, MS.def('a2_workshop').time - 1, 1e-9, 'paused inside an aerie');
   MS.step(cs, 19, []);
-  near(cs.mission.left, 400, 1e-9, 'runs again outside');
+  near(cs.mission.left, MS.def('a2_workshop').time - 20, 1e-9, 'runs again outside');
 }
 
 // 4. timer start from an aerie, even in the lair region's neighbourhood rules
