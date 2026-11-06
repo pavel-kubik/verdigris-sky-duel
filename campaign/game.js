@@ -16,14 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't213.3 2026-11-05 rebased on campaign-phase-3 (message log)';
-  const BUILD = 't214.1 2026-11-05 destroy mission: workshop held as a ruin, rebuilt at accept, debug run-in';
-  const BUILD = 't214.2 2026-11-05 rebased on campaign-phase-3 (message log)';
-  const BUILD = 't215.1 2026-11-05 tithe wagon intercept mission';
-  const BUILD = 't215.2 2026-11-05 rebased on campaign-phase-3 (message log)';
-  const BUILD = 't216.1 2026-11-05 freed village: Order flag falls, food tribute in the larder';
-  const BUILD = 't216.2 2026-11-05 freed village: Order flag falls, food tribute in the larder';
-  const BUILD = 't216.3 2026-11-05 rebased on campaign-phase-3 (message log)';
+  const BUILD = 'fix.1 2026-11-06 phase 3 base repaired (duplicate lines from the T14-T16 rebases)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -412,9 +405,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLCZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+C wagon (T15), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[FGJKLZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+F / G: free the village, tribute now (Phase 3 T16); Shift+L chalice (T12), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CFGJKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+C wagon (T15), Shift+F / G free the village, tribute now (T16), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1750,8 +1741,7 @@
       ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyF', 'ShiftKeyG']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
-      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW']]]],
-      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyC']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW', 'ShiftKeyC']]]],
       ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];
