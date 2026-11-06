@@ -1,4 +1,4 @@
-name: Rebase remaining campaign Phase 3 branches
+name: Rebase final campaign Phase 3 branch
 
 on:
   push:
@@ -19,7 +19,6 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          - agent/t215-caravan-intercept
           - agent/t216-freed-village
     steps:
       - name: Check out full history
