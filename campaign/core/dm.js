@@ -26,6 +26,14 @@
   const { clamp, wrap, fwd, norm, mulberry, range } = M.need('math');
   const X = D.dm;
   const MODES = ['air', 'perching', 'perch', 'fall', 'down'];
+  const PHASES = ['lobby', 'play', 'over'];
+  /** Seat key of a browser's token: who a player is across reconnects and host changes (friendly games, not secure). */
+  function keyOf(token) {
+    let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995;
+    for (const ch of String(token)) { const c = ch.charCodeAt(0); a = Math.imul(a ^ c, 0x01000193); b = Math.imul(b ^ c, 0x5bd1e995) ^ (b >>> 13); }
+    return 'k' + (a >>> 0).toString(36) + (b >>> 0).toString(36);
+  }
+  const pick = (v, list, d) => (list.indexOf(+v) >= 0 ? +v : d);
   const FOOD_TYPES = Object.keys(X.food.kinds);
   const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
   const fin = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
@@ -292,9 +300,12 @@
    * ===================================================================== */
   function newWorld(opts) {
     opts = opts || {};
+    const phase = PHASES.indexOf(opts.phase) >= 0 ? opts.phase : 'play';   // the client starts rooms in 'lobby'
     const w = {
-      t: 0, timeLeft: opts.timeLimit || X.timeLimit, fragLimit: opts.fragLimit || X.fragLimit, over: false, overT: 0, winner: 0,
+      t: 0, timeLimit: opts.timeLimit || X.timeLimit, timeLeft: opts.timeLimit || X.timeLimit, fragLimit: opts.fragLimit || X.fragLimit,
+      phase, over: phase === 'over', overT: 0, winner: 0, code: opts.code || '', hostId: opts.hostId || 1,
       players: {}, balls: [], food: [], nid: 1, ev: [], rng: opts.rng || Math.random, round: 1,
+      ledger: {}, seqN: 1,                                        // ledger: seat key -> stats of players who left
     };
     const A = arena(), FD = X.food;
     A.homes.forEach((h, i) => {
@@ -329,14 +340,21 @@
     });
     return best;
   }
-  function addPlayer(w, id, name, color) {
+  /** key: the player's seat key (keyOf(token)); a key seen before gets its stats (and colour, when free) back. */
+  function addPlayer(w, id, name, color, key) {
+    key = typeof key === 'string' ? key.slice(0, 40) : '';
+    if (key) playerList(w).forEach(o => { if (o.key === key) removePlayer(w, o.id); });   // a stale connection of the same seat
+    const L = key ? w.ledger[key] : null;
+    if (color == null && L && !playerList(w).some(o => o.color === L.color)) color = L.color;
     const s = spawnFor(w, id);
     const pl = {
-      id, name: String(name || 'Dragon').slice(0, 16), color: color == null ? freeColor(w) : color,
+      id, key, seq: w.seqN++, name: String(name || 'Dragon').slice(0, 16), color: color == null ? freeColor(w) : color,
       pos: s.pos.slice(), vel: [0, 0, 0], yaw: s.yaw, pitch: 0, roll: 0, rollX: 0, sx: 0, mode: 0,
-      br: false, hp: X.hp, down: false, downT: 0, rollInv: false, sinv: X.spawnInv, kills: 0, deaths: 0, score: 0,
+      br: false, hp: X.hp, down: false, downT: 0, rollInv: false, sinv: X.spawnInv,
+      kills: L ? L.kills : 0, deaths: L ? L.deaths : 0, score: L ? L.score : 0,
       lastBy: 0, lastAt: -1e9, bumpT: 0, eaten: 0,
     };
+    if (L) delete w.ledger[key];
     w.players[id] = pl;
     w.ev.push({ e: 'join', pl: id, name: pl.name, p: pl.pos.map(r2), y: r3(pl.yaw) });
     return pl;
@@ -345,6 +363,7 @@
     const p = w.players[id];
     if (!p) return;
     delete w.players[id];
+    if (p.key) w.ledger[p.key] = { name: p.name, color: p.color, kills: p.kills, deaths: p.deaths, score: p.score };
     w.ev.push({ e: 'left', pl: id, name: p.name });
   }
   function setPose(w, id, m) {
@@ -371,7 +390,7 @@
 
   /** Damage to a dragon. by = the attacker's id (0 = none); kind: ball | breath | bump | crash | impact. */
   function damage(w, p, amt, by, kind) {
-    if (!p || p.down || w.over || !(amt > 0)) return false;
+    if (!p || p.down || w.phase !== 'play' || !(amt > 0)) return false;   // lobby = warm-up: nothing hurts
     if (p.sinv > 0) return false;
     if ((kind === 'ball' || kind === 'breath') && p.rollInv) return false;
     if (by && by !== p.id && w.players[by]) { p.lastBy = by; p.lastAt = w.t; }
@@ -412,14 +431,70 @@
     if (w.over) return;
     const b = board(w);
     const tie = b.length > 1 && b[1].score === b[0].score && b[1].kills === b[0].kills && b[1].deaths === b[0].deaths;
-    w.over = true; w.overT = X.overTime; w.winner = b.length && !tie ? b[0].id : 0;   // 0 = a draw
+    w.over = true; w.phase = 'over'; w.overT = X.overTime; w.winner = b.length && !tie ? b[0].id : 0;   // 0 = a draw
     w.balls.length = 0;
     w.ev.push({ e: 'over', winner: w.winner, name: w.winner ? b[0].name : '', board: b });
   }
+  function resetScores(w) {
+    playerList(w).forEach(p => { p.kills = p.deaths = p.score = 0; p.eaten = 0; });
+    for (const k in w.ledger) Object.assign(w.ledger[k], { kills: 0, deaths: 0, score: 0 });
+  }
+  /** After a match: back to the lobby for the next round (scores reset, everyone respawns). */
   function restart(w) {
-    w.over = false; w.overT = 0; w.winner = 0; w.timeLeft = X.timeLimit; w.balls.length = 0; w.round++;
-    playerList(w).forEach(p => { p.kills = p.deaths = p.score = 0; p.eaten = 0; respawn(w, p); });
+    w.over = false; w.phase = 'lobby'; w.overT = 0; w.winner = 0; w.timeLeft = w.timeLimit; w.balls.length = 0; w.round++;
+    resetScores(w);
+    playerList(w).forEach(p => respawn(w, p));
     w.ev.push({ e: 'restart', round: w.round });
+  }
+  /** Lobby -> match: the host pressed Start. Scores from 0, everyone respawns, the clock runs. */
+  function startMatch(w) {
+    if (w.phase !== 'lobby') return false;
+    w.phase = 'play'; w.over = false; w.winner = 0; w.timeLeft = w.timeLimit; w.balls.length = 0;
+    resetScores(w);
+    playerList(w).forEach(p => respawn(w, p));
+    w.ev.push({ e: 'start', fl: w.fragLimit, tl: w.timeLimit });
+    return true;
+  }
+  /** Host settings, in the lobby only: kills to win and the time limit (from fragChoices / timeChoices). */
+  function setSettings(w, o) {
+    if (w.phase !== 'lobby' || !o) return false;
+    w.fragLimit = pick(o.fragLimit, X.fragChoices, w.fragLimit);
+    w.timeLimit = pick(o.timeLimit, X.timeChoices, w.timeLimit);
+    w.timeLeft = w.timeLimit;
+    return true;
+  }
+
+  /* ---------- room record: what every client keeps, so anyone can host the room again ---------- */
+  function exportRoom(w) {
+    const people = {};
+    for (const k in w.ledger) people[k] = Object.assign({}, w.ledger[k]);
+    playerList(w).forEach(p => { if (p.key) people[p.key] = { name: p.name, color: p.color, kills: p.kills, deaths: p.deaths, score: p.score }; });
+    return { v: 1, code: w.code, round: w.round, phase: w.phase, timeLeft: Math.ceil(w.timeLeft), fragLimit: w.fragLimit, timeLimit: w.timeLimit, people };
+  }
+  /** A world from a saved / received record (null when it is not one): everyone is in the ledger until they rejoin. */
+  function importRoom(rec, opts) {
+    opts = opts || {};
+    if (!rec || typeof rec !== 'object' || rec.v !== 1 || !rec.people || typeof rec.people !== 'object') return null;
+    const timeLimit = pick(rec.timeLimit, X.timeChoices, X.timeLimit);
+    const w = newWorld({ phase: PHASES.indexOf(rec.phase) >= 0 ? rec.phase : 'lobby', rng: opts.rng, code: opts.code || String(rec.code || ''),
+      fragLimit: pick(rec.fragLimit, X.fragChoices, X.fragLimit), timeLimit });
+    w.round = Math.max(1, Math.min(1e6, rec.round | 0));
+    w.timeLeft = w.phase === 'play' ? clamp(+rec.timeLeft || 0, 0, timeLimit) : timeLimit;
+    if (w.phase === 'play' && w.timeLeft <= 0) w.phase = 'over';
+    w.over = w.phase === 'over';
+    const n = v => clamp(Math.round(+v || 0), -9999, 9999);
+    Object.keys(rec.people).slice(0, 64).forEach(k => {
+      const e = rec.people[k];
+      if (!/^k[0-9a-z]{2,40}$/.test(k) || !e || typeof e !== 'object') return;
+      w.ledger[k] = { name: String(e.name || 'Dragon').slice(0, 16), color: clamp(e.color | 0, 0, X.palettes - 1), kills: Math.max(0, n(e.kills)), deaths: Math.max(0, n(e.deaths)), score: n(e.score) };
+    });
+    return w;
+  }
+  /** Who takes over when the host is gone: the guest that joined first (lowest seq). rows: [{ id, seq }]. */
+  function successorOf(rows, hostId) {
+    let best = null;
+    for (const r of rows || []) if (r && r.id !== hostId && (!best || r.seq < best.seq)) best = r;
+    return best ? best.id : 0;
   }
 
   function stepBalls(w, dt) {
@@ -549,7 +624,7 @@
       pl.forEach(p => { if (p.down) { p.downT -= dt; if (p.downT <= 0) respawn(w, p); } });
       return;
     }
-    w.timeLeft -= dt;
+    if (w.phase === 'play') w.timeLeft -= dt;
     pl.forEach(p => {
       p.sinv = Math.max(0, p.sinv - dt);
       if (p.down) { p.downT -= dt; if (p.downT <= 0) respawn(w, p); }
@@ -559,21 +634,22 @@
     stepBumps(w, dt);
     stepBalls(w, dt);
     stepFood(w, dt);
-    if (w.timeLeft <= 0) { w.timeLeft = 0; endMatch(w); }
+    if (w.phase === 'play' && w.timeLeft <= 0) { w.timeLeft = 0; endMatch(w); }
   }
 
   /** Compact state for every client (about 20 times a second). */
   function snapshot(w) {
     return {
-      t: r2(w.t), tl: Math.ceil(w.timeLeft), fl: w.fragLimit, o: w.over ? 1 : 0, win: w.winner, rd: w.round,
+      t: r2(w.t), tl: Math.ceil(w.timeLeft), fl: w.fragLimit, tm: w.timeLimit, o: w.over ? 1 : 0, win: w.winner, rd: w.round,
+      ph: PHASES.indexOf(w.phase), hid: w.hostId,
       P: playerList(w).map(p => [p.id, r2(p.pos[0]), r2(p.pos[1]), r2(p.pos[2]), r3(p.yaw), r3(p.pitch), r3(p.roll), r3(p.rollX),
-        p.br ? 1 : 0, Math.round(p.hp), p.down ? 1 : 0, p.color, p.name, r2(p.sx), p.kills, p.deaths, p.score, p.mode, p.sinv > 0 ? 1 : 0]),
+        p.br ? 1 : 0, Math.round(p.hp), p.down ? 1 : 0, p.color, p.name, r2(p.sx), p.kills, p.deaths, p.score, p.mode, p.sinv > 0 ? 1 : 0, p.seq]),
       F: w.food.filter(f => f.alive).map(f => [f.id, FOOD_TYPES.indexOf(f.type), r2(f.x), r2(f.z), r3(f.yaw), r2(f.speed)]),
     };
   }
 
   M.define('dm', {
-    MODES, FOOD_TYPES, arena, env, treeGrid, surface, solidTop, obstacle, pillarAt,
+    MODES, PHASES, FOOD_TYPES, keyOf, startMatch, setSettings, exportRoom, importRoom, successorOf, arena, env, treeGrid, surface, solidTop, obstacle, pillarAt,
     newPilot, step, startFall, tryPerch, perchBlock, tryTakeoff, tryBall, tryRoll, poseOf,
     newWorld, addPlayer, removePlayer, setPose, shoot, damage, reportCrash, respawn, board, endMatch, restart,
     stepWorld, snapshot, playerList, modeOf, spawnFor,

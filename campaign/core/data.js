@@ -605,6 +605,16 @@
         kinds: { chicken: { hp: 15, speed: 4.5, share: 0.5 }, goat: { hp: 30, speed: 6, share: 0.25 }, sheep: { hp: 25, speed: 4, share: 0.25 } },
       },
       spawns: 10, palettes: 8, nameKey: 'vsd-name', peerPrefix: 'vsd-dm-',
+      /* Room (lobby, persistence, host take-over): the match starts from a lobby (warm-up, no damage) when the host
+         presses Start; fragChoices / timeChoices = the host's settings there. The host sends the room record (scores
+         of everyone who was ever in the room, by seat key, the phase and the clock) every recEvery s; every client
+         keeps the last one in localStorage (roomKey, for roomKeep s) and tokenKey holds this browser's seat token.
+         A guest that hears nothing from the host for hostTimeout s (or sees the connection close) looks for a new
+         host: the guest that joined first claims the room code at once, the others wait migrateDelay s and join it;
+         whoever finds the code free hosts it from the saved record. They give up after migrateWait s. */
+      fragChoices: [5, 10, 15, 20], timeChoices: [300, 600, 900],
+      recEvery: 1, roomKey: 'vsd-dm-room', tokenKey: 'vsd-dm-token', roomKeep: 6 * 3600,
+      hostTimeout: 6, migrateDelay: 2.5, migrateWait: 45,
     },
   };
 

@@ -249,9 +249,87 @@ const E = DM.env([]);
   DM.setPose(w, 2, m);
   ok(b.pos[0] === 10 && b.mode === 0, 'pose applied');
   const s = DM.snapshot(w);
-  ok(s.P.length === 2 && s.P[0].length === 19 && s.F.length === w.food.length, 'snapshot rows');
+  ok(s.P.length === 2 && s.P[0].length === 20 && s.F.length === w.food.length, 'snapshot rows');
   ok(JSON.stringify(s).length < 4000, 'snapshot small: ' + JSON.stringify(s).length);
   DM.stepWorld(w, X.spawnInv + 0.1);
   b.rollInv = true;
   ok(!DM.damage(w, b, 10, 1, 'ball') && DM.damage(w, b, 10, 1, 'bump'), 'roll dodges fire, not bumps');
+}
+
+// 13. Lobby: warm-up without damage or clock, host settings, Start resets scores and runs the clock, restart -> lobby
+{
+  const w = DM.newWorld({ rng: mulberry(29), phase: 'lobby' });
+  const a = DM.addPlayer(w, 1, 'A', null, DM.keyOf('ta')), b = DM.addPlayer(w, 2, 'B', null, DM.keyOf('tb'));
+  DM.stepWorld(w, X.spawnInv + 0.1);
+  ok(!DM.damage(w, b, 50, 1, 'ball') && b.hp === X.hp, 'no damage in the lobby');
+  const tl = w.timeLeft; DM.stepWorld(w, 5);
+  ok(w.timeLeft === tl, 'no clock in the lobby');
+  ok(DM.setSettings(w, { fragLimit: 5, timeLimit: 300 }) && w.fragLimit === 5 && w.timeLimit === 300, 'settings');
+  DM.setSettings(w, { fragLimit: 7, timeLimit: 42 });
+  ok(w.fragLimit === 5 && w.timeLimit === 300, 'only offered settings');
+  a.kills = 3; a.score = 3;
+  w.ev.length = 0;
+  ok(DM.startMatch(w) && w.phase === 'play' && a.score === 0 && w.timeLeft === 300, 'start');
+  ok(w.ev.some(e => e.e === 'start') && !DM.startMatch(w), 'start once');
+  ok(!DM.setSettings(w, { fragLimit: 20 }), 'no settings during the match');
+  DM.stepWorld(w, X.spawnInv + 0.1); DM.stepWorld(w, 1);
+  ok(w.timeLeft < 300, 'clock runs');
+  ok(DM.damage(w, b, 10, 1, 'ball'), 'damage in the match');
+  DM.endMatch(w);
+  ok(w.phase === 'over' && w.over, 'over');
+  DM.restart(w);
+  ok(w.phase === 'lobby' && !w.over && w.timeLeft === 300 && w.round === 2, 'restart opens the lobby');
+  ok(DM.snapshot(w).ph === 0 && DM.snapshot(w).tm === 300, 'snapshot phase and time limit');
+}
+
+// 14. Seats: a player who leaves and comes back (same key) keeps kills, deaths, score and colour; a stale seat is replaced
+{
+  const w = DM.newWorld({ rng: mulberry(31) });
+  const ka = DM.keyOf('token-a'), kb = DM.keyOf('token-b');
+  ok(ka !== kb && /^k[0-9a-z]+$/.test(ka) && ka === DM.keyOf('token-a'), 'seat keys');
+  DM.addPlayer(w, 1, 'A', null, ka); const b = DM.addPlayer(w, 2, 'B', null, kb);
+  DM.stepWorld(w, X.spawnInv + 0.1);
+  DM.damage(w, b, 500, 1, 'ball');
+  const colB = b.color;
+  DM.removePlayer(w, 2);
+  ok(w.ledger[kb] && w.ledger[kb].deaths === 1, 'ledger keeps the stats');
+  const b2 = DM.addPlayer(w, 3, 'B', null, kb);
+  ok(b2.deaths === 1 && b2.score === 0 && b2.color === colB && !w.ledger[kb], 'stats and colour back');
+  const b3 = DM.addPlayer(w, 4, 'B', null, kb);
+  ok(!w.players[3] && b3.deaths === 1 && DM.playerList(w).length === 2, 'same seat twice: the old one goes');
+  ok(w.players[1].kills === 1, 'the killer keeps the kill');
+}
+
+// 15. Room record: export -> import keeps everyone's stats, phase, clock and settings; junk is refused; successor
+{
+  const w = DM.newWorld({ rng: mulberry(37), phase: 'lobby', code: 'ABCDE' });
+  const ka = DM.keyOf('a'), kb = DM.keyOf('b'), kc = DM.keyOf('c');
+  DM.addPlayer(w, 1, 'A', null, ka); DM.addPlayer(w, 2, 'B', null, kb); DM.addPlayer(w, 3, 'C', null, kc);
+  DM.setSettings(w, { fragLimit: 15, timeLimit: 900 });
+  DM.startMatch(w);
+  DM.stepWorld(w, X.spawnInv + 0.1);
+  DM.damage(w, w.players[3], 500, 2, 'ball');
+  DM.removePlayer(w, 3);
+  DM.stepWorld(w, 10);
+  const rec = JSON.parse(JSON.stringify(DM.exportRoom(w)));
+  ok(rec.code === 'ABCDE' && rec.phase === 'play' && Object.keys(rec.people).length === 3, 'record has everyone, also who left');
+  ok(JSON.stringify(rec).length < 2000, 'record is small');
+  const w2 = DM.importRoom(rec, { rng: mulberry(1) });
+  ok(w2 && w2.phase === 'play' && w2.fragLimit === 15 && w2.timeLimit === 900 && Math.abs(w2.timeLeft - w.timeLeft) <= 1, 'import keeps phase, clock, settings');
+  ok(DM.playerList(w2).length === 0 && w2.ledger[kb].kills === 1 && w2.ledger[kc].deaths === 1, 'import: everyone in the ledger');
+  const nb = DM.addPlayer(w2, 1, 'B', null, kb);
+  ok(nb.kills === 1 && nb.score === 1, 'new host gets its score back');
+  DM.addPlayer(w2, 2, 'A', null, ka);
+  DM.stepWorld(w2, X.spawnInv + 0.1);
+  ok(DM.damage(w2, w2.players[2], 10, 1, 'ball') && w2.phase === 'play', 'the match goes on after the take-over');
+  ok(DM.importRoom(null) === null && DM.importRoom({ v: 2, people: {} }) === null && DM.importRoom({ v: 1 }) === null, 'junk refused');
+  const bad = DM.importRoom({ v: 1, people: { 'nope': { name: 'x' }, kzz9: { name: 'Y'.repeat(50), kills: -5, deaths: 'x', score: 1e9, color: 99 } }, fragLimit: 3, timeLimit: 1 });
+  ok(bad && !bad.ledger.nope && bad.ledger.kzz9.name.length === 16 && bad.ledger.kzz9.kills === 0 && bad.ledger.kzz9.score === 9999 && bad.ledger.kzz9.color < X.palettes, 'record values clamped');
+  ok(bad.fragLimit === X.fragLimit && bad.timeLimit === X.timeLimit && bad.phase === 'lobby', 'bad settings fall back');
+  const over = DM.importRoom(Object.assign({}, rec, { timeLeft: 0 }));
+  ok(over.phase === 'over' && over.over, 'a finished clock restores as over');
+  const rows = DM.snapshot(w).P.map(r => ({ id: r[0], seq: r[19] }));
+  ok(DM.successorOf(rows, 1) === 2, 'successor: the first guest');
+  ok(DM.successorOf([{ id: 1, seq: 1 }, { id: 5, seq: 9 }, { id: 4, seq: 7 }], 1) === 4, 'successor: lowest seq');
+  ok(DM.successorOf([{ id: 1, seq: 1 }], 1) === 0, 'no successor alone');
 }
