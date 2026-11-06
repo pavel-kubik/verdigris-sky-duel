@@ -8,17 +8,17 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'dm.3 2026-11-06 share via QR code';
+  const BUILD = 'dm.4 2026-11-06 one world per room code: host steps down, merged scores';
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   const C = window.VCamp;
   if (!window.THREE || !C || !window.VRender || !window.VDragon) { $('#loading').textContent = t('mp.engineFail'); return; }
-  const DM = C.need('dm'), D = C.need('data'), TR = C.need('terrain'), WK = C.need('walk'), MT = C.need('math');
+  const DM = C.need('dm'), NETC = C.need('dmnet'), D = C.need('data'), TR = C.need('terrain'), WK = C.need('walk'), MT = C.need('math');
   const X = D.dm, V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const debug = /[?&]debug\b/.test(location.search);
-  const NET_DT = 1 / 20, PEER_TIMEOUT = 15000, CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const NET_DT = 1 / 20;
 
   const PALETTES = [
     { body: 0x2f7f50, dark: 0x1f5c3c, belly: 0xc9bf7c, wing: 0x3f936a, horn: 0xe7dcc1, eye: 0xffd23a, ui: '#62c48a' },
@@ -144,11 +144,10 @@
   const fbGeo = new THREE.IcosahedronGeometry(1, 1), fbMat = new THREE.MeshBasicMaterial({ color: 0xffd27a });
   const ballViews = new Map();
   const view = { players: new Map(), food: new Map(), myId: 0, myColor: 0, hp: X.hp, myDown: false, rows: [], names: {}, colors: {}, tl: X.timeLimit, fl: X.fragLimit, tm: X.timeLimit, ph: null, hid: 1, over: false, winner: 0 };
-  let mode = 'lobby', role = null, world = null, pilot = DM.newPilot([0, 90, 0], 0), hero = makeDragon(PALETTES[0]);
+  let mode = 'lobby', pilot = DM.newPilot([0, 90, 0], 0), hero = makeDragon(PALETTES[0]);
   const heroPose = {};
   scene.add(hero.root);
-  let peer = null, hostConn = null, roomCode = '', nextId = 2, outbox = [], netT = 0, menuOpen = false, lastSnapAt = 0;
-  const guests = new Map();
+  let menuOpen = false;
   let time = 0, shake = 0, hurt = 0, bannerT = 0, phase = 0, deadAt = 0, killerId = 0, promptT = 0;
 
   function remoteView(id, color) {
@@ -317,8 +316,8 @@
     const win = final ? rows.find(r => r.id === view.winner) : null;
     $('#boardEyebrow').textContent = final ? t('dm.board.final') : t('dm.board.title');
     $('#boardTitle').textContent = win ? (win.id === view.myId ? t('dm.youWin') : t('dm.wins', { name: win.name })) : final ? t('dm.draw') : t('dm.goal', { n: view.fl });
-    $('#boardNote').textContent = final ? (role === 'host' ? t('dm.board.hostNote') : t('dm.board.wait')) : t('dm.board.rule');
-    $('#againBtn').hidden = !(final && role === 'host');
+    $('#boardNote').textContent = final ? (N.role === 'host' ? t('dm.board.hostNote') : t('dm.board.wait')) : t('dm.board.rule');
+    $('#againBtn').hidden = !(final && N.role === 'host');
     $('#leave2Btn').hidden = !final;
     $('#boardClose').hidden = final;
     $('#boardPanel').hidden = false;
@@ -405,8 +404,7 @@
     const dir = fwdV.clone();
     if (best) { const tt = best.pos.distanceTo(mouthW) / X.ball.speed; dir.copy(best.pos).addScaledVector(best.vel, tt).sub(mouthW).normalize(); }
     const from = [mouthW.x, mouthW.y, mouthW.z], d = [dir.x, dir.y, dir.z];
-    if (role === 'host') DM.shoot(world, view.myId, from, d);
-    else if (hostConn && hostConn.open) hostConn.send({ k: 'b', f: from.map(v => Math.round(v * 100) / 100), d: d.map(v => Math.round(v * 1000) / 1000) });
+    N.shoot(from, d);
     burst(from, 14, 0, 8, 1.6, 0.35);
     hero.jaw.rotation.x = 0.7;
   }
@@ -423,8 +421,7 @@
         burst([pilot.pos[0], pilot.pos[1] - X.stand, pilot.pos[2]], ev.water ? 20 : 40, ev.water ? 3 : 1, 12, 2.6, 1.0);
       }
       if ((ev.e === 'crash' || ev.e === 'impact') && ev.dmg > 0) {
-        if (role === 'host') DM.reportCrash(world, view.myId, ev.dmg, ev.e);
-        else if (hostConn && hostConn.open) { try { hostConn.send({ k: 'c', d: ev.dmg, w: ev.e }); } catch (_) { } }
+        N.crash(ev.dmg, ev.e);
       }
     });
   }
@@ -434,20 +431,17 @@
     if (code === 'Digit1') { pilot.pos = [A.homes[0][0], TR.surfaceAt(X.region, A.homes[0][0], A.homes[0][1]) + 6, A.homes[0][1] - 20]; pilot.yaw = 0; pilot.mode = 'air'; }
     if (code === 'Digit2') { const p = A.pillars[0]; pilot.pos = [p.x, p.top + 5, p.z - 30]; pilot.yaw = 0; pilot.pitch = 0; pilot.mode = 'air'; }
     if (code === 'Digit3') { const b = A.town.buildings[0]; pilot.pos = [b.pos[0], b.pos[1] + b.h + 5, b.pos[2] - 30]; pilot.yaw = 0; pilot.mode = 'air'; }
-    if (code === 'Digit4' && role === 'host') { const pl = world.players[view.myId]; if (pl) DM.damage(world, pl, 25, 0, 'crash'); }
-    if (code === 'Digit5' && role === 'host') { if (!world.players[99]) DM.addPlayer(world, 99, 'Dummy'); const d = world.players[99]; d.sinv = 0; d.down = false; const f = MT.fwd(pilot.yaw, 0); d.pos = [pilot.pos[0] + f[0] * 40, pilot.pos[1], pilot.pos[2] + f[2] * 40]; d.yaw = pilot.yaw + Math.PI; d.mode = 2; }
-    if (code === 'Digit6' && role === 'host') DM.endMatch(world);
+    const world = N.N.role === 'host' ? N.world : null;
+    if (code === 'Digit4' && world) { const pl = world.players[view.myId]; if (pl) DM.damage(world, pl, 25, 0, 'crash'); }
+    if (code === 'Digit5' && world) { if (!world.players[99]) DM.addPlayer(world, 99, 'Dummy'); const d = world.players[99]; d.sinv = 0; d.down = false; const f = MT.fwd(pilot.yaw, 0); d.pos = [pilot.pos[0] + f[0] * 40, pilot.pos[1], pilot.pos[2] + f[2] * 40]; d.yaw = pilot.yaw + Math.PI; d.mode = 2; }
+    if (code === 'Digit6' && world) DM.endMatch(world);
   }
 
-  /* ---------- networking ----------
-   * Room = PeerJS id peerPrefix + code. The host holds that id; guests connect to it.
-   * enterRoom(code) joins it, or claims it when nobody holds it (rejoining a saved room, host take-over);
-   * every client keeps the host's room record (scores by seat key) in localStorage, so whoever hosts next
-   * restores the scores, and a player who comes back to the room gets its seat back. */
+  /* ---------- networking: core/dmnet.js runs the room (join / claim, host take-over, step-down, merging);
+   * this part keeps the identity and the saved room in localStorage and turns the session's events into the view. */
   const status = $('#status');
   function setStatus(s, okc) { status.textContent = s; status.className = okc ? 'ok' : ''; }
   function setBusy(b) { $('#hostBtn').disabled = b; $('#joinBtn').disabled = b; $('#rejoinBtn').disabled = b; }
-  function makeCode() { let s = ''; for (let i = 0; i < 5; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return s; }
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (_) { } },
@@ -462,17 +456,16 @@
     if (!tk) { tk = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2); store.set(X.tokenKey, tk); }
     return DM.keyOf(tk);
   })();
-  function inviteLink() { return location.origin + location.pathname + (roomCode ? '#' + roomCode : ''); }
+  function inviteLink() { return location.origin + location.pathname + (N.code ? '#' + N.code : ''); }
 
   /* the saved room: the last record from the host (or our own), kept roomKeep s */
-  let lastRec = null, recSavedAt = 0, recT = 0;
+  let recSavedAt = 0;
   function saveRoom(rec, force) {
-    if (!rec || !roomCode) return;
-    lastRec = Object.assign({}, rec, { code: roomCode });
+    if (!rec || !N.code) return;
     const now = Date.now();
     if (!force && now - recSavedAt < 2000) return;
     recSavedAt = now;
-    store.set(X.roomKey, JSON.stringify({ code: roomCode, at: now, rec: lastRec }));
+    store.set(X.roomKey, JSON.stringify({ code: N.code, at: now, rec: Object.assign({}, rec, { code: N.code }) }));
   }
   function loadRoom() {
     try {
@@ -482,74 +475,50 @@
     return null;
   }
 
-  /** Claims the room id: done(null, peer) or done(errorType). */
-  function claimRoom(code, done) {
-    if (!window.Peer) { done('nolib'); return; }
-    let fin = false;
-    const p = new window.Peer(X.peerPrefix + code, { debug: 1 });
-    const end = err => {
-      if (fin) return; fin = true; clearTimeout(timer);
-      if (err) { try { p.destroy(); } catch (_) { } done(err); } else done(null, p);
-    };
-    const timer = setTimeout(() => end('timeout'), 10000);
-    p.on('open', () => end(null));
-    p.on('error', e => { if (!fin) end((e && e.type) || 'error'); else console.warn('peer error', e && e.type); });
-  }
-  /** Joins the room: done(null, { peer, conn, welcome }) or done(errorType). */
-  function joinRoom(code, hello, done) {
-    if (!window.Peer) { done('nolib'); return; }
-    let fin = false;
-    const p = new window.Peer({ debug: 1 });
-    const end = (err, c, m) => {
-      if (fin) return; fin = true; clearTimeout(timer);
-      if (err) { try { p.destroy(); } catch (_) { } done(err); } else done(null, { peer: p, conn: c, welcome: m });
-    };
-    const timer = setTimeout(() => end('timeout'), 9000);
-    p.on('open', () => {
-      const c = p.connect(X.peerPrefix + code, { reliable: true, serialization: 'json' });
-      c.on('open', () => c.send(hello));
-      c.on('data', m => { if (fin || !m) return; if (m.k === 'w') end(null, c, m); else if (m.k === 'full') end('full'); });
-      c.on('close', () => end('closed'));
-    });
-    p.on('error', e => { if (!fin) end((e && e.type) || 'error'); else console.warn('peer error', e && e.type); });
-  }
-  const hello = () => ({ k: 'hi', name: myName(), key: myKey, pose: mode === 'game' && pilot.mode !== 'down' ? DM.poseOf(pilot) : null });
-
-  /**
-   * Into room `code`: join it; when nobody holds it (o.hostIfEmpty) claim it and host from o.rec. o.preferHost tries
-   * the claim first (the successor of a lost host). Retries until o.wait s are over, then o.fail(lastError).
-   * o.failFast: errors that end it at once (a plain Join with a wrong code).
-   */
-  let entering = 0;
-  function enterRoom(code, o) {
-    const run = ++entering, until = performance.now() + (o.wait || 15) * 1000;
-    let lastErr = '';
-    const next = (step, ms) => {
-      if (run !== entering) return;
-      if (performance.now() > until) { entering++; o.fail(lastErr); return; }
-      setTimeout(() => attempt(step), ms);
-    };
-    function attempt(step) {
-      if (run !== entering) return;
-      if (step === 'claim') {
-        claimRoom(code, (err, p) => {
-          if (run !== entering) { if (p) try { p.destroy(); } catch (_) { } return; }
-          if (!err) { entering++; hosted(p, code, o.rec); return; }
-          lastErr = err;
-          if (err === 'nolib') { entering++; o.fail(err); return; }
-          next(err === 'unavailable-id' ? 'join' : 'claim', err === 'unavailable-id' ? 400 : 1500);
-        });
-      } else {
-        joinRoom(code, hello(), (err, r) => {
-          if (run !== entering) { if (r) try { r.peer.destroy(); } catch (_) { } return; }
-          if (!err) { entering++; joined(r, code); return; }
-          lastErr = err;
-          if (err === 'full' || (o.failFast && o.failFast.indexOf(err) >= 0)) { entering++; o.fail(err); return; }
-          next(err === 'peer-unavailable' && o.hostIfEmpty ? 'claim' : 'join', err === 'peer-unavailable' ? 400 : 1500);
-        });
+  const offline = !window.Peer || /[?&]offline\b/.test(location.search);
+  const N = NETC.session({
+    Peer: window.Peer || null, offline,
+    clock: { now: () => performance.now(), setTimeout: (f, ms) => setTimeout(f, ms), clearTimeout: h => clearTimeout(h) },
+    key: myKey, name: myName,
+    pose: () => (mode === 'game' && pilot.mode !== 'down' ? DM.poseOf(pilot) : null),
+    emit: onNet,
+  });
+  let joinCode = '';
+  function onNet(ev) {
+    switch (ev.t) {
+      case 'hosted': {
+        view.myId = N.myId;
+        view.players.forEach(e => e.d.dispose()); view.players.clear();
+        enterGame(ev.me.color, ev.me.pos, ev.me.yaw, ev.resume);
+        if (ev.resume) showBanner(t('dm.mig.youHost'), t('dm.mig.back', { c: ev.code }));
+        else if (ev.restored) showBanner(t('dm.restored', { c: ev.code }), t('dm.restoredSub'));
+        else if (ev.code) showBanner(t('mp.roomBanner', { c: ev.code }), t('dm.sendLink'));
+        else showBanner(t('dm.practice'), t('mp.noServerHost'));
+        break;
       }
+      case 'joined':
+        view.myId = ev.welcome.id;
+        view.players.forEach(e => e.d.dispose()); view.players.clear();
+        enterGame(ev.welcome.color, ev.welcome.p, ev.welcome.y, ev.resume);
+        if (ev.resume) showBanner(t('dm.mig.back', { c: ev.code }), t('dm.mig.newHost', { name: ev.welcome.host || '' }));
+        else showBanner(t('mp.joined', { c: ev.code }), t('dm.room.waitShort'));
+        break;
+      case 'snap':
+        if (mode === 'game') { applyEvents(ev.e || []); applySnapshot(ev.s); }
+        break;
+      case 'record': saveRoom(ev.rec); break;
+      case 'migrating':
+        showBanner(ev.why === 'stepdown' || ev.why === 'moved' ? t('dm.mig.moved') : t('dm.mig.lost'), t('dm.mig.finding'));
+        feed(t('dm.mig.finding'));
+        break;
+      case 'migrateSlow':
+        showBanner(t('dm.mig.slow'), t('dm.mig.slowSub'));
+        feed(t('dm.mig.slow'));
+        break;
+      case 'enterFailed':
+        setStatus(failText(ev.err, ev.code)); setBusy(false);
+        break;
     }
-    if (o.delay) next(o.preferHost ? 'claim' : 'join', o.delay * 1000); else attempt(o.preferHost ? 'claim' : 'join');
   }
   function failText(err, code) {
     if (err === 'full') return t('dm.full', { c: code, n: X.maxPlayers });
@@ -560,95 +529,10 @@
     return t('mp.failed', { t: err || t('mp.unknown') });
   }
 
-  /** This browser hosts room `code` (p = its peer, null offline), from record rec (or a fresh lobby). */
-  function hosted(p, code, rec) {
-    const name = myName(), resume = mode === 'game';
-    dropNet();
-    peer = p; roomCode = code; role = 'host'; migrating = false;
-    if (p) {
-      p.on('connection', onGuestConn);
-      p.on('disconnected', () => { if (peer === p) { try { p.reconnect(); } catch (_) { } } });
-    }
-    world = (rec && DM.importRoom(rec, { code })) || DM.newWorld({ phase: 'lobby', code });
-    world.code = code;
-    view.players.forEach(e => e.d.dispose()); view.players.clear();
-    view.myId = 1; nextId = 2;
-    const me = DM.addPlayer(world, 1, name, null, myKey);
-    world.ev.length = 0;
-    if (resume && pilot.mode !== 'down') DM.setPose(world, 1, DM.poseOf(pilot));
-    enterGame(me.color, me.pos, me.yaw, resume);
-    saveRoom(DM.exportRoom(world), true);
-    if (resume) showBanner(t('dm.mig.youHost'), t('dm.mig.back', { c: code }));
-    else if (rec) showBanner(t('dm.restored', { c: code }), t('dm.restoredSub'));
-    else if (code) showBanner(t('mp.roomBanner', { c: code }), t('dm.sendLink'));
-    else showBanner(t('dm.practice'), t('mp.noServerHost'));
-  }
-  /** This browser is a guest of room `code`. */
-  function joined(r, code) {
-    const resume = mode === 'game';
-    dropNet();
-    peer = r.peer; hostConn = r.conn; role = 'guest'; roomCode = code; migrating = false; world = null;
-    view.players.forEach(e => e.d.dispose()); view.players.clear();
-    view.myId = r.welcome.id; lastSnapAt = performance.now();
-    const c = r.conn;
-    c.on('data', m => onHostMsg(c, m));
-    c.on('close', () => { if (hostConn === c) onHostLost(); });
-    r.peer.on('disconnected', () => { if (peer === r.peer) { try { r.peer.reconnect(); } catch (_) { } } });
-    enterGame(r.welcome.color, r.welcome.p, r.welcome.y, resume);
-    if (resume) showBanner(t('dm.mig.back', { c: code }), t('dm.mig.newHost', { name: r.welcome.host || '' }));
-    else showBanner(t('mp.joined', { c: code }), t('dm.room.waitShort'));
-  }
-  function onHostMsg(c, m) {
-    if (!m || typeof m !== 'object' || hostConn !== c) return;
-    if (m.k === 's') {
-      lastSnapAt = performance.now();
-      if (mode === 'game') { applyEvents(m.e || []); applySnapshot(m.s); }
-    } else if (m.k === 'r') saveRoom(m.r);
-  }
-  /** Closes the current peer and connections without leaving the game view. */
-  function dropNet() {
-    const p = peer, c = hostConn;
-    peer = null; hostConn = null;
-    guests.forEach(g => { try { g.conn.close(); } catch (_) { } });
-    guests.clear();
-    try { if (c) c.close(); } catch (_) { }
-    try { if (p) p.destroy(); } catch (_) { }
-  }
-
-  /* ---------- host take-over: the guest that joined first claims the room, the others join it ---------- */
-  let migrating = false;
-  function onHostLost() {
-    if (migrating || role !== 'guest' || !roomCode) return;
-    migrating = true;
-    const succ = DM.successorOf(view.rows.map(r => ({ id: r[0], seq: r[19] })), view.hid) === view.myId;
-    dropNet();
-    const rec = lastRec ? Object.assign({}, lastRec) : null;
-    if (rec && view.ph != null) { rec.phase = DM.PHASES[view.ph] || rec.phase; rec.timeLeft = view.tl; }
-    if (rec) view.rows.forEach(r => { /* the newest scores of who is in the room, by name where the record knows them */
-      for (const k in rec.people) if (rec.people[k].name === r[12]) Object.assign(rec.people[k], { kills: r[14], deaths: r[15], score: r[16] });
-    });
-    showBanner(t('dm.mig.lost'), t('dm.mig.finding'));
-    feed(t('dm.mig.finding'));
-    enterRoom(roomCode, {
-      hostIfEmpty: true, preferHost: succ, delay: succ ? 0 : X.migrateDelay, wait: X.migrateWait, rec,
-      fail: () => { migrating = false; showNotice(t('dm.mig.failed'), t('dm.mig.failedText')); },
-    });
-  }
-
   function hostGame() {
     setBusy(true);
-    if (!window.Peer || /[?&]offline\b/.test(location.search)) { hosted(null, '', null); return; }
-    setStatus(t('mp.opening'), true);
-    let tries = 0;
-    const attempt = () => {
-      const code = makeCode();
-      claimRoom(code, (err, p) => {
-        if (!err) { hosted(p, code, null); return; }
-        if (err === 'unavailable-id' && tries++ < 3) attempt();
-        else hosted(null, '', null);
-      });
-    };
-    attempt();
+    if (!offline) setStatus(t('mp.opening'), true);
+    N.host();
   }
   function joinGame() {
     const code = ($('#codeIn').value || '').trim().toUpperCase();
@@ -656,55 +540,15 @@
     if (!window.Peer) { setStatus(t('mp.noLib')); return; }
     setBusy(true); setStatus(t('mp.connecting', { c: code }), true);
     const saved = loadRoom();
-    const mine = saved && saved.code === code;                  // our saved room: host it again when it is empty
-    enterRoom(code, {
-      hostIfEmpty: !!mine, rec: mine ? saved.rec : null, wait: 15,
-      failFast: mine ? ['nolib'] : ['peer-unavailable', 'network', 'server-error', 'socket-error', 'nolib'],
-      fail: err => { setStatus(failText(err, code)); setBusy(false); },
-    });
+    joinCode = code;
+    N.join(code, saved && saved.code === code ? saved.rec : null);   // our saved room: host it again when it is empty
   }
   function rejoinSaved() {
     const saved = loadRoom();
     if (!saved) return;
     if (!window.Peer) { setStatus(t('mp.noLib')); return; }
     setBusy(true); setStatus(t('mp.connecting', { c: saved.code }), true);
-    enterRoom(saved.code, {
-      hostIfEmpty: true, rec: saved.rec, wait: 20, failFast: ['nolib'],
-      fail: err => { setStatus(failText(err, saved.code)); setBusy(false); },
-    });
-  }
-
-  function onGuestConn(conn) {
-    conn.on('data', m => onGuestMsg(conn, m));
-    conn.on('close', () => dropGuest(conn));
-    conn.on('error', () => dropGuest(conn));
-  }
-  function onGuestMsg(conn, m) {
-    if (!m || typeof m !== 'object' || !world || role !== 'host') return;
-    const g = guests.get(conn.peer);
-    if (g) g.last = performance.now();
-    if (m.k === 'hi') {
-      if (g) return;
-      const key = typeof m.key === 'string' && /^k[0-9a-z]{2,40}$/.test(m.key) ? m.key : '';
-      const seated = key && DM.playerList(world).some(p => p.key === key);
-      if (!seated && DM.playerList(world).length >= X.maxPlayers) { conn.send({ k: 'full' }); setTimeout(() => conn.close(), 500); return; }
-      if (key === myKey) { conn.send({ k: 'full' }); setTimeout(() => conn.close(), 500); return; }   // our own seat from another tab
-      guests.forEach((o, pid) => { if (key && world.players[o.id] && world.players[o.id].key === key) { guests.delete(pid); try { o.conn.close(); } catch (_) { } } });
-      const id = nextId++;
-      const pl = DM.addPlayer(world, id, String(m.name || 'Dragon'), null, key);
-      if (m.pose) DM.setPose(world, id, m.pose);
-      guests.set(conn.peer, { conn, id, last: performance.now() });
-      conn.send({ k: 'w', id, color: pl.color, p: pl.pos, y: pl.yaw, code: roomCode, host: world.players[1] ? world.players[1].name : '' });
-      try { conn.send({ k: 'r', r: DM.exportRoom(world) }); } catch (_) { }
-    } else if (m.k === 'p' && g) DM.setPose(world, g.id, m);
-    else if (m.k === 'b' && g) DM.shoot(world, g.id, m.f, m.d);
-    else if (m.k === 'c' && g) DM.reportCrash(world, g.id, m.d, m.w);
-  }
-  function dropGuest(conn) {
-    const g = guests.get(conn.peer);
-    if (!g || g.conn !== conn) return;
-    guests.delete(conn.peer);
-    if (world) DM.removePlayer(world, g.id);
+    N.rejoin(saved.code, saved.rec);
   }
 
   /** Shows the game for my dragon (resume: keep flying where it is, only the colour may change). */
@@ -724,18 +568,18 @@
     view.myDown = false;
     mode = 'game';
     camera.clearViewOffset();
-    history.replaceState(null, '', location.pathname + location.search + (roomCode ? '#' + roomCode : ''));
-    $('#roomCode').textContent = roomCode || t('mp.solo'); $('#menuCode').textContent = roomCode || t('mp.solo');
-    $('#roomChip').hidden = !roomCode;
+    history.replaceState(null, '', location.pathname + location.search + (N.code ? '#' + N.code : ''));
+    $('#roomCode').textContent = N.code || t('mp.solo'); $('#menuCode').textContent = N.code || t('mp.solo');
+    $('#roomChip').hidden = !N.code;
     $('#lobby').hidden = true; $('#hudTop').hidden = false; $('#notice').hidden = true;
     $('#legend').hidden = isTouch; $('#touch').hidden = !isTouch;
     if (!resume) menuOpen = false;
     roomSig = '';
     setStatus('');
+    if (N.code) saveRoom(N.lastRec, true);
   }
   function leave() {
-    entering++;
-    dropNet();
+    N.leave();
     history.replaceState(null, '', location.pathname + location.search);
     location.reload();
   }
@@ -746,8 +590,8 @@
   function toggleMenu(force) {
     menuOpen = force == null ? !menuOpen : force;
     $('#menu').hidden = !menuOpen;
-    $('#linkOut').value = roomCode ? inviteLink() : t('mp.soloLink');
-    $('#copyBtn').disabled = !roomCode;
+    $('#linkOut').value = N.code ? inviteLink() : t('mp.soloLink');
+    $('#copyBtn').disabled = !N.code;
     if (menuOpen) mouseBreath = false;
   }
   function copyLink(box) {
@@ -757,14 +601,15 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(() => feed(t('mp.feed.copied')), fallback);
     else fallback();
   }
+
   /* ---------- share via QR code (shared/qr.js): the room invite in a room, else the game's page ---------- */
   let qrOpen = false, qrUrl = '', qrMenu = false;
   function gameLink() { return location.origin + location.pathname; }
   function openQr() {
     if (!window.VQR) return;
-    qrUrl = roomCode ? inviteLink() : gameLink();
-    $('#qrTitle').textContent = roomCode ? t('dm.qr.room') : t('dm.qr.game');
-    $('#qrCode').textContent = roomCode; $('#qrCode').hidden = !roomCode;
+    qrUrl = N.code ? inviteLink() : gameLink();
+    $('#qrTitle').textContent = N.code ? t('dm.qr.room') : t('dm.qr.game');
+    $('#qrCode').textContent = N.code; $('#qrCode').hidden = !N.code;
     $('#qrLink').textContent = qrUrl;
     const code = VQR.encode(qrUrl, 'M'), cv = $('#qrCanvas'), quiet = 4;
     const cssPx = Math.min(260, innerWidth - 96, innerHeight - 330), d = Math.min(window.devicePixelRatio || 1, 3);
@@ -788,8 +633,8 @@
   }
   /** Phones: the system share sheet; else copy. */
   function shareLink() {
-    if (!roomCode) return;
-    if (isTouch && navigator.share) navigator.share({ title: t('dm.title'), text: t('dm.room.shareText', { c: roomCode }), url: inviteLink() }).catch(() => { });
+    if (!N.code) return;
+    if (isTouch && navigator.share) navigator.share({ title: t('dm.title'), text: t('dm.room.shareText', { c: N.code }), url: inviteLink() }).catch(() => { });
     else copyLink(null);
   }
 
@@ -799,7 +644,7 @@
   (function roomSettings() {
     X.fragChoices.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; $('#setFrag').appendChild(o); });
     X.timeChoices.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = t('dm.room.min', { n: mins(n) }); $('#setTime').appendChild(o); });
-    const apply = e => { if (role === 'host' && world) DM.setSettings(world, { fragLimit: $('#setFrag').value, timeLimit: $('#setTime').value }); e.target.blur(); roomSig = ''; };
+    const apply = e => { N.setSettings({ fragLimit: $('#setFrag').value, timeLimit: $('#setTime').value }); e.target.blur(); roomSig = ''; };
     $('#setFrag').addEventListener('change', apply); $('#setTime').addEventListener('change', apply);
   })();
   function renderRoom() {
@@ -809,12 +654,12 @@
     if (!show) return;
     const rows = view.rows.slice().sort((a, b) => a[19] - b[19]);
     const host = rows.find(r => r[0] === view.hid);
-    const sig = [roomMin, role, roomCode, view.fl, view.tm, I18N && I18N.lang, rows.map(r => r[0] + r[12] + r[11]).join()].join('|');
+    const sig = [roomMin, N.role, N.code, view.fl, view.tm, I18N && I18N.lang, rows.map(r => r[0] + r[12] + r[11]).join()].join('|');
     if (sig === roomSig) return;
     roomSig = sig;
     $('#room').classList.toggle('min', roomMin);
-    $('#roomCodeBig').textContent = roomCode || t('mp.solo');
-    $('#roomInvite').hidden = !roomCode;
+    $('#roomCodeBig').textContent = N.code || t('mp.solo');
+    $('#roomInvite').hidden = !N.code;
     $('#roomMinBtn').textContent = roomMin ? t('dm.room.show') : t('dm.room.hide');
     const list = $('#roomPlayers'); list.textContent = '';
     rows.forEach(r => {
@@ -824,7 +669,7 @@
       if (r[0] === view.hid) { const h = document.createElement('small'); h.textContent = t('dm.room.hostTag'); chip.appendChild(h); }
       list.appendChild(chip);
     });
-    const isHost = role === 'host';
+    const isHost = N.role === 'host';
     $('#roomSet').hidden = !isHost; $('#roomRules').hidden = isHost;
     $('#setFrag').value = String(view.fl); $('#setTime').value = String(view.tm);
     $('#roomRules').textContent = t('dm.room.rules', { f: view.fl, m: mins(view.tm) });
@@ -845,15 +690,15 @@
   $('#shareGameBtn').onclick = () => openQr();
   $('#qrClose').onclick = () => closeQr();
   $('#qrCopy').onclick = () => copyText(qrUrl);
-  $('#qrShare').onclick = () => { navigator.share({ title: t('dm.title'), text: roomCode ? t('dm.room.shareText', { c: roomCode }) : t('dm.desc'), url: qrUrl }).catch(() => { }); };
+  $('#qrShare').onclick = () => { navigator.share({ title: t('dm.title'), text: N.code ? t('dm.room.shareText', { c: N.code }) : t('dm.desc'), url: qrUrl }).catch(() => { }); };
   $('#roomMinBtn').onclick = () => { roomMin = !roomMin; roomSig = ''; renderRoom(); };
-  $('#roomStart').onclick = () => { if (role === 'host' && world) { DM.startMatch(world); $('#roomStart').blur(); } };
+  $('#roomStart').onclick = () => { N.startMatch(); $('#roomStart').blur(); };
   $('#boardBtn').onclick = () => { if (boardOpen) hideBoard(); else showBoard(false); };
   $('#boardClose').onclick = hideBoard;
   $('#copyBtn').onclick = () => copyLink($('#linkOut'));
   $('#leaveBtn').onclick = leave; $('#leave2Btn').onclick = leave; $('#backBtn').onclick = leave;
-  addEventListener('pagehide', () => { try { if (peer) peer.destroy(); } catch (_) { } });
-  $('#againBtn').onclick = () => { if (role === 'host' && world) DM.restart(world); };
+  addEventListener('pagehide', () => N.leave());
+  $('#againBtn').onclick = () => N.restart();
 
   /* ---------- resize ---------- */
   let W = 1, Hh = 1, dpr = 1;
@@ -915,38 +760,21 @@
     hx.fillStyle = 'rgba(235,227,205,.5)'; hx.font = '600 10px "Barlow Semi Condensed",sans-serif'; hx.fillText('300 m', rx, ry + R - 6);
   }
 
-  /* ---------- simulation tick (the host keeps ticking in background tabs) ---------- */
-  function hostTick(dt) {
-    DM.setPose(world, view.myId, DM.poseOf(pilot));
-    DM.stepWorld(world, dt);
-    const ev = world.ev.splice(0);
-    applyEvents(ev);
-    for (const e of ev) outbox.push(e);
-    netT += dt;
-    if (netT >= NET_DT) {
-      netT = 0;
-      const now = performance.now();
-      guests.forEach(g => { if (now - g.last > PEER_TIMEOUT) { try { g.conn.close(); } catch (_) { } dropGuest(g.conn); } });
-      const msg = { k: 's', s: DM.snapshot(world), e: outbox }; outbox = [];
-      guests.forEach(g => { if (g.conn.open) { try { g.conn.send(msg); } catch (_) { } } });
-    }
-    recT += dt;
-    if (recT >= X.recEvery && roomCode) {                       // the room record: every client keeps it
-      recT = 0;
-      const rec = DM.exportRoom(world);
-      saveRoom(rec);
-      const rm = { k: 'r', r: rec };
-      guests.forEach(g => { if (g.conn.open) { try { g.conn.send(rm); } catch (_) { } } });
-    }
+  /* ---------- the room tick (the host keeps ticking in background tabs) ---------- */
+  /** One network step: the host steps the world (its own events and snapshot go to the view), a guest sends its pose. */
+  function netTick(dt) {
+    const r = N.tick(dt);
+    if (r) { applyEvents(r.events); applySnapshot(r.snap); }
   }
   let bgLast = 0;
   setInterval(() => {
+    // requestAnimationFrame stops in hidden tabs; keep the room (and the host's world) running
     if (!document.hidden || mode !== 'game') { bgLast = 0; return; }
     const now = performance.now();
     let el = bgLast ? Math.min(1, (now - bgLast) / 1000) : NET_DT; bgLast = now;
-    while (el > 0) { const d = Math.min(0.05, el); el -= d; reportLocal(DM.step(pilot, { sx: 0, sy: 0 }, d, E)); if (role === 'host') hostTick(d); }
-    if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send(Object.assign({ k: 'p' }, DM.poseOf(pilot))); } catch (_) { } }
+    while (el > 0) { const d = Math.min(0.05, el); el -= d; reportLocal(DM.step(pilot, { sx: 0, sy: 0 }, d, E)); netTick(d); }
   }, 50);
+  addEventListener('visibilitychange', () => { if (!document.hidden && mode === 'game') netTick(0); });   // back: check the claim now
 
   /* ---------- camera ---------- */
   const camPos = new V3(0, 100, -30), camLook = new V3();
@@ -1021,12 +849,7 @@
       if (pilot.breathing) breathFx(mouthW, MT.fwd(pilot.yaw, pilot.mode === 'perch' ? -0.12 : pilot.pitch), pilot.vel, dt);
       if (pilot.mode === 'fall' && Math.random() < 0.5) spawnP(pilot.pos[0], pilot.pos[1], pilot.pos[2], (Math.random() - .5) * 3, 2, (Math.random() - .5) * 3, 0.8, 1.4, 1.5, 1, 0.5);
 
-      if (role === 'host') { hostTick(dt); applySnapshot(DM.snapshot(world)); }
-      else {
-        if (!migrating && lastSnapAt && performance.now() - lastSnapAt > X.hostTimeout * 1000) onHostLost();
-        netT += dt;
-        if (netT >= NET_DT) { netT = 0; if (hostConn && hostConn.open) { try { hostConn.send(Object.assign({ k: 'p' }, DM.poseOf(pilot))); } catch (_) { } } }
-      }
+      netTick(dt);
 
       view.players.forEach(e => {
         smooth(e, dt);
@@ -1057,7 +880,7 @@
         miniT = 0.3; renderMini(); renderRoom();
         if (boardOpen && !view.over) showBoard(false);
         if (view.over && !boardOpen && !menuOpen) showBoard(true);   // joined or took over after the end
-        $('#goal').textContent = migrating ? t('dm.mig.short') : view.ph === 0 ? t('dm.warmup') : t('dm.goalShort', { n: view.fl });
+        $('#goal').textContent = N.migrating ? t('dm.mig.short') : view.ph === 0 ? t('dm.warmup') : t('dm.goalShort', { n: view.fl });
       }
       hurt = Math.max(0, hurt - dt * 1.8);
       $('#vignette').style.opacity = Math.max(hurt, view.hp < 30 && pilot.mode !== 'down' ? 0.35 + Math.sin(time * 5) * 0.15 : 0);
@@ -1093,7 +916,7 @@
   }
 
   /* ---------- boot ---------- */
-  if (debug) window.__vdm = { get world() { return world; }, get pilot() { return pilot; }, set pilot(p) { pilot = p; }, view, DM, E, A, BUILD, get fps() { return fps; }, landOrFly, fireBall, debugKey, get role() { return role; }, get code() { return roomCode; }, get migrating() { return migrating; }, myKey, loadRoom };
+  if (debug) window.__vdm = { get world() { return N.world; }, N, get pilot() { return pilot; }, set pilot(p) { pilot = p; }, view, DM, E, A, BUILD, get fps() { return fps; }, landOrFly, fireBall, debugKey, get role() { return N.role; }, get code() { return N.code; }, get migrating() { return N.migrating; }, myKey, loadRoom };
   try { const n = localStorage.getItem(X.nameKey); if (n) $('#nameIn').value = n; } catch (_) { }
   const invited = location.hash.slice(1).toUpperCase();
   const lobbyStatus = () => {

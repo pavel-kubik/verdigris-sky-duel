@@ -333,3 +333,40 @@ const E = DM.env([]);
   ok(DM.successorOf([{ id: 1, seq: 1 }, { id: 5, seq: 9 }, { id: 4, seq: 7 }], 1) === 4, 'successor: lowest seq');
   ok(DM.successorOf([{ id: 1, seq: 1 }], 1) === 0, 'no successor alone');
 }
+
+// 16. Merging two copies of a room (a host that stepped down, a joining player's saved record)
+{
+  const ka = DM.keyOf('ma'), kb = DM.keyOf('mb'), kc = DM.keyOf('mc');
+  const mk = () => { const w = DM.newWorld({ rng: mulberry(41), phase: 'lobby', code: 'MERGE' }); return w; };
+  // the copy that split off kept playing: more kills for A, C only there
+  const w1 = mk(); DM.addPlayer(w1, 1, 'A', null, ka); DM.addPlayer(w1, 2, 'B', null, kb); DM.startMatch(w1);
+  DM.stepWorld(w1, X.spawnInv + 0.1);
+  DM.damage(w1, w1.players[2], 500, 1, 'ball');
+  const w2 = DM.importRoom(DM.exportRoom(w1), { code: 'MERGE' });
+  DM.addPlayer(w2, 1, 'B', null, kb);
+  DM.addPlayer(w1, 3, 'C', null, kc);
+  DM.stepWorld(w1, X.respawn + 0.1); DM.stepWorld(w1, X.spawnInv + 0.1);
+  ok(DM.damage(w1, w1.players[2], 500, 1, 'ball'), 'second kill in the split copy');   // A: 2 kills in w1, w2 only knows 1
+  DM.stepWorld(w1, 20);
+  ok(DM.mergeRoom(w2, JSON.parse(JSON.stringify(DM.exportRoom(w1)))), 'merge accepted');
+  ok(w2.ledger[ka].kills === 2 && w2.players[1].deaths === 2 && w2.ledger[kc], 'merge keeps the most progress per seat and adds new seats');
+  ok(w2.phase === 'play' && w2.timeLeft <= w1.timeLeft + 1, 'merge: lower time left');
+  const back = DM.addPlayer(w2, 2, 'A', null, ka);
+  ok(back.kills === 2 && back.score === 2, 'merged stats come back with the seat');
+  // older copies change nothing; another room is refused
+  const before = JSON.stringify(DM.exportRoom(w2));
+  const old = DM.exportRoom(mk()); old.code = 'MERGE';
+  ok(DM.mergeRoom(w2, Object.assign({}, old, { round: 0 })) === false || JSON.stringify(DM.exportRoom(w2)) === before, 'an older round changes nothing');
+  ok(DM.mergeRoom(w2, DM.exportRoom(w2)) && JSON.stringify(DM.exportRoom(w2)) === before, 'merging itself changes nothing');
+  ok(!DM.mergeRoom(w2, Object.assign(DM.exportRoom(w2), { code: 'OTHER' })), 'another room refused');
+  // a newer round wins: scores from the old round do not count
+  const nr = Object.assign(DM.exportRoom(w2), { round: w2.round + 1, phase: 'lobby' });
+  Object.keys(nr.people).forEach(k => Object.assign(nr.people[k], { kills: 0, deaths: 0, score: 0 }));
+  ok(DM.mergeRoom(w2, nr) && w2.round === nr.round && w2.phase === 'lobby' && w2.players[2].kills === 0, 'newer round wins');
+  // the lobby copy meets a copy that already plays: the match is on
+  const w3 = mk(); DM.addPlayer(w3, 1, 'A', null, ka);
+  const playing = Object.assign(DM.exportRoom(w3), { phase: 'play', timeLeft: 300 });
+  ok(DM.mergeRoom(w3, playing) && w3.phase === 'play' && w3.timeLeft === 300, 'lobby + play = play');
+  const ended = Object.assign(DM.exportRoom(w3), { phase: 'over' });
+  ok(DM.mergeRoom(w3, ended) && w3.phase === 'over' && w3.over, 'play + over = over');
+}

@@ -490,6 +490,34 @@
     });
     return w;
   }
+  /**
+   * Merges another copy of this room (a record from a host that stepped down, or a joining player's saved record) into
+   * w: a newer round wins outright; in the same round the later phase wins (lobby < play < over), the clock takes the
+   * lower time left, and each seat keeps whichever copy has more progress (kills + deaths only grow within a round).
+   * Returns false when rec is not a record of this room or is of an older round.
+   */
+  function mergeRoom(w, rec) {
+    const r = importRoom(rec, { code: rec && rec.code });
+    if (!r || (w.code && r.code !== w.code) || r.round < w.round) return false;
+    const rank = { lobby: 0, play: 1, over: 2 };
+    let toOver = false;
+    if (r.round > w.round) {
+      Object.assign(w, { round: r.round, phase: r.phase === 'over' ? 'play' : r.phase, over: false, timeLeft: r.timeLeft, fragLimit: r.fragLimit, timeLimit: r.timeLimit });
+      resetScores(w);
+      toOver = r.phase === 'over';
+    } else if (rank[r.phase] > rank[w.phase]) {
+      if (r.phase === 'over') toOver = true;
+      else Object.assign(w, { phase: 'play', timeLeft: r.timeLeft, fragLimit: r.fragLimit, timeLimit: r.timeLimit });
+    } else if (r.phase === 'play' && w.phase === 'play') w.timeLeft = Math.min(w.timeLeft, r.timeLeft);
+    const prog = e => e.kills + e.deaths;
+    for (const k in r.ledger) {
+      const e = r.ledger[k], p = playerList(w).find(q => q.key === k), L = w.ledger[k];
+      if (p) { if (prog(e) > prog(p)) Object.assign(p, { kills: e.kills, deaths: e.deaths, score: e.score }); }
+      else if (!L || prog(e) > prog(L)) w.ledger[k] = Object.assign({}, e, L ? { color: L.color } : {});
+    }
+    if (toOver || (w.phase === 'play' && playerList(w).some(p => p.score >= w.fragLimit))) { if (w.phase === 'lobby') w.phase = 'play'; endMatch(w); }
+    return true;
+  }
   /** Who takes over when the host is gone: the guest that joined first (lowest seq). rows: [{ id, seq }]. */
   function successorOf(rows, hostId) {
     let best = null;
@@ -649,7 +677,7 @@
   }
 
   M.define('dm', {
-    MODES, PHASES, FOOD_TYPES, keyOf, startMatch, setSettings, exportRoom, importRoom, successorOf, arena, env, treeGrid, surface, solidTop, obstacle, pillarAt,
+    MODES, PHASES, FOOD_TYPES, keyOf, startMatch, setSettings, exportRoom, importRoom, mergeRoom, successorOf, arena, env, treeGrid, surface, solidTop, obstacle, pillarAt,
     newPilot, step, startFall, tryPerch, perchBlock, tryTakeoff, tryBall, tryRoll, poseOf,
     newWorld, addPlayer, removePlayer, setPose, shoot, damage, reportCrash, respawn, board, endMatch, restart,
     stepWorld, snapshot, playerList, modeOf, spawnFor,
