@@ -3,11 +3,14 @@
  *
  * - Game files (same origin): network first, so a new deploy shows up on the next load;
  *   the cached copy is used when offline or when the network is slower than NET_TIMEOUT.
+ *   Versioned requests (?v=..., test links and the pages' script loaders) never take the cached copy on a timeout:
+ *   it may be an older build, and a new page with old scripts shows raw text keys and dead buttons. They wait for
+ *   the network and fall back to the cache only when it fails (offline).
  * - Versioned CDN libraries and fonts: cache first (their URLs never change content).
  * - Everything else (PeerJS signalling for co-op) goes straight to the network.
  * Bump VERSION only when the list of precached files changes.
  */
-const VERSION = 'vsd-v18';
+const VERSION = 'vsd-v19';
 const NET_TIMEOUT = 4000;
 const SHELL = [
   './', 'index.html', 'i18n.js', 'pwa.js', 'manifest.webmanifest',
@@ -63,6 +66,9 @@ async function networkFirst(req, url) {
     return res;
   });
   network.catch(() => {}); // a late failure after the timeout is not an error
+  if (url.searchParams.has('v')) {                     // a specific build: wait for it, the cache only offline
+    try { return await network; } catch (_) { return (await cache.match(key, { ignoreSearch: true })) || Response.error(); }
+  }
   const timeout = new Promise(resolve => setTimeout(resolve, NET_TIMEOUT));
   try {
     const res = await Promise.race([network, timeout]);

@@ -127,7 +127,7 @@ The game is a Progressive Web App and can be installed from the browser:
 - **Chrome, Edge, Android:** an **Install app** button appears on the home screen and in the co-op lobby (or use the install icon in the address bar).
 - **iPhone / iPad:** tap **Install app** for a hint, then Share → Add to Home Screen.
 
-The installed app opens fullscreen, has a Co-op shortcut and works offline for solo play (co-op still needs a connection). `sw.js` loads game files network first, so a new deploy shows up on the next start, and caches the versioned CDN libraries. Bump `VERSION` in `sw.js` only when the list of precached files changes.
+The installed app opens fullscreen, has a Co-op shortcut and works offline for solo play (co-op still needs a connection). `sw.js` loads game files network first, so a new deploy shows up on the next start, and caches the versioned CDN libraries. Files requested with `?v=` (test links) always wait for the network and use the cache only offline, so a slow host never mixes a new page with older scripts. Bump `VERSION` in `sw.js` only when the list of precached files changes.
 
 | File | Role |
 |---|---|
