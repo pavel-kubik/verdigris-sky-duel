@@ -86,6 +86,31 @@ A single-player dragon campaign in its own page, built mobile first: everything 
 
 **Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, dragon parameters) and one button per debug action (feed, hunger, damage, die, to lair, to herd, to exit, Drake, alert, calm, to a ballista / loot / pen / town, ignite, gold, upgrades, next day phase, fast time, tips reset, save + reload, wipe save, reset); on desktop the same actions have hotkeys listed in the panel. The panel also shows fps, draw calls and the quality tier. `?region=wild` starts in Wildwood, `?region=farm` in the River Farmlands, and `window.__vcamp` exposes the game state.
 
+## Deathmatch (beta, `/campaign/dm/`)
+
+- **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/dm/ (or **Deathmatch (beta)** on the home screen and the campaign start screen)
+
+Dragon against dragon over the campaign's Wildwood (Phase 3 terrain, trees and the hamlet and outpost buildings, with no defenders). Only human players, no AI dragons: up to 8, connected peer-to-peer like the co-op (one player hosts and sends the link `…/campaign/dm/#ROOMCODE`). Without the matchmaking server the host flies a practice game alone.
+
+- **Match:** first to 10 kills, or the best score after 10 minutes. A kill is +1; crashing with nobody to blame is -1. The **leaderboard** (kills, deaths, score) is always shown in short at the top left; Tab or the Board button opens the full one, and it opens by itself at the end of the match, where the host can start a new round.
+- **Respawn:** 5 s after dying, at the spawn point farthest from the other dragons, with 3 s of spawn protection.
+- **Food:** chickens, goats and sheep wander the arena and flee dragons. Fly low over one or sit down next to it to eat it (+15 / +25 / +30 vitality); it comes back after 18 s. Vitality otherwise regenerates only slowly.
+- **Sitting down:** F / Sit within 8 m of any surface - the ground, a roof or the flat top of a rock pillar (not water). A sitting dragon turns, breathes fire and shoots fireballs, and its fire refills faster. F, W, Shift or Fly takes off.
+- **Falling:** flying into another dragon, a rock pillar, a building wall or a tree crown, or diving steeply into the ground, sends the dragon tumbling out of control until it hits the ground or a roof: damage on impact, then a short stun. Both dragons fall in a dragon-on-dragon collision; a fall death counts as a kill for whoever hit or bumped the dragon in the last 8 s.
+
+| Action | Keyboard / mouse | Touch |
+|---|---|---|
+| Turn, climb, dive | A / D, W / S | Left stick |
+| Fire breath (hold) | Space / left mouse | Breath |
+| Fireball (auto-aim) | R / right mouse | Ball |
+| Boost | Shift | Boost |
+| Barrel roll | Q / E | Roll |
+| Sit down / take off | F | Sit / Fly |
+| Leaderboard | Tab | Board |
+| Menu (invite link) | Esc | II |
+
+Rules are in `campaign/core/dm.js` (pure, tested by `campaign/test/dm.test.js`), tunables in `data.dm`; the client is `campaign/dm/game.js`. `?debug` exposes `window.__vdm` and keys 1-6 (to food, to a pillar, to a roof, take damage, a dummy dragon ahead, end the match).
+
 ## Languages
 
 The game is available in **English** and **Czech** (solo, tutorial and co-op). The language follows the browser (`cs` and `sk` get Czech, everything else English) and can be switched with the **EN / CS** buttons on the home screen and in the co-op lobby. The choice is stored in `localStorage` (`vsd-lang`); `?lang=cs` forces a language for one visit.

@@ -569,6 +569,43 @@
     messages: { perChar: 12, min: 4, max: 9, waitCut: 0.7, queueMax: 4, logMax: 40 },
 
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
+
+    /* Deathmatch (campaign/dm/, core/dm.js): dragons of human players only (no AI dragons) in the Wildwood around the
+       hamlet and the outpost. Peer-to-peer like the co-op: every browser flies its own dragon, the host owns hp,
+       fireballs, breath damage, dragon-on-dragon bumps, food, kills and the board.
+       arena: soft wall from r - soft (steer back), centre 0, 0. match: first to fragLimit kills or the best after
+       timeLimit s. A kill = +1, dying with nobody to blame (crash with no hit in the last fall.credit s) = -1.
+       ball / breath: damage to other dragons (rolling and spawn protection make them miss).
+       bump: two dragons closer than r (both in the air or one perched) knock each other off: both fall, pushed apart.
+       fall: after a bump or crashing into a pillar, building wall, tree or (steeper than groundPitch, faster than
+       groundSpeed) the ground, the dragon tumbles under gravity g, out of control, until it hits a surface; crash
+       = damage at the hit, impact = (vertical speed - impactFrom) x impactK on landing (max maxDmg, half in water);
+       then it sits stunned for `stun` s. A fall death credits whoever hit or bumped it in the last `credit` s.
+       perch: Land within maxAlt of any surface (ground, roof, pillar top, not water) and the dragon sits there
+       (settling `time` s); it can turn, breathe and shoot, stamina regenerates stRegen x faster; Fly / climb / boost
+       takes off at takeoffSpeed. hop: wall tops this close above are hopped onto instead of crashing.
+       pillars: seeded rock pillars with flat grassy tops (perches). trees: crown height = r x hK, solid within r x rK.
+       food: wandering animals; a dragon within eatR (horizontal) and eatAlt above it eats it (+hp), back after respawn s;
+       they flee dragons within flee. */
+    dm: {
+      region: 'wild', maxPlayers: 8, fragLimit: 10, timeLimit: 600, overTime: 12,
+      arena: { r: 640, soft: 110 },
+      hp: 100, regen: 0.35, respawn: 5, spawnInv: 3, spawnAlt: 60, minAlt: 3, stand: 1.6,
+      stats: { turn: 1.0, cruise: 30, boost: 54 },
+      ball: { speed: 115, life: 2.4, cd: 1.0, st: 12, hit: 3.8, dmg: 30, splash: 10, splashR: 9, aim: 0.38, aimRange: 240 },
+      breath: { range: 40, cone: 16, dps: 34 },
+      bump: { r: 3.6, push: 16, dmg: 6, cool: 1.5 },
+      fall: { g: 24, drag: 0.6, stun: 1.4, crashDmg: 6, impactFrom: 9, impactK: 1.3, maxDmg: 45, credit: 8,
+              groundPitch: -0.42, groundSpeed: 18, spin: 6, bounce: 10 },
+      perch: { maxAlt: 8, time: 0.6, stRegen: 2.2, takeoffSpeed: 20, takeoffPitch: 0.45, hop: 2.5, turn: 1.6 },
+      pillars: { n: 14, ring: [110, 560], h: [24, 58], r: [5, 9], gap: 60, seed: 77 },
+      trees: { hK: 3, rK: 0.7, cell: 24 },
+      food: {
+        n: 18, eatR: 4.5, eatAlt: 6, respawn: 18, flee: 24, roam: 36, seed: 91,
+        kinds: { chicken: { hp: 15, speed: 4.5, share: 0.5 }, goat: { hp: 30, speed: 6, share: 0.25 }, sheep: { hp: 25, speed: 4, share: 0.25 } },
+      },
+      spawns: 10, palettes: 8, nameKey: 'vsd-name', peerPrefix: 'vsd-dm-',
+    },
   };
 
   M.define('data', data);

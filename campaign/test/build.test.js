@@ -15,7 +15,7 @@ const parses = (f, src) => {
 };
 const files = dir => fs.readdirSync(path.join(root, 'campaign', dir)).filter(f => f.endsWith('.js')).map(f => 'campaign/' + dir + '/' + f);
 
-const scripts = ['campaign/game.js', 'campaign/preview/castle.js', 'i18n.js', 'sw.js', 'shared/dragon.js']
+const scripts = ['campaign/game.js', 'campaign/dm/game.js', 'campaign/preview/castle.js', 'i18n.js', 'sw.js', 'shared/dragon.js']
   .concat(files('core'), files('render'))
   .filter(f => fs.existsSync(path.join(root, f)));
 for (const f of scripts) {
@@ -23,7 +23,7 @@ for (const f of scripts) {
   ok(r === true, f + ' parses' + (r === true ? '' : ': ' + r));
 }
 
-for (const f of ['campaign/game.js', 'campaign/preview/castle.js']) {
+for (const f of ['campaign/game.js', 'campaign/dm/game.js', 'campaign/preview/castle.js']) {
   const n = (read(f).match(/^\s*const BUILD = /gm) || []).length;
   ok(n === 1, f + ' has one BUILD label (found ' + n + ')');
 }
@@ -48,3 +48,20 @@ const entries = [...shell.matchAll(/'([^']+)'/g)].map(m => m[1]);
 const swDup = entries.filter((f, i) => entries.indexOf(f) !== i);
 ok(!swDup.length, 'sw.js SHELL lists every file once' + (swDup.length ? ' (twice: ' + swDup.join(', ') + ')' : ''));
 for (const f of files('core').concat(files('render'))) ok(entries.indexOf(f) >= 0, 'sw.js precaches ' + f);
+
+// the deathmatch page (campaign/dm/): its loader lists files that exist, once, with core modules before the ones that
+// need them and game.js last; the service worker precaches the page
+{
+  const dm = read('campaign/dm/index.html');
+  const a2 = dm.indexOf("['../../i18n.js'"), b2 = dm.indexOf('].forEach', a2);
+  ok(a2 > 0 && b2 > a2, 'dm/index.html has the script loader list');
+  const dl = vm.runInNewContext(dm.slice(a2, b2 + 1));
+  ok(dl.filter((f, i) => dl.indexOf(f) !== i).length === 0, 'dm/index.html loads every script once');
+  for (const f of dl) ok(fs.existsSync(path.join(root, 'campaign', 'dm', f)), 'dm/index.html loads an existing file: ' + f);
+  ok(dl[dl.length - 1] === 'game.js', 'dm/index.html loads game.js last');
+  const at = f => dl.indexOf('../core/' + f + '.js');
+  for (const [mod, deps] of [['dm', ['data', 'terrain', 'settlement', 'flight', 'math']], ['settlement', ['castle', 'terrain']], ['flight', ['terrain']], ['walk', ['terrain']]]) {
+    for (const d of deps) ok(at(d) >= 0 && at(d) < at(mod), 'dm/index.html loads core/' + d + ' before core/' + mod);
+  }
+  for (const f of ['campaign/dm/', 'campaign/dm/index.html', 'campaign/dm/game.js']) ok(entries.indexOf(f) >= 0, 'sw.js precaches ' + f);
+}

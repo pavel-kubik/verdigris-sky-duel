@@ -292,6 +292,7 @@
     }
     return {
       group, palette: pal, fog: pal.fog, sky: pal.sky, mouth, lava: lavaFx, update, dispose,
+      trees: flora ? flora.trees : [],                                 // [[x, z, r]] (deathmatch tree collisions, core/dm.js)
       get info() { return { chunks: chunks.length, visible, trees: flora ? flora.count.trees : 0, rocks: flora ? flora.count.rocks : 0 }; },
     };
   }
