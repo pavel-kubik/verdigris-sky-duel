@@ -99,6 +99,12 @@ input{background:rgba(233,225,204,.06);border:1px solid var(--line);border-radiu
 #status.ok{color:var(--verd)}
 .linkbox{display:grid;grid-template-columns:1fr auto;gap:8px}
 .linkbox input{font-size:13px}
+/* QR share panel: the room invite (or the game link) as a QR code, on white so any phone camera reads it */
+#qrPanel{z-index:20}
+.qrBox{justify-self:center;background:#fff;border-radius:8px;padding:6px;line-height:0;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+#qrCanvas{image-rendering:pixelated;image-rendering:crisp-edges}
+#qrCode{font-family:var(--f-display);font-size:34px;letter-spacing:.16em;color:var(--verd);line-height:1}
+#qrLink{font-size:12px;word-break:break-all;color:var(--mute);-webkit-user-select:text;user-select:text}
 .lobbyFoot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px}
 .lobbyFoot a{color:var(--bone)}
 .langSwitch{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
@@ -202,6 +208,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
     <button class="ghost" id="joinBtn" data-i18n="mp.lobby.join">Join</button>
   </div>
   <button class="ghost" id="rejoinBtn" hidden>Rejoin room</button>
+  <button class="ghost" id="shareGameBtn" data-i18n="dm.qr.shareGame">Share the game (QR code)</button>
   <div id="status" role="status"></div>
   <div class="lobbyFoot"><a href="../" data-i18n="dm.lobby.back">Back to the campaign</a><div class="langSwitch"></div></div>
   <p id="buildNote" style="font-size:12px"></p>
@@ -212,7 +219,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
 <section id="room" hidden>
   <div class="roomHead">
     <div><div class="eyebrow" data-i18n="dm.room.eyebrow">Lobby · room code</div><b id="roomCodeBig">-</b></div>
-    <button class="ghost mini" id="roomInvite" data-i18n="dm.room.invite">Invite</button><button class="ghost mini" id="roomMinBtn">Hide</button>
+    <button class="ghost mini" id="roomInvite" data-i18n="dm.room.invite">Invite</button><button class="ghost mini" id="roomQr" data-i18n="dm.qr.btn" data-i18n-attr="aria-label:dm.qr.label">QR</button><button class="ghost mini" id="roomMinBtn">Hide</button>
   </div>
   <div id="roomBody">
     <div id="roomPlayers"></div>
@@ -228,6 +235,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   <h2 data-i18n="mp.menu.title">Invite friends</h2>
   <p data-i18n="mp.menu.text">The game keeps running while this menu is open.</p>
   <div class="linkbox"><input id="linkOut" readonly aria-label="Invite link" data-i18n-attr="aria-label:mp.menu.link"><button class="ghost" id="copyBtn" data-i18n="mp.menu.copy">Copy</button></div>
+  <button class="ghost" id="menuQr" data-i18n="dm.qr.show">Show QR code</button>
   <div class="row"><button class="cta" id="resumeBtn" data-i18n="btn.resume">Resume</button><button class="ghost" id="leaveBtn" data-i18n="mp.leave">Leave game</button></div>
 </section>
 
@@ -237,6 +245,15 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   <table class="board"><thead><tr><th>#</th><th data-i18n="dm.board.dragon">Dragon</th><th class="n" data-i18n="dm.board.kills">Kills</th><th class="n" data-i18n="dm.board.deaths">Deaths</th><th class="n" data-i18n="dm.board.score">Score</th></tr></thead><tbody id="boardRows"></tbody></table>
   <p id="boardNote"></p>
   <div class="row"><button class="cta" id="againBtn" hidden data-i18n="dm.again">Next round</button><button class="ghost" id="boardClose" data-i18n="dm.board.close">Close</button><button class="ghost" id="leave2Btn" hidden data-i18n="mp.leave">Leave game</button></div>
+</section>
+
+<section id="qrPanel" class="panel center" hidden role="dialog" aria-labelledby="qrTitle">
+  <div class="eyebrow" id="qrTitle">-</div>
+  <b id="qrCode" hidden>-</b>
+  <div class="qrBox"><canvas id="qrCanvas" role="img" aria-label="QR code" data-i18n-attr="aria-label:dm.qr.label"></canvas></div>
+  <p data-i18n="dm.qr.hint">Point a phone camera at the code to open the link.</p>
+  <p id="qrLink">-</p>
+  <div class="row"><button class="cta" id="qrShare" hidden data-i18n="dm.qr.share">Share</button><button class="ghost" id="qrCopy" data-i18n="mp.menu.copy">Copy</button><button class="ghost" id="qrClose" data-i18n="dm.board.close">Close</button></div>
 </section>
 
 <section id="notice" class="panel center" hidden>
@@ -253,7 +270,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   /* Game scripts carry the page's ?v= so a test link with a new v also fetches fresh scripts (no stale cache). */
   (function () {
     var v = (location.search.match(/[?&]v=([^&]+)/) || [])[1], q = v ? '?v=' + v : '';
-    ['../../i18n.js', '../../pwa.js', '../../shared/dragon.js',
+    ['../../i18n.js', '../../pwa.js', '../../shared/dragon.js', '../../shared/qr.js',
      '../core/umd.js', '../core/math.js', '../core/data.js', '../core/terrain.js', '../core/castle.js', '../core/settlement.js', '../core/flight.js', '../core/walk.js', '../core/dm.js',
      '../render/flora.js', '../render/terrain.js', '../render/prey-view.js', '../render/settlement-view.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });

@@ -15,7 +15,7 @@ const parses = (f, src) => {
 };
 const files = dir => fs.readdirSync(path.join(root, 'campaign', dir)).filter(f => f.endsWith('.js')).map(f => 'campaign/' + dir + '/' + f);
 
-const scripts = ['campaign/game.js', 'campaign/dm/game.js', 'campaign/preview/castle.js', 'i18n.js', 'sw.js', 'shared/dragon.js']
+const scripts = ['campaign/game.js', 'campaign/dm/game.js', 'campaign/preview/castle.js', 'i18n.js', 'sw.js', 'shared/dragon.js', 'shared/qr.js']
   .concat(files('core'), files('render'))
   .filter(f => fs.existsSync(path.join(root, f)));
 for (const f of scripts) {
@@ -63,5 +63,5 @@ for (const f of files('core').concat(files('render'))) ok(entries.indexOf(f) >= 
   for (const [mod, deps] of [['dm', ['data', 'terrain', 'settlement', 'flight', 'math']], ['settlement', ['castle', 'terrain']], ['flight', ['terrain']], ['walk', ['terrain']]]) {
     for (const d of deps) ok(at(d) >= 0 && at(d) < at(mod), 'dm/index.html loads core/' + d + ' before core/' + mod);
   }
-  for (const f of ['campaign/dm/', 'campaign/dm/index.html', 'campaign/dm/game.js']) ok(entries.indexOf(f) >= 0, 'sw.js precaches ' + f);
+  for (const f of ['campaign/dm/', 'campaign/dm/index.html', 'campaign/dm/game.js', 'shared/qr.js']) ok(entries.indexOf(f) >= 0, 'sw.js precaches ' + f);
 }

@@ -8,7 +8,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'dm.2 2026-11-06 room lobby, saved room, host take-over';
+  const BUILD = 'dm.3 2026-11-06 share via QR code';
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   const C = window.VCamp;
@@ -332,7 +332,7 @@
   addEventListener('keydown', e => {
     if (typing()) { if (e.code === 'Enter' && document.activeElement === $('#codeIn')) $('#joinBtn').click(); return; }
     if (mode !== 'game') return;
-    if (e.code === 'Escape') { if (boardOpen && !view.over) hideBoard(); else toggleMenu(); return; }
+    if (e.code === 'Escape') { if (qrOpen) closeQr(); else if (boardOpen && !view.over) hideBoard(); else toggleMenu(); return; }
     if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) { if (boardOpen) hideBoard(); else showBoard(false); } return; }
     if (e.repeat && /^Key[FQER]$/.test(e.code)) return;
     keys[e.code] = true;
@@ -757,6 +757,35 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(() => feed(t('mp.feed.copied')), fallback);
     else fallback();
   }
+  /* ---------- share via QR code (shared/qr.js): the room invite in a room, else the game's page ---------- */
+  let qrOpen = false, qrUrl = '', qrMenu = false;
+  function gameLink() { return location.origin + location.pathname; }
+  function openQr() {
+    if (!window.VQR) return;
+    qrUrl = roomCode ? inviteLink() : gameLink();
+    $('#qrTitle').textContent = roomCode ? t('dm.qr.room') : t('dm.qr.game');
+    $('#qrCode').textContent = roomCode; $('#qrCode').hidden = !roomCode;
+    $('#qrLink').textContent = qrUrl;
+    const code = VQR.encode(qrUrl, 'M'), cv = $('#qrCanvas'), quiet = 4;
+    const cssPx = Math.min(260, innerWidth - 96, innerHeight - 330), d = Math.min(window.devicePixelRatio || 1, 3);
+    const px = Math.max(2, Math.floor(Math.max(120, cssPx) * d / (code.size + quiet * 2)));
+    VQR.draw(cv, code, { px, quiet, dark: '#0d1411', light: '#ffffff' });
+    cv.style.width = cv.style.height = (cv.width / d) + 'px';
+    $('#qrShare').hidden = !(isTouch && navigator.share);
+    qrMenu = menuOpen;
+    if (mode === 'game') { menuOpen = true; mouseBreath = false; $('#menu').hidden = true; }
+    $('#qrPanel').hidden = false; qrOpen = true;
+    $('#qrClose').focus();
+  }
+  function closeQr() {
+    $('#qrPanel').hidden = true; qrOpen = false;
+    if (mode === 'game') { menuOpen = qrMenu; $('#menu').hidden = !qrMenu; }
+  }
+  function copyText(link) {
+    const fallback = () => feed(t('mp.feed.copyManual'));
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(() => feed(t('mp.feed.copied')), fallback);
+    else fallback();
+  }
   /** Phones: the system share sheet; else copy. */
   function shareLink() {
     if (!roomCode) return;
@@ -811,6 +840,12 @@
   $('#resumeBtn').onclick = () => toggleMenu(false);
   $('#roomChip').onclick = () => { toggleMenu(true); copyLink($('#linkOut')); };
   $('#roomInvite').onclick = shareLink;
+  $('#roomQr').onclick = () => openQr();
+  $('#menuQr').onclick = () => openQr();
+  $('#shareGameBtn').onclick = () => openQr();
+  $('#qrClose').onclick = () => closeQr();
+  $('#qrCopy').onclick = () => copyText(qrUrl);
+  $('#qrShare').onclick = () => { navigator.share({ title: t('dm.title'), text: roomCode ? t('dm.room.shareText', { c: roomCode }) : t('dm.desc'), url: qrUrl }).catch(() => { }); };
   $('#roomMinBtn').onclick = () => { roomMin = !roomMin; roomSig = ''; renderRoom(); };
   $('#roomStart').onclick = () => { if (role === 'host' && world) { DM.startMatch(world); $('#roomStart').blur(); } };
   $('#boardBtn').onclick = () => { if (boardOpen) hideBoard(); else showBoard(false); };
