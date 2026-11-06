@@ -69,17 +69,17 @@
       g.fillStyle = river; g.beginPath(); g.moveTo(w * 0.56, h); g.lineTo(w * 0.6, ry + h * 0.07); g.lineTo(w, ry + h * 0.04); g.lineTo(w, h); g.closePath(); g.fill();
       ridge(h * 0.84, h * 0.012, '#120d0f', 4.1);               // near bank
     } else {
-      const glow = g.createRadialGradient(w * 0.5, h * 0.55, 0, w * 0.5, h * 0.55, w * 0.7);
-      glow.addColorStop(0, 'rgba(255,120,40,.75)'); glow.addColorStop(1, 'rgba(255,80,20,0)');
+      const glow = g.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.42, Math.max(w, h) * 0.45);
+      glow.addColorStop(0, 'rgba(255,130,50,.95)'); glow.addColorStop(1, 'rgba(255,80,20,0)');
       g.fillStyle = glow; g.fillRect(0, 0, w, h);
       ridge(h * 0.18, h * 0.05, '#0b0807', 0.4);                // cave roof (drawn from the top down)
       g.save(); g.scale(1, -1); g.translate(0, -h); ridge(h * 0.8, h * 0.05, '#0b0807', 2.2); g.restore();
-      g.fillStyle = '#1a0f0a'; g.beginPath(); g.ellipse(w * 0.5, h * 0.66, w * 0.3, h * 0.035, 0, 0, Math.PI * 2); g.fill();   // the nest
-      const egg = g.createRadialGradient(w * 0.47, h * 0.57, 0, w * 0.5, h * 0.6, w * 0.12);
+      g.fillStyle = '#1a0f0a'; g.beginPath(); g.ellipse(w * 0.5, h * 0.47, w * 0.3, h * 0.035, 0, 0, Math.PI * 2); g.fill();   // the nest
+      const egg = g.createRadialGradient(w * 0.47, h * 0.38, 0, w * 0.5, h * 0.41, w * 0.12);
       egg.addColorStop(0, '#9fe0b4'); egg.addColorStop(0.6, '#2f7a52'); egg.addColorStop(1, '#0f2a1d');
-      g.fillStyle = egg; g.beginPath(); g.ellipse(w * 0.5, h * 0.6, w * 0.085, h * 0.065, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = egg; g.beginPath(); g.ellipse(w * 0.5, h * 0.41, w * 0.085, h * 0.065, 0, 0, Math.PI * 2); g.fill();
       g.strokeStyle = 'rgba(10,20,14,.8)'; g.lineWidth = Math.max(2, w * 0.004); g.beginPath();   // the crack
-      g.moveTo(w * 0.45, h * 0.58); g.lineTo(w * 0.48, h * 0.6); g.lineTo(w * 0.5, h * 0.585); g.lineTo(w * 0.53, h * 0.605); g.stroke();
+      g.moveTo(w * 0.45, h * 0.39); g.lineTo(w * 0.48, h * 0.41); g.lineTo(w * 0.5, h * 0.395); g.lineTo(w * 0.53, h * 0.415); g.stroke();
     }
     const vig = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
     vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,.55)');

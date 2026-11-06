@@ -13,8 +13,8 @@
  *   step(cs, dt) -> events[]            once per frame (state.js): act change ('story:act' { act }), the mother's first
  *                                       castle raid ('story:raid' { id } when the first mission in a castle region is
  *                                       accepted, 'story:raidEnd' when it is over), her lines ('story:say' { key }):
- *                                       data.story.raidLine when the raid starts outside, kingCityLine on the first entry
- *                                       into the Bend with the raid on. cs.story.say = { key, t } is her caption for sayTime s.
+ *                                       data.story.raidLine when the raid starts outside, kingCityLine on the first time in the Bend
+ *                                       with the raid on, after the raid line. cs.story.say = { key, t } is her caption for sayTime s.
  *   raid(cs) -> mission id | null       the mission the mother flies along on (core/mother.js 'escort' phase)
  *
  * cs.story = { act, mother, seen: [ids], raid: id | null, say: { key, t } | null }; act, seen and raid are saved.
@@ -79,7 +79,7 @@
     if (b.raid) {
       if (!m || m.id !== b.raid) { b.raid = null; b.say = null; out.push({ e: 'story:raidEnd' }); return out; }
       if (!b.raidSaid && !cs.inLair && !cs.inAerie) { b.raidSaid = true; say(cs, S().raidLine, out); }
-      if (cs.region === S().kingCityRegion && !cs.inLair && !seen(cs, 'kingCity')) { mark(cs, 'kingCity'); say(cs, S().kingCityLine, out); }
+      if (cs.region === S().kingCityRegion && !cs.inLair && !b.say && !seen(cs, 'kingCity')) { mark(cs, 'kingCity'); say(cs, S().kingCityLine, out); }
     }
     return out;
   }
