@@ -71,6 +71,46 @@ jobs:
             fi
           done
 
+          # Union merges can retain both versions of comma-separated dependency declarations.
+          # Consolidate those declarations and keep the newest build label in the two client entry files.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def merge_need_declarations(path, prefix, source):
+              p = Path(path)
+              lines = p.read_text().splitlines()
+              hits = [i for i, line in enumerate(lines) if line.lstrip().startswith(prefix)]
+              if len(hits) < 2:
+                  return
+              entries = {}
+              order = []
+              for i in hits:
+                  for name, module in re.findall(r"([A-Z]+)\\s*=\\s*" + re.escape(source) + r"\\.need\\('([^']+)'\\)", lines[i]):
+                      if name not in entries:
+                          order.append(name)
+                      entries[name] = module
+              if not entries:
+                  return
+              merged = "  const " + ", ".join(f"{name} = {source}.need('{entries[name]}')" for name in order) + ";"
+              first = hits[0]
+              for i in reversed(hits):
+                  del lines[i]
+              lines.insert(first, merged)
+              p.write_text("\\n".join(lines) + "\\n")
+
+          merge_need_declarations("campaign/core/state.js", "const D = M.need(", "M")
+          merge_need_declarations("campaign/game.js", "const C = window.VCamp", "C")
+          for name in ("campaign/game.js", "campaign/preview/castle.js"):
+              p = Path(name)
+              lines = p.read_text().splitlines()
+              builds = [i for i, line in enumerate(lines) if "const BUILD =" in line]
+              for i in reversed(builds[:-1]):
+                  del lines[i]
+              p.write_text("\\n".join(lines) + "\\n")
+          PY
+
+          find campaign -name '*.js' -print0 | xargs -0 -n1 node --check
           if [ -f campaign/test/run.js ]; then node campaign/test/run.js; fi
           if [ -f mp/sim.test.js ]; then node mp/sim.test.js; fi
           new_head="$(git rev-parse HEAD)"
