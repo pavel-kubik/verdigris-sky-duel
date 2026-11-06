@@ -86,7 +86,7 @@ jobs:
               entries = {}
               order = []
               for i in hits:
-                  for name, module in re.findall(r"([A-Z]+)\\s*=\\s*" + re.escape(source) + r"\\.need\\('([^']+)'\\)", lines[i]):
+                  for name, module in re.findall(r"([A-Z]+)\s*=\s*" + re.escape(source) + r"\.need\('([^']+)'\)", lines[i]):
                       if name not in entries:
                           order.append(name)
                       entries[name] = module
@@ -97,7 +97,7 @@ jobs:
               for i in reversed(hits):
                   del lines[i]
               lines.insert(first, merged)
-              p.write_text("\\n".join(lines) + "\\n")
+              p.write_text("\n".join(lines) + "\n")
 
           merge_need_declarations("campaign/core/state.js", "const D = M.need(", "M")
           merge_need_declarations("campaign/game.js", "const C = window.VCamp", "C")
@@ -107,7 +107,7 @@ jobs:
               builds = [i for i, line in enumerate(lines) if "const BUILD =" in line]
               for i in reversed(builds[:-1]):
                   del lines[i]
-              p.write_text("\\n".join(lines) + "\\n")
+              p.write_text("\n".join(lines) + "\n")
           PY
 
           find campaign -name '*.js' -print0 | xargs -0 -n1 node --check
