@@ -8,7 +8,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'dm.4 2026-11-06 one world per room code: host steps down, merged scores';
+  const BUILD = 'dm.5 2026-11-06 no silent practice: host retries, says why, Practice alone; ?peer= server';
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   const C = window.VCamp;
@@ -456,7 +456,7 @@
     if (!tk) { tk = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2); store.set(X.tokenKey, tk); }
     return DM.keyOf(tk);
   })();
-  function inviteLink() { return location.origin + location.pathname + (N.code ? '#' + N.code : ''); }
+  function inviteLink() { return location.origin + location.pathname + (peerOptions ? '?peer=' + peerParam : '') + (N.code ? '#' + N.code : ''); }
 
   /* the saved room: the last record from the host (or our own), kept roomKeep s */
   let recSavedAt = 0;
@@ -475,9 +475,17 @@
     return null;
   }
 
-  const offline = !window.Peer || /[?&]offline\b/.test(location.search);
+  const offline = /[?&]offline\b/.test(location.search);
+  /* ?peer=host[:port][/path]: a PeerJS server of your own instead of the public one (it travels in the invite link) */
+  const peerParam = (location.search.match(/[?&]peer=([^&#]+)/) || [])[1] || '';
+  const peerOptions = (() => {
+    const m = decodeURIComponent(peerParam).match(/^([a-z0-9.-]+)(?::(\d+))?(\/.*)?$/i);
+    if (!m) return null;
+    const port = m[2] ? +m[2] : 443;
+    return { host: m[1], port, path: m[3] || '/', secure: port === 443 || location.protocol === 'https:' };
+  })();
   const N = NETC.session({
-    Peer: window.Peer || null, offline,
+    Peer: window.Peer || null, offline, peerOptions,
     clock: { now: () => performance.now(), setTimeout: (f, ms) => setTimeout(f, ms), clearTimeout: h => clearTimeout(h) },
     key: myKey, name: myName,
     pose: () => (mode === 'game' && pilot.mode !== 'down' ? DM.poseOf(pilot) : null),
@@ -515,6 +523,12 @@
         showBanner(t('dm.mig.slow'), t('dm.mig.slowSub'));
         feed(t('dm.mig.slow'));
         break;
+      case 'hostFailed':
+        setStatus(ev.err === 'nolib' ? t('mp.noLibSolo') : t('dm.hostFailed', { why: ev.err }));
+        setBusy(false);
+        $('#practiceBtn').hidden = false;
+        try { status.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) { }   // phones: below the fold
+        break;
       case 'enterFailed':
         setStatus(failText(ev.err, ev.code)); setBusy(false);
         break;
@@ -531,6 +545,7 @@
 
   function hostGame() {
     setBusy(true);
+    $('#practiceBtn').hidden = true;
     if (!offline) setStatus(t('mp.opening'), true);
     N.host();
   }
@@ -609,6 +624,7 @@
     if (!window.VQR) return;
     qrUrl = N.code ? inviteLink() : gameLink();
     $('#qrTitle').textContent = N.code ? t('dm.qr.room') : t('dm.qr.game');
+    $('#qrSolo').hidden = !(mode === 'game' && !N.code);           // a practice game: the code opens the game, not this game
     $('#qrCode').textContent = N.code; $('#qrCode').hidden = !N.code;
     $('#qrLink').textContent = qrUrl;
     const code = VQR.encode(qrUrl, 'M'), cv = $('#qrCanvas'), quiet = 4;
@@ -681,6 +697,7 @@
   $('#hostBtn').onclick = hostGame;
   $('#joinBtn').onclick = joinGame;
   $('#rejoinBtn').onclick = rejoinSaved;
+  $('#practiceBtn').onclick = () => { setBusy(true); N.practice(); };
   $('#menuBtn').onclick = () => toggleMenu();
   $('#resumeBtn').onclick = () => toggleMenu(false);
   $('#roomChip').onclick = () => { toggleMenu(true); copyLink($('#linkOut')); };
@@ -921,7 +938,7 @@
   const invited = location.hash.slice(1).toUpperCase();
   const lobbyStatus = () => {
     if (/^[A-Z0-9]{5}$/.test(invited)) setStatus(t('mp.invited', { c: invited }), true);
-    if (!window.Peer) setStatus(t('dm.noLibSolo'));
+    if (!window.Peer && !offline) { setStatus(t('dm.noLibSolo')); $('#practiceBtn').hidden = false; }
   };
   if (/^[A-Z0-9]{5}$/.test(invited)) $('#codeIn').value = invited;
   lobbyStatus();

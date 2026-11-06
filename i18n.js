@@ -436,6 +436,9 @@
       'mp.invited': 'You are invited to room {c}. Pick a name and press Join.',
 
       /* deathmatch (campaign/dm/) */
+      'dm.hostFailed': "Couldn't open a room: the matchmaking server did not answer ({why}). Check the connection and press Host a game again - or practice alone.",
+      'dm.practiceBtn': 'Practice alone (nobody can join)',
+      'dm.qr.solo': 'This is a practice game - nobody can join it. Host a game from the start screen to play together.',
       'dm.qr.btn': 'QR', 'dm.qr.label': 'QR code of the link', 'dm.qr.show': 'Show QR code', 'dm.qr.shareGame': 'Share the game (QR code)',
       'dm.qr.room': 'Scan to join the room', 'dm.qr.game': 'Scan to open the game', 'dm.qr.share': 'Share',
       'dm.qr.hint': 'Point a phone camera at the code to open the link.',
@@ -901,6 +904,9 @@
       'mp.unknown': 'neznámá chyba',
       'mp.invited': 'Máš pozvánku do místnosti {c}. Zvol jméno a stiskni Připojit.',
 
+      'dm.hostFailed': 'Místnost se nepodařilo otevřít: server pro párování hráčů neodpověděl ({why}). Zkontroluj připojení a stiskni znovu Založit hru - nebo trénuj sám.',
+      'dm.practiceBtn': 'Trénovat sám (nikdo se nepřipojí)',
+      'dm.qr.solo': 'Tohle je cvičná hra - nikdo se k ní nepřipojí. Pro hru s kamarády založ hru na úvodní obrazovce.',
       'dm.qr.btn': 'QR', 'dm.qr.label': 'QR kód odkazu', 'dm.qr.show': 'Ukázat QR kód', 'dm.qr.shareGame': 'Sdílet hru (QR kód)',
       'dm.qr.room': 'Naskenuj a připoj se do místnosti', 'dm.qr.game': 'Naskenuj a otevři hru', 'dm.qr.share': 'Sdílet',
       'dm.qr.hint': 'Namiř fotoaparát telefonu na kód a otevře se odkaz.',

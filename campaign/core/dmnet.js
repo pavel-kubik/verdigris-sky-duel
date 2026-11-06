@@ -13,11 +13,13 @@
  * claimCheck s (reconnects a dropped socket). A player rejoining a saved room claims the code only when it was
  * missing claimAfter times in a row (not during a host's short reconnect).
  *
- *   NET.session({ Peer, clock: { now, setTimeout, clearTimeout }, random, rng, key, name(), pose(), emit(ev), offline })
- *     -> { host(), join(code, savedRec?), rejoin(code, rec), leave(), tick(dt), shoot(from, dir), crash(dmg, kind),
+ *   NET.session({ Peer, peerOptions, clock: { now, setTimeout, clearTimeout }, random, rng, key, name(), pose(), emit(ev), offline })
+ *     -> { host(), practice(), join(code, savedRec?), rejoin(code, rec), leave(), tick(dt), shoot(from, dir), crash(dmg, kind),
  *          startMatch(), restart(), setSettings(o), state getters: role, code, world, myId, migrating, ... }
  *   emit: { t: 'hosted', code, me, resume, restored } | { t: 'joined', code, welcome, resume } | { t: 'snap', s, e }
  *         | { t: 'record', rec } | { t: 'migrating', why } | { t: 'migrateSlow' } | { t: 'enterFailed', err, code }
+ *         | { t: 'hostFailed', err }: no room could be opened (the server is unreachable); nothing starts by itself -
+ *           the player tries again or picks practice() (a game nobody can join)
  *   A take-over never gives up (the player may be the one who was offline): after migrateWait s it emits
  *   'migrateSlow' once and keeps trying until it is back in the room or the player leaves.
  *   tick(dt) on the host steps the world and returns { events, snap } for its own view; on a guest it sends the pose.
@@ -27,7 +29,7 @@
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const D = M.need('data'), DM = M.need('dm');
   const X = D.dm, NET_DT = 1 / 20, GUEST_TIMEOUT = 15000, CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  const CLAIM_CHECK = 2, CLAIM_AFTER = 2;
+  const CLAIM_CHECK = 2, CLAIM_AFTER = 2, HOST_TRIES = 3, FIRST_OPEN = 20000;
 
   function session(o) {
     const clock = o.clock, rnd = o.random || Math.random;
@@ -42,15 +44,16 @@
     const makeCode = () => { let s = ''; for (let i = 0; i < 5; i++) s += CODE_CHARS[Math.floor(rnd() * CODE_CHARS.length)]; return s; };
 
     /** Claims the room id: done(null, peer) or done(errorType). */
-    function claimRoom(code, done) {
+    const peerOpts = () => Object.assign({ debug: 1 }, o.peerOptions || {});
+    function claimRoom(code, done, waitMs) {
       if (!o.Peer) { done('nolib'); return; }
       let fin = false;
-      const p = new o.Peer(X.peerPrefix + code, { debug: 1 });
+      const p = new o.Peer(X.peerPrefix + code, peerOpts());
       const end = err => {
         if (fin) return; fin = true; clock.clearTimeout(timer);
         if (err) { destroy(p); done(err); } else done(null, p);
       };
-      const timer = later(() => end('timeout'), 10000);
+      const timer = later(() => end('timeout'), waitMs || 10000);
       p.on('open', () => end(null));
       p.on('error', e => { if (!fin) end((e && e.type) || 'error'); });
     }
@@ -58,7 +61,7 @@
     function joinRoom(code, hello, done) {
       if (!o.Peer) { done('nolib'); return; }
       let fin = false;
-      const p = new o.Peer(undefined, { debug: 1 });
+      const p = new o.Peer(undefined, peerOpts());
       const end = (err, c, m) => {
         if (fin) return; fin = true; clock.clearTimeout(timer);
         if (err) { destroy(p); done(err); } else done(null, { peer: p, conn: c, welcome: m });
@@ -201,19 +204,27 @@
       });
     }
 
+    /** Opens a new room with a random code. A taken code: another code; no server: try again, then 'hostFailed'. */
     function host() {
-      if (!o.Peer || o.offline) { hosted(null, '', null); return; }
-      let tries = 0;
+      if (o.offline) { hosted(null, '', null); return; }
+      if (!o.Peer) { emit({ t: 'hostFailed', err: 'nolib' }); return; }
+      const run = ++S.entering;
+      let taken = 0, failed = 0;
       const attempt = () => {
+        if (run !== S.entering) return;
         const code = makeCode();
         claimRoom(code, (err, p) => {
-          if (!err) { hosted(p, code, null); return; }
-          if (err === 'unavailable-id' && tries++ < 3) attempt();
-          else hosted(null, '', null);
-        });
+          if (run !== S.entering) { destroy(p); return; }
+          if (!err) { S.entering++; hosted(p, code, null); return; }
+          if (err === 'unavailable-id' && taken++ < 3) attempt();
+          else if (err !== 'unavailable-id' && ++failed < HOST_TRIES) later(attempt, 1500);
+          else { S.entering++; emit({ t: 'hostFailed', err }); }
+        }, FIRST_OPEN);
       };
       attempt();
     }
+    /** A game on this device only (no room, nobody can join). */
+    function practice() { S.entering++; hosted(null, '', null); }
     /** Join by code. saved = this browser's saved record of the same room: host it again when nobody does. */
     function join(code, saved) {
       enterRoom(code, {
@@ -312,7 +323,7 @@
     const hostOnly = fn => (...a) => (S.role === 'host' && S.world ? fn(S.world, ...a) : false);
 
     return {
-      host, join, rejoin, leave, tick, shoot, crash,
+      host, practice, join, rejoin, leave, tick, shoot, crash,
       startMatch: hostOnly(DM.startMatch), restart: hostOnly(DM.restart), setSettings: hostOnly(DM.setSettings),
       get role() { return S.role; }, get code() { return S.code; }, get world() { return S.world; }, get myId() { return S.myId; },
       get migrating() { return S.migrating; }, get peer() { return S.peer; }, get hostConn() { return S.hostConn; },

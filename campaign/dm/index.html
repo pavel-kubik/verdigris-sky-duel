@@ -202,6 +202,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   </ul>
   <label for="nameIn"><span data-i18n="mp.lobby.name">Your dragon's name</span><input id="nameIn" maxlength="16" autocomplete="nickname" placeholder="Verdigris"></label>
   <button class="cta" id="hostBtn" data-i18n="mp.lobby.host">Host a game</button>
+  <button class="ghost" id="practiceBtn" hidden data-i18n="dm.practiceBtn">Practice alone (nobody can join)</button>
   <div class="or" data-i18n="mp.lobby.or">or join a friend</div>
   <div class="join">
     <label for="codeIn"><span data-i18n="mp.lobby.code">Room code</span><input id="codeIn" maxlength="5" autocomplete="off" spellcheck="false" placeholder="K3X9Q"></label>
@@ -252,6 +253,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   <b id="qrCode" hidden>-</b>
   <div class="qrBox"><canvas id="qrCanvas" role="img" aria-label="QR code" data-i18n-attr="aria-label:dm.qr.label"></canvas></div>
   <p data-i18n="dm.qr.hint">Point a phone camera at the code to open the link.</p>
+  <p id="qrSolo" hidden style="color:var(--ember)" data-i18n="dm.qr.solo">This is a practice game - nobody can join it. Host a game from the start screen to play together.</p>
   <p id="qrLink">-</p>
   <div class="row"><button class="cta" id="qrShare" hidden data-i18n="dm.qr.share">Share</button><button class="ghost" id="qrCopy" data-i18n="mp.menu.copy">Copy</button><button class="ghost" id="qrClose" data-i18n="dm.board.close">Close</button></div>
 </section>

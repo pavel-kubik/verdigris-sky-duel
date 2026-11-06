@@ -195,6 +195,18 @@ scenario('empty room comes back from a saved record', () => {
   return st;
 });
 
+// 8b. No matchmaking server: hosting does not start a practice game by itself - it says so; practice() is a choice
+{
+  const R = room(31), A = R.add('Ash');
+  A.offline = true;                                           // the server cannot be reached
+  A.N.host(); R.net.run(70000);
+  ok(A.events.indexOf('hostFailed') >= 0 && A.events.indexOf('hosted') < 0 && A.N.role === null, 'no server: hostFailed, no silent practice game');
+  A.N.practice(); R.net.run(200);
+  ok(A.N.role === 'host' && A.N.code === '' && A.events.indexOf('hosted') >= 0, 'practice when the player picks it');
+  const B = R.add('Birch'); B.offline = true; B.N.host(); R.net.run(3000); B.offline = false; R.net.run(30000);
+  ok(B.N.role === 'host' && /^[A-Z0-9]{5}$/.test(B.N.code) && B.events.indexOf('hostFailed') < 0, 'the server back during the retries: the room opens');
+}
+
 // 9. Chaos: random screen locks, socket drops, network losses, dead phones and reopened tabs; after a quiet minute: one world
 for (let seed = 11; seed <= 30; seed++) scenario('chaos seed ' + seed, () => {
   const { R, code } = setup(seed, ['Ash', 'Birch', 'Cedar', 'Dogwood', 'Elm']);
