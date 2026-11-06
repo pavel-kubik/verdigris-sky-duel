@@ -18,7 +18,9 @@
  *                                           chance `fire.spread` per s, and at 0 hp becomes a ruin ('building:ruined',
  *                                           ruinAt = now). cone: prey.breathCone or null (not breathing).
  *   rebuild(town, now, blocked?) -> events[]   ruins older than `fire.rebuild` s stand again ('building:rebuilt'),
- *                                           unless blocked(b) (the dragon stands in the footprint)
+ *                                           unless blocked(b) (the dragon stands in the footprint); Order buildings of a
+ *                                           freed place (pl.freed, Phase 3 T16) stay ruins
+ *       regionState.freed (Phase 3 T16): [place ids] - those places get pl.freed and no alert3 buildings
  *   inFire(b, cone) -> bool                 the cone reaches building b (samples along the stream)
  * T03 castle (a template with `walls`, core/castle.js): its pieces (corners, wall runs as capsules, the portcullis,
  *   inner buildings) are buildings like the others. A piece type with walkTop (wall walk, bastion top) is a solid with a
@@ -135,7 +137,9 @@
     const L = layout(regionId);
     const ruins = {}, chars = {};
     for (const r of (rs && rs.ruins) || []) if (r && r.id) (r.char ? chars : ruins)[r.id] = r.at || 0;
-    const on = alert3On(rs), keep = L.buildings.map(b => !b.alert3 || on), map = [];
+    const freed = {};                                // Phase 3 T16: freed places (no Order platform, no Order rebuild)
+    for (const id of (rs && Array.isArray(rs.freed) && rs.freed) || []) freed[id] = true;
+    const on = alert3On(rs), keep = L.buildings.map(b => !b.alert3 || (on && !freed[b.place])), map = [];
     let n = 0;
     keep.forEach((k, i) => { map[i] = k ? n++ : -1; });
     const buildings = L.buildings.filter((b, i) => keep[i]).map(b => Object.assign({}, b, {
@@ -150,7 +154,7 @@
     }
     return {
       region: regionId, alert3: on,
-      places: L.places.map(p => Object.assign({}, p)),
+      places: L.places.map(p => Object.assign({}, p, freed[p.id] ? { freed: true } : null)),
       buildings, posts,
       pens: L.pens.map(p => Object.assign({}, p, { pos: p.pos.slice() })),
     };
@@ -291,8 +295,10 @@
   }
 
   function rebuild(town, now, blocked) {
-    const ev = [];
+    const ev = [], freed = {};
+    for (const pl of (town && town.places) || []) if (pl.freed) freed[pl.id] = true;
     for (const b of (town && town.buildings) || []) {
+      if (freed[b.place] && D.buildings[b.type].order) continue;   // Phase 3 T16: the Order does not come back to a freed village
       if (b.char) {                              // T06: new roof and hoardings; the shell stood all along (no blocked check)
         if (now - (b.charAt || 0) < D.fire.rebuild) continue;
         b.char = false; b.charAt = null; b.hp = fullHp(b.type); b.fire = 0; b.heat = 0;

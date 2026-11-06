@@ -21,6 +21,9 @@
   const BUILD = 't214.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const BUILD = 't215.1 2026-11-05 tithe wagon intercept mission';
   const BUILD = 't215.2 2026-11-05 rebased on campaign-phase-3 (message log)';
+  const BUILD = 't216.1 2026-11-05 freed village: Order flag falls, food tribute in the larder';
+  const BUILD = 't216.2 2026-11-05 freed village: Order flag falls, food tribute in the larder';
+  const BUILD = 't216.3 2026-11-05 rebased on campaign-phase-3 (message log)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -411,6 +414,7 @@
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
     if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
     if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLCZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+C wagon (T15), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[FGJKLZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+F / G: free the village, tribute now (Phase 3 T16); Shift+L chalice (T12), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -812,6 +816,9 @@
       else if (e.e === 'loot:taken' && e.relic) { flashPrompt(null); toast(t('c.toast.relicTaken', { relic: lootName(e) }), t('c.toast.relicTakenSub'), 3.5, 'mission'); }   // Phase 3 T12
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
       else if (e.e === 'relic:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.trophy.bankedAerie', { relic: lootName(e) })); toast(t('c.toast.relicBanked', { relic: lootName(e) }), t('c.toast.relicBankedSub'), 3.5, 'mission'); }   // Phase 3 T12
+      else if (e.e === 'settlement:freed') toast(t('c.toast.freed', { place: t('c.place.' + e.type) }), t('c.toast.freedSub'), 4);   // Phase 3 T16
+      else if (e.e === 'tribute:arrived') toast(t('c.toast.tribute'), t('c.toast.tributeSub'), 3);
+      else if (e.e === 'freed:none') flashPrompt(t('c.dbg.freedNone'), 1.8);
       else if (e.e === 'loot:tooHeavy') flashPrompt(t('c.prompt.lootHeavy', { loot: lootName(e) }), 2.2);
       else if (e.e === 'loot:dropped') toast(t('c.toast.lootDropped'), t('c.toast.lootDroppedSub', { loot: lootName(e) }), 2.5);
       else if (e.e === 'hoard:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.aerie.banked', { gold: e.gold, total: e.total })); toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
@@ -1307,6 +1314,8 @@
     ['Shift+C', 'tithe wagon: accepts its mission if needed, goes to the Veltava Bend and flies 90 behind the wagon, 30 up, facing it (breathe fire on it until it stops, land, Grab the chest), T15', 'ShiftKeyC', 'wagon'],
     ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
     ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyW', 'workshop'],
+    ['Shift+F', 'free the village: its Order buildings fall to ruins, its archers fall, the Order flag drops (Farmlands village), Phase 3 T16', 'ShiftKeyF', 'free village'],
+    ['Shift+G', 'tribute now: the next food tribute of a freed village arrives in the larder (Phase 3 T16)', 'ShiftKeyG', 'tribute now'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1406,6 +1415,11 @@
       const list = (cs.town.items || []).filter(it => !it.taken && !it.hidden);
       if (!list.length) flashPrompt(t('c.dbg.noLoot'), 1.5);
       else { dbgLoot = (dbgLoot + 1) % list.length; standAtLoot(list[dbgLoot]); }
+    }
+    if (code === 'ShiftKeyF' && !cs.inLair && cs.town) onEvents(C.need('freed').freeDebug(cs));   // Phase 3 T16
+    if (code === 'ShiftKeyG') {
+      if (!C.need('freed').freedAll(cs).length) flashPrompt(t('c.dbg.tributeNone'), 1.8);
+      else cs.tributeT = D.tribute.every;                        // arrives on the next frame (or waits for room in the larder)
     }
     if (code === 'ShiftKeyL' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
       const m = RL.missionOf('ember_chalice'), a = MS.active(cs);
@@ -1734,7 +1748,7 @@
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
       ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
-      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']]]],
+      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyF', 'ShiftKeyG']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyC']]]],

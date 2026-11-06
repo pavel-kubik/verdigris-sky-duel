@@ -341,6 +341,11 @@
       lights: { torches: 16, windows: true },
     },
     palisade: { piece: 6, radius: 1, gate: 12 },
+    // Phase 3 T16 (003 5.7): settlements that can be freed (every Order building burned out and its archers dead at once)
+    // and the food tribute a freed one leaves in the larder: every `every` s of play a carcass of `prey` with `food`,
+    // at most `max` waiting (and never past lair.larderSize).
+    freed: { places: ['farm.village'], flag: [-4, 0], flagH: 14, fallTime: 1.6 },
+    tribute: { every: 300, food: 40, max: 3, prey: 'cow' },
     fire: { ignite: 0.8, cool: 0.5, burn: 6, fan: 2.5, spread: 0.15, reach: 8, rebuild: 600 },
     settlement: { jitter: 1, jitterYaw: 0.2, penR: 4, pad: 1.4 },          // penR 4 (T18): room for the animals, drawn larger than life
     settlements: {

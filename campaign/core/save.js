@@ -43,7 +43,7 @@
         loot: cs.carriedLoot && !(D.loot[cs.carriedLoot.kind] && D.loot[cs.carriedLoot.kind].mission) ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,
       },
       hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: ((cs.hoard && cs.hoard.relics) || []).filter(id => D.relics && D.relics[id]) },   // T19, relics: Phase 3 T12
-      larder: cs.larder.map(it => ({ prey: it.type, food: round(it.food, 100) })),
+      larder: cs.larder.map(it => it.tribute ? { prey: it.type, food: round(it.food, 100), tribute: true } : { prey: it.type, food: round(it.food, 100) }),   // Phase 3 T16: tribute carcasses keep their mark
       renown: 0,
       regions: Object.keys(D.regions).reduce((o, id) => {              // T12: discovered settlements (the rest of v2 in T22)
         o[id] = {};
@@ -56,6 +56,8 @@
         const rs = cs.regionStates && cs.regionStates[id];
         const taken = ((rs && rs.lootTaken) || []).filter(r => r && typeof r.id === 'string');
         if (taken.length) o[id].lootTaken = taken.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T19 (v2 shape, 5.9)
+        const freed = ((rs && rs.freed) || []).filter(k => typeof k === 'string');
+        if (freed.length) o[id].freed = freed.slice();               // Phase 3 T16: freed villages (5.9)
         if (rs && rs.heat > 0) {                                     // T17: alert heat with its play-time stamps (5.9)
           o[id].heat = round(rs.heat, 1000);
           if (typeof rs.lastIncident === 'number') o[id].lastIncident = round(rs.lastIncident, 10);
@@ -74,6 +76,7 @@
         mode: p && !cs.inLair && (p.mode === 'ground' || p.mode === 'landing') ? 'ground' : 'air',   // T22: a landing ends on the ground
         clock: round(cs.clock ? cs.clock.t : CK.create().t, 1e5),          // T22: time of day
         now: round(cs.stats.played, 10),                                   // T22: the stamp of ruins, loot and heat (= stats.played)
+        tribute: round(cs.tributeT || 0, 10),                              // Phase 3 T16: s towards the next tribute carcass
       },
       flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0, tips: (cs.flags.tips || []).filter(id => D.tips.order.indexOf(id) >= 0) },   // T23: seen tips
       stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
@@ -155,7 +158,8 @@
       carried: null, eatT: 0,
     });
     cs.larder = (o.larder || []).filter(it => it && D.prey[it.prey] && num(it.food) && it.food > 0)
-      .slice(0, D.lair.larderSize).map(it => ({ type: it.prey, food: it.food }));
+      .slice(0, D.lair.larderSize).map(it => (it.tribute === true ? { type: it.prey, food: it.food, tribute: true } : { type: it.prey, food: it.food }));
+    cs.tributeT = num(w.tribute) ? Math.max(0, Math.min(D.tribute.every, w.tribute)) : 0;   // Phase 3 T16
     const f = o.flags || {};
     cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0,
                  tips: Array.isArray(f.tips) ? f.tips.filter((id, i) => typeof id === 'string' && D.tips.order.indexOf(id) >= 0 && f.tips.indexOf(id) === i) : [] };   // T23
@@ -191,6 +195,10 @@
       if (D.regions[id] && r && Array.isArray(r.lootTaken)) {      // T19: taken loot, back fire.rebuild s after `at`
         const taken = r.lootTaken.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
         if (taken.length) (cs.regionStates[id] = cs.regionStates[id] || {}).lootTaken = taken;
+      }
+      if (D.regions[id] && r && Array.isArray(r.freed)) {         // Phase 3 T16: freed villages (only the freeable ones)
+        const freed = r.freed.filter((k, i) => typeof k === 'string' && k.indexOf(id + '.') === 0 && D.freed.places.indexOf(k) >= 0 && r.freed.indexOf(k) === i);
+        if (freed.length) (cs.regionStates[id] = cs.regionStates[id] || {}).freed = freed;
       }
       if (D.regions[id] && r && num(r.heat) && r.heat > 0) {        // T17: alert heat; decays from `at` on region load
         const q = cs.regionStates[id] = cs.regionStates[id] || {};

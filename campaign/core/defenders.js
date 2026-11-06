@@ -32,6 +32,8 @@
  *       by side when there are more archers than posts), the bastions' ballistae on their walk tops; after the defenders
  *       move, castle.step runs the gate (closes on alarm, opens after the search) and the keep's horn ('horn:blow').
  * Phase 3 T15: caravan escort archers (d.escort, core/caravan.js) join the squad of their region; caravan.step moves them.
+ * Phase 3 T16 freed place (pl.freed): no archers or ballistae spawn there, its peasants do not see or hear the dragon
+ *       and ring no bell (they still flee the breath).
  * The squad also serves as cs.watch (the T14 debug view and the 'to post' debug jump read cs.watch.list).
  * Pure: no DOM, no THREE.
  */
@@ -94,7 +96,7 @@
     for (const pl of town.places) {
       const tpl = D.settlements[pl.type] || {}, own = town.buildings.filter(b => b.place === pl.id);
       const towers = own.filter(b => D.buildings[b.type].post === 'archer');
-      const nA = (tpl.archers || 0) + (tpl.archers ? resp.extraArchers || 0 : 0);   // T17: alert sends more archers up
+      const nA = pl.freed ? 0 : (tpl.archers || 0) + (tpl.archers ? resp.extraArchers || 0 : 0);   // T17: alert sends more archers up; Phase 3 T16: none at a freed place
       const slots = pl.castle ? M.need('castle').posts(town, pl) : null;   // T05: castle posts (towers, gatehouses, wall walks)
       for (let i = 0; slots && slots.length && i < nA; i++) {
         const sl = slots[i % slots.length], k = Math.floor(i / slots.length), b = byId(town, sl.building);
@@ -113,7 +115,7 @@
         if (SE_OUT(b)) { d.alive = false; d.down = true; }
         list.push(d);
       }
-      for (const b of own.filter(x => D.buildings[x.type].post === 'ballista')) {
+      for (const b of pl.freed ? [] : own.filter(x => D.buildings[x.type].post === 'ballista')) {
         const pos = [b.pos[0], topOf(b), b.pos[2]];
         const d = mk('ballista', b.id + '.ballista', pl.id, pos, baseYaw(b, pl), { building: b.id, post: true });
         if (SE_OUT(b)) { d.alive = false; d.down = true; }
@@ -365,7 +367,7 @@
       return;
     }
     // alert / search / panic: ring the bell (one peasant per settlement), then hide
-    const bell = town.buildings.find(b => b.place === d.place && D.buildings[b.type].bell && !b.ruin);
+    const bell = sq.freed && sq.freed[d.place] ? null : town.buildings.find(b => b.place === d.place && D.buildings[b.type].bell && !b.ruin);   // Phase 3 T16: a freed village rings no bell
     const rung = (sq.rung[d.place] || 0) > 0, ringer = sq.list.find(o => o.ringer && o.place === d.place && o.alive && o !== d);
     if (V.ringsBell && bell && !rung && !d.rang && (!ringer || d.ringer)) {
       d.ringer = true; d.goalB = bell.id;
@@ -435,6 +437,8 @@
       if (old && old.town && town && old.town.region === town.region && old.level != null && lv > old.level) out.push({ e: 'defenders:reinforced', level: lv, from: old.level });
     }
     const sq = cs.squad, p = cs.dragon.pilot;
+    sq.freed = {};                                      // Phase 3 T16: peasants of a freed place stay calm (no sight, no bell)
+    for (const pl of (town && town.places) || []) if (pl.freed) sq.freed[pl.id] = true;
     cs.watch = sq;                                      // T14's debug view and 'to post' read cs.watch.list
     sq.t += dt;
     for (const k in sq.rung) sq.rung[k] = Math.max(0, sq.rung[k] - dt);
@@ -461,8 +465,9 @@
         const dy = wrap(want - d.yaw), mx = (d.kind === 'ballista' ? D.defenders.ballista.turn : W.turn) * dt;
         d.yaw = wrap(d.yaw + clamp(dy, -mx, mx));
       }
-      d.seen = inside ? 0 : PC.seen(d, { pos: p.pos }, ctx);
-      d.heard = PC.heard(d, noises);
+      const calm = d.kind === 'peasant' && sq.freed[d.place];
+      d.seen = inside || calm ? 0 : PC.seen(d, { pos: p.pos }, ctx);
+      d.heard = calm ? null : PC.heard(d, noises);
       if (d.seen > 0) d.focus = p.pos.slice();
       else if (d.heard) d.focus = d.heard.pos.slice();
       const was = d.state;
