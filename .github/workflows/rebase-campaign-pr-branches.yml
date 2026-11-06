@@ -1,0 +1,49 @@
+name: Rebase open campaign Phase 3 branches
+
+on:
+  push:
+    branches:
+      - feature/professional-dragon-upgrade
+    paths:
+      - '.github/workflows/rebase-campaign-pr-branches.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rebase:
+    name: Rebase ${{ matrix.branch }} onto campaign-phase-3
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - agent/t214-destroy-mission
+          - agent/t215-caravan-intercept
+          - agent/t216-freed-village
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: campaign-phase-3
+
+      - name: Rebase branch and push safely
+        env:
+          TARGET_BRANCH: ${{ matrix.branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin campaign-phase-3 "${TARGET_BRANCH}"
+          expected_head="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          base_head="$(git rev-parse origin/campaign-phase-3)"
+          echo "Rebasing ${TARGET_BRANCH} (${expected_head}) onto campaign-phase-3 (${base_head})"
+          git checkout --detach "${expected_head}"
+          if ! git rebase "${base_head}"; then
+            git rebase --abort || true
+            echo "::error::Rebase conflict on ${TARGET_BRANCH}; branch was left unchanged."
+            exit 1
+          fi
+          new_head="$(git rev-parse HEAD)"
+          git push --force-with-lease="refs/heads/${TARGET_BRANCH}:${expected_head}" origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          echo "Rebased ${TARGET_BRANCH}: ${expected_head} -> ${new_head}"
