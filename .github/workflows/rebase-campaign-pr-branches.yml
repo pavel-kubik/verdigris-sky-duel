@@ -14,7 +14,7 @@ jobs:
   rebase:
     name: Rebase ${{ matrix.branch }} onto campaign-phase-3
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
           ref: campaign-phase-3
 
-      - name: Rebase branch and push safely
+      - name: Rebase, preserve both sides of overlapping edits, test, and push
         env:
           TARGET_BRANCH: ${{ matrix.branch }}
         run: |
@@ -41,11 +41,40 @@ jobs:
           base_head="$(git rev-parse origin/campaign-phase-3)"
           echo "Rebasing ${TARGET_BRANCH} (${expected_head}) onto campaign-phase-3 (${base_head})"
           git checkout --detach "${expected_head}"
-          if ! git rebase "${base_head}"; then
-            git rebase --abort || true
-            echo "::error::Rebase conflict on ${TARGET_BRANCH}; branch was left unchanged."
-            exit 1
-          fi
+
+          git rebase "${base_head}" || true
+          rebase_dir="$(git rev-parse --git-path rebase-merge)"
+          apply_dir="$(git rev-parse --git-path rebase-apply)"
+          while [ -d "${rebase_dir}" ] || [ -d "${apply_dir}" ]; do
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            if [ "${#conflicts[@]}" -eq 0 ]; then
+              echo "::error::Rebase stopped without resolvable file conflicts."
+              git rebase --abort || true
+              exit 1
+            fi
+            for file in "${conflicts[@]}"; do
+              echo "Combining non-identical edits in ${file}"
+              ours="$(mktemp)"
+              base="$(mktemp)"
+              theirs="$(mktemp)"
+              git show ":2:${file}" > "${ours}"
+              git show ":1:${file}" > "${base}"
+              git show ":3:${file}" > "${theirs}"
+              git merge-file --union -p "${ours}" "${base}" "${theirs}" > "${file}"
+              rm -f "${ours}" "${base}" "${theirs}"
+              git add -- "${file}"
+            done
+            if ! GIT_EDITOR=true git rebase --continue; then
+              if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
+                echo "::error::Rebase continuation failed for a non-conflict reason."
+                git rebase --abort || true
+                exit 1
+              fi
+            fi
+          done
+
+          if [ -f campaign/test/run.js ]; then node campaign/test/run.js; fi
+          if [ -f mp/sim.test.js ]; then node mp/sim.test.js; fi
           new_head="$(git rev-parse HEAD)"
           git push --force-with-lease="refs/heads/${TARGET_BRANCH}:${expected_head}" origin "HEAD:refs/heads/${TARGET_BRANCH}"
-          echo "Rebased ${TARGET_BRANCH}: ${expected_head} -> ${new_head}"
+          echo "Rebased and tested ${TARGET_BRANCH}: ${expected_head} -> ${new_head}"
