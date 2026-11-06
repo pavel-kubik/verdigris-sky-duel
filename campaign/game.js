@@ -9,7 +9,7 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), ML = C.need('msglog');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -19,6 +19,8 @@
   const BUILD = 't213.3 2026-11-05 rebased on campaign-phase-3 (message log)';
   const BUILD = 't214.1 2026-11-05 destroy mission: workshop held as a ruin, rebuilt at accept, debug run-in';
   const BUILD = 't214.2 2026-11-05 rebased on campaign-phase-3 (message log)';
+  const BUILD = 't215.1 2026-11-05 tithe wagon intercept mission';
+  const BUILD = 't215.2 2026-11-05 rebased on campaign-phase-3 (message log)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -138,6 +140,8 @@
   scene.add(lootView.group);
   const targetView = VRender.target.build();                       // T12: gold ring + beam around the mission objective
   scene.add(targetView.group);
+  const caravanView = VRender.caravan.build();                     // Phase 3 T15: the intercept mission's tithe wagon
+  scene.add(caravanView.group);
   /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap.
    *  Outside, render/sky.js sets the lights and the fog colour from the clock every frame (T21). */
   function syncScene() {
@@ -406,6 +410,7 @@
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
     if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[JKLCZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+C wagon (T15), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -831,7 +836,9 @@
         $('#lairDeath').append(b, sm);
         ML.push(msgs, { title: b.textContent, sub: sm.textContent, kind: 'mission', show: false }, stamp());
       }
-      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' ? e.why : 'other')), 4.5, 'mission');
+      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' || e.why === 'caravan' ? e.why : 'other')), 4.5, 'mission');
+      else if (e.e === 'caravan:departed') toast(t('c.caravan.departed'), t(isTouch ? 'c.caravan.departedSubTouch' : 'c.caravan.departedSub'), 4, 'mission');   // T15
+      else if (e.e === 'caravan:stopped') toast(t('c.caravan.stopped'), t(isTouch ? 'c.caravan.stoppedSubTouch' : 'c.caravan.stoppedSub'), 4, 'mission');
       else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2, 'mission');
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
       else if (e.e === 'aerie:enter') openAerie();
@@ -1297,6 +1304,7 @@
     ['Shift+3', 'mission: accept the next one of the catalogue that is open (any stage; won ones and ones waiting for a rest are skipped; the timer starts outside the lair region or an aerie), T10', 'ShiftDigit3', 'mission'],
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
+    ['Shift+C', 'tithe wagon: accepts its mission if needed, goes to the Veltava Bend and flies 90 behind the wagon, 30 up, facing it (breathe fire on it until it stops, land, Grab the chest), T15', 'ShiftKeyC', 'wagon'],
     ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
     ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyW', 'workshop'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
@@ -1565,6 +1573,27 @@
         snapCam(); flashPrompt(t('c.dbg.aerie'), 2);
       }
     }
+    if (code === 'ShiftKeyC') {                                   // Phase 3 T15: the tithe wagon - its mission, the Bend, 90 out behind it
+      const m = D.missions.find(q => q.type === 'intercept'), a = MS.active(cs);
+      if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
+      else {
+        if (cs.inLair) onEvents(ST.lairLeave(cs));
+        if (cs.inAerie) onEvents(ST.aerieAct(cs, 'leave'));
+        if (!a) { cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', m.id)); cs.debugForce = false; }
+        if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
+        if (cs.region !== m.region) onEvents(RG.enter(cs, m.region, cs.region));
+        ST.ensureTown(cs);
+        onEvents(MS.step(cs, 0, []));                             // the timer starts (outside the lair region)
+        onEvents(CA.step(cs, 0));                                 // the wagon is there
+        const cv = cs.caravans && cs.caravans[m.caravan];
+        if (!cv) flashPrompt(t('c.dbg.noCaravan'), 1.5);
+        else {
+          const x = cv.pos[0] - Math.sin(cv.yaw) * 90, z = cv.pos[2] - Math.cos(cv.yaw) * 90;
+          Object.assign(pilot, { mode: 'air', tr: null, pos: [x, Math.max(cv.pos[1], TR.surfaceAt(cs.region, x, z)) + 30, z], yaw: cv.yaw, pitch: -0.12, speed: stats.cruise });
+          snapCam(); flashPrompt(t('c.dbg.caravan'), 2);
+        }
+      }
+    }
     const dbgRi = DBG_REGION_KEYS.findIndex(k => k[1] === code), dbgRegion = dbgRi >= 0 ? Object.keys(D.regions)[dbgRi] || null : null;
     if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
       if (cs.inLair) onEvents(ST.lairLeave(cs));
@@ -1633,6 +1662,7 @@
     preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
     targetView.update(cs, pilot && !cs.inLair ? pilot.pos : null, time);
+    caravanView.update(cs, time, camera, dt);                    // T15
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
@@ -1707,6 +1737,7 @@
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyC']]]],
       ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];
@@ -1807,6 +1838,7 @@
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
+      { const cvi = CA.info(cs); L.push('CARAVAN ' + (!cvi ? '-  (Shift+C: the wagon)' : cvi.id + '  ' + cvi.state + '  hp ' + Math.ceil(cvi.hp) + '/' + cvi.hpMax + '  road ' + Math.round(cvi.s) + '/' + Math.round(cvi.end) + '  escort ' + cvi.alive + '/' + cvi.escort)); }   // T15
       { const ms = MS.timerState(cs); L.push('MISSION ' + (!ms ? '-  (Shift+3: accept next)' : ms.id + '  ' + ms.state + '  left ' + mmss(ms.left) + '  ' + ms.level + (ms.running ? '' : '  paused') + '  (Shift+J done, Shift+K fail)') + '  completed ' + ((cs.missions && cs.missions.completed.length) || 0)); }   // T10
       { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+1: to aerie)')); }   // T08
       L.push('TRAVEL  at ' + (MP.here(cs) || '-') + '  to ' + MP.destinations(cs).map(d => d.id).join(', ') + (cs.mission ? '  mission ' + cs.mission.state : '') + '  (Shift+2 all aeries, Shift+3 mission)');   // T09

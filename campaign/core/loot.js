@@ -21,6 +21,8 @@
  * building as `target` (item.relic = the relic id); core/relics.js hides it (item.hidden) unless its mission is on.
  * Mission items are not written to lootTaken: lost, dropped or vanished, they are back at the door at the next refill.
  * Banking a relic puts it into hoard.relics ('relic:banked' { relic }) instead of gold.
+ * Phase 3 T15: an item with `mission` (the caravan chest, core/caravan.js) is mission loot too: 'loot:taken' carries
+ * e.mission, the carried loot keeps it (missions.fail makes it vanish), it is not written to lootTaken.
  * Pure: no DOM, no THREE.
  */
 (function (root) {
@@ -83,13 +85,15 @@
     item.taken = true;
     cs.carriedLoot = { id: item.id, kind: item.kind, gold: item.gold, size: item.size, region: cs.region };
     if (item.relic) Object.assign(cs.carriedLoot, { relic: item.relic, mission: item.mission });
+    else if (item.mission) cs.carriedLoot.mission = item.mission;   // T15: the caravan chest is mission loot of its kind
     const K = L[item.kind];
-    if (!(K && K.mission)) {                                    // T12: mission loot is back as soon as it is not carried
+    if (!(K && K.mission) && !item.mission) {                                    // T12: mission loot is back as soon as it is not carried
       const rs = cs.regionStates[cs.region] = cs.regionStates[cs.region] || {};
       rs.lootTaken = (rs.lootTaken || []).filter(r => r.id !== item.id).concat([{ id: item.id, at: now }]);
     }
     const e = { e: 'loot:taken', id: item.id, kind: item.kind, gold: item.gold, place: item.place };
     if (item.relic) e.relic = item.relic;
+    if (item.mission) e.mission = item.mission;
     return [e];
   }
 

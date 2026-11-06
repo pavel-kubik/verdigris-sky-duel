@@ -31,6 +31,7 @@
  * T05 castle: a castle place's archers stand on castle.posts (round towers, gatehouses, wall walks; round robin, side
  *       by side when there are more archers than posts), the bastions' ballistae on their walk tops; after the defenders
  *       move, castle.step runs the gate (closes on alarm, opens after the search) and the keep's horn ('horn:blow').
+ * Phase 3 T15: caravan escort archers (d.escort, core/caravan.js) join the squad of their region; caravan.step moves them.
  * The squad also serves as cs.watch (the T14 debug view and the 'to post' debug jump read cs.watch.list).
  * Pure: no DOM, no THREE.
  */
@@ -494,7 +495,7 @@
     const by = {}, out = [], town = sq && sq.town;
     for (const d of (sq && sq.list) || []) {
       if (!d.alive || (d.kind !== 'archer' && d.kind !== 'ballista')) continue;
-      if (d.patrol) { out.push({ x: d.pos[0], z: d.pos[2], r: D.defenders.archer.range }); continue; }   // T17: a zone per patrol archer
+      if (d.patrol || d.escort) { out.push({ x: d.pos[0], z: d.pos[2], r: D.defenders.archer.range }); continue; }   // T17: a zone per patrol archer (T15: and caravan escort)
       const pl = town && town.places.find(p => p.id === d.place), cx = pl ? pl.x : d.pos[0], cz = pl ? pl.z : d.pos[2];
       const r = Math.hypot(d.pos[0] - cx, d.pos[2] - cz) + D.defenders[d.kind].range;
       if (!by[d.place] || by[d.place].r < r) by[d.place] = { x: cx, z: cz, r };
@@ -513,5 +514,5 @@
     return sq;
   }
 
-  M.define('defenders', { spawn, routeOf, along, step, burn, zones, calm, aimArrow, inCone, segDist2 });
+  M.define('defenders', { mk, spawn, routeOf, along, step, burn, zones, calm, aimArrow, inCone, segDist2 });
 })(typeof self !== 'undefined' ? self : this);

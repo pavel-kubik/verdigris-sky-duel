@@ -14,7 +14,7 @@
  *       -> state 'done' ('mission:done'); mission loot lost or dropped again -> back to 'running'
  *     - done and inside the lair or an aerie -> success: gold x (1 + bonus x floor(left / bonusPer)) into the hoard,
  *       the relic into hoard.relics ('mission:success' { id, gold, base, bonus, left })
- *     - 'dragon:died' -> fail 'death'; timer at 0 -> fail 'timeout'
+ *     - 'dragon:died' -> fail 'death'; timer at 0 -> fail 'timeout'; T15: 'caravan:arrived' of its caravan -> fail 'caravan'
  *   fail(cs, why) -> events[]                 mission loot in the claws vanishes ('loot:vanished'), region heat + alertOnFail,
  *                                             retry after the next rest (failedAt[id] = cs.flags.rested): 'mission:failed' { id, why }
  *   finish(cs) -> events[]                    debug: the objective counts as met ('mission:done')
@@ -168,6 +168,7 @@
       if (cs.inAerie) a.viaAerie = true;
       if (!inside(cs) && (a.viaAerie || cs.region !== LR().home())) { a.state = 'running'; out.push({ e: 'mission:started', id: a.id, time: a.left }); }
     }
+    if (a.state === 'running' && m.type === 'intercept' && ev.some(e => e.e === 'caravan:arrived' && e.caravan === m.caravan)) return out.concat(fail(cs, 'caravan'));   // T15
     if (a.state === 'running' || a.state === 'done') {
       for (const e of ev) {
         if (a.state === 'running' && meets(a, m, e)) { a.state = 'done'; out.push({ e: 'mission:done', id: a.id }); }
@@ -220,6 +221,8 @@
       const s = !cs.inLair && !cs.inAerie && AE.site(cs.region);
       return s && AE.found(cs, cs.region) ? { key: 'c.mission.obj.homeAerie', p: { region: 'c.region.' + cs.region } } : { key: 'c.mission.obj.home' };
     }
+    if (a.state === 'done') return { key: 'c.mission.obj.home' };
+    if (m.type === 'intercept' && a.stopped) return { key: 'c.mission.obj.chest' };   // T15: the wagon stands, take its chest
     return { key: 'c.mission.obj.' + m.type, p: { region: 'c.region.' + m.region } };
   }
 
