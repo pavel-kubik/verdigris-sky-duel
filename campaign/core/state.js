@@ -182,9 +182,10 @@
     for (const e of NV.step(cs, dt)) emit(cs, ev, e);           // smell: scent markers for the compass (T09); discovery (T12)
     for (const e of MP.step(cs, dt)) emit(cs, ev, e);           // Phase 3 T07: cells around the dragon become explored (map fog)
     for (const e of MO.step(cs, ev, dt, cs.danger ? { danger: cs.danger } : null)) emit(cs, ev, e);   // the mother (T05) reacts to this frame
-    for (const e of TP.step(cs, ev, dt)) emit(cs, ev, e);      // T23: one-time tips (landing, compass, cave, raid, alert, altar)
     for (const e of MS.step(cs, dt, ev.slice())) emit(cs, ev, e);   // Phase 3 T10: mission timer, objectives, success / fail
     for (const e of SY.step(cs, dt)) emit(cs, ev, e);           // Phase 3 T17: act change, the mother's first castle raid, her lines
+    // T23: one-time tips; T19: after the story, so a line she starts this frame (her castle raid) holds the tip back
+    for (const e of TP.step(cs, ev, dt)) emit(cs, ev, e);
     return autosave(cs, ev, dt);
   }
 

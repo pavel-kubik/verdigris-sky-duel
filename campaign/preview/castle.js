@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't219.1 2026-11-08 tips for the Bend, castle, map, aeries, missions; balancing (ballista 28, mission times, caravan chest)';
+  const BUILD = 't219.2 2026-11-08 tips after the story step (her castle raid line holds a tip back); tips for the Bend, castle, map, aeries, missions; balancing';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
