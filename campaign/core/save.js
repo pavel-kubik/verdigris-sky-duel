@@ -1,6 +1,10 @@
 /*
  * Verdigris campaign - the save: serialise / deserialise / migrate, and a storage adapter.
- * See 001_task_survival.md 5.9 (v1) and 002_task_kingdom.md 5.9 (v2, T22).
+ * See 001_task_survival.md 5.9 (v1), 002_task_kingdom.md 5.9 (v2, T22) and 003_task_missions.md 5.9 (v3, Phase 3 T18).
+ * v3 adds: missions.active (the running mission with its mission loot in the claws and its caravan), regions.<id>.explored
+ * (base64 bitset of map cells), regions.<id>.aerieFound (out of `discovered`), regions.<id>.gate ('open' | 'closed', the
+ * castle portcullis of the loaded town), story.act. v2 -> v3: no active mission, explored = the cells around the
+ * discovered places (seedExplored, done in apply), story.act from the stage.
  * v2 adds to world: mode ('air' | 'ground'; landing saves as ground, takeoff as air), location 'field' | 'cave'
  * (v1 wrote 'lair'), clock (time of day 0..1) and now (= stats.played, the stamp for ruins, loot and heat).
  * A ground save restores standing on the ground (on a roof when it stood on one); a cave save restores on the nest.
@@ -23,12 +27,64 @@
 
   const num = v => typeof v === 'number' && Number.isFinite(v);
   const round = (v, k) => Math.round(v * k) / k;
+  /* ---------- T18: explored cells as base64 (bitset words, 32 cells each, little-endian bytes) ---------- */
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  function wordsTo64(words) {
+    const by = [];
+    for (const w of words) for (let k = 0; k < 4; k++) by.push((w >>> (8 * k)) & 255);
+    let out = '';
+    for (let i = 0; i < by.length; i += 3) {
+      const n = (by[i] << 16) | ((by[i + 1] || 0) << 8) | (by[i + 2] || 0), left = by.length - i;
+      out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + (left > 1 ? B64[(n >> 6) & 63] : '=') + (left > 2 ? B64[n & 63] : '=');
+    }
+    return out;
+  }
+  /** -> number[] of `count` words, or null when the text is not base64 of that length. */
+  function wordsFrom64(text, count) {
+    if (typeof text !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(text) || text.length % 4) return null;
+    const by = [];
+    for (let i = 0; i < text.length; i += 4) {
+      const c = [0, 1, 2, 3].map(k => (text[i + k] === '=' ? 0 : B64.indexOf(text[i + k])));
+      const n = (c[0] << 18) | (c[1] << 12) | (c[2] << 6) | c[3];
+      by.push((n >> 16) & 255);
+      if (text[i + 2] !== '=') by.push((n >> 8) & 255);
+      if (text[i + 3] !== '=') by.push(n & 255);
+    }
+    if (by.length !== count * 4) return null;
+    const words = [];
+    for (let i = 0; i < count; i++) words.push((by[4 * i] | (by[4 * i + 1] << 8) | (by[4 * i + 2] << 16) | (by[4 * i + 3] << 24)) >>> 0);
+    return words;
+  }
+  const MP = () => M.need('map'), MS = () => M.need('missions');
+
+  /** T18: the running mission as saved: { id, state, left, viaAerie, stopped, caravan? }; null when none is on. */
+  function activeOf(cs) {
+    const a = cs.mission, m = a && MS().def(a.id);
+    if (!m || !(a.state === 'accepted' || a.state === 'running' || a.state === 'done')) return null;
+    const o = { id: a.id, state: a.state, left: round(Math.max(0, a.left), 10), viaAerie: !!a.viaAerie, stopped: !!a.stopped };
+    const cv = m.caravan && cs.caravans && cs.caravans[m.caravan];
+    if (cv && cv.state !== 'arrived') o.caravan = { s: round(cv.s, 10), hp: round(cv.hp, 100), state: cv.state, chestTaken: !!(cv.chest && cv.chest.taken) };
+    return o;
+  }
+  /** T18: loot in the claws as saved; mission loot (a relic, the caravan chest) only together with its running mission. */
+  function lootOf(cs) {
+    const l = cs.carriedLoot, K = l && D.loot[l.kind];
+    if (!l || !K) return null;
+    const mine = !!(K.mission || l.mission);
+    if (!mine) return { id: l.id, kind: l.kind, region: l.region };
+    const a = activeOf(cs);
+    if (!a || (l.mission && l.mission !== a.id)) return null;
+    const o = { id: l.id, kind: l.kind, region: l.region, mission: a.id };
+    if (l.relic) o.relic = l.relic;
+    return o;
+  }
+
   function fail(code, why) { const e = new Error(code + (why ? ': ' + why : '')); e.code = code; throw e; }
 
   /** The story part of the save: the act and the mother's lesson state (null = no teacher, e.g. a phase 1 run). */
   function storyOf(st) {
     const m = st && st.mother, SY = M.need('story').saved(st);   // Phase 3 T17: seen cards / lines and the mother's raid
-    return { act: (st && st.act) || 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null, seen: SY.seen, raid: SY.raid };
+    return { act: st && (st.act === 1 || st.act === 2 || st.act === 3) ? st.act : 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null, seen: SY.seen, raid: SY.raid };
   }
 
   function serialise(cs) {
@@ -40,15 +96,21 @@
         hp: round(d.hp, 100), hunger: round(d.hunger, 100), deaths: d.deaths || 0, upgrades: (cs.upgrades || []).filter(id => D.upgrades[id]),   // T20
         // T19: in the claws. Phase 3 T12: not mission loot (a relic) - the running mission is only saved with v3 (T18),
         // so a reload puts the relic back at its door with the mission
-        loot: cs.carriedLoot && !(D.loot[cs.carriedLoot.kind] && D.loot[cs.carriedLoot.kind].mission) ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,
+        // v3 (T18): mission loot is saved together with the running mission (missions.active)
+        loot: lootOf(cs),
       },
       hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: ((cs.hoard && cs.hoard.relics) || []).filter(id => D.relics && D.relics[id]) },   // T19, relics: Phase 3 T12
       larder: cs.larder.map(it => it.tribute ? { prey: it.type, food: round(it.food, 100), tribute: true } : { prey: it.type, food: round(it.food, 100) }),   // Phase 3 T16: tribute carcasses keep their mark
       renown: 0,
       regions: Object.keys(D.regions).reduce((o, id) => {              // T12: discovered settlements (the rest of v2 in T22)
         o[id] = {};
-        const seen = Object.keys(cs.discovered || {}).filter(k => cs.discovered[k] && k.indexOf(id + '.') === 0).sort();
+        const seen = Object.keys(cs.discovered || {}).filter(k => cs.discovered[k] && k.indexOf(id + '.') === 0 && k !== id + '.aerie').sort();
         if (seen.length) o[id].discovered = seen;
+        if (cs.discovered && cs.discovered[id + '.aerie']) o[id].aerieFound = true;   // v3 (T18)
+        const ex = cs.explored && cs.explored[id];                   // v3 (T18): explored map cells
+        if (ex && ex.some(w => w)) o[id].explored = wordsTo64(ex);
+        const town = cs.town && cs.town.region === id ? cs.town : null;   // v3 (T18): the castle gate of the loaded town
+        if (town && town.buildings && town.buildings.some(b => b.gate)) o[id].gate = town.gateClosed ? 'closed' : 'open';
         const ruins = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].ruins) || []).filter(r => r && typeof r.id === 'string');
         if (ruins.length) o[id].ruins = ruins.map(r => r.char ? { id: r.id, at: round(r.at || 0, 10), char: true } : { id: r.id, at: round(r.at || 0, 10) });   // T13 (v2 shape, 5.9); T06: char = a charred castle stone piece
         const corn = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].corn) || []).filter(r => r && typeof r.id === 'string');
@@ -65,8 +127,8 @@
         }
         return o;
       }, {}),
-      missions: { completed: ((cs.missions && cs.missions.completed) || []).slice(), active: null, failedAt: Object.assign({}, cs.missions && cs.missions.failedAt) },   // T10 (the running mission: T18)
-      story: storyOf(cs.story),
+      missions: { completed: ((cs.missions && cs.missions.completed) || []).slice(), active: activeOf(cs), failedAt: Object.assign({}, cs.missions && cs.missions.failedAt) },   // T10, active: T18
+      story: Object.assign(storyOf(cs.story), { act: M.need('story').act(cs) }),   // T18: the act from the stage
       world: {
         region: cs.region,
         pos: p ? (cs.inLair && LR.mouthPos(cs.region) || p.pos).map(v => round(v, 100)) : null,   // inside: the mouth (cave coordinates are local)
@@ -108,6 +170,30 @@
       const h = o.hoard && typeof o.hoard === 'object' ? o.hoard : { gold: 0, relics: [] };
       return Object.assign({}, o, { version: 2, dragon: d, hoard: h, regions: o.regions && typeof o.regions === 'object' ? o.regions : {}, world: w });
     },
+    /* v2 -> v3 (Phase 3 T18): no running mission (a v2 save never had one), the found aeries move from `discovered` to
+       aerieFound, explored cells are seeded around the discovered places in apply (seedExplored), story.act from the stage */
+    2: o => {
+      const regions = {};
+      const src = o.regions && typeof o.regions === 'object' && !Array.isArray(o.regions) ? o.regions : {};
+      for (const id of Object.keys(src)) {
+        const r = src[id];
+        if (!r || typeof r !== 'object') { regions[id] = r; continue; }
+        const q = Object.assign({}, r);
+        if (Array.isArray(r.discovered) && r.discovered.indexOf(id + '.aerie') >= 0) {
+          q.discovered = r.discovered.filter(k => k !== id + '.aerie');
+          q.aerieFound = true;
+        }
+        delete q.explored; delete q.gate;
+        regions[id] = q;
+      }
+      const mo = o.missions && typeof o.missions === 'object' ? o.missions : {};
+      const st = Object.assign({}, o.story && typeof o.story === 'object' ? o.story : {});
+      st.act = o.dragon && o.dragon.stage >= 1 ? 2 : 1;
+      const d = Object.assign({}, o.dragon);
+      if (d.loot && D.loot[d.loot.kind] && D.loot[d.loot.kind].mission) d.loot = null;
+      return Object.assign({}, o, { version: 3, dragon: d, regions, story: st, seedExplored: true,
+        missions: { completed: Array.isArray(mo.completed) ? mo.completed : [], active: null, failedAt: mo.failedAt && typeof mo.failedAt === 'object' ? mo.failedAt : {} } });
+    },
   };
 
   function migrate(obj) {
@@ -141,6 +227,16 @@
       if (o.hoard != null && (typeof o.hoard !== 'object' || (o.hoard.gold != null && !num(o.hoard.gold)))) fail('corrupt', 'hoard');
       if (o.regions != null && (typeof o.regions !== 'object' || Array.isArray(o.regions))) fail('corrupt', 'regions');
     }
+    if (o.version >= 3) {                                        // T18: the v3 blocks
+      const mo = o.missions;
+      if (!mo || typeof mo !== 'object' || Array.isArray(mo)) fail('corrupt', 'missions');
+      if (mo.active != null && (typeof mo.active !== 'object' || typeof mo.active.id !== 'string' || !num(mo.active.left))) fail('corrupt', 'missions.active');
+      if (!o.story || typeof o.story !== 'object') fail('corrupt', 'story');
+      for (const id of Object.keys(o.regions || {})) {
+        const r = o.regions[id];
+        if (r && r.explored != null && typeof r.explored !== 'string') fail('corrupt', 'regions.' + id + '.explored');
+      }
+    }
     return o;
   }
 
@@ -170,7 +266,7 @@
     const h = o.hoard || {};                                     // T19: banked gold, never negative
     cs.hoard = { gold: num(h.gold) ? Math.max(0, Math.floor(h.gold)) : 0, relics: Array.isArray(h.relics) ? h.relics.filter(id => typeof id === 'string' && D.relics && D.relics[id]) : [] };   // T12: known relics
     const dl = o.dragon.loot;                                    // T19: loot in the claws
-    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && !D.loot[dl.kind].mission && D.regions[dl.region]
+    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && !D.loot[dl.kind].mission && !dl.mission && D.regions[dl.region]
       ? { id: dl.id, kind: dl.kind, gold: D.loot[dl.kind].gold, size: D.loot[dl.kind].size, region: dl.region } : null;
     cs.lootTarget = null;
     const ups = Array.isArray(o.dragon.upgrades) ? o.dragon.upgrades : [];   // T20: owned upgrades, known ids once each
@@ -178,15 +274,22 @@
     const mo = o.missions || {}, known = id => typeof id === 'string' && D.missions.some(m => m.id === id);   // T10
     cs.missions = { completed: Array.isArray(mo.completed) ? mo.completed.filter((id, i) => known(id) && mo.completed.indexOf(id) === i) : [], failedAt: {} };
     for (const id of Object.keys(mo.failedAt || {})) if (known(id) && num(mo.failedAt[id])) cs.missions.failedAt[id] = mo.failedAt[id] | 0;
-    cs.mission = null;
+    cs.mission = null; cs.caravans = {}; cs.caravanSaved = null;
+    restoreMission(cs, mo.active, dl);                           // v3 (T18): the running mission, its loot and caravan
     cs.story = storyOf(o.story);
-    cs.discovered = {}; cs.regionStates = {};
+    cs.discovered = {}; cs.regionStates = {}; cs.explored = {};
     for (const id of Object.keys(o.regions || {})) {
       const r = o.regions[id];
       if (D.regions[id] && r && Array.isArray(r.discovered)) for (const k of r.discovered) if (typeof k === 'string' && k.indexOf(id + '.') === 0) cs.discovered[k] = true;
+      if (D.regions[id] && r && r.aerieFound === true) cs.discovered[id + '.aerie'] = true;   // v3 (T18)
+      if (D.regions[id] && r && typeof r.explored === 'string') {  // v3 (T18): the bitset; a wrong length starts unexplored
+        const words = wordsFrom64(r.explored, MP().bits({ explored: {} }, id).length);
+        if (words) cs.explored[id] = words;
+      }
+      if (D.regions[id] && r && (r.gate === 'open' || r.gate === 'closed')) (cs.regionStates[id] = cs.regionStates[id] || {}).gate = r.gate;   // v3 (T18)
       if (D.regions[id] && r && Array.isArray(r.ruins)) {          // T13: burned buildings, rebuilt fire.rebuild s after `at`
         const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => q.char === true ? { id: q.id, at: q.at, char: true } : { id: q.id, at: q.at });
-        if (ruins.length) cs.regionStates[id] = { ruins };
+        if (ruins.length) (cs.regionStates[id] = cs.regionStates[id] || {}).ruins = ruins;
       }
       if (D.regions[id] && r && Array.isArray(r.corn)) {           // burned corn fields, grow back corn.regrow s after `at`
         const corn = r.corn.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
@@ -207,6 +310,7 @@
         if (num(r.at)) q.at = r.at;
       }
     }
+    if (o.seedExplored) seedExplored(cs);                        // v2 -> v3: the cells around the discovered places
     cs.town = null; cs.crops = null;                             // rebuilt with the loaded ruins (state.ensureTown)
     cs.hint = null; cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.exit = null; cs.exitT = 0; cs.exitSmall = null; cs.exitSmallT = 0; cs.saveT = 0; cs.station = null;
 
@@ -224,6 +328,34 @@
       else if (w.mode === 'ground') standOn(cs, d.pilot);        // T22: a landed dragon wakes standing where it was
     } else d.pilot = null;
     return cs;
+  }
+
+  /** T18: cs.mission (and the mission loot in the claws, and the caravan to restore when it spawns) from missions.active. */
+  function restoreMission(cs, a, dl) {
+    const m = a && typeof a.id === 'string' ? MS().def(a.id) : null;
+    if (!m || cs.missions.completed.indexOf(m.id) >= 0 || !(a.state === 'accepted' || a.state === 'running' || a.state === 'done')) return;
+    cs.mission = { id: m.id, state: a.state, t: m.time, left: Math.max(0, Math.min(m.time, a.left)), viaAerie: !!a.viaAerie, stopped: !!a.stopped };
+    const K = dl && D.loot[dl.kind];
+    if (K && dl.mission === m.id && typeof dl.id === 'string' && D.regions[dl.region]) {
+      cs.carriedLoot = { id: dl.id, kind: dl.kind, gold: K.gold, size: K.size, region: dl.region, mission: m.id };
+      if (typeof dl.relic === 'string' && D.relics && D.relics[dl.relic]) cs.carriedLoot.relic = dl.relic;
+      else if (dl.kind === 'relic') cs.carriedLoot = null;       // a relic without a known id
+      if (cs.carriedLoot && m.caravan) cs.carriedLoot.gold = (D.loot[(D.caravan[m.caravan] || {}).chest] || K).gold;
+    }
+    const c = a.caravan;
+    if (m.caravan && c && num(c.s) && num(c.hp) && (c.state === 'waiting' || c.state === 'moving' || c.state === 'stopped'))
+      cs.caravanSaved = { [m.caravan]: { s: c.s, hp: c.hp, state: c.state, chestTaken: !!c.chestTaken } };
+  }
+
+  /** v2 -> v3: explore the cells around every discovered place (and the lair), as if the dragon had flown there. */
+  function seedExplored(cs) {
+    const keep = cs.region;
+    for (const id of Object.keys(D.regions)) {
+      let places = [];
+      try { places = MP().model(cs, id).places; } catch (_) { places = []; }
+      for (const pl of places) MP().reveal(cs, id, pl.x, pl.z, D.map.reveal);
+    }
+    cs.region = keep;
   }
 
   /** T22: put a restored pilot on the ground (terrain or a roof under it); over water it stays in the air. */

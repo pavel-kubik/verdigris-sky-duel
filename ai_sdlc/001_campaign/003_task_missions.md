@@ -354,7 +354,7 @@ Mission times are longer than in the first draft because the Bend is one region 
   reward comes from `mission:success`). The save keeps `hoard.relics` now (v2 shape); a relic in the claws is not saved
   until the running mission is (v3, T18) - a reload puts it back at the door. Trophy wall: cave station `trophy`
   [-40, 20, 5], `data.trophy.niches` 3 arched niches, the Ember Chalice in niche 1 with an additive glow; its panel lists
-  each niche with the relic's story line. Debug: Shift+L (DBG mission tab, "chalice") accepts the chalice mission and
+  each niche with the relic's story line. Debug: Shift+H (was Shift+L; DBG mission tab, "chalice") accepts the chalice mission and
   stands at the chapel door in the Bend, elsewhere puts the chalice straight into the claws.
 - As built (T13): the steal flow needed no new rules beyond T10-T12 (the chalice lies at the chapel1 door inside the
   walls; Grab takes it on foot only). Added: once the chalice is taken, the HUD objective line names the escape -
@@ -373,7 +373,7 @@ Mission times are longer than in the first draft because the Bend is one region 
   time 540 s (was 420): the seeded bot `test/destroy-bot.js` (careful pilot: hunts in the Wildwood, rounds the castle at
   300 out to a run-in over the courtyard at bearing 0.75 from the workshop, a long glide at roof height with Fire held,
   climbs out and circles 280 out until it is a ruin, then flies home) needed 6.5-9.4 min per seed, and 420 s timed out
-  4 of 8 seeds. Debug: Shift+W (DBG mission tab, "workshop") accepts it and puts the dragon on the run-in, 160 out.
+  4 of 8 seeds. Debug: Shift+O (was Shift+W, which fired while boosting forward; DBG mission tab, "workshop") accepts it and puts the dragon on the run-in, 160 out.
 
 ### 5.6 `caravan`
 
@@ -416,6 +416,20 @@ Mission times are longer than in the first draft because the Bend is one region 
 ```
 
 v2 -> v3: empty missions, no relics, nothing explored except the cells around discovered places, `story.act` from the stage.
+
+- As built (T18): `missions.active` = `{ id, state: 'accepted' | 'running' | 'done', left, viaAerie, stopped, caravan? }`;
+  mission loot in the claws (the chalice, the caravan chest) is saved in `dragon.loot` with `mission` (and `relic`) and
+  restored only together with its running mission (a v2 relic in the claws is dropped, as before). The intercept caravan
+  is saved as `caravan: { s, hp, state, chestTaken }`: after the reload the wagon goes on from the saved spot (a moving
+  wagon waits again until the dragon is in the Bend), a stopped one drops its chest on the road again (or has it taken);
+  the escort archers come back fresh. `regions.<id>.explored` is the region's bitset words as little-endian bytes in
+  base64 (a string of the wrong length starts that region unexplored, it does not make the save corrupt);
+  `aerieFound` replaces `<id>.aerie` in `discovered`; `gate: 'closed'` is written for the loaded castle town and closes
+  the portcullis on the first town build after the load; the calm garrison then opens it as after a search. Charred
+  stone stays in `ruins` (`char: true`, v2 shape). Migration v2 -> v3 sets `seedExplored` and `apply` reveals
+  `data.map.reveal` around every discovered place and the lair. A new dragon's save with every region fully
+  explored is about 2 KB (the explored bitsets are under 1 KB). Corrupt v3: missing `missions` or `story`, a non-object `missions.active` or a non-number `left`, a
+  non-string `explored`.
 
 ## 6. Rendering and UI
 

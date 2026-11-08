@@ -10,7 +10,7 @@
   const PI = Math.PI;
 
   const data = {
-    version: 2,                      // save format (core/save.js): v2 = Phase 2 (T22), v1 saves migrate
+    version: 3,                      // save format (core/save.js): v3 = Phase 3 (T18), v2 = Phase 2 (T22); older saves migrate
     saveKey: 'vsd-campaign',
     // autosave: every `every` s of play, plus on rest, region change and death (core emits a 'save' event)
     save: { every: 60 },

@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't217.2 2026-11-06 rebased on campaign-phase-3 (base repair #61 merged)';
+  const BUILD = 't218.2 2026-11-08 debug keys never clash with game keys (X was save + reload, Shift+W / F / G / L with Boost)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -409,7 +409,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CFGJKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+C wagon (T15), Shift+F / G free the village, tribute now (T16), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CHJKOTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+H chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1286,7 +1286,7 @@
     ['C', 'become a Drake now (Farmlands test)', 'KeyC', 'drake now'],
     ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
-    ['X', 'save now, then reload the page (save v2 test: Continue restores it)', 'KeyX', 'save + reload'],
+    ['panel', 'save now, then reload the page (save test: Continue restores it); DBG button only - X is Eat', 'DbgSaveReload', 'save + reload'],
     ['Y', 'graphics quality low / mid / high (saved)', 'KeyY', 'quality'],
     ['I', 'put the nearest goat in front of the dragon', 'KeyI', 'goat here'],
     ['M', 'mother: complete the current lesson', 'KeyM', 'next lesson'],
@@ -1320,10 +1320,10 @@
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
     ['Shift+C', 'tithe wagon: accepts its mission if needed, goes to the Veltava Bend and flies 90 behind the wagon, 30 up, facing it (breathe fire on it until it stops, land, Grab the chest), T15', 'ShiftKeyC', 'wagon'],
-    ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
-    ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyW', 'workshop'],
-    ['Shift+F', 'free the village: its Order buildings fall to ruins, its archers fall, the Order flag drops (Farmlands village), Phase 3 T16', 'ShiftKeyF', 'free village'],
-    ['Shift+G', 'tribute now: the next food tribute of a freed village arrives in the larder (Phase 3 T16)', 'ShiftKeyG', 'tribute now'],
+    ['Shift+H', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyH', 'chalice'],
+    ['Shift+O', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyO', 'workshop'],
+    ['Shift+V', 'free the village: its Order buildings fall to ruins, its archers fall, the Order flag drops (Farmlands village), Phase 3 T16', 'ShiftKeyV', 'free village'],
+    ['Shift+T', 'tribute now: the next food tribute of a freed village arrives in the larder (Phase 3 T16)', 'ShiftKeyT', 'tribute now'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
@@ -1424,12 +1424,12 @@
       if (!list.length) flashPrompt(t('c.dbg.noLoot'), 1.5);
       else { dbgLoot = (dbgLoot + 1) % list.length; standAtLoot(list[dbgLoot]); }
     }
-    if (code === 'ShiftKeyF' && !cs.inLair && cs.town) onEvents(C.need('freed').freeDebug(cs));   // Phase 3 T16
-    if (code === 'ShiftKeyG') {
+    if (code === 'ShiftKeyV' && !cs.inLair && cs.town) onEvents(C.need('freed').freeDebug(cs));   // Phase 3 T16
+    if (code === 'ShiftKeyT') {
       if (!C.need('freed').freedAll(cs).length) flashPrompt(t('c.dbg.tributeNone'), 1.8);
       else cs.tributeT = D.tribute.every;                        // arrives on the next frame (or waits for room in the larder)
     }
-    if (code === 'ShiftKeyL' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
+    if (code === 'ShiftKeyH' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
       const m = RL.missionOf('ember_chalice'), a = MS.active(cs);
       if (RL.has(cs, 'ember_chalice')) flashPrompt(t('c.dbg.relicOwned'), 1.5);
       else if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
@@ -1441,7 +1441,7 @@
         else if (!cs.carriedLoot) { onEvents(RL.giveDebug(cs)); flashPrompt(t('c.dbg.relicClaws'), 1.5); }
       }
     }
-    if (code === 'ShiftKeyW' && !cs.inLair) {                     // Phase 3 T14: run-in on the siege workshop (destroy mission)
+    if (code === 'ShiftKeyO' && !cs.inLair) {                     // Phase 3 T14: run-in on the siege workshop (destroy mission)
       const m = MS.def('a2_workshop'), a = MS.active(cs);
       if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
       else if (cs.region !== m.region || !cs.town) flashPrompt(t('c.dbg.workshopBend'), 2);
@@ -1626,7 +1626,7 @@
     }
     if (code === 'KeyV') { const okS = saveNow('debug'); flashPrompt(t(okS ? 'c.dbg.saved' : saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); }
     if (code === 'KeyU') { saveOff = true; SV.clear(storage); location.reload(); return; }
-    if (code === 'KeyX') { if (saveNow('debug')) location.reload(); else flashPrompt(t(saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); return; }   // T22
+    if (code === 'DbgSaveReload') { if (saveNow('debug')) location.reload(); else flashPrompt(t(saveOff ? 'c.dbg.saveOff' : 'c.dbg.notSaved'), 1.5); return; }   // T22
     if (code === 'KeyR') {
       Object.assign(dragon, { stage: 0, foodXp: 0, hp: D.stages[0].hp, hunger: D.hunger.start });
       refreshStage(); pilot.st = 100;
@@ -1757,10 +1757,10 @@
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
       ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
-      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyF', 'ShiftKeyG']]]],
+      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
-      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW', 'ShiftKeyC']]]],
-      ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyH', 'ShiftKeyO', 'ShiftKeyC']]]],
+      ['save', [['', ['KeyV', 'DbgSaveReload', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];
     for (const [name, rows] of GROUPS) {

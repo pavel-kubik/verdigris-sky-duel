@@ -23,7 +23,8 @@
  *        burnT, walk, escort: [defender], chest: loot item | null }
  * The chest is a loot item { id: 'caravan.<id>.chest', kind (data.caravan.<id>.chest), mission, caravan, ... }: loot.take
  * emits 'loot:taken' with `mission`, it is never written to lootTaken (mission loot) and vanishes on a mission fail.
- * Not saved (the running mission is saved with v3, T18). Pure: no DOM, no THREE.
+ * Saved with the running mission (save v3, T18: missions.active.caravan { s, hp, state, chestTaken }); apply puts it in
+ * cs.caravanSaved and spawn() goes on from there (a moving wagon waits again, escorts come back fresh). Pure: no DOM, no THREE.
  */
 (function (root) {
   'use strict';
@@ -65,7 +66,15 @@
     if (!c || !r) return null;
     const cv = { id, mission: missionId || null, region: c.region, s: c.from * r.total, end: c.to * r.total, speed: c.speed,
                  hp: c.wagonHp, hpMax: c.wagonHp, state: 'waiting', pos: [0, 0, 0], yaw: 0, burnT: 0, walk: 0, escort: [], chest: null };
+    const sv = cs.caravanSaved && cs.caravanSaved[id];             // T18: a caravan of a reloaded save goes on where it was
+    if (sv) {
+      delete cs.caravanSaved[id];
+      cv.s = Math.max(cv.s, Math.min(cv.end, sv.s));
+      cv.hp = Math.max(0, Math.min(cv.hpMax, sv.hp));
+      if (sv.state === 'stopped' || cv.hp <= 0) { cv.state = 'stopped'; cv.hp = 0; }
+    }
     place(cv);
+    if (cv.state === 'stopped') { dropChest(cv); if (sv && sv.chestTaken) cv.chest.taken = true; }
     const S = C().slots;
     for (let i = 0; i < (c.escort || 0); i++) {
       const sl = S[i % S.length], [x, z] = off(cv, sl[1], sl[0]);

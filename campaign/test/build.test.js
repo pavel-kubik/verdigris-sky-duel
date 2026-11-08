@@ -48,3 +48,19 @@ const entries = [...shell.matchAll(/'([^']+)'/g)].map(m => m[1]);
 const swDup = entries.filter((f, i) => entries.indexOf(f) !== i);
 ok(!swDup.length, 'sw.js SHELL lists every file once' + (swDup.length ? ' (twice: ' + swDup.join(', ') + ')' : ''));
 for (const f of files('core').concat(files('render'))) ok(entries.indexOf(f) >= 0, 'sw.js precaches ' + f);
+
+// Debug keys never clash with game keys (2026-11-08: X is Eat and was also the debug save + reload, so eating restarted
+// a ?debug game; Shift is Boost, so Shift+W / F / G / L fired debug actions while boosting forward, landing, grabbing).
+{
+  const src = read('campaign/game.js');
+  const D = require('./harness.js').core('data');
+  const block = src.slice(src.indexOf('const DEBUG_KEYS = ['), src.indexOf('];', src.indexOf('const DEBUG_KEYS = [')));
+  const codes = [...block.matchAll(/\[\s*'[^']*',\s*'(?:[^'\\]|\\.)*',\s*'([A-Za-z0-9]+)'/g)].map(m => m[1]);
+  ok(codes.length > 30, 'debug key table read (' + codes.length + ' codes)');
+  const game = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyL', 'Space', 'Enter', 'Tab', 'Escape', 'ShiftLeft', 'ShiftRight',
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].concat(Object.values(D.controls));
+  for (const c of codes) {
+    const base = c.replace(/^Shift(?=Key|Digit)/, '');
+    ok(game.indexOf(c) < 0 && game.indexOf(base) < 0, 'debug key ' + c + ' is not a game key (or Shift + one: Shift is Boost)');
+  }
+}
