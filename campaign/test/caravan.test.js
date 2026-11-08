@@ -43,7 +43,7 @@ function distToRoad(r, x, z) {
 {
   const c = D.caravan.tithe, r = CA.route('tithe');
   ok(D.missions.find(m => m.id === 'a2_caravan').caravan === 'tithe', 'the intercept mission names the tithe caravan');
-  ok(c.region === 'bend' && c.escort === 3 && c.chest === 'strongbox' && c.wagonHp > 0, 'tithe caravan data');
+  ok(c.region === 'bend' && c.escort === 3 && c.chest === 'tithe' && c.wagonHp > 0, 'tithe caravan data');
   ok(r && r.total > 600, 'road 1 of the Bend: ' + (r && r.total.toFixed(0)));
   ok(Math.hypot(r.pts[0][0] - 645, r.pts[0][1] - 0) < 80, 'starts on the Hradchan side');
   const castle = D.regions.bend.settlements.find(s => s.type === 'castle');
@@ -128,7 +128,7 @@ function distToRoad(r, x, z) {
   for (let i = 0; i < 60; i++) CA.step(cs, dt);
   ok(cv.s === s, 'a stopped wagon stays');
   const chest = cs.town.items.find(it => it.caravan === 'tithe');
-  ok(chest && chest.kind === 'strongbox' && chest.mission === 'a2_caravan' && LT.available(cs.town.items).indexOf(chest) >= 0, 'the chest lies on the ground');
+  ok(chest && chest.kind === D.caravan.tithe.chest && chest.mission === 'a2_caravan' && LT.available(cs.town.items).indexOf(chest) >= 0, 'the chest lies on the ground');
   ok(Math.hypot(chest.pos[0] - cv.pos[0], chest.pos[2] - cv.pos[2]) < 8, 'next to the wagon');
   ok(distToRoad(CA.route('tithe'), chest.pos[0], chest.pos[2]) < 0.5, 'on the road behind it');
   // a rebuilt town keeps the chest
@@ -141,7 +141,7 @@ function distToRoad(r, x, z) {
   ok(ev[0].e === 'loot:taken' && ev[0].mission === 'a2_caravan', 'loot:taken names the mission');
   ok(cs.carriedLoot.mission === 'a2_caravan', 'the chest in the claws is mission loot');
   ok(!((cs.regionStates.bend || {}).lootTaken || []).some(r => r.id === chest.id), 'not kept in lootTaken');
-  ok(LT.blocksBreath(cs.carriedLoot), 'a strongbox blocks the fire');
+  ok(!LT.blocksBreath(cs.carriedLoot) && cs.carriedLoot.size === 1, 'T19: a tithe chest - light, the fire still works, starving claws keep it');
   ok(ofType(MS.step(cs, dt, ev), 'mission:done').length === 1, 'the chest of the stopped wagon meets the objective');
   ok(MS.target(cs) === null && MS.objective(cs).key === 'c.mission.obj.home', 'then: fly home');
   ok(cs.caravans.tithe, 'the caravan stays while the mission is done');
@@ -235,7 +235,7 @@ function distToRoad(r, x, z) {
   for (let t = 0; t <= r.total / c.speed && meet == null; t += 0.5) { const a = DF.along(r, c.speed * t); if (Math.hypot(a.x - e[0], a.z - e[1]) <= cruise * t) meet = { t, a }; }
   ok(meet != null, 'the dragon can reach the wagon before the gate (' + (meet && meet.t) + ' s after entering)');
   const fire = c.wagonHp / D.caravan.burn, grab = 12;                    // land, take, take off
-  const ae = D.aeries.bend, home = Math.hypot(meet.a.x - ae.x, meet.a.z - ae.z) / (cruise * D.loot.strongbox.carry.speedMult);
+  const ae = D.aeries.bend, home = Math.hypot(meet.a.x - ae.x, meet.a.z - ae.z) / (cruise * D.loot[D.caravan.tithe.chest].carry.speedMult);
   const lairTrip = 2 * 2 * 1000 / cruise;                                  // Ash -> Wild -> Farm (about 2 region diameters), timer starts after the Ash Wastes
   const total = lairTrip + meet.t + fire + grab + home;
   ok(total < m.time, 'fits the mission time: ' + total.toFixed(0) + ' of ' + m.time + ' s');
