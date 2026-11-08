@@ -1,9 +1,10 @@
 // Intercept mission bot (Phase 3 T19): a Drake accepts a2_caravan at the board in the cave of the Ashen Crags, flies
 // through the Wildwood and the Farmlands into the Veltava Bend (the tithe wagon sets out when it arrives), finds the
-// wagon on the road (the gold marker), makes breath passes at it from behind along the road until it stops, then the
-// raid bot (test/raid-bot.js) lands by the dropped chest, takes it on foot and flies home or into a found aerie.
-// Like the destroy bot it flies as a careful player: high to the run-in point behind the wagon, a shallow dive along
-// the road with the breath held, a climb out, `miss` of the passes with the breath too late (comes round again).
+// wagon on the road (the gold marker) and ambushes it: sets down on the road ahead of it, facing it, and breathes while
+// the wagon drives into the fire (a dive at a moving wagon gives about a second of fire per pass); when the wagon has
+// passed it flies round to the next spot ahead. Once the wagon stops it walks to the dropped chest and takes it, then
+// the raid bot (test/raid-bot.js) flies home or into a found aerie. Careful: `miss` of the stands fire late (1.5 s),
+// it keeps clear of the castle (bastion ballistae) on the way to each spot.
 // Uses only CampaignState input (S.missionAct, S.lairLeave, S.step), never edits the state.
 'use strict';
 const RB = require('./raid-bot.js');
@@ -86,7 +87,7 @@ function attack(bot, dt) {
     const q = ambushSpot(cs, cv);
     if (!q) { setPhase(bot, 'approach'); const s = steer(p, around(cs, cv.pos), cv.pos[1] + HIGH); return { sx: s.sx, sy: s.sy }; }
     bot.spot = q; bot.spotS = cv.s + Math.hypot(q.x - cv.pos[0], q.z - cv.pos[2]);
-    bot.passes++;
+    bot.stands++;
   }
   setPhase(bot, 'approach');
   const sp = [bot.spot.x, bot.spot.y, bot.spot.z], ds = Math.hypot(sp[0] - p.pos[0], sp[2] - p.pos[2]);
@@ -126,13 +127,13 @@ function input(bot, dt) {
 
 /**
  * Fly mission `id` (an intercept mission) from the cave. Returns { accepted, minutes, success, failed, died, hpLeft,
- * log, passes, stoppedAt (minutes), arrived (the wagon reached the gate), banked }.
+ * log, stands (ambush spots flown to), stoppedAt (minutes), arrived (the wagon reached the gate), banked }.
  */
 function fly(cs, id, opts) {
   const o = Object.assign({ dt: 1 / 30, maxMin: 15 }, opts);
   const m = MS.def(id);
   const accepted = S.missionAct(cs, 'accept', id).some(e => e.e === 'mission:accepted');
-  const bot = { cs, m, phase: 'out', t: 0, phaseT: 0, log: [], passes: 0, prof: PROFILES[o.profile || 'careful'],
+  const bot = { cs, m, phase: 'out', t: 0, phaseT: 0, log: [], stands: 0, prof: PROFILES[o.profile || 'careful'],
     rng: mulberry(((o.seed || 1) * 15485863 + 11) | 0),
     rb: RB.createBot(cs, { dest: m.region, pick: c => chestOf(c, m), escape: o.escape, seed: o.seed, profile: o.profile }) };
   S.lairLeave(cs);
@@ -153,7 +154,7 @@ function fly(cs, id, opts) {
     if (o.check) o.check(cs, ev, bot);
     if (failed || died || cs.inLair || cs.inAerie) break;
   }
-  return { accepted, minutes: t / 60, success, failed, died, hpLeft: cs.dragon.hp, log: bot.log.concat(bot.rb.log), passes: bot.passes,
+  return { accepted, minutes: t / 60, success, failed, died, hpLeft: cs.dragon.hp, log: bot.log.concat(bot.rb.log), stands: bot.stands,
            stoppedAt, arrived, banked };
 }
 

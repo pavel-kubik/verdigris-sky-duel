@@ -14,12 +14,23 @@
  *   night    outside at night
  *   altar    the hoard holds enough gold for an upgrade not yet owned
  *   farm     a Drake outside the Farmlands (the exit opens); the Farmlands themselves mark it seen
+ * Phase 3 T19 (003_task_missions.md T19):
+ *   bend     in the Veltava Bend
+ *   board    in the cave, a mission on the board can be taken now (act 2, stage)
+ *   timer    a mission's timer runs
+ *   relic    a relic in the claws (slow, no breath, lost on death or timeout)
+ *   castle   Vyshgard Castle discovered, outside
+ *   aerie    outside, an aerie of the current region found
+ *   travel   in the cave, an aerie found anywhere (the map stone flies there)
+ *   map      outside, in the Farmlands or the Bend (the map: button on touch, Tab on desktop)
+ *   freed    a village is freed (tribute in the larder)
  * Pure: no DOM, no THREE.
  */
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const D = M.need('data'), CK = M.need('clock'), AL = M.need('alert'), MO = M.need('mother');
+  const MS = () => M.need('missions'), AE = () => M.need('aerie'), FR = () => M.need('freed');   // T19: lazy (load order)
 
   const list = cs => (cs.flags.tips = Array.isArray(cs.flags.tips) ? cs.flags.tips : []);
   const seen = (cs, id) => list(cs).indexOf(id) >= 0;
@@ -48,6 +59,15 @@
     night: cs => outside(cs) && !!cs.clock && CK.phase(cs.clock.t) === 'night',
     altar: cs => !!cs.hoard && (cs.hoard.gold || 0) >= cheapest(cs),
     farm: cs => outside(cs) && cs.dragon.stage >= 1 && cs.region !== 'farm',
+    bend: cs => outside(cs) && cs.region === 'bend',
+    board: cs => !!cs.inLair && MS().list(cs).some(q => q.ok) && !MS().active(cs),
+    timer: cs => { const a = MS().active(cs); return !!a && a.state === 'running'; },
+    relic: cs => !!(cs.carriedLoot && cs.carriedLoot.relic),
+    castle: cs => outside(cs) && !!cs.discovered && !!cs.discovered['bend.castle'],
+    aerie: cs => outside(cs) && AE().found(cs, cs.region),
+    travel: cs => !!cs.inLair && Object.keys(D.aeries || {}).some(r => AE().found(cs, r)),
+    map: cs => outside(cs) && (cs.region === 'farm' || cs.region === 'bend'),
+    freed: cs => FR().freedAll(cs).length > 0,
   };
 
   function due(cs) {

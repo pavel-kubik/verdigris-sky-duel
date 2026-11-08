@@ -17,7 +17,9 @@
     /* One-time tips (Phase 2 T23, core/tips.js): shown under the HUD once per save, in `order` when their condition holds.
        gap = s of play between two tips (and after a start), show = s on screen, hungry = hunger at or below which the
        smell / compass tip comes. Conditions live in tips.js; texts are c.tip.<id> (+ Touch) in i18n.js. */
-    tips: { gap: 25, show: 9, hungry: 45, order: ['land', 'compass', 'cave', 'raid', 'alert', 'night', 'altar', 'farm'] },
+    tips: { gap: 25, show: 9, hungry: 45, order: ['land', 'compass', 'cave', 'raid', 'alert', 'night', 'altar', 'farm',
+      // Phase 3 T19
+      'relic', 'timer', 'bend', 'castle', 'board', 'aerie', 'travel', 'map', 'freed'] },
 
     /* Graphics quality tiers (Phase 2 T02). flora = share of the region's trees, pixelRatio = cap on
        devicePixelRatio, far = fog and chunk view distance multiplier, particles = breath particle rate.
