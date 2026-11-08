@@ -10,14 +10,16 @@
   const PI = Math.PI;
 
   const data = {
-    version: 2,                      // save format (core/save.js): v2 = Phase 2 (T22), v1 saves migrate
+    version: 3,                      // save format (core/save.js): v3 = Phase 3 (T18), v2 = Phase 2 (T22); older saves migrate
     saveKey: 'vsd-campaign',
     // autosave: every `every` s of play, plus on rest, region change and death (core emits a 'save' event)
     save: { every: 60 },
     /* One-time tips (Phase 2 T23, core/tips.js): shown under the HUD once per save, in `order` when their condition holds.
        gap = s of play between two tips (and after a start), show = s on screen, hungry = hunger at or below which the
        smell / compass tip comes. Conditions live in tips.js; texts are c.tip.<id> (+ Touch) in i18n.js. */
-    tips: { gap: 25, show: 9, hungry: 45, order: ['land', 'compass', 'cave', 'raid', 'alert', 'night', 'altar', 'farm'] },
+    tips: { gap: 25, show: 9, hungry: 45, order: ['land', 'compass', 'cave', 'raid', 'alert', 'night', 'altar', 'farm',
+      // Phase 3 T19
+      'relic', 'timer', 'bend', 'castle', 'board', 'aerie', 'travel', 'map', 'freed'] },
 
     /* Graphics quality tiers (Phase 2 T02). flora = share of the region's trees, pixelRatio = cap on
        devicePixelRatio, far = fog and chunk view distance multiplier, particles = breath particle rate.
@@ -189,7 +191,9 @@
       // T24: archer damage 3 -> 2 (a careful raid keeps 20%+ HP, test/raid.test.js)
       archer:   { hp: 18, sight: 130, fov: 1.8, range: 120, volley: 3, gap: 0.18, spread: 0.06,
                   speed: 70, damage: 2, aimTime: 0.6, cooldown: 3 },
-      ballista: { hp: 18, sight: 170, fov: 1.2, range: 220, aimTime: 2.0, lock: 0.5, bolt: 160, damage: 35, reload: 8,
+      // Phase 3 T19: ballista damage 35 -> 28 (the castle's bastion bolts were 60-75% of a careful mission's damage;
+      // every seeded mission bot keeps 20%+ HP, test/mission.bot.test.js)
+      ballista: { hp: 18, sight: 170, fov: 1.2, range: 220, aimTime: 2.0, lock: 0.5, bolt: 160, damage: 28, reload: 8,
                   turn: 0.9, crew: 1, hit: 3, life: 2 },
     },
     defense: { eye: 1.6, wander: 7, stroll: 0.3, pad: 0.6, ringTime: 2, ringCool: 40, towerSpacing: 1.6, aimCone: 0.5, burn: 14, markRange: 120 },
@@ -534,10 +538,10 @@
       briefs: { a2_chalice: 3, a2_workshop: 2, a2_caravan: 2 } },
     missions: [
       { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
-        relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
+        relic: 'ember_chalice', time: 540, reward: { gold: 250 } },
       { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-        time: 540, reward: { gold: 200 } },
-      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
+        time: 600, reward: { gold: 200 } },
+      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 600,
         reward: { gold: 300 } },
     ],
     mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1,
@@ -558,7 +562,7 @@
        wagon or the oxen (`oxen` units ahead) costs `burn` hp/s; at 0 it stops and drops its `chest` on the road
        `chestBack` units behind it. Road 1 of the Bend: the Hradchan side, Karlsbridge, the east bank, the castle gate. */
     caravan: {
-      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'strongbox', wagonHp: 120 },
+      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
       burn: 20, oxen: 5, catchUp: 2, chestBack: 4,
       slots: [[-4, 1], [4, 1], [0, -7]],
     },

@@ -43,7 +43,7 @@ function dryGround(cs) {
   CK.setPhase(cs, 'dusk');
   const { back, raw } = roundTrip(cs, 11);
 
-  ok(raw.version === 2 && raw.world.mode === 'ground' && raw.world.location === 'field', 'v2: mode ground, location field');
+  ok(raw.version === D.version && raw.world.mode === 'ground' && raw.world.location === 'field', 'v2: mode ground, location field');
   near(raw.world.clock, D.clock.dusk, 1e-4, 'clock saved'); near(raw.world.now, 5200, 0.1, 'now = played');
   ok(raw.hoard.gold === 320 && raw.dragon.upgrades.length === 2, 'gold and upgrades in the save');
   ok(raw.regions.farm.heat === 2.4 && raw.regions.farm.ruins.length === 1 && raw.regions.farm.lootTaken.length === 1 && raw.regions.farm.discovered.length === 2, 'region state in the save');
@@ -131,7 +131,7 @@ function dryGround(cs) {
   };
   const st = mem(); st.setItem(D.saveKey, JSON.stringify(v1));
   const r = SV.load(st);
-  ok(r.status === 'ok' && r.data.version === 2, 'v1 loads as v2');
+  ok(r.status === 'ok' && r.data.version === D.version, 'v1 loads as the current version');
   const w = r.data.world;
   ok(w.location === 'cave' && w.mode === 'air' && w.clock === D.clock.start && w.now === 3100, 'v1 -> v2 world defaults (cave, air, morning, now)');
   const back = SV.deserialise(r.data, mulberry(1));
@@ -146,11 +146,11 @@ function dryGround(cs) {
 {
   const p1 = { version: 1, dragon: { stage: 0, foodXp: 120, hp: 90, hunger: 30, deaths: 0 }, larder: [], world: { region: 'wild', pos: [50, 80, -40], yaw: 0.5, location: 'field' }, flags: { introSeen: true }, stats: { played: 600, eaten: 4, food: 120 } };
   const o = SV.migrate(JSON.parse(JSON.stringify(p1)));
-  ok(o.version === 2 && o.hoard && o.regions && Array.isArray(o.dragon.upgrades) && o.world.mode === 'air' && o.world.location === 'field', 'phase 1 save migrates with v2 defaults');
+  ok(o.version === D.version && o.hoard && o.regions && Array.isArray(o.dragon.upgrades) && o.world.mode === 'air' && o.world.location === 'field', 'phase 1 save migrates with v2 defaults');
   const back = SV.deserialise(o, mulberry(2));
   ok(back.hoard.gold === 0 && back.upgrades.length === 0 && back.region === 'wild' && back.dragon.pilot.mode === 'air', 'gold 0, no upgrades, in the air');
   const v0 = SV.migrate({ stage: 0, xp: 50, hp: 80, hunger: 40, region: 'ash', pos: [0, 90, 0] });
-  ok(v0.version === 2 && v0.world.mode === 'air' && v0.world.location === 'field', 'v0 migrates to v2');
+  ok(v0.version === D.version && v0.world.mode === 'air' && v0.world.location === 'field', 'v0 migrates to v2');
 }
 
 // 7. Corrupt v2 saves are reported (never thrown) and newer ones too
@@ -173,8 +173,8 @@ function dryGround(cs) {
   }
   const st = mem(); st.setItem(D.saveKey, '{"version":2,"dragon":');
   ok(SV.load(st).status === 'corrupt', 'cut off JSON is corrupt');
-  st.setItem(D.saveKey, JSON.stringify(Object.assign({}, good, { version: 3 })));
-  ok(SV.load(st).status === 'newer', 'v3 is newer');
+  st.setItem(D.saveKey, JSON.stringify(Object.assign({}, good, { version: D.version + 1 })));
+  ok(SV.load(st).status === 'newer', 'a version above data.version is newer');
 }
 
 // 8. Autosave on landing and on entering the cave (both are kept by v2)

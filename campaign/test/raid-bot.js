@@ -50,9 +50,13 @@ function pickLoot(cs, kind) {
 }
 
 /** Where to stand to pick the item up: in front of it, on the side away from its building (as in loot.test.js). */
+const FROM = new WeakMap();            // building-less items: the point the stand side is measured from
 function standPoint(cs, it) {
   const b = cs.town.buildings.find(q => q.id === it.building), sc = S.scaleOf(cs);
-  let dx = it.pos[0] - b.pos[0], dz = it.pos[2] - b.pos[2];
+  // T19: a chest without a building (the caravan's, on the road): stand on the side the dragon comes from
+  if (!b && !FROM.has(it)) FROM.set(it, cs.dragon.pilot.pos.map((v, i) => it.pos[i] * 2 - v));
+  const from = b ? b.pos : FROM.get(it);
+  let dx = it.pos[0] - from[0], dz = it.pos[2] - from[2];
   const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
   const f = 1.5 + D.settlement.pad * sc;
   return { pos: [it.pos[0] + dx * f, 0, it.pos[2] + dz * f], out: [dx, dz] };

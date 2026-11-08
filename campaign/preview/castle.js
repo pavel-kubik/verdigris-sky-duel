@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't217.2 2026-11-06 rebased on campaign-phase-3 (base repair #61 merged)';
+  const BUILD = 't220.2 2026-11-08 README phase 3 section, Phase 3 marked done, intro news line';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);

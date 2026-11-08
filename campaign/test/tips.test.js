@@ -41,7 +41,7 @@ const tipsOf = ev => ev.filter(e => e.e === 'tip').map(e => e.id);
   cs.dragon.stage = 0;
   LR.enter(cs); cs.station = null; ok(TIPS.due(cs) === 'cave', 'in the cave: the stations tip');
   cs.station = 'nest'; ok(TIPS.due(cs) === 'cave', 'also next to a station (its prompt is at the bottom, the tip at the top)');
-  TIPS.mark(cs, 'cave'); cs.dragon.stage = 1; ok(TIPS.due(cs) === null, 'the Farmlands tip waits until outside');
+  TIPS.mark(cs, 'cave'); TIPS.mark(cs, 'board'); cs.dragon.stage = 1; ok(TIPS.due(cs) === null, 'the Farmlands tip waits until outside (T19: the board tip marked seen)');
 }
 
 // 2. Order: the first fitting tip in data.tips.order wins
@@ -126,4 +126,43 @@ const tipsOf = ev => ev.filter(e => e.e === 'tip').map(e => e.id);
       ok(!/\b(tap|klepni)\b/i.test(desk), lang + ' desktop text of ' + id + ' does not say tap');
     }
   }
+}
+
+// 6. Phase 3 T19: the Bend, the castle, the map, aeries, fast travel, the board, the timer, relics, the freed village
+{
+  const MS = TP('missions'), FR = TP('freed');
+  const seenAll = cs => { for (const id of D.tips.order) TIPS.mark(cs, id); };
+  const only = (cs, id) => { seenAll(cs); cs.flags.tips = cs.flags.tips.filter(q => q !== id); return TIPS.due(cs); };
+  const cs = run('farm');
+  cs.dragon.stage = 1;
+  ok(only(cs, 'map') === 'map', 'outside in the Farmlands: the map tip');
+  ok(only(cs, 'bend') === null, 'not in the Bend: no Bend tip');
+  cs.region = 'bend';
+  ok(only(cs, 'bend') === 'bend', 'in the Bend: the Bend tip');
+  ok(only(cs, 'castle') === null, 'castle not found: no castle tip');
+  cs.discovered = { 'bend.castle': true };
+  ok(only(cs, 'castle') === 'castle', 'castle discovered: the castle tip');
+  ok(only(cs, 'aerie') === null, 'no aerie found here: no aerie tip');
+  cs.discovered['bend.aerie'] = true;
+  ok(only(cs, 'aerie') === 'aerie', 'the Troyvale aerie found: the aerie tip');
+  cs.carriedLoot = { kind: 'relic', relic: 'ember_chalice', size: 1 };
+  ok(only(cs, 'relic') === 'relic', 'a relic in the claws: the relic tip');
+  cs.carriedLoot = null;
+  // in the cave: the board (a mission can be taken), fast travel (an aerie found)
+  const c2 = run('ash');
+  c2.inLair = true; c2.dragon.stage = 1; c2.story.act = 2;
+  ok(only(c2, 'travel') === null, 'no aerie found: no travel tip');
+  c2.discovered = { 'farm.aerie': true };
+  ok(only(c2, 'travel') === 'travel', 'an aerie found: the map stone tip in the cave');
+  ok(only(c2, 'board') === 'board', 'act 2, a Drake: a mission to take, the board tip');
+  MS.accept(c2, 'a2_chalice');
+  ok(only(c2, 'board') === null, 'a mission taken: no board tip');
+  ok(only(c2, 'timer') === null, 'accepted, the clock not running yet: no timer tip');
+  c2.mission.state = 'running';
+  ok(only(c2, 'timer') === 'timer', 'the clock runs: the timer tip');
+  // the freed village
+  const c3 = run('farm');
+  ok(only(c3, 'freed') === null, 'nothing freed: no freed tip');
+  c3.regionStates.farm = c3.regionStates.farm || {}; c3.regionStates.farm.freed = [D.freed.places[0]];
+  ok(FR.freedAll(c3).length === 1 && only(c3, 'freed') === 'freed', 'a freed village: the tribute tip');
 }

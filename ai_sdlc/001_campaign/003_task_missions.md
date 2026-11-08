@@ -1,6 +1,6 @@
 # Phase 3 - Castle, Map + Missions: Implementation Spec
 
-Status: draft, 2026-10-31. Refines `000_spec.md` for Phase 3. Built on `campaign-phase-3` (branched from the finished `campaign-phase-2`). Task branches are `agent/t2NN-...` (T01 -> `t201`).
+Status: done, 2026-11-08 (T01-T20 merged into `campaign-phase-3`). Drafted 2026-10-31. Refines `000_spec.md` for Phase 3. Built on `campaign-phase-3` (branched from the finished `campaign-phase-2`). Task branches are `agent/t2NN-...` (T01 -> `t201`).
 
 Revised by Pavel, 2026-10-31:
 - **Visual form comes first.** The phase opens with the first Order castle as a showpiece, before the mission systems.
@@ -245,11 +245,11 @@ aeries: {
 ```js
 missions: [
   { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
-    relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
+    relic: 'ember_chalice', time: 540, reward: { gold: 250 } },   // T19: 540 (was 480)
   { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-    time: 540, reward: { gold: 200 } },             // T14: 540 (was 420 - the Bend is 2.4 min from the cave each way)
-  { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
-    reward: { gold: 300 } },
+    time: 600, reward: { gold: 200 } },             // T14: 540 (was 420 - the Bend is 2.4 min from the cave each way); T19: 600
+  { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 600,
+    reward: { gold: 300 } },                        // T19: 600 (was 390 - the wagon only sets out when the dragon reaches the Bend)
 ],
 mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1 },
 relics: {
@@ -258,13 +258,17 @@ relics: {
 loot: { relic: { carry: { speed: 0.8, breath: false }, mission: true } },
 caravan: {
   // road 1 of the Bend: from the Hradchan side across Karlsbridge, along the east bank to the castle gate
-  tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'strongbox', wagonHp: 120 },
+  tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
+  // T19: chest 'tithe' (was 'strongbox': a starving Drake drops a strongbox on the long way home, and its 150 gold
+  // came on top of the reward), wagonHp 80 (was 120: a breath pass at a moving wagon gives about a second of fire)
 },
 tribute: { every: 300, food: 40, max: 3 },          // a freed village leaves food in the larder every `every` s of play
 story: { acts: [1, 2], cards: ['act1', 'act2'], firstRaidMother: true },
 ```
 
 Mission times are longer than in the first draft because the Bend is one region further from the lair (the timer starts when the dragon leaves the lair region or an aerie); T19 tunes them.
+
+T19 balancing (as built): `defenders.ballista.damage` 35 -> 28 (the castle's bastion bolts were 60-75% of a careful mission's damage), mission times 540 / 600 / 600 s, the caravan chest a tithe chest and wagon hp 80. Seeded careful bots (`test/mission.bot.test.js`, seeds 1-4, full hunger, lair escape): steal mean 7.8 min, 25-49% HP; destroy 6.5-9.4 min, 25%+ HP; intercept mean 8.8 min, 25-33% HP. The intercept bot ambushes the wagon on the road (lands ahead of it, breathes as it drives in) - a breath pass at a moving wagon gives only about a second of fire.
 
 ## 5. System interfaces (`core/`)
 
@@ -354,7 +358,7 @@ Mission times are longer than in the first draft because the Bend is one region 
   reward comes from `mission:success`). The save keeps `hoard.relics` now (v2 shape); a relic in the claws is not saved
   until the running mission is (v3, T18) - a reload puts it back at the door. Trophy wall: cave station `trophy`
   [-40, 20, 5], `data.trophy.niches` 3 arched niches, the Ember Chalice in niche 1 with an additive glow; its panel lists
-  each niche with the relic's story line. Debug: Shift+L (DBG mission tab, "chalice") accepts the chalice mission and
+  each niche with the relic's story line. Debug: Shift+H (was Shift+L; DBG mission tab, "chalice") accepts the chalice mission and
   stands at the chapel door in the Bend, elsewhere puts the chalice straight into the claws.
 - As built (T13): the steal flow needed no new rules beyond T10-T12 (the chalice lies at the chapel1 door inside the
   walls; Grab takes it on foot only). Added: once the chalice is taken, the HUD objective line names the escape -
@@ -373,12 +377,12 @@ Mission times are longer than in the first draft because the Bend is one region 
   time 540 s (was 420): the seeded bot `test/destroy-bot.js` (careful pilot: hunts in the Wildwood, rounds the castle at
   300 out to a run-in over the courtyard at bearing 0.75 from the workshop, a long glide at roof height with Fire held,
   climbs out and circles 280 out until it is a ruin, then flies home) needed 6.5-9.4 min per seed, and 420 s timed out
-  4 of 8 seeds. Debug: Shift+W (DBG mission tab, "workshop") accepts it and puts the dragon on the run-in, 160 out.
+  4 of 8 seeds. Debug: Shift+O (was Shift+W, which fired while boosting forward; DBG mission tab, "workshop") accepts it and puts the dragon on the run-in, 160 out.
 
 ### 5.6 `caravan`
 
 - Spawned when the intercept mission starts: wagon(s) move along road `road` of the region from `from` to `to` (fractions of the polyline) with escort archers walking beside them; `caravan.step` moves, the escort uses the defender AI.
-- Burning the wagon's oxen or the wagon to 0 hp stops it and drops the chest (`strongbox`) next to it; a chest dropped on the bridge stays on the deck; reaching `to` (the castle gate) ends the mission as failed.
+- Burning the wagon's oxen or the wagon to 0 hp stops it and drops the chest (a `tithe` chest since T19) next to it; a chest dropped on the bridge stays on the deck; reaching `to` (the castle gate) ends the mission as failed.
 
 ### 5.7 Freed village
 
@@ -416,6 +420,20 @@ Mission times are longer than in the first draft because the Bend is one region 
 ```
 
 v2 -> v3: empty missions, no relics, nothing explored except the cells around discovered places, `story.act` from the stage.
+
+- As built (T18): `missions.active` = `{ id, state: 'accepted' | 'running' | 'done', left, viaAerie, stopped, caravan? }`;
+  mission loot in the claws (the chalice, the caravan chest) is saved in `dragon.loot` with `mission` (and `relic`) and
+  restored only together with its running mission (a v2 relic in the claws is dropped, as before). The intercept caravan
+  is saved as `caravan: { s, hp, state, chestTaken }`: after the reload the wagon goes on from the saved spot (a moving
+  wagon waits again until the dragon is in the Bend), a stopped one drops its chest on the road again (or has it taken);
+  the escort archers come back fresh. `regions.<id>.explored` is the region's bitset words as little-endian bytes in
+  base64 (a string of the wrong length starts that region unexplored, it does not make the save corrupt);
+  `aerieFound` replaces `<id>.aerie` in `discovered`; `gate: 'closed'` is written for the loaded castle town and closes
+  the portcullis on the first town build after the load; the calm garrison then opens it as after a search. Charred
+  stone stays in `ruins` (`char: true`, v2 shape). Migration v2 -> v3 sets `seedExplored` and `apply` reveals
+  `data.map.reveal` around every discovered place and the lair. A new dragon's save with every region fully
+  explored is about 2 KB (the explored bitsets are under 1 KB). Corrupt v3: missing `missions` or `story`, a non-object `missions.active` or a non-number `left`, a
+  non-string `explored`.
 
 ## 6. Rendering and UI
 
