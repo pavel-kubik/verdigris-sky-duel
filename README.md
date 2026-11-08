@@ -88,7 +88,7 @@ A single-player dragon campaign in its own page, built mobile first: everything 
 
 ## Deathmatch (beta, `/campaign/dm/`)
 
-- **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/dm/ (or **Deathmatch (beta)** on the home screen and the campaign start screen)
+- **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/dm/ (or **Deathmatch (beta)** on the home screen, under Co-op)
 
 Dragon against dragon over the campaign's Wildwood (Phase 3 terrain, trees and the hamlet and outpost buildings, with no defenders). Only human players, no AI dragons: up to 8, connected peer-to-peer like the co-op (one player hosts and sends the link `…/campaign/dm/#ROOMCODE`). Without the matchmaking server the host flies a practice game alone.
 
