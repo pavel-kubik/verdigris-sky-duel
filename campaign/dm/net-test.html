@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Verdigris Connection Test</title>
+<meta name="theme-color" content="#0d1411">
+<!-- Debug tool (English only, like the debug panels): tries the matchmaking server the way co-op and the deathmatch
+     do, side by side, and records exactly how each attempt ends. ?peer=host:port tests another PeerJS server. -->
+<style>
+:root{--ink:#0d1411;--panel:#131d18;--line:rgba(233,225,204,.16);--bone:#ebe3cd;--mute:#a9ae9b;--verd:#62c48a;--ember:#ff9447;--blood:#ef6a70;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--bone);font:15px/1.45 system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 32px max(16px,env(safe-area-inset-left))}
+main{max-width:720px;margin:0 auto;display:grid;gap:14px}
+h1{margin:0;font-size:26px}
+p{margin:0;color:var(--mute)}
+button{font:700 16px system-ui,sans-serif;border:0;border-radius:4px;padding:12px 16px;background:var(--verd);color:#08130d;cursor:pointer}
+button.ghost{background:transparent;color:var(--bone);border:1px solid var(--line)}
+button:disabled{opacity:.5}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.t{display:grid;gap:8px}
+.r{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:10px 12px;display:grid;gap:3px}
+.r b{font-size:15px}
+.r code{font:12px ui-monospace,Menlo,monospace;color:var(--mute);word-break:break-all}
+.ok{color:var(--verd)}.bad{color:var(--blood)}.wait{color:var(--ember)}
+textarea{width:100%;min-height:150px;background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:5px;font:12px ui-monospace,Menlo,monospace;padding:8px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Connection test</h1>
+  <p>Tries the matchmaking server the way co-op and the deathmatch do, one after the other, and shows how each attempt ends. Takes about half a minute. Then press Copy results and send them.</p>
+  <div class="row"><button id="run">Run the test</button><button class="ghost" id="copy" disabled>Copy results</button></div>
+  <div class="t" id="out"></div>
+  <textarea id="log" readonly hidden aria-label="Results"></textarea>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script>if(!window.Peer)document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');</script>
+<script>
+(function () {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const out = $('#out'), lines = [];
+  const peerParam = decodeURIComponent((location.search.match(/[?&]peer=([^&#]+)/) || [])[1] || '');
+  const pm = peerParam.match(/^([a-z0-9.-]+)(?::(\d+))?(\/.*)?$/i);
+  const srv = pm ? { host: pm[1], port: pm[2] ? +pm[2] : 443, path: pm[3] || '/' } : { host: '0.peerjs.com', port: 443, path: '/' };
+  srv.secure = srv.port === 443 || location.protocol === 'https:';
+  const peerOpts = pm ? { host: srv.host, port: srv.port, path: srv.path, secure: srv.secure } : {};
+  const code = () => { let s = ''; for (let i = 0; i < 5; i++) s += 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]; return s; };
+  const base = (srv.secure ? 'wss://' : 'ws://') + srv.host + ':' + srv.port + srv.path.replace(/\/$/, '') + '/peerjs';
+  const http = (srv.secure ? 'https://' : 'http://') + srv.host + ':' + srv.port + srv.path.replace(/\/$/, '') + '/peerjs';
+
+  function row(name) {
+    const d = document.createElement('div'); d.className = 'r';
+    d.innerHTML = '<b></b><span class="wait">running...</span><code></code>';
+    d.querySelector('b').textContent = name; out.appendChild(d);
+    return (cls, text, detail) => {
+      const s = d.querySelector('span'); s.className = cls; s.textContent = text;
+      d.querySelector('code').textContent = detail || '';
+      lines.push(name + ': ' + text + (detail ? ' | ' + detail : ''));
+    };
+  }
+  /** A raw WebSocket as PeerJS opens it: ends at the server's first message, a close, or 10 s. */
+  function rawWs(name, id) {
+    return new Promise(done => {
+      const set = row(name), t0 = performance.now(), ms = () => Math.round(performance.now() - t0) + ' ms';
+      let ws, fin = false, opened = false;
+      const end = (cls, text, detail) => { if (fin) return; fin = true; set(cls, text, detail); try { ws.close(); } catch (_) { } done(); };
+      try { ws = new WebSocket(base + '?key=peerjs&id=' + encodeURIComponent(id) + '&token=' + Math.random().toString(36).slice(2) + '&version=1.5.4'); }
+      catch (e) { end('bad', 'could not start: ' + e.message, id); return; }
+      ws.onopen = () => { opened = true; };
+      ws.onmessage = ev => end(/OPEN/.test(ev.data) ? 'ok' : 'bad', (/OPEN/.test(ev.data) ? 'server accepted' : 'server said: ' + String(ev.data).slice(0, 80)) + ' after ' + ms(), 'id ' + id);
+      ws.onclose = ev => end('bad', (opened ? 'closed after opening' : 'refused before opening') + ', code ' + ev.code + (ev.reason ? ' "' + ev.reason + '"' : '') + ' after ' + ms(), 'id ' + id);
+      setTimeout(() => end('bad', 'no answer in 10 s', 'id ' + id + (opened ? ' (socket opened)' : ' (socket never opened)')), 10000);
+    });
+  }
+  /** PeerJS exactly as the game calls it: 'open' or the error type. */
+  function peer(name, id) {
+    return new Promise(done => {
+      const set = row(name), t0 = performance.now(), ms = () => Math.round(performance.now() - t0) + ' ms';
+      if (!window.Peer) { set('bad', 'PeerJS did not load (CDN blocked?)'); done(); return; }
+      let fin = false, p;
+      const end = (cls, text) => { if (fin) return; fin = true; set(cls, text, 'id ' + (id || '(server picks)')); try { p.destroy(); } catch (_) { } done(); };
+      try { p = id ? new window.Peer(id, Object.assign({ debug: 0 }, peerOpts)) : new window.Peer(Object.assign({ debug: 0 }, peerOpts)); }
+      catch (e) { end('bad', 'threw: ' + e.message); return; }
+      p.on('open', got => end('ok', 'open as ' + got + ' after ' + ms()));
+      p.on('error', e => end('bad', 'error "' + (e && e.type) + '" after ' + ms() + (e && e.message ? ': ' + e.message : '')));
+      setTimeout(() => end('bad', 'no answer in 15 s'), 15000);
+    });
+  }
+  function httpId() {
+    const set = row('Server web address (/peerjs/id)'), t0 = performance.now();
+    return fetch(http + '/id?ts=' + Date.now()).then(r => r.text().then(t => set(r.ok ? 'ok' : 'bad', 'HTTP ' + r.status + ' after ' + Math.round(performance.now() - t0) + ' ms', t.slice(0, 60))))
+      .catch(e => set('bad', 'failed: ' + e.message));
+  }
+
+  $('#run').onclick = async () => {
+    $('#run').disabled = true; $('#copy').disabled = true; out.textContent = ''; lines.length = 0;
+    lines.push('Verdigris connection test ' + new Date().toISOString());
+    lines.push('page ' + location.origin + location.pathname + ' | server ' + srv.host + ':' + srv.port + srv.path + ' | PeerJS ' + (window.Peer ? 'loaded' : 'missing'));
+    lines.push('browser ' + navigator.userAgent + ' | online ' + navigator.onLine);
+    const c = code();
+    await httpId();
+    await rawWs('Raw socket, co-op style id', 'vsd-' + c);
+    await rawWs('Raw socket, deathmatch style id', 'vsd-dm-' + c);
+    await peer('PeerJS, co-op host (vsd-' + c + ')', 'vsd-' + c);
+    await peer('PeerJS, deathmatch host (vsd-dm-' + c + ')', 'vsd-dm-' + c);
+    await peer('PeerJS, guest (random id)', null);
+    $('#log').value = lines.join('\n'); $('#log').hidden = false;
+    $('#run').disabled = false; $('#copy').disabled = false;
+  };
+  $('#copy').onclick = () => {
+    const box = $('#log');
+    const sel = () => { box.focus(); box.select(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(box.value).then(() => { $('#copy').textContent = 'Copied'; }, sel); else sel();
+  };
+})();
+</script>
+</body>
+</html>

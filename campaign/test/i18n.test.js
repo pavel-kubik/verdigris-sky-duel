@@ -52,3 +52,25 @@ ok(dashed.length === 0, 'long dashes in: ' + dashed.join(', '));
 // the touch layout: the hint names buttons, not keys
 const tip = [...src.slice(enAt, csAt).matchAll(/'c\.tip\.huntTouch':\s*'([^']*)'/g)][0][1];
 ok(!/\b(G|X|Space)\b/.test(tip), 'touch tip names buttons: ' + tip);
+
+// deathmatch page (campaign/dm/): every key of its page and game.js in EN and CS
+{
+  const dmHtml = fs.readFileSync(path.join(root, 'campaign', 'dm', 'index.html'), 'utf8');
+  const dmGame = fs.readFileSync(path.join(root, 'campaign', 'dm', 'game.js'), 'utf8');
+  const dmUsed = new Set();
+  for (const m of dmHtml.matchAll(/data-i18n="([^"]+)"/g)) dmUsed.add(m[1]);
+  for (const m of dmHtml.matchAll(/data-i18n-attr="([^"]+)"/g)) for (const pair of m[1].split(';')) dmUsed.add(pair.split(':')[1].trim());
+  for (const m of dmGame.matchAll(/\bt\('([a-zA-Z0-9_.]+)'/g)) if (!m[1].endsWith('.')) dmUsed.add(m[1]);
+  for (const m of dmGame.matchAll(/'(dm\.[a-zA-Z0-9_.]*[a-zA-Z0-9])'/g)) dmUsed.add(m[1]);
+  for (const k of ['ball', 'breath', 'bump', 'crash', 'impact']) dmUsed.add('dm.how.' + k);          // t('dm.how.' + kind)
+  for (const k of ['pillar', 'wall', 'tree', 'ground']) dmUsed.add('dm.crash.' + k);                 // t('dm.crash.' + kind)
+  for (const k of Object.keys(D.dm.food.kinds)) dmUsed.add('dm.food.' + k);                          // t('dm.food.' + type)
+  ok(dmUsed.size > 60, 'deathmatch keys collected: ' + dmUsed.size);
+  const dmEn = [...dmUsed].filter(k => !EN.has(k)), dmCs = [...dmUsed].filter(k => !CS.has(k));
+  ok(dmEn.length === 0, 'deathmatch keys missing in EN: ' + dmEn.join(', '));
+  ok(dmCs.length === 0, 'deathmatch keys missing in CS: ' + dmCs.join(', '));
+  const dmOnly = [...EN].filter(k => k.startsWith('dm.') && !CS.has(k)).concat([...CS].filter(k => k.startsWith('dm.') && !EN.has(k)));
+  ok(dmOnly.length === 0, 'dm.* keys in one language only: ' + dmOnly.join(', '));
+  const dmDash = [...src.matchAll(/'(dm\.[a-zA-Z0-9_.]+)':\s*'([^']*)'/g)].filter(m => /[\u2013\u2014]/.test(m[2])).map(m => m[1]);
+  ok(dmDash.length === 0, 'long dashes in: ' + dmDash.join(', '));
+}

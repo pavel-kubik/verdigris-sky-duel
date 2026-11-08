@@ -99,6 +99,35 @@ A single-player dragon campaign in its own page, built mobile first: everything 
 
 **Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, draw calls, quality tier, dragon parameters) and one button per debug action, grouped in tabs: feed, hunger, damage, die, to lair, to herd, to exit, Drake, alert, calm, to a ballista / loot / pen / town, ignite, gold, upgrades, next day phase, fast time, and for phase 3 the castle gate, alarm and fire, castle wall passes, aerie and every aerie, reveal the map, accept / finish / fail a mission, jump to the tithe wagon, the chalice or the siege workshop, free the village, tribute now, tips reset, save + reload, wipe save, reset. On desktop the same actions have hotkeys listed in the panel. `?region=wild` starts in Wildwood, `?region=farm` in the River Farmlands, `?region=bend` in the Veltava Bend, `campaign/preview/castle.html` shows the castle kit, and `window.__vcamp` exposes the game state.
 
+## Deathmatch (beta, `/campaign/dm/`)
+
+- **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/dm/ (or **Deathmatch (beta)** on the home screen, under Co-op)
+
+Dragon against dragon over the campaign's Wildwood (Phase 3 terrain, trees and the hamlet and outpost buildings, with no defenders). Only human players, no AI dragons: up to 8, connected peer-to-peer like the co-op (one player hosts and sends the link `…/campaign/dm/#ROOMCODE`). Without the matchmaking server the host flies a practice game alone.
+
+- **Lobby:** a new room opens in a lobby panel with the room code, an **Invite** button (copies the link; phones open the share sheet), everyone in the room and, for the host, the settings (kills to win 5 / 10 / 15 / 20, time 5 / 10 / 15 min). Until the host presses **Start match** it is a warm-up: everyone flies, nothing hurts. After a match **Next round** opens the lobby again.
+- **Opening a room** needs the free public PeerJS matchmaking server. When it does not answer, Host a game tries three times and then says so, with a **Practice alone** button (a game nobody can join) - it never starts a practice game by itself. `?peer=host:port` (e.g. `?peer=peer.example.org:443`) uses a PeerJS server of your own instead; the invite link and the QR code carry it, so friends use the same server.
+- **QR code:** the **QR** button in the lobby panel (or **Show QR code** in the menu) shows the room's invite link as a QR code with the room code, for a friend to scan with a phone camera; on the start screen **Share the game (QR code)** shows the game's own link. Phones also get a **Share** button. The code is made in the browser by `shared/qr.js` (no network, works offline), tested by `campaign/test/qr.test.js`.
+- **Saved room and host take-over:** the host sends the room record (everyone's kills, deaths and score, the phase, the clock and the settings) to every player once a second, and every browser keeps it in `localStorage` (`vsd-dm-room`, 6 hours). A player is recognised by a key made from a random token stored in the browser (`vsd-dm-token`), so leaving and joining again (or **Rejoin room** on the start screen) gives the seat its score back. When the host leaves or goes silent for 6 s, the guest who joined first claims the room code and hosts from the record; the others join it 2.5 s later. The code and the invite link stay the same. If nobody is left, the next player to rejoin hosts the room from their saved copy. Seat keys are not secure, so rooms are for friends. **One world per code:** whoever holds the room code at the PeerJS server is the host. A host that loses it (its phone's screen was locked or its network dropped, the server freed the code and a guest took over) steps down when it is back: it sends its guests to the new host and joins it itself. Every joining player brings its saved copy of the room and the host merges it (most kills and deaths per seat win), so the two copies become one world without losing scores. A take-over never gives up; after 45 s the game says it is still reconnecting.
+- **Match:** first to 10 kills (or the host's choice), or the best score when the time runs out. A kill is +1; crashing with nobody to blame is -1. The **leaderboard** (kills, deaths, score) is always shown in short at the top left; Tab or the Board button opens the full one, and it opens by itself at the end of the match, where the host can start a new round.
+- **Respawn:** 5 s after dying, at the spawn point farthest from the other dragons, with 3 s of spawn protection.
+- **Food:** chickens, goats and sheep wander the arena and flee dragons. Fly low over one or sit down next to it to eat it (+15 / +25 / +30 vitality); it comes back after 18 s. Vitality otherwise regenerates only slowly.
+- **Sitting down:** F / Sit within 8 m of any surface - the ground, a roof or the flat top of a rock pillar (not water). A sitting dragon turns, breathes fire and shoots fireballs, and its fire refills faster. F, W, Shift or Fly takes off.
+- **Falling:** flying into another dragon, a rock pillar, a building wall or a tree crown, or diving steeply into the ground, sends the dragon tumbling out of control until it hits the ground or a roof: damage on impact, then a short stun. Both dragons fall in a dragon-on-dragon collision; a fall death counts as a kill for whoever hit or bumped the dragon in the last 8 s.
+
+| Action | Keyboard / mouse | Touch |
+|---|---|---|
+| Turn, climb, dive | A / D, W / S | Left stick |
+| Fire breath (hold) | Space / left mouse | Breath |
+| Fireball (auto-aim) | R / right mouse | Ball |
+| Boost | Shift | Boost |
+| Barrel roll | Q / E | Roll |
+| Sit down / take off | F | Sit / Fly |
+| Leaderboard | Tab | Board |
+| Menu (invite link) | Esc | II |
+
+Rules are in `campaign/core/dm.js` (pure, tested by `campaign/test/dm.test.js`), tunables in `data.dm`; rooms and networking in `campaign/core/dmnet.js`, tested by `campaign/test/dmnet.test.js` on a simulated PeerJS network (`campaign/test/fake-net.js`: closed tabs, dead phones, locked screens, dropped server sockets, lost networks and 20 seeds of random chaos must all end as one world with the scores kept); the client is `campaign/dm/game.js`. `?debug` exposes `window.__vdm` and keys 1-6 (to food, to a pillar, to a roof, take damage, a dummy dragon ahead, end the match).
+
 ## Languages
 
 The game is available in **English** and **Czech** (solo, tutorial and co-op). The language follows the browser (`cs` and `sk` get Czech, everything else English) and can be switched with the **EN / CS** buttons on the home screen and in the co-op lobby. The choice is stored in `localStorage` (`vsd-lang`); `?lang=cs` forces a language for one visit.
@@ -112,7 +141,7 @@ The game is a Progressive Web App and can be installed from the browser:
 - **Chrome, Edge, Android:** an **Install app** button appears on the home screen and in the co-op lobby (or use the install icon in the address bar).
 - **iPhone / iPad:** tap **Install app** for a hint, then Share → Add to Home Screen.
 
-The installed app opens fullscreen, has a Co-op shortcut and works offline for solo play (co-op still needs a connection). `sw.js` loads game files network first, so a new deploy shows up on the next start, and caches the versioned CDN libraries. Bump `VERSION` in `sw.js` only when the list of precached files changes.
+The installed app opens fullscreen, has a Co-op shortcut and works offline for solo play (co-op still needs a connection). `sw.js` loads game files network first, so a new deploy shows up on the next start, and caches the versioned CDN libraries. Files requested with `?v=` (test links) always wait for the network and use the cache only offline, so a slow host never mixes a new page with older scripts. Bump `VERSION` in `sw.js` only when the list of precached files changes.
 
 | File | Role |
 |---|---|
