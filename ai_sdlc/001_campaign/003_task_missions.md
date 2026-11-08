@@ -417,6 +417,20 @@ Mission times are longer than in the first draft because the Bend is one region 
 
 v2 -> v3: empty missions, no relics, nothing explored except the cells around discovered places, `story.act` from the stage.
 
+- As built (T18): `missions.active` = `{ id, state: 'accepted' | 'running' | 'done', left, viaAerie, stopped, caravan? }`;
+  mission loot in the claws (the chalice, the caravan chest) is saved in `dragon.loot` with `mission` (and `relic`) and
+  restored only together with its running mission (a v2 relic in the claws is dropped, as before). The intercept caravan
+  is saved as `caravan: { s, hp, state, chestTaken }`: after the reload the wagon goes on from the saved spot (a moving
+  wagon waits again until the dragon is in the Bend), a stopped one drops its chest on the road again (or has it taken);
+  the escort archers come back fresh. `regions.<id>.explored` is the region's bitset words as little-endian bytes in
+  base64 (a string of the wrong length starts that region unexplored, it does not make the save corrupt);
+  `aerieFound` replaces `<id>.aerie` in `discovered`; `gate: 'closed'` is written for the loaded castle town and closes
+  the portcullis on the first town build after the load; the calm garrison then opens it as after a search. Charred
+  stone stays in `ruins` (`char: true`, v2 shape). Migration v2 -> v3 sets `seedExplored` and `apply` reveals
+  `data.map.reveal` around every discovered place and the lair. A save with every region fully explored is about
+  6 KB. Corrupt v3: missing `missions` or `story`, a non-object `missions.active` or a non-number `left`, a
+  non-string `explored`.
+
 ## 6. Rendering and UI
 
 | Element | Implementation |

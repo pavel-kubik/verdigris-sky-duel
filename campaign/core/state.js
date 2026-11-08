@@ -128,6 +128,10 @@
       if (rs) AL.catchUp(rs, cs.stats.played, { towerDown: AL.towerDown(rs) });   // T17: the decay it missed while the dragon was away
       cs.town = SE.build(cs.region, rs);
       cs.town.items = LT.place(cs.town, rs, cs.stats.played);    // T19: tithe chests and strongboxes
+      if (rs && rs.gate) {                                       // Phase 3 T18: the saved castle gate (once, on the first build)
+        if (rs.gate === 'closed' && cs.town.buildings.some(b => b.gate)) Object.assign(cs.town, { gateClosed: true, gateK: 1 });
+        delete rs.gate;
+      }
     }
     return cs.town;
   }

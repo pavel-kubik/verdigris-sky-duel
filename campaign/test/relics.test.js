@@ -193,7 +193,7 @@ const relicItem = cs => cs.town.items.find(it => it.kind === 'relic');
   ok(S.caveAct(cs, 'trophy').length === 0, 'the panel only shows');
 }
 
-// 11. save: banked relics survive, a relic in the claws goes back to its door (the mission is saved only in v3)
+// 11. save: banked relics survive; v3 (T18): a relic in the claws is saved together with its running mission
 {
   const cs = make();
   cs.hoard.relics = ['ember_chalice', 'no_such_relic'];
@@ -205,11 +205,16 @@ const relicItem = cs => cs.town.items.find(it => it.kind === 'relic');
   MS.accept(c2, 'a2_chalice'); MS.step(c2, 1, []); RL.sync(c2);
   LT.take(c2, relicItem(c2), c2.stats.played);
   const o2 = SV.serialise(c2);
-  ok(o2.dragon.loot === null, 'a carried relic is not saved in the claws');
+  ok(o2.dragon.loot && o2.dragon.loot.relic === 'ember_chalice' && o2.dragon.loot.mission === 'a2_chalice' && o2.missions.active.id === 'a2_chalice', 'v3: a carried relic is saved with its mission');
+  const c4 = make(); SV.apply(c4, JSON.parse(JSON.stringify(o2)));
+  ok(RL.carrying(c4) === 'ember_chalice' && c4.mission && c4.mission.state === o2.missions.active.state, 'v3: the relic is back in the claws with the mission');
   const forged = JSON.parse(JSON.stringify(o2));
   forged.dragon.loot = { id: 'bend.castle.chapel1.relic', kind: 'relic', region: 'bend' };
   const c3 = make(); SV.apply(c3, forged);
-  ok(!c3.carriedLoot, 'a relic in the claws of a save is dropped on load');
+  ok(!c3.carriedLoot, 'a relic in the claws without its mission tag is dropped on load');
+  const forged2 = JSON.parse(JSON.stringify(o2)); forged2.missions.active = null;
+  const c5 = make(); SV.apply(c5, forged2);
+  ok(!c5.carriedLoot && !c5.mission, 'a relic in the claws without a running mission is dropped on load');
 }
 
 void WK;

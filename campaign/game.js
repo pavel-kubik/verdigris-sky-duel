@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't217.2 2026-11-06 rebased on campaign-phase-3 (base repair #61 merged)';
+  const BUILD = 't218.1 2026-11-08 save v3 (mission, relic, caravan, explored map, gate, story)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
