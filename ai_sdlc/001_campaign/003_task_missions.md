@@ -245,11 +245,11 @@ aeries: {
 ```js
 missions: [
   { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
-    relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
+    relic: 'ember_chalice', time: 540, reward: { gold: 250 } },   // T19: 540 (was 480)
   { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-    time: 540, reward: { gold: 200 } },             // T14: 540 (was 420 - the Bend is 2.4 min from the cave each way)
-  { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
-    reward: { gold: 300 } },
+    time: 600, reward: { gold: 200 } },             // T14: 540 (was 420 - the Bend is 2.4 min from the cave each way); T19: 600
+  { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 600,
+    reward: { gold: 300 } },                        // T19: 600 (was 390 - the wagon only sets out when the dragon reaches the Bend)
 ],
 mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1 },
 relics: {
@@ -258,13 +258,17 @@ relics: {
 loot: { relic: { carry: { speed: 0.8, breath: false }, mission: true } },
 caravan: {
   // road 1 of the Bend: from the Hradchan side across Karlsbridge, along the east bank to the castle gate
-  tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'strongbox', wagonHp: 120 },
+  tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
+  // T19: chest 'tithe' (was 'strongbox': a starving Drake drops a strongbox on the long way home, and its 150 gold
+  // came on top of the reward), wagonHp 80 (was 120: a breath pass at a moving wagon gives about a second of fire)
 },
 tribute: { every: 300, food: 40, max: 3 },          // a freed village leaves food in the larder every `every` s of play
 story: { acts: [1, 2], cards: ['act1', 'act2'], firstRaidMother: true },
 ```
 
 Mission times are longer than in the first draft because the Bend is one region further from the lair (the timer starts when the dragon leaves the lair region or an aerie); T19 tunes them.
+
+T19 balancing (as built): `defenders.ballista.damage` 35 -> 28 (the castle's bastion bolts were 60-75% of a careful mission's damage), mission times 540 / 600 / 600 s, the caravan chest a tithe chest and wagon hp 80. Seeded careful bots (`test/mission.bot.test.js`, seeds 1-4, full hunger, lair escape): steal mean 7.8 min, 25-49% HP; destroy 6.5-9.4 min, 25%+ HP; intercept mean 8.8 min, 25-33% HP. The intercept bot ambushes the wagon on the road (lands ahead of it, breathes as it drives in) - a breath pass at a moving wagon gives only about a second of fire.
 
 ## 5. System interfaces (`core/`)
 
@@ -378,7 +382,7 @@ Mission times are longer than in the first draft because the Bend is one region 
 ### 5.6 `caravan`
 
 - Spawned when the intercept mission starts: wagon(s) move along road `road` of the region from `from` to `to` (fractions of the polyline) with escort archers walking beside them; `caravan.step` moves, the escort uses the defender AI.
-- Burning the wagon's oxen or the wagon to 0 hp stops it and drops the chest (`strongbox`) next to it; a chest dropped on the bridge stays on the deck; reaching `to` (the castle gate) ends the mission as failed.
+- Burning the wagon's oxen or the wagon to 0 hp stops it and drops the chest (a `tithe` chest since T19) next to it; a chest dropped on the bridge stays on the deck; reaching `to` (the castle gate) ends the mission as failed.
 
 ### 5.7 Freed village
 

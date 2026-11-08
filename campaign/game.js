@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't218.2 2026-11-08 debug keys never clash with game keys (X was save + reload, Shift+W / F / G / L with Boost)';
+  const BUILD = 't219.1 2026-11-08 tips for the Bend, castle, map, aeries, missions; balancing (ballista 28, mission times, caravan chest)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
