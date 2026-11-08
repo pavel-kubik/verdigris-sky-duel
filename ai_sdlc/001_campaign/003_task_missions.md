@@ -1,6 +1,6 @@
 # Phase 3 - Castle, Map + Missions: Implementation Spec
 
-Status: draft, 2026-10-31. Refines `000_spec.md` for Phase 3. Built on `campaign-phase-3` (branched from the finished `campaign-phase-2`). Task branches are `agent/t2NN-...` (T01 -> `t201`).
+Status: done, 2026-11-08 (T01-T20 merged into `campaign-phase-3`). Drafted 2026-10-31. Refines `000_spec.md` for Phase 3. Built on `campaign-phase-3` (branched from the finished `campaign-phase-2`). Task branches are `agent/t2NN-...` (T01 -> `t201`).
 
 Revised by Pavel, 2026-10-31:
 - **Visual form comes first.** The phase opens with the first Order castle as a showpiece, before the mission systems.
