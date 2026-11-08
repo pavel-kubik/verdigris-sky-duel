@@ -40,6 +40,7 @@ h1{font-size:60px}
 p{margin:0;color:var(--mute);line-height:1.45}
 .cta{background:var(--verd);color:#08130d;border:0;border-radius:4px;padding:12px 16px;font-size:16px;font-weight:700;letter-spacing:.04em}
 .cta:hover{filter:brightness(1.08)}
+.cta:disabled,.cta:disabled:hover{background:#4a524d;color:#9aa79f;filter:none;cursor:default;opacity:.7}
 .ghost{background:transparent;color:var(--bone);border:1px solid var(--line);border-radius:4px;padding:10px 16px;font-size:15px;font-weight:600;text-align:center;text-decoration:none}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:13px}
@@ -92,6 +93,58 @@ p{margin:0;color:var(--mute);line-height:1.45}
 #alertRow i.on{background:var(--blood);border-color:var(--blood);box-shadow:0 0 6px rgba(229,72,79,.55)}
 #alertRow.pulse i.on{animation:alertPulse .5s ease-in-out 4}
 @keyframes alertPulse{50%{transform:scaleY(1.8);box-shadow:0 0 12px rgba(229,72,79,.95)}}
+#hudBtns{display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+#mapBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center}
+#mapBtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+/* map screen (Phase 3 T07): full screen canvas, a top bar with World / Region tabs and Close, zoom buttons bottom right */
+#map{position:fixed;inset:0;z-index:30;background:#1d1810;touch-action:none}
+#map[hidden]{display:none}
+#mapCanvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+#mapBar{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 10px calc(12px + env(safe-area-inset-left,0px));background:linear-gradient(rgba(12,19,16,.9),rgba(12,19,16,0))}
+#mapTitle{flex:1;text-align:center;font-family:var(--f-display);font-size:24px;color:var(--bone);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#map button{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);min-width:44px;height:44px;border-radius:22px;padding:0 14px;font:600 14px/1 var(--f-ui)}
+#map button.on{border-color:var(--verd,#62c48a);color:#62c48a}
+#mapZoom{position:absolute;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:8px}
+#map #mapZoom button{width:48px;height:48px;padding:0;font-size:22px}
+#mapTag{position:absolute;transform:translateX(-50%);font-size:13px;font-weight:600;color:var(--bone);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 10px;pointer-events:none;white-space:nowrap}
+#mapTravel{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));right:calc(74px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;display:grid;gap:8px}
+#mapTravel[hidden]{display:none}
+#mapTravelHead{margin:0;font-family:var(--f-ui);font-weight:700;color:var(--bone)}
+#mapTravelList{display:flex;flex-wrap:wrap;gap:8px}
+#map #mapTravelList button{height:auto;min-height:44px;padding:8px 14px;line-height:1.2;text-align:left}
+#map #mapTravelList button.cta{border-color:var(--verd,#62c48a);color:#62c48a}
+#map #mapTravelList button:disabled{opacity:.45}
+#mapTravelWhy{margin:0;font-size:13px;color:#e0b040}
+#map.travel #mapHelp{display:none}
+#mapHelp{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));font-size:12px;color:var(--mute);max-width:60%;pointer-events:none}
+/* message log (Pavel's request): button under pause, panel over the paused game */
+#hudBtns{position:relative}
+#logBtn{position:absolute;right:0;top:48px;pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center}
+#logBtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+#logBtn.on{border-color:var(--ember);color:var(--ember)}
+#logPanel{left:50%;top:calc(60px + env(safe-area-inset-top,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(460px,calc(100% - 24px));padding:14px 16px;gap:10px;grid-template-rows:auto auto auto 1fr auto;z-index:30;text-align:left}
+#logPanel h2{margin:0;font-size:24px}
+#logMission{border:1px solid rgba(255,211,77,.45);border-radius:4px;padding:8px 12px;background:rgba(255,211,77,.06)}
+#logMission b{display:block;font-family:var(--f-ui);font-size:16px;color:#ffd34d}
+#logMission p{margin:3px 0 0;font-size:13px;line-height:1.35}
+#logMission .state{color:var(--ember);font-weight:600}
+#logMission .obj{color:var(--bone);font-weight:600}
+#logMission .brief,#logMission .none{color:var(--mute)}
+#logScroll{overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch}
+#logList{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+#logList li{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+#logList .tm{font:500 12px/1.4 var(--f-ui);color:var(--mute);font-variant-numeric:tabular-nums}
+#logList b{display:block;font-family:var(--f-ui);font-size:14px;font-weight:600;color:var(--bone)}
+#logList small{display:block;font-size:12px;line-height:1.35;color:var(--mute)}
+#logList i{display:block;font:500 10px/1.3 var(--f-ui);letter-spacing:.1em;text-transform:uppercase;font-style:normal;color:var(--mute)}
+#logList li.mission i,#logList li.mission b{color:#ffd34d}
+#logList li.mother i{color:var(--verd)}
+#logEmpty{color:var(--mute);font-size:13px;margin:0}
+#logClose{min-height:44px}
+#toast.tap{pointer-events:auto;cursor:pointer}
+body.mom #toast{top:calc(26% + 72px)}
+#toast.mission small{color:#ffd34d}
+#missionHud{cursor:pointer}
 #pauseBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(620px,70vw);font-size:12px;color:var(--mute);pointer-events:none}
 kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin-right:4px;background:rgba(12,19,16,.5)}
@@ -128,12 +181,13 @@ kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);bor
 .center{left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));text-align:center}
 .center .row{justify-content:center}
 h2{font-size:42px}
-#lair{max-height:calc(100% - 24px);overflow:auto;gap:10px}
+#lair,#aeriePanel{max-height:calc(100% - 24px);overflow:auto;gap:10px}
+#aerieNote{color:var(--mute);font-size:13px}
 /* T10 station panel: the dragon stays in the cave, the panel names one station (nest or larder).
    Desktop: side panel on the right. Touch portrait: a sheet above the stick and buttons. Touch landscape: between them. */
-#lair.station{left:auto;top:50%;right:calc(16px + env(safe-area-inset-right,0px));transform:translateY(-50%);width:min(340px,calc(100% - 32px));padding:16px 18px;text-align:left}
-#lair.station .row{justify-content:flex-start}
-#lair.station h2{font-size:28px}
+#lair.station,#aeriePanel.station{left:auto;top:50%;right:calc(16px + env(safe-area-inset-right,0px));transform:translateY(-50%);width:min(340px,calc(100% - 32px));padding:16px 18px;text-align:left}
+#lair.station .row,#aeriePanel.station .row{justify-content:flex-start}
+#lair.station h2,#aeriePanel.station h2{font-size:28px}
 #lair[data-station=nest] .larder{display:none}
 #lair .hoardInfo{display:none}
 #lair[data-station=hoard] .hoardInfo{display:block}
@@ -154,24 +208,68 @@ h2{font-size:42px}
 #altarList li.owned b{color:var(--verd)}
 #altarList button{min-height:44px;min-width:78px;flex:none;white-space:nowrap}
 #altarList button:disabled{opacity:.45;cursor:default}
+/* Phase 3 T11: the mission board - list, briefing, Accept */
+#lair .boardInfo{display:none}
+#lair[data-station=board] .boardInfo{display:block}
+#lair[data-station=board] .larder,#lair[data-station=board] #lairStage,#lair[data-station=board] #lairVitals,#lair[data-station=board] #lairTime,#lair[data-station=board] .restRow{display:none}
+/* Phase 3 T12: the trophy wall - one row per niche */
+#lair .trophyInfo{display:none}
+#lair[data-station=trophy] .trophyInfo{display:block}
+#lair[data-station=trophy] .larder,#lair[data-station=trophy] #lairStage,#lair[data-station=trophy] #lairVitals,#lair[data-station=trophy] #lairTime,#lair[data-station=trophy] .restRow{display:none}
+#trophyCount{font-family:var(--f-ui);font-size:18px;font-weight:700;color:#ff9a3c;margin:2px 0 8px}
+#trophyList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#trophyList li{border:1px solid var(--line);border-radius:4px;padding:8px 12px;opacity:.6}
+#trophyList li.has{opacity:1;border-color:rgba(255,154,60,.6);box-shadow:inset 0 0 18px rgba(255,122,46,.18)}
+#trophyList li b{display:block;font-family:var(--f-ui);font-size:16px;color:var(--bone)}
+#trophyList li.has b{color:#ffb066}
+#trophyList li small{display:block;font-size:12px;line-height:1.35;color:var(--mute)}
+.trophyNote{font-size:13px;color:var(--mute)}
+#boardList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#boardList button{display:block;width:100%;text-align:left;min-height:52px;padding:8px 12px;border:1px solid var(--line);border-radius:4px;background:rgba(233,225,204,.04);color:var(--bone);font:inherit;cursor:pointer}
+#boardList button b{display:block;font-family:var(--f-ui);font-size:16px}
+#boardList button small{display:block;font-size:12px;line-height:1.3;color:var(--mute)}
+#boardList button.locked{opacity:.55}
+#boardList button.on{border-color:#ffd34d;background:rgba(255,211,77,.1)}
+#boardList button.on b{color:#ffd34d}
+#boardBrief[hidden],#boardList[hidden]{display:none}
+#boardBrief h3{margin:0 0 4px;font-family:var(--f-ui);font-size:20px;color:#ffd34d}
+#boardBrief p{margin:0 0 6px;line-height:1.4}
+#boardBrief .facts{display:flex;gap:14px;font-family:var(--f-ui);font-weight:700;color:var(--bone);margin:6px 0 10px}
+#boardBrief .facts span{color:#f2c14e}
+#boardBrief .why{color:#e0b040;font-weight:600}
+#boardBrief .row{gap:8px;flex-wrap:wrap}
+#boardBrief button{min-height:44px}
+/* Phase 3 T11: mission HUD - timer under the compass (28 px, amber at warn, red pulsing at danger) + objective line */
+#missionHud{position:fixed;left:50%;top:calc(142px + env(safe-area-inset-top,0px));transform:translateX(-50%);text-align:center;pointer-events:auto;z-index:6;max-width:calc(100% - 28px)}
+#missionTimer{display:inline-block;font-family:var(--f-ui);font-size:28px;font-weight:700;line-height:1;letter-spacing:.04em;color:#ffd34d;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:2px 10px;border-radius:4px;background:rgba(12,19,16,.55)}
+#missionTimer.warn{color:#f0a030}
+#missionTimer.danger{color:#ff4d4d;animation:mPulse .8s ease-in-out infinite}
+#missionTimer.paused{opacity:.6}
+@keyframes mPulse{50%{transform:scale(1.12);text-shadow:0 0 10px #ff4d4d}}
+#missionObj{margin-top:3px;font-size:12px;font-weight:600;color:var(--bone);text-shadow:0 1px 2px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.mHud #compassTag{top:calc(196px + env(safe-area-inset-top,0px))}
+body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
+@media (max-width:720px){body.mHud #hint{top:calc(198px + env(safe-area-inset-top,0px))}}
+@media (pointer:coarse) and (orientation:landscape) and (max-height:560px){body.mHud #hint{top:calc(198px + env(safe-area-inset-top,0px))}#missionHud{top:calc(140px + env(safe-area-inset-top,0px))}#missionTimer{font-size:24px}}
 /* T19: gold under the stage row; the carried chest as a small icon */
 #goldRow{display:flex;width:max-content;margin:4px auto 0;gap:5px;align-items:center}
 #goldRow small{font-family:var(--f-ui);font-size:12px;font-weight:700;letter-spacing:.06em;color:#f2c14e}
 #goldRow .coin{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe08a,#c8901e);box-shadow:0 0 0 1px #6a4a10}
 #goldLoot{width:16px;height:11px;border-radius:2px;background:#7a4a24;box-shadow:inset 0 -3px 0 #d9a63a,0 0 0 1px #2a1d08}
+#goldLoot.relic{width:12px;height:14px;border-radius:2px 2px 6px 6px;background:#e0b040;box-shadow:inset 0 3px 0 #ff7a2e,0 0 6px #ff7a2e}
 #goldLoot.strongbox{background:#3b3f45;box-shadow:inset 0 -3px 0 #8a8f96,0 0 0 1px #111}
 #goldRow.pulse small{animation:goldPulse .5s ease-in-out 4}
 @keyframes goldPulse{50%{color:#fff3c4;text-shadow:0 0 8px #f2c14e}}
 #lair[data-station=larder] #lairStage,#lair[data-station=larder] #lairVitals,#lair[data-station=larder] #lairTime,#lair[data-station=larder] .restRow{display:none}
-@media (pointer:coarse){#lair.station{left:12px;right:12px;width:auto;top:auto;transform:none;bottom:calc(252px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 252px - 130px - env(safe-area-inset-bottom,0px) - env(safe-area-inset-top,0px));padding:12px 14px;gap:8px}#lair.station h2{font-size:22px}}
+@media (pointer:coarse){#lair.station,#aeriePanel.station{left:12px;right:12px;width:auto;top:auto;transform:none;bottom:calc(252px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 252px - 130px - env(safe-area-inset-bottom,0px) - env(safe-area-inset-top,0px));padding:12px 14px;gap:8px}#lair.station h2,#aeriePanel.station h2{font-size:22px}}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
-  #lair.station{left:calc(190px + env(safe-area-inset-left,0px));right:calc(190px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 140px)}
+  #lair.station,#aeriePanel.station{left:calc(190px + env(safe-area-inset-left,0px));right:calc(190px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));max-height:calc(100% - 140px)}
 }
 #lair .larder{display:grid;gap:6px;text-align:left}
 #larderList{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 #larderList li{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:4px;padding:4px 4px 4px 12px}
 #larderList button{min-height:38px;min-width:64px}
-#lairMsg{min-height:1.4em;color:var(--verd);font-weight:600}
+#lairMsg,#aerieMsg{min-height:1.4em;color:var(--verd);font-weight:600}
 #lairDeath{margin:0;padding:8px 12px;border:1px solid var(--blood);border-radius:4px;color:var(--bone);background:rgba(229,72,79,.14);font-weight:600}
 #saveNote{margin:0;font-size:14px;color:var(--mute)}
 #introNew{margin:0;font-size:14px;color:var(--mute);border-left:2px solid var(--verd);padding-left:10px}
@@ -179,6 +277,7 @@ h2{font-size:42px}
 #saveBad p{margin:0 0 10px;font-size:14px;color:var(--ember)}
 #newBtn.confirm{border-color:var(--ember);color:var(--ember)}
 #lairDeath small{display:block;font-weight:400;color:var(--mute);margin-top:2px}
+#lairDeath .mFail{display:block;margin-top:8px;color:var(--ember)}
 #lairStage.ready{color:var(--verd);font-weight:700}
 #hatchLine{position:fixed;left:50%;top:30%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));margin:0;text-align:center;font:500 clamp(20px,4.6vw,30px)/1.25 var(--f-display);color:var(--bone);text-shadow:0 2px 18px rgba(0,0,0,.8);opacity:0;transition:opacity .6s;pointer-events:none;text-wrap:balance}
 #hatchLine.on{opacity:1}
@@ -225,15 +324,19 @@ h2{font-size:42px}
     <div class="bar" id="hgBar"><span data-i18n="c.hud.hunger">Hunger</span><div class="track"><div class="fill" id="hgFill"></div></div></div>
   </div>
   <div id="regionName"><i id="todIcon" data-phase="day" role="img" aria-label="day"></i><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span><span id="goldRow" hidden aria-label="Gold" data-i18n-attr="aria-label:c.hud.gold"><i class="coin"></i><small id="goldText">0</small><i id="goldLoot" hidden></i></span></div>
+  <div id="hudBtns"><button id="mapBtn" aria-label="Map" data-i18n-attr="aria-label:c.map.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14"/></svg></button>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
+  <button id="logBtn" aria-label="Messages" data-i18n-attr="aria-label:c.log.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h10l3 3v15H6z M9 9h7 M9 13h7 M9 17h4"/></svg></button>
+  </div>
 </div>
 <div id="legend" hidden>
-  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>G</kbd><span data-i18n="c.legend.grab">Grab (hold)</span></span><span><kbd>X</kbd><span data-i18n="c.legend.eat">Eat (hold)</span></span><span><kbd>F</kbd><span data-i18n="c.legend.land">Land / fly</span></span><span><kbd>E</kbd><span data-i18n="c.legend.station">Use (in the cave)</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
+  <span><kbd>A</kbd><kbd>D</kbd><span data-i18n="legend.turn">Turn</span></span><span><kbd>W</kbd><kbd>S</kbd><span data-i18n="legend.pitch">Climb / dive</span></span><span><kbd data-i18n="key.space">Space</kbd><span data-i18n="legend.breath">Fire breath</span></span><span><kbd>Shift</kbd><span data-i18n="legend.boost">Boost</span></span><span><kbd>Q</kbd><kbd>E</kbd><span data-i18n="legend.roll">Barrel roll</span></span><span><kbd>G</kbd><span data-i18n="c.legend.grab">Grab (hold)</span></span><span><kbd>X</kbd><span data-i18n="c.legend.eat">Eat (hold)</span></span><span><kbd>F</kbd><span data-i18n="c.legend.land">Land / fly</span></span><span><kbd>E</kbd><span data-i18n="c.legend.station">Use (in the cave)</span></span><span><kbd>Tab</kbd><span data-i18n="c.legend.map">Map</span></span><span><kbd>L</kbd><span data-i18n="c.legend.log">Messages</span></span><span><kbd>Esc</kbd><span data-i18n="legend.pause">Pause</span></span>
 </div>
 <div id="prompt" hidden><div id="promptText"></div><div id="promptBar" hidden><i></i></div></div>
 <div id="fade"></div>
 <canvas id="compass" hidden aria-label="Compass" data-i18n-attr="aria-label:c.nav.compass"></canvas>
 <div id="compassTag" hidden aria-live="polite"></div>
+<div id="missionHud" hidden aria-live="off"><div id="missionTimer" role="timer"></div><div id="missionObj"></div></div>
 <div id="momArrow" hidden aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5l18 7-18 7 4.5-7z"/></svg></div>
 <div id="mother" hidden aria-live="polite"><b data-i18n="c.mother.name">Mother</b><span id="motherText"></span></div>
 <div id="hint" hidden data-i18n="c.tip.hunt">Hunt: fly low over a herd and hold G to swoop and grab, X to eat. Too heavy? Roast it with fire (Space).</div>
@@ -259,6 +362,14 @@ h2{font-size:42px}
   <div class="row"><button class="cta" id="hatchBtn" data-i18n="c.hatch.go">Open your eyes</button></div>
 </section>
 
+<section id="logPanel" class="panel" hidden aria-labelledby="logTitle">
+  <div class="eyebrow" data-i18n="c.log.eyebrow">Journal</div>
+  <h2 id="logTitle" data-i18n="c.log.title">Messages</h2>
+  <div id="logMission"></div>
+  <div id="logScroll"><ul id="logList"></ul><p id="logEmpty" data-i18n="c.log.empty">No messages yet.</p></div>
+  <button class="ghost" id="logClose" data-i18n="c.log.close">Close</button>
+</section>
+
 <section id="lair" class="panel station" hidden aria-labelledby="lairTitle">
   <p id="lairDeath" role="status" hidden></p>
   <div class="eyebrow" data-i18n="c.lair.eyebrow">Volcano lair</div>
@@ -269,9 +380,33 @@ h2{font-size:42px}
   <div class="row restRow"><button class="cta" id="restBtn" data-i18n="c.lair.rest">Rest</button><button class="ghost" id="sleepDuskBtn" data-i18n="c.clock.sleepDusk">Sleep until dusk</button><button class="ghost" id="sleepDawnBtn" data-i18n="c.clock.sleepDawn">Sleep until dawn</button></div>
   <div class="hoardInfo"><p id="hoardGold"></p><p id="hoardTier"></p><p class="hoardCarry" data-i18n="c.hoard.carry">Loot is banked the moment you enter the lair. If you die on the way, it is lost.</p></div>
   <div class="altarInfo"><p id="altarGold"></p><ul id="altarList"></ul></div>
+  <div class="trophyInfo"><p id="trophyCount"></p><ul id="trophyList"></ul><p class="trophyNote" data-i18n="c.trophy.note">Relics are mission prizes.</p></div>
+  <div class="boardInfo"><ul id="boardList"></ul>
+    <div id="boardBrief" hidden><h3 id="briefName"></h3><p id="briefText"></p><div class="facts"><div><span data-i18n="c.board.time">Time</span> <b id="briefTime"></b></div><div><span data-i18n="c.board.reward">Reward</span> <b id="briefReward"></b></div></div><p class="why" id="briefWhy" hidden></p>
+      <div class="row"><button class="cta" id="briefAccept" data-i18n="c.board.accept">Accept</button><button class="ghost" id="briefDrop" hidden data-i18n="c.board.drop">Drop mission</button><button class="ghost" id="briefBack" data-i18n="c.board.back">Back</button></div></div>
+  </div>
   <div class="larder"><div class="eyebrow" id="larderHead"></div><ul id="larderList"></ul><p id="larderEmpty" data-i18n="c.lair.empty">Empty - carry prey into the cave to store it</p></div>
   <p id="lairMsg" aria-live="polite"></p>
   <button class="ghost" id="leaveBtn" data-i18n="c.cave.close">Close</button>
+</section>
+
+<section id="aeriePanel" class="panel station" hidden aria-labelledby="aerieTitle">
+  <div class="eyebrow" id="aerieWhere"></div>
+  <h2 id="aerieTitle" data-i18n="c.aerie.title">Aerie</h2>
+  <p id="aerieVitals"></p>
+  <p id="aerieGold"></p>
+  <p id="aerieNote" data-i18n="c.aerie.note">Loot you carry in is banked here, like in the lair. Growing up still needs the nest in the volcano.</p>
+  <p id="aerieMsg" aria-live="polite"></p>
+  <div class="row"><button class="cta" id="aerieRestBtn" data-i18n="c.aerie.rest">Rest</button><button class="ghost" id="aerieTravelBtn" data-i18n="c.aerie.travel">Fast travel</button><button class="ghost" id="aerieLeaveBtn" data-i18n="c.aerie.leave">Leave</button></div>
+</section>
+
+<section id="map" hidden aria-label="Map" data-i18n-attr="aria-label:c.map.open">
+  <canvas id="mapCanvas"></canvas>
+  <div id="mapBar"><button id="mapWorldBtn" data-i18n="c.map.worldBtn">World</button><button id="mapRegionBtn" data-i18n="c.map.regionBtn">Region</button><span id="mapTitle"></span><button id="mapClose" data-i18n="c.map.close">Close</button></div>
+  <div id="mapZoom"><button id="mapZoomIn" aria-label="Zoom in" data-i18n-attr="aria-label:c.map.zoomIn">+</button><button id="mapZoomOut" aria-label="Zoom out" data-i18n-attr="aria-label:c.map.zoomOut">-</button></div>
+  <div id="mapHelp"></div>
+  <div id="mapTag" hidden aria-live="polite"></div>
+  <div id="mapTravel" hidden><p id="mapTravelHead"></p><div id="mapTravelList"></div><p id="mapTravelWhy" hidden></p></div>
 </section>
 
 <section id="pause" class="panel center" hidden>
@@ -288,9 +423,9 @@ h2{font-size:42px}
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
     ['../i18n.js', '../pwa.js', '../shared/dragon.js',
-     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/loot.js',
-     'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/perception.js', 'core/defenders.js', 'core/alert.js', 'core/tips.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js',
-     'render/flora.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/loot-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/sky.js', 'render/hatch-scene.js', 'game.js'
+     'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/loot.js', 'core/relics.js', 'core/freed.js',
+     'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/caravan.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/story.js', 'core/tips.js', 'core/msglog.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js', 'core/dm.js', 'core/dmnet.js',
+     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/caravan-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'render/story-card.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>

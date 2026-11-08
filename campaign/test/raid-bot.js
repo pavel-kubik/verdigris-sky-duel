@@ -7,11 +7,12 @@
 'use strict';
 const M = require('../core/umd.js');
 const S = M.need('state'), D = M.need('data'), T = M.need('terrain'), LR = M.need('lair'), RG = M.need('region'),
-  WK = M.need('walk'), SE = M.need('settlement'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey');
+  WK = M.need('walk'), SE = M.need('settlement'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'),
+  AE = M.need('aerie');
 const { clamp, wrap, dist2, mulberry } = M.need('math');
 
-const ROUTE = { ash: 'wild', wild: 'farm' };        // outward; home is the reverse
-const BACK = { farm: 'wild', wild: 'ash' };
+const ROUTE = { ash: 'wild', wild: 'farm', farm: 'bend' };    // outward to bot.dest; home is the reverse
+const BACK = { bend: 'farm', farm: 'wild', wild: 'ash' };
 const CRUISE = 70;                                   // height over the ground between the regions
 const HIGH = 150;                                    // height over the ground for the approach to the settlement
 const LAND_R = 30;                                   // sets down within this distance of the landing spot
@@ -39,7 +40,7 @@ function steer(p, to, alt) {
 
 /** The loot the bot goes for in the Farmlands: the strongbox when it lies there, else the nearest tithe chest. */
 function pickLoot(cs, kind) {
-  const items = (cs.town.items || []).filter(it => !it.taken);
+  const items = (cs.town.items || []).filter(it => !it.taken && !it.hidden);
   const want = kind ? items.filter(it => it.kind === kind) : items;
   if (!want.length) return null;
   const box = want.find(it => it.kind === 'strongbox');
@@ -89,7 +90,9 @@ function landingSpot(cs, sp, item) {
 
 function createBot(cs, opts) {
   const o = opts || {};
-  return { cs, phase: 'out', kind: o.kind || null, item: null, t: 0, phaseT: 0, log: [], huntT: 0,
+  // Phase 3 T13 (mission bot, test/mission-bot.js): dest = the region of the loot, pick(cs) = the item to take there,
+  // escape 'aerie' = on the way home fly into a found aerie of the region when it is nearer than the exit home
+  return { cs, phase: 'out', dest: o.dest || 'farm', pick: o.pick || null, escape: o.escape || 'lair', kind: o.kind || null, item: null, t: 0, phaseT: 0, log: [], huntT: 0,
            hunt: Object.assign({}, HUNT, o.hunt), prof: PROFILES[o.profile || 'careful'], rng: mulberry(((o.seed || 1) * 7919 + 29) | 0),
            missT: 0, seenId: null, seenT: 0, botch: false, lap: 0, lapA: null };
 }
@@ -170,13 +173,13 @@ function input(bot, dt) {
 function decide(bot, dt) {
   const cs = bot.cs, p = cs.dragon.pilot;
   if (cs.carriedLoot && bot.phase !== 'takeoff' && bot.phase !== 'home') setPhase(bot, 'takeoff');
-  if (!cs.carriedLoot && bot.phase === 'home' && cs.region === 'farm' && !bot.item) setPhase(bot, 'out');
+  if (!cs.carriedLoot && bot.phase === 'home' && cs.region === bot.dest && !bot.item) setPhase(bot, 'out');
 
   if (bot.phase === 'out' || bot.phase === 'hunt') {
     const h = hunt(bot, dt);
     if (h) return h;
-    if (cs.region !== 'farm') return travel(cs, ROUTE[cs.region]);
-    bot.item = pickLoot(cs, bot.kind);
+    if (cs.region !== bot.dest) return travel(cs, ROUTE[cs.region]);
+    bot.item = bot.pick ? bot.pick(cs) : pickLoot(cs, bot.kind);
     if (!bot.item) return travel(cs, BACK[cs.region]);
     setPhase(bot, 'approach');
   }
@@ -251,11 +254,18 @@ function decide(bot, dt) {
   }
 
   if (bot.phase === 'home') {
+    const aer = bot.escape === 'aerie' && escapeAerie(cs);
+    if (aer) {                                              // T13: into the mouth of a found aerie (banks, ends the mission)
+      const dm = Math.hypot(p.pos[0] - aer.mouth[0], p.pos[2] - aer.mouth[2]);
+      if (bot.phaseT < 6 && cs.region === bot.dest) return { sx: 0, sy: 1 };
+      const s = steer(p, aer.mouth, dm > 60 ? aer.mouth[1] + Math.min(40, dm * 0.25) : aer.mouth[1]);
+      return { sx: s.sx, sy: s.sy };
+    }
     if (cs.region !== LR.home()) {
       const r = travel(cs, BACK[cs.region]);
       // weave while archers or a ballista may be aiming (the first 25 s out of the settlement)
-      if (cs.region === 'farm' && bot.phaseT < 25 && r.sx != null) r.sx = clamp(r.sx + Math.sin(bot.phaseT * 2.2) * 0.6, -1, 1);
-      if (cs.region === 'farm' && bot.phaseT < 6 && r.sy != null) r.sy = 1;   // climb out first
+      if (cs.region === bot.dest && bot.phaseT < 25 && r.sx != null) r.sx = clamp(r.sx + Math.sin(bot.phaseT * 2.2) * 0.6, -1, 1);
+      if (cs.region === bot.dest && bot.phaseT < 6 && r.sy != null) r.sy = 1;   // climb out first
       return r;
     }
     const m = LR.mouthPos(cs.region);
@@ -264,6 +274,17 @@ function decide(bot, dt) {
     return { sx: s.sx, sy: s.sy };
   }
   return {};
+}
+
+/** T13: the found aerie of this region when it is nearer than the exit toward the lair, else null. */
+function escapeAerie(cs) {
+  const s = AE.site(cs.region), p = cs.dragon.pilot;
+  if (!s || !AE.found(cs, cs.region)) return null;
+  const da = Math.hypot(p.pos[0] - s.x, p.pos[2] - s.z);
+  if (cs.region === LR.home()) return null;
+  const R = T.region(cs.region), ex = R.exits.find(e => e.to === BACK[cs.region]);
+  const a = RG.arcMid(ex), de = Math.hypot(p.pos[0] - Math.sin(a) * R.radius, p.pos[2] - Math.cos(a) * R.radius);
+  return da < de ? s : null;
 }
 
 /** Is the dragon (flying or walking) inside a building's footprint below its roof? */
@@ -298,16 +319,19 @@ function raid(cs, opts) {
       else if (e.e === 'bolt:hit') { stats.boltHits++; stats.damage += e.damage; }
       else if (e.e === 'bell:ring') stats.bells++;
       else if (e.e === 'loot:taken') stats.taken = e.kind;
-      else if (e.e === 'hoard:banked') banked = e;
+      else if (e.e === 'hoard:banked' || e.e === 'relic:banked') banked = e;
+      else if (e.e === 'mission:success') stats.success = e;
+      else if (e.e === 'mission:failed') stats.failed = e;
+      else if (e.e === 'mission:started') stats.startedAt = t;
       else if (e.e === 'prey:eaten') stats.meals++;
       else if (e.e === 'dragon:died') died = e.cause || true;
     }
     stats.minHp = Math.min(stats.minHp, cs.dragon.hp);
     if (cs.squad) stats.maxArrows = Math.max(stats.maxArrows, cs.squad.arrows.length + (cs.squad.bolts || []).length);
     if (o.check) o.check(cs, ev);
-    if (banked || died || cs.inLair) break;
+    if (banked || died || cs.inLair || cs.inAerie) break;
   }
   return { minutes: t / 60, banked, gold: banked ? banked.gold : 0, died, hpLeft: cs.dragon.hp, log: bot.log, stats };
 }
 
-module.exports = { raid, input, createBot, insideSolid, pickLoot, standPoint, PROFILES };
+module.exports = { raid, input, createBot, insideSolid, pickLoot, standPoint, hunt, PROFILES };

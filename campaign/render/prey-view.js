@@ -55,6 +55,14 @@
       { geo: horn(0.05, 0.3), col: 0xe8dcc0, places: [[0.22, 2.05, 1.2, 0, 0, -0.9], [-0.22, 2.05, 1.2, 0, 0, 0.9]] },
       { geo: leg(0.12, 0.95), col: 0x3a302a, legs: true, places: [[0.32, 0.95, 0.75], [-0.32, 0.95, 0.75], [0.32, 0.95, -0.75], [-0.32, 0.95, -0.75]] },
     ] },
+    chicken: { parts: [                                                  // deathmatch food (core/dm.js): white or brown hens
+      { geo: new THREE.DodecahedronGeometry(0.3, 0).scale(1, 0.9, 1.3), col: [0xf4efe4, 0xa8652e], places: [[0, 0.55, 0, 0, 0, 0]] },
+      { geo: box(0.1, 0.32, 0.22), col: [0xe8e2d4, 0x6e3e1c], places: [[0, 0.78, -0.36, -0.5, 0, 0]] },
+      { geo: new THREE.SphereGeometry(0.16, 6, 4), col: [0xf4efe4, 0xa8652e], places: [[0, 0.86, 0.3, 0, 0, 0]] },
+      { geo: box(0.05, 0.12, 0.18), col: 0xd23a2a, places: [[0, 1.03, 0.3, 0, 0, 0], [0, 0.72, 0.42, 0, 0, 0]] },   // comb, wattle
+      { geo: new THREE.ConeGeometry(0.05, 0.14, 4), col: 0xe8b23a, places: [[0, 0.84, 0.5, Math.PI / 2, 0, 0]] },
+      { geo: leg(0.035, 0.32), col: 0xe8a23a, legs: true, places: [[0.1, 0.32, 0], [-0.1, 0.32, 0]] },
+    ] },
     roast: { parts: [
       { geo: new THREE.DodecahedronGeometry(0.55, 0), col: [0x8a4a1e, 0x6a3416], places: [[0, 0.45, 0, 0.3, 0, 0.2]] },
       { geo: new THREE.CylinderGeometry(0.09, 0.12, 0.9, 5), col: 0xeee4cc, places: [[0.55, 0.42, 0.1, 0, 0, 1.25]] },

@@ -28,6 +28,12 @@
  *       settlement, `patrols` archer pairs walking the road (routeOf: the region's road or a line through its settlements;
  *       d.patrol { s, dir, side, pause }), bellFast (ringTime x alert.bellFast); old = the squad before (same ids keep
  *       their state). step() respawns the squad when the region's alert level changes ('defenders:reinforced' on a rise).
+ * T05 castle: a castle place's archers stand on castle.posts (round towers, gatehouses, wall walks; round robin, side
+ *       by side when there are more archers than posts), the bastions' ballistae on their walk tops; after the defenders
+ *       move, castle.step runs the gate (closes on alarm, opens after the search) and the keep's horn ('horn:blow').
+ * Phase 3 T15: caravan escort archers (d.escort, core/caravan.js) join the squad of their region; caravan.step moves them.
+ * Phase 3 T16 freed place (pl.freed): no archers or ballistae spawn there, its peasants do not see or hear the dragon
+ *       and ring no bell (they still flee the breath).
  * The squad also serves as cs.watch (the T14 debug view and the 'to post' debug jump read cs.watch.list).
  * Pure: no DOM, no THREE.
  */
@@ -35,9 +41,10 @@
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const D = M.need('data'), T = M.need('terrain'), SE = M.need('settlement'), PC = M.need('perception');
+  const SE_OUT = b => !!(b && (b.ruin || b.char));          // T06: a ruin or a charred stone shell: its posts are empty
   const { wrap, clamp } = M.need('math');
   const TAU = Math.PI * 2;
-  const SHELTER = { house: 1, barn: 1, granary: 1, taxhouse: 1, barracks: 1 };
+  const SHELTER = { house: 1, barn: 1, granary: 1, taxhouse: 1, barracks: 1, hall: 1, stables: 1, keep: 1, rotunda: 1 };   // T05: castle folk hide too
 
   function baseYaw(b, pl) {
     const dx = b.pos[0] - (pl ? pl.x : b.pos[0]), dz = b.pos[2] - (pl ? pl.z : b.pos[2]);
@@ -55,7 +62,7 @@
   }
 
   /** Eye height of a defender standing on b (a post building) or on the ground. */
-  const topOf = b => b.pos[1] + b.h + D.perception.watch.eye;
+  const topOf = b => b.pos[1] + (D.buildings[b.type].walkTop != null ? D.buildings[b.type].walkTop : b.h) + D.perception.watch.eye;   // T05: bastion = its walk top
 
   const NO_RESP = { extraArchers: 0, patrols: 0, bellFast: false };
 
@@ -89,20 +96,29 @@
     for (const pl of town.places) {
       const tpl = D.settlements[pl.type] || {}, own = town.buildings.filter(b => b.place === pl.id);
       const towers = own.filter(b => D.buildings[b.type].post === 'archer');
-      const nA = (tpl.archers || 0) + (tpl.archers ? resp.extraArchers || 0 : 0);   // T17: alert sends more archers up
-      for (let i = 0; i < nA && towers.length; i++) {
+      const nA = pl.freed ? 0 : (tpl.archers || 0) + (tpl.archers ? resp.extraArchers || 0 : 0);   // T17: alert sends more archers up; Phase 3 T16: none at a freed place
+      const slots = pl.castle ? M.need('castle').posts(town, pl) : null;   // T05: castle posts (towers, gatehouses, wall walks)
+      for (let i = 0; slots && slots.length && i < nA; i++) {
+        const sl = slots[i % slots.length], k = Math.floor(i / slots.length), b = byId(town, sl.building);
+        const side = (k % 2 ? -1 : 1) * Math.ceil(k / 2) * E.towerSpacing;   // more archers than posts: side by side
+        const pos = [sl.x + Math.cos(sl.yaw) * side, sl.y, sl.z - Math.sin(sl.yaw) * side];
+        const d = mk('archer', sl.building + '.archer' + (i + 1), pl.id, pos, sl.yaw, { building: sl.building, post: true });
+        if (b && SE_OUT(b)) { d.alive = false; d.down = true; }
+        list.push(d);
+      }
+      for (let i = 0; !slots && i < nA && towers.length; i++) {
         const b = towers[i % towers.length], k = Math.floor(i / towers.length), base = baseYaw(b, pl);
         const nOn = Math.floor(nA / towers.length) + (i % towers.length < nA % towers.length ? 1 : 0);
         const side = (k - (nOn - 1) / 2) * E.towerSpacing;   // side by side, across the outward direction
         const pos = [b.pos[0] + Math.cos(base) * side, topOf(b), b.pos[2] - Math.sin(base) * side];
         const d = mk('archer', b.id + '.archer' + (k + 1), pl.id, pos, base, { building: b.id, post: true });
-        if (b.ruin) { d.alive = false; d.down = true; }
+        if (SE_OUT(b)) { d.alive = false; d.down = true; }
         list.push(d);
       }
-      for (const b of own.filter(x => D.buildings[x.type].post === 'ballista')) {
+      for (const b of pl.freed ? [] : own.filter(x => D.buildings[x.type].post === 'ballista')) {
         const pos = [b.pos[0], topOf(b), b.pos[2]];
         const d = mk('ballista', b.id + '.ballista', pl.id, pos, baseYaw(b, pl), { building: b.id, post: true });
-        if (b.ruin) { d.alive = false; d.down = true; }
+        if (SE_OUT(b)) { d.alive = false; d.down = true; }
         list.push(d);
       }
       const homes = own.filter(b => b.type === 'house').concat(own.filter(b => SHELTER[b.type] && b.type !== 'house'));
@@ -138,7 +154,7 @@
       }
     }
     return { town, list, arrows: old ? old.arrows : [], bolts: old ? old.bolts || [] : [], t: old ? old.t : 0, rung: old ? old.rung : {},
-             kills: old ? old.kills : 0, rng, resp, route, alarmed: old ? old.alarmed || {} : {} };
+             kills: old ? old.kills : 0, rng, resp, route, alarmed: old ? old.alarmed || {} : {}, horn: old ? old.horn || {} : {} };
   }
 
   /** T17: a patrol archer walks its route while idle (ping-pong, a pause at each end); otherwise stands and turns to
@@ -351,7 +367,7 @@
       return;
     }
     // alert / search / panic: ring the bell (one peasant per settlement), then hide
-    const bell = town.buildings.find(b => b.place === d.place && D.buildings[b.type].bell && !b.ruin);
+    const bell = sq.freed && sq.freed[d.place] ? null : town.buildings.find(b => b.place === d.place && D.buildings[b.type].bell && !b.ruin);   // Phase 3 T16: a freed village rings no bell
     const rung = (sq.rung[d.place] || 0) > 0, ringer = sq.list.find(o => o.ringer && o.place === d.place && o.alive && o !== d);
     if (V.ringsBell && bell && !rung && !d.rang && (!ringer || d.ringer)) {
       d.ringer = true; d.goalB = bell.id;
@@ -421,6 +437,8 @@
       if (old && old.town && town && old.town.region === town.region && old.level != null && lv > old.level) out.push({ e: 'defenders:reinforced', level: lv, from: old.level });
     }
     const sq = cs.squad, p = cs.dragon.pilot;
+    sq.freed = {};                                      // Phase 3 T16: peasants of a freed place stay calm (no sight, no bell)
+    for (const pl of (town && town.places) || []) if (pl.freed) sq.freed[pl.id] = true;
     cs.watch = sq;                                      // T14's debug view and 'to post' read cs.watch.list
     sq.t += dt;
     for (const k in sq.rung) sq.rung[k] = Math.max(0, sq.rung[k] - dt);
@@ -432,7 +450,7 @@
       d.burnT = Math.max(0, d.burnT - dt);
       const b = d.post ? byId(town, d.building) : null;
       if (d.post && b) {
-        if (b.ruin) { if (d.alive) kill(sq, d, 'fall', out); d.down = true; continue; }
+        if (SE_OUT(b)) { if (d.alive) kill(sq, d, 'fall', out); d.down = true; continue; }   // T06: a charred tower too
         if (!d.alive && d.down) {                       // the tower stands again: new archers on it
           Object.assign(d, { alive: true, down: false, hp: D.defenders[d.kind].hp, aware: 0, state: 'idle', focus: null, search: 0 });
           out.push({ e: 'defender:back', id: d.id, kind: d.kind, place: d.place });
@@ -447,8 +465,9 @@
         const dy = wrap(want - d.yaw), mx = (d.kind === 'ballista' ? D.defenders.ballista.turn : W.turn) * dt;
         d.yaw = wrap(d.yaw + clamp(dy, -mx, mx));
       }
-      d.seen = inside ? 0 : PC.seen(d, { pos: p.pos }, ctx);
-      d.heard = PC.heard(d, noises);
+      const calm = d.kind === 'peasant' && sq.freed[d.place];
+      d.seen = inside || calm ? 0 : PC.seen(d, { pos: p.pos }, ctx);
+      d.heard = calm ? null : PC.heard(d, noises);
       if (d.seen > 0) d.focus = p.pos.slice();
       else if (d.heard) d.focus = d.heard.pos.slice();
       const was = d.state;
@@ -467,6 +486,11 @@
       if (d.kind === 'peasant') peasant(sq, d, cs, dt, out); else archer(sq, d, cs, dt, out);
     }
     stepArrows(sq, cs, dt, scale, out);
+    // T05: castle alarm -> gate and the keep's horn (the horn's 'aware:state' events reach the alert heat as usual)
+    if (town && town.places.some(pl => pl.castle)) {
+      const pad = D.settlement.pad * scale;
+      for (const e of M.need('castle').step(sq, { pos: p ? p.pos : null, pad, inside }, dt)) out.push(e);
+    }
     cs.danger = zones(sq);
     return out;
   }
@@ -476,7 +500,7 @@
     const by = {}, out = [], town = sq && sq.town;
     for (const d of (sq && sq.list) || []) {
       if (!d.alive || (d.kind !== 'archer' && d.kind !== 'ballista')) continue;
-      if (d.patrol) { out.push({ x: d.pos[0], z: d.pos[2], r: D.defenders.archer.range }); continue; }   // T17: a zone per patrol archer
+      if (d.patrol || d.escort) { out.push({ x: d.pos[0], z: d.pos[2], r: D.defenders.archer.range }); continue; }   // T17: a zone per patrol archer (T15: and caravan escort)
       const pl = town && town.places.find(p => p.id === d.place), cx = pl ? pl.x : d.pos[0], cz = pl ? pl.z : d.pos[2];
       const r = Math.hypot(d.pos[0] - cx, d.pos[2] - cz) + D.defenders[d.kind].range;
       if (!by[d.place] || by[d.place].r < r) by[d.place] = { x: cx, z: cz, r };
@@ -489,11 +513,11 @@
     for (const d of (sq && sq.list) || []) {
       const b = d.post && sq.town ? byId(sq.town, d.building) : null;
       Object.assign(d, { aware: 0, state: 'idle', focus: null, search: 0, panic: false, hidden: false, rang: false, ringer: false, shots: 0, aim: 0, cool: 0, aimAt: null, target: null });
-      if (!(b && b.ruin)) { d.alive = true; d.down = false; d.hp = D.defenders[d.kind].hp; }
+      if (!(b && SE_OUT(b))) { d.alive = true; d.down = false; d.hp = D.defenders[d.kind].hp; }
     }
     if (sq) { sq.arrows.length = 0; sq.bolts = []; sq.rung = {}; }
     return sq;
   }
 
-  M.define('defenders', { spawn, routeOf, along, step, burn, zones, calm, aimArrow, inCone, segDist2 });
+  M.define('defenders', { mk, spawn, routeOf, along, step, burn, zones, calm, aimArrow, inCone, segDist2 });
 })(typeof self !== 'undefined' ? self : this);

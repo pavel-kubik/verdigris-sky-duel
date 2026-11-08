@@ -27,8 +27,8 @@
 
   /** The story part of the save: the act and the mother's lesson state (null = no teacher, e.g. a phase 1 run). */
   function storyOf(st) {
-    const m = st && st.mother;
-    return { act: (st && st.act) || 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null };
+    const m = st && st.mother, SY = M.need('story').saved(st);   // Phase 3 T17: seen cards / lines and the mother's raid
+    return { act: (st && st.act) || 1, mother: m ? { lesson: m.lesson | 0, at: m.at || 'lair' } : null, seen: SY.seen, raid: SY.raid };
   }
 
   function serialise(cs) {
@@ -38,22 +38,26 @@
       dragon: {
         growth: round(G.growthValue(d.foodXp), 1e4), stage: d.stage, foodXp: round(d.foodXp, 100),
         hp: round(d.hp, 100), hunger: round(d.hunger, 100), deaths: d.deaths || 0, upgrades: (cs.upgrades || []).filter(id => D.upgrades[id]),   // T20
-        loot: cs.carriedLoot ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,   // T19: in the claws
+        // T19: in the claws. Phase 3 T12: not mission loot (a relic) - the running mission is only saved with v3 (T18),
+        // so a reload puts the relic back at its door with the mission
+        loot: cs.carriedLoot && !(D.loot[cs.carriedLoot.kind] && D.loot[cs.carriedLoot.kind].mission) ? { id: cs.carriedLoot.id, kind: cs.carriedLoot.kind, region: cs.carriedLoot.region } : null,
       },
-      hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: [] },   // T19
-      larder: cs.larder.map(it => ({ prey: it.type, food: round(it.food, 100) })),
+      hoard: { gold: Math.max(0, Math.floor((cs.hoard && cs.hoard.gold) || 0)), relics: ((cs.hoard && cs.hoard.relics) || []).filter(id => D.relics && D.relics[id]) },   // T19, relics: Phase 3 T12
+      larder: cs.larder.map(it => it.tribute ? { prey: it.type, food: round(it.food, 100), tribute: true } : { prey: it.type, food: round(it.food, 100) }),   // Phase 3 T16: tribute carcasses keep their mark
       renown: 0,
       regions: Object.keys(D.regions).reduce((o, id) => {              // T12: discovered settlements (the rest of v2 in T22)
         o[id] = {};
         const seen = Object.keys(cs.discovered || {}).filter(k => cs.discovered[k] && k.indexOf(id + '.') === 0).sort();
         if (seen.length) o[id].discovered = seen;
         const ruins = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].ruins) || []).filter(r => r && typeof r.id === 'string');
-        if (ruins.length) o[id].ruins = ruins.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T13 (v2 shape, 5.9)
+        if (ruins.length) o[id].ruins = ruins.map(r => r.char ? { id: r.id, at: round(r.at || 0, 10), char: true } : { id: r.id, at: round(r.at || 0, 10) });   // T13 (v2 shape, 5.9); T06: char = a charred castle stone piece
         const corn = ((cs.regionStates && cs.regionStates[id] && cs.regionStates[id].corn) || []).filter(r => r && typeof r.id === 'string');
         if (corn.length) o[id].corn = corn.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));       // burned corn fields
         const rs = cs.regionStates && cs.regionStates[id];
         const taken = ((rs && rs.lootTaken) || []).filter(r => r && typeof r.id === 'string');
         if (taken.length) o[id].lootTaken = taken.map(r => ({ id: r.id, at: round(r.at || 0, 10) }));   // T19 (v2 shape, 5.9)
+        const freed = ((rs && rs.freed) || []).filter(k => typeof k === 'string');
+        if (freed.length) o[id].freed = freed.slice();               // Phase 3 T16: freed villages (5.9)
         if (rs && rs.heat > 0) {                                     // T17: alert heat with its play-time stamps (5.9)
           o[id].heat = round(rs.heat, 1000);
           if (typeof rs.lastIncident === 'number') o[id].lastIncident = round(rs.lastIncident, 10);
@@ -61,7 +65,7 @@
         }
         return o;
       }, {}),
-      missions: { completed: [], active: null },
+      missions: { completed: ((cs.missions && cs.missions.completed) || []).slice(), active: null, failedAt: Object.assign({}, cs.missions && cs.missions.failedAt) },   // T10 (the running mission: T18)
       story: storyOf(cs.story),
       world: {
         region: cs.region,
@@ -72,6 +76,7 @@
         mode: p && !cs.inLair && (p.mode === 'ground' || p.mode === 'landing') ? 'ground' : 'air',   // T22: a landing ends on the ground
         clock: round(cs.clock ? cs.clock.t : CK.create().t, 1e5),          // T22: time of day
         now: round(cs.stats.played, 10),                                   // T22: the stamp of ruins, loot and heat (= stats.played)
+        tribute: round(cs.tributeT || 0, 10),                              // Phase 3 T16: s towards the next tribute carcass
       },
       flags: { introSeen: !!cs.flags.introSeen, rested: cs.flags.rested || 0, tips: (cs.flags.tips || []).filter(id => D.tips.order.indexOf(id) >= 0) },   // T23: seen tips
       stats: { played: round(cs.stats.played, 10), eaten: cs.stats.eaten, food: round(cs.stats.food, 100),
@@ -153,7 +158,8 @@
       carried: null, eatT: 0,
     });
     cs.larder = (o.larder || []).filter(it => it && D.prey[it.prey] && num(it.food) && it.food > 0)
-      .slice(0, D.lair.larderSize).map(it => ({ type: it.prey, food: it.food }));
+      .slice(0, D.lair.larderSize).map(it => (it.tribute === true ? { type: it.prey, food: it.food, tribute: true } : { type: it.prey, food: it.food }));
+    cs.tributeT = num(w.tribute) ? Math.max(0, Math.min(D.tribute.every, w.tribute)) : 0;   // Phase 3 T16
     const f = o.flags || {};
     cs.flags = { introSeen: !!f.introSeen, heavyT: 0, rested: f.rested | 0,
                  tips: Array.isArray(f.tips) ? f.tips.filter((id, i) => typeof id === 'string' && D.tips.order.indexOf(id) >= 0 && f.tips.indexOf(id) === i) : [] };   // T23
@@ -162,20 +168,24 @@
                  civilBurned: num(s.civilBurned) ? s.civilBurned : 0, orderBurned: num(s.orderBurned) ? s.orderBurned : 0,
                  livestockTaken: num(s.livestockTaken) ? s.livestockTaken : 0, lootBanked: num(s.lootBanked) ? s.lootBanked : 0 };
     const h = o.hoard || {};                                     // T19: banked gold, never negative
-    cs.hoard = { gold: num(h.gold) ? Math.max(0, Math.floor(h.gold)) : 0, relics: Array.isArray(h.relics) ? h.relics.slice() : [] };
+    cs.hoard = { gold: num(h.gold) ? Math.max(0, Math.floor(h.gold)) : 0, relics: Array.isArray(h.relics) ? h.relics.filter(id => typeof id === 'string' && D.relics && D.relics[id]) : [] };   // T12: known relics
     const dl = o.dragon.loot;                                    // T19: loot in the claws
-    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && D.regions[dl.region]
+    cs.carriedLoot = dl && typeof dl.id === 'string' && D.loot[dl.kind] && !D.loot[dl.kind].mission && D.regions[dl.region]
       ? { id: dl.id, kind: dl.kind, gold: D.loot[dl.kind].gold, size: D.loot[dl.kind].size, region: dl.region } : null;
     cs.lootTarget = null;
     const ups = Array.isArray(o.dragon.upgrades) ? o.dragon.upgrades : [];   // T20: owned upgrades, known ids once each
     cs.upgrades = ups.filter((id, i) => typeof id === 'string' && D.upgrades[id] && ups.indexOf(id) === i);
+    const mo = o.missions || {}, known = id => typeof id === 'string' && D.missions.some(m => m.id === id);   // T10
+    cs.missions = { completed: Array.isArray(mo.completed) ? mo.completed.filter((id, i) => known(id) && mo.completed.indexOf(id) === i) : [], failedAt: {} };
+    for (const id of Object.keys(mo.failedAt || {})) if (known(id) && num(mo.failedAt[id])) cs.missions.failedAt[id] = mo.failedAt[id] | 0;
+    cs.mission = null;
     cs.story = storyOf(o.story);
     cs.discovered = {}; cs.regionStates = {};
     for (const id of Object.keys(o.regions || {})) {
       const r = o.regions[id];
       if (D.regions[id] && r && Array.isArray(r.discovered)) for (const k of r.discovered) if (typeof k === 'string' && k.indexOf(id + '.') === 0) cs.discovered[k] = true;
       if (D.regions[id] && r && Array.isArray(r.ruins)) {          // T13: burned buildings, rebuilt fire.rebuild s after `at`
-        const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
+        const ruins = r.ruins.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => q.char === true ? { id: q.id, at: q.at, char: true } : { id: q.id, at: q.at });
         if (ruins.length) cs.regionStates[id] = { ruins };
       }
       if (D.regions[id] && r && Array.isArray(r.corn)) {           // burned corn fields, grow back corn.regrow s after `at`
@@ -185,6 +195,10 @@
       if (D.regions[id] && r && Array.isArray(r.lootTaken)) {      // T19: taken loot, back fire.rebuild s after `at`
         const taken = r.lootTaken.filter(q => q && typeof q.id === 'string' && q.id.indexOf(id + '.') === 0 && num(q.at)).map(q => ({ id: q.id, at: q.at }));
         if (taken.length) (cs.regionStates[id] = cs.regionStates[id] || {}).lootTaken = taken;
+      }
+      if (D.regions[id] && r && Array.isArray(r.freed)) {         // Phase 3 T16: freed villages (only the freeable ones)
+        const freed = r.freed.filter((k, i) => typeof k === 'string' && k.indexOf(id + '.') === 0 && D.freed.places.indexOf(k) >= 0 && r.freed.indexOf(k) === i);
+        if (freed.length) (cs.regionStates[id] = cs.regionStates[id] || {}).freed = freed;
       }
       if (D.regions[id] && r && num(r.heat) && r.heat > 0) {        // T17: alert heat; decays from `at` on region load
         const q = cs.regionStates[id] = cs.regionStates[id] || {};

@@ -1,0 +1,20 @@
+{
+  "tile": "N50E014",
+  "lon": [
+    14.33,
+    14.53
+  ],
+  "lat": [
+    50.02,
+    50.15
+  ],
+  "perDegree": 3600,
+  "scale": 10,
+  "offset": 0,
+  "shape": [
+    469,
+    721
+  ],
+  "source": "Sonny's LiDAR Digital Terrain Model of Europe, 1 arc second (~30 m), tile N50E014 (50-51 N, 14-15 E), SRTM .hgt format (3601 x 3601 big-endian int16, metres)",
+  "licence": "CC BY 4.0 - credit: 'Terrain: \u010c\u00daZK (DMR 5G) via Sonny's LiDAR DTM Europe'"
+}

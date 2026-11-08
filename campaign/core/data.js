@@ -134,7 +134,9 @@
         exit:   [0, 56, 4],
         hoard:  [30, -8, 10],                 // T19: the coin pile (hoardTiers), its panel shows the gold
         altar:  [0, 8, 5],                    // T20: upgrades for hoard gold (core/upgrades.js)
-        // Phase 3: trophy [-40, 20], board [40, 20], mapStone [0, 30]
+        mapStone: [-22, 32, 3],               // Phase 3 T09: the map in travel mode (fast travel to found aeries), off the entry line
+        board:  [40, 20, 4],                  // Phase 3 T11: the mission board (core/missions.js), right of the entry
+        trophy: [-40, 20, 5],                 // Phase 3 T12: the trophy wall, a niche per relic (data.relics niche), left of the entry
       },
       hoardTiers: [0, 100, 300, 700, 1500],   // T19: coin pile size steps (tier = steps reached - 1); coins = min(maxCoins, gold / 2)
       maxCoins: 800,
@@ -240,6 +242,10 @@
     loot: {
       tithe:     { size: 1, gold: 50,  carry: { speedMult: 0.85, breath: true } },
       strongbox: { size: 2, gold: 150, carry: { speedMult: 0.8,  breath: false } },
+      // Phase 3 T12 (core/relics.js): a relic lies at the door of the building its mission targets (data.missions
+      // relic + target) only while that mission is on and the relic is not in the hoard yet; mission loot: not kept in
+      // lootTaken (it is back at the door as soon as it is lost or vanishes), no gold, banked into hoard.relics.
+      relic:     { size: 1, gold: 0,   carry: { speedMult: 0.8,  breath: false }, mission: true },
       door: 2, clear: 3,
     },
 
@@ -303,8 +309,43 @@
       vault:    { r: 4, h: 6,  hp: 150, order: true, loot: ['strongbox'] },
       palisade: { r: 0, h: 6,  hp: 40,  order: true, wall: true },
       platform: { r: 4, h: 4,  hp: 80,  order: true, post: 'ballista' },
+      // castle pieces (Phase 3, 003 spec 4.1): stone = fire burns only the wooden parts (roof, hoardings), the shell
+      // stays a solid; woodHp (T06) = hp of the wooden parts: a stone piece with it burns, at 0 it turns charred and
+      // roofless (b.char) but stays a solid, its archers fall; without woodHp (walls, bastions) stone does not burn; walkTop = landable top band height; posts = several archers along a wall / gatehouse
+      wall:      { r: 0,  h: 11, hp: 400, order: true, wall: true, stone: true, walkTop: 9.5, posts: 'archer' },
+      bastion:   { r: 8,  h: 12, hp: 360, order: true, stone: true, walkTop: 11, post: 'ballista' },
+      ctower:    { r: 6,  h: 20, hp: 300, order: true, stone: true, woodHp: 110, post: 'archer', calmsAlert: true },
+      gatehouse: { r: 8,  h: 16, hp: 360, order: true, stone: true, woodHp: 130, gate: true, posts: 'archer' },
+      portcullis: { r: 0, h: 11, hp: 0, order: true, stone: true, gate: true },         // T03: the gate gap, a solid only while closed
+      keep:      { r: 11, h: 30, hp: 500, order: true, stone: true, woodHp: 180, garrison: 4, horn: true },
+      chapel:    { r: 8,  h: 14, hp: 160, order: true, stone: true, woodHp: 100, spires: 2, spireH: 38, loot: ['relic'] },
+      rotunda:   { r: 4,  h: 9,  hp: 120, civil: true, stone: true, woodHp: 60 },
+      hall:      { r: 9,  h: 11, hp: 200, order: true, loot: ['strongbox'] },
+      workshop:  { r: 8,  h: 8,  hp: 140, order: true, target: 'workshop' },
+      stables:   { r: 7,  h: 6,  hp: 100, order: true },
+      well:      { r: 2,  h: 2,  hp: 0 },
+    },
+    /* Vyshgard Castle (Phase 3 T01): the look and the kit; layout in settlements.castle, piece list from core/castle.js.
+       lod: full kit inside `near`, merged silhouette out to `far`. lights: emissive torches and windows, no real lights. */
+    castle: {
+      wallThick: 3, walkWidth: 2.4, crenel: 1.2,
+      gate: { w: 10, close: 2.5, margin: 1 },          // T05: margin = extra reach of 'the dragon is in the gap'
+      horn: { range: 'region', cool: 60 },
+      // T05 archer posts: towerOut / towerUp = where on a round tower (out from its radius, up from its wall top),
+      // gatehouse = archers per gatehouse (gateSpacing apart, gateOut beyond 0.8 r, gateUp over its top), one wall walk
+      // slot every wallEvery units of a run (runs under wallMin get none), wallOut = toward the outer parapet
+      posts: { towerOut: 1.0, towerUp: 1.8, gatehouse: 2, gateSpacing: 3, gateOut: 1.2, gateUp: 0.6, wallEvery: 14, wallMin: 8, wallOut: 0.4 },
+      char: { tint: 0.35 },
+      lod: { near: 280, far: 1000, band: 20 },          // T04: full kit inside near, silhouette to far, +-band hysteresis
+      smoke: { puffs: 14, life: 7, rise: 26, drift: 9, size: 6, alpha: 0.5 },   // T04: chimney smoke from the great hall
+      lights: { torches: 16, windows: true },
     },
     palisade: { piece: 6, radius: 1, gate: 12 },
+    // Phase 3 T16 (003 5.7): settlements that can be freed (every Order building burned out and its archers dead at once)
+    // and the food tribute a freed one leaves in the larder: every `every` s of play a carcass of `prey` with `food`,
+    // at most `max` waiting (and never past lair.larderSize).
+    freed: { places: ['farm.village'], flag: [-4, 0], flagH: 14, fallTime: 1.6 },
+    tribute: { every: 300, food: 40, max: 3, prey: 'cow' },
     fire: { ignite: 0.8, cool: 0.5, burn: 6, fan: 2.5, spread: 0.15, reach: 8, rebuild: 600 },
     settlement: { jitter: 1, jitterYaw: 0.2, penR: 4, pad: 1.4 },          // penR 4 (T18): room for the animals, drawn larger than life
     settlements: {
@@ -318,6 +359,15 @@
       outpostS: { buildings: [['tower', 0, 0], ['taxhouse', 7, 7]], ring: [16, 12], archers: 2 },
       outpost:  { buildings: [['tower', -14, 0], ['tower', 14, 0], ['barracks', 0, -10], ['vault', 0, 6],
                               ['platform', -10, 14], ['platform', 10, 14]], ring: [24, 12], archers: 4 },
+      // Vyshgard Castle: local +X = the land side with the gate, the cliff on local -X (the river); in the Bend the site
+      // has yaw PI, so the gate faces east (world -X) and the cliff west (world +X, game axes: +X = west).
+      // walls = corner points (closed polygon); corners[i] = the piece at walls[i]; the gate gap is the segment
+      // between the two gatehouses (indices 3 and 4).
+      castle:   { walls: [[-60, -30], [-20, -42], [30, -38], [70, -14], [72, 14], [30, 38], [-20, 42], [-62, 26]],
+                  corners: ['bastion', 'ctower', 'bastion', 'gatehouse', 'gatehouse', 'bastion', 'ctower', 'bastion'],
+                  buildings: [['keep', -36, 0], ['chapel', 8, 12], ['rotunda', 40, -22], ['hall', 10, -18], ['workshop', 42, 18],
+                              ['stables', -14, 26], ['well', 26, 0]],
+                  archers: 10, peasants: 4 },
     },
 
     regions: {
@@ -370,8 +420,46 @@
         herds: [{ type: 'deer', count: 2, ring: [700, 1000] }],
         settlements: [{ type: 'village', x: 380, z: 260, yaw: 0 }, { type: 'hamlet', x: -420, z: -460, yaw: 1.2 },
                       { type: 'outpost', x: 640, z: -520, yaw: -0.8 }],
-        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],
-        entries: { wild: { angle: PI } },
+        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }, { to: 'bend', angleFrom: -0.5, angleTo: 0.5, minStage: 1 }],
+        entries: { wild: { angle: PI }, bend: { angle: 0 } },
+      },
+      /* Veltava Bend (Phase 3 T02, 003_task_missions.md 4.2): real Prague terrain baked into core/dem-bend.js
+         (tools/terrain). terrain.dem: base heights from that grid (metres above its base / metresPerUnit x exag +
+         offset, plus detail noise); water: 'mask' = the baked river mask, its level falling downstream (terrain.waterY).
+         Overlays: plateau (settlement ground), cliff (the Vyshgard rock face toward the river), ruins (Staromark, the
+         burned royal city: scenery only), road, bridge (a dry deck at bank height: Karlsbridge in stone, a wooden one
+         to Holeshwick). Vyshgard Castle itself joins the settlements in T03 / T04 (its plateau is already here). */
+      bend: {
+        nameKey: 'c.region.bend', radius: 1200, seed: 53, ceiling: 340,
+        terrain: {
+          dem: 'demBend', exag: 1.6, offset: 4, water: 'mask',
+          features: [
+            { type: 'plateau', x: 220, z: -815, r: 84, edge: 20, level: 'top' },                        // Vyshgard top
+            { type: 'cliff', x: 220, z: -815, r: 84, face: PI / 2, drop: 12, width: 60 },               // rock face west (+X), to the river
+            { type: 'plateau', x: 190, z: 250, r: 34 }, { type: 'plateau', x: -250, z: 450, r: 60 },
+            { type: 'plateau', x: 230, z: 930, r: 34 }, { type: 'plateau', x: 745, z: -230, r: 24 },
+            { type: 'ruins', x: 230, z: -200, r: 150 },                                                 // Staromark
+            { type: 'ruins', x: 645, z: 0, r: 50, kind: 'castle' },                                     // Hradchan
+            { type: 'road', width: 8, points: [[255, -1190], [245, -1000], [230, -870]] },            // south entry on the east bank -> gate
+            { type: 'road', width: 7, points: [[640, 40], [460, -125], [360, -125], [280, -300], [250, -600], [230, -870]] },
+            { type: 'road', width: 7, points: [[280, -300], [100, 20], [-150, 212], [-250, 450]] },       // to Holeshwick
+            { type: 'bridge', x: 418, z: -125, yaw: -PI / 2, len: 104, width: 10, towers: true },        // Karlsbridge, bank to bank
+            { type: 'bridge', x: -150, z: 212, yaw: -0.5, len: 60, width: 7, kind: 'wood' },
+          ],
+        },
+        palette: 'bend',
+        flora: { trees: 700, rocks: 90, fields: 14, vines: 'troyvale' },
+        vines: { x: 230, z: 880, r: 110, rows: 9 },                                                     // Troyvale vineyard slopes
+        herds: [{ type: 'deer', count: 2, ring: [600, 1150] }, { type: 'boar', count: 1, ring: [700, 1150] }],
+        settlements: [
+          { type: 'castle',   x: 220, z: -815, yaw: PI, name: 'vyshgard' },                                // T03: on the plateau top; yaw PI: the gate (local +X) east, the cliff west
+          { type: 'outpost',  x: 190, z: 250, yaw: PI, name: 'lethna' },
+          { type: 'village',  x: -250, z: 450, yaw: -0.6, name: 'holeshwick' },
+          { type: 'hamlet',   x: 230, z: 930, yaw: -2.2, name: 'troyvale' },
+          { type: 'outpostS', x: 745, z: -230, yaw: -1.4, name: 'petrovel' },
+        ],
+        exits: [{ to: 'farm', angleFrom: PI - 0.5, angleTo: PI + 0.5 }],
+        entries: { farm: { angle: PI - 0.27 } },                                                         // over the river, south
       },
     },
     startRegion: 'ash',
@@ -392,6 +480,7 @@
       followRange: 60, divePitch: -0.32, showRange: 110, arrive: 60, loseRange: 320, showTime: 4.5, skim: 4,
       breathStand: 22, breathAlt: 9, circleR: 30, circleAlt: 34, circleRate: 0.45, praiseTime: 3.5,
       exitInset: 130, dangerPad: 40, hold: 0.5, teleport: 650, leaveFade: 5, drakeGap: 90,
+      escort: { side: 30, ahead: 6, up: 8 },   // Phase 3 T17: her place at the Drake's side on the first castle raid (x scale)
       visit: [{ away: 150, stay: 40 }, { away: 420, stay: 25 }],
       lessons: [
         { id: 'fly',   goal: 'self',  done: { follow: 6 } },
@@ -404,7 +493,129 @@
       ],
     },
 
+    /* Map and exploration (Phase 3 T07, 003_task_missions.md 4.3, core/map.js + render/map-view.js).
+       cell: explored grid cell (a region of radius r has ceil(2r / cell) cells per side, a bitset per region);
+       reveal: cells within this distance of the dragon (x stage spot ^ 0.5) become explored, x revealAlt when
+       flying above ceiling x highAlt; every: explored update period (s, at most 4 Hz). image: region view terrain
+       image (px, drawn once per region and cached). world: [column, row] of each region in the world view (row grows
+       north, toward the capital); later: regions of later phases, shown locked with the stage they need. zoom: the
+       region view's zoom range. tapPx: the smallest tap target of a map icon (css px). */
+    map: {
+      cell: 50, reveal: 160, revealAlt: 1.5, highAlt: 0.6, every: 0.25, image: 256,
+      world: { ash: [0, 0], wild: [0, 1], farm: [0, 2], bend: [0, 3], pass: [-1, 2.6], low: [1, 3.6], capital: [0, 4.4] },
+      later: { pass: { stage: 1 }, low: { stage: 2 }, capital: { stage: 3 } },   // 000_spec.md 9: Drake (late), Wyrm, Elder
+      links: [['pass', 'farm'], ['low', 'bend'], ['capital', 'bend']],
+      zoom: [1, 4], tapPx: 36,
+    },
+
+    /* Aeries (Phase 3 T08, core/aerie.js, render/aerie-view.js; 003_task_missions.md 4.4). A small cliff cave per region
+       outside the Ash Wastes: a rock outcrop with a mouth on a ledge `above` the ground, facing `facing` (yaw: 0 = +Z).
+       Found within `discover` and in line of sight (nav.seesPlace), saved as cs.discovered['<region>.aerie'].
+       Flying into the mouth (inside `mouthR` x scale) or the Move slot within `enterRange` enters: carried loot is
+       banked, Rest heals (no stage-up: that stays at the nest), Leave puts the dragon back in the air in front of it. */
+    aeries: {
+      wild: { x: -620, z: -480, facing: 1.9 },
+      farm: { x: 720, z: 560, facing: -2.4 },
+      bend: { x: 120, z: 1010, facing: Math.PI },      // a cleft in the Troyvale rocks, facing the river
+      discover: 200, enterRange: 40, nearRange: 110, mouthR: 9, above: 6, out: 26, outY: 22, room: { r: 22, h: 14 },
+    },
+
+    /* Missions (Phase 3 T10, core/missions.js; 003_task_missions.md 4.5, 5.5). Accepted at the board (T11); the timer
+       (`time` s) starts when the dragon leaves the lair region or an aerie and does not run inside either. Success =
+       objective met, then into the lair or an aerie: reward.gold x (1 + bonus per bonusPer s left). Fail (timeout,
+       death): mission loot vanishes, region heat + alertOnFail, retry after the next rest. T19 tunes the numbers. */
+    /* Story (Phase 3 T17, core/story.js; 003_task_missions.md 5.8). Act cards (lines = i18n suffixes c.story.<id>.<n>,
+       scene = the backdrop render/story-card.js paints), story briefings of n lines (c.story.brief.<id>.1..n) the first time
+       a mission is accepted, one-line outcomes (c.story.out.<id>.ok / fail). The mother flies along on the first mission
+       into a raid region (firstRaidMother) and says raidLine; kingCityLine on her first flight into the Bend. */
+    story: { acts: [1, 2], firstRaidMother: true, raidRegions: ['bend'], sayTime: 7,
+      raidLine: 'c.mother.raid', kingCityLine: 'c.mother.kingCity', kingCityRegion: 'bend',
+      cards: { act1: { act: 1, scene: 'lair', lines: [1, 2, 3] }, act2: { act: 2, scene: 'castle', lines: [1, 2, 3] } },
+      briefs: { a2_chalice: 3, a2_workshop: 2, a2_caravan: 2 } },
+    missions: [
+      { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
+        relic: 'ember_chalice', time: 480, reward: { gold: 250 } },
+      { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
+        time: 540, reward: { gold: 200 } },
+      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 390,
+        reward: { gold: 300 } },
+    ],
+    mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1,
+      // T12 (Pavel's feedback): a gold ring on the ground around the objective (building r + pad, at least min) and a light
+      // beam over it seen from afar (beam high, fading out inside fadeNear .. fadeFar of the dragon) - render/target-view.js
+      ring: { pad: 6, min: 10, beam: 140, fadeNear: 40, fadeFar: 110 } },
+    /* Relics (Phase 3 T12, core/relics.js; 003_task_missions.md 4.5, 5.5). Mission prizes carried as loot kind 'relic'
+       (data.loot.relic: speed x0.8, no breath), lost on death or timeout, kept in hoard.relics once banked and shown
+       in their niche of the trophy wall (niche: 0..niches-1, left to right; colour of the relic's glow). */
+    relics: {
+      ember_chalice: { niche: 1, color: 0xff7a2e },
+    },
+    trophy: { niches: 3 },
+    /* Caravans (Phase 3 T15, core/caravan.js, render/caravan-view.js; 003_task_missions.md 4.5, 5.6). The intercept
+       mission's wagon drives along road `road` (index of the region's road features) from `from` to `to` (fractions of
+       the polyline) at `speed` units/s, only while the dragon is in its region (the world elsewhere waits); `escort`
+       archers walk at the slots [side, ahead] beside it (catchUp x speed to get back to the slot). The breath on the
+       wagon or the oxen (`oxen` units ahead) costs `burn` hp/s; at 0 it stops and drops its `chest` on the road
+       `chestBack` units behind it. Road 1 of the Bend: the Hradchan side, Karlsbridge, the east bank, the castle gate. */
+    caravan: {
+      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'strongbox', wagonHp: 120 },
+      burn: 20, oxen: 5, catchUp: 2, chestBack: 4,
+      slots: [[-4, 1], [4, 1], [0, -7]],
+    },
+
+    /* Messages (Pavel's request 2026-11-04, core/msglog.js): the big message lines wait in a queue; each stays
+       chars / perChar s, at least min, at most max (a tap closes it sooner); with others waiting it is cut to waitCut of
+       its time (never under min). queueMax waiting at most (the oldest plain 'info' goes first); the log keeps logMax. */
+    messages: { perChar: 12, min: 4, max: 9, waitCut: 0.7, queueMax: 4, logMax: 40 },
+
     controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
+
+    /* Deathmatch (campaign/dm/, core/dm.js): dragons of human players only (no AI dragons) in the Wildwood around the
+       hamlet and the outpost. Peer-to-peer like the co-op: every browser flies its own dragon, the host owns hp,
+       fireballs, breath damage, dragon-on-dragon bumps, food, kills and the board.
+       arena: soft wall from r - soft (steer back), centre 0, 0. match: first to fragLimit kills or the best after
+       timeLimit s. A kill = +1, dying with nobody to blame (crash with no hit in the last fall.credit s) = -1.
+       ball / breath: damage to other dragons (rolling and spawn protection make them miss).
+       bump: two dragons closer than r (both in the air or one perched) knock each other off: both fall, pushed apart.
+       fall: after a bump or crashing into a pillar, building wall, tree or (steeper than groundPitch, faster than
+       groundSpeed) the ground, the dragon tumbles under gravity g, out of control, until it hits a surface; crash
+       = damage at the hit, impact = (vertical speed - impactFrom) x impactK on landing (max maxDmg, half in water);
+       then it sits stunned for `stun` s. A fall death credits whoever hit or bumped it in the last `credit` s.
+       perch: Land within maxAlt of any surface (ground, roof, pillar top, not water) and the dragon sits there
+       (settling `time` s); it can turn, breathe and shoot, stamina regenerates stRegen x faster; Fly / climb / boost
+       takes off at takeoffSpeed. hop: wall tops this close above are hopped onto instead of crashing.
+       pillars: seeded rock pillars with flat grassy tops (perches). trees: crown height = r x hK, solid within r x rK.
+       food: wandering animals; a dragon within eatR (horizontal) and eatAlt above it eats it (+hp), back after respawn s;
+       they flee dragons within flee. */
+    dm: {
+      region: 'wild', maxPlayers: 8, fragLimit: 10, timeLimit: 600, overTime: 12,
+      arena: { r: 640, soft: 110 },
+      hp: 100, regen: 0.35, respawn: 5, spawnInv: 3, spawnAlt: 60, minAlt: 3, stand: 1.6,
+      stats: { turn: 1.0, cruise: 30, boost: 54 },
+      ball: { speed: 115, life: 2.4, cd: 1.0, st: 12, hit: 3.8, dmg: 30, splash: 10, splashR: 9, aim: 0.38, aimRange: 240 },
+      breath: { range: 40, cone: 16, dps: 34 },
+      bump: { r: 3.6, push: 16, dmg: 6, cool: 1.5 },
+      fall: { g: 24, drag: 0.6, stun: 1.4, crashDmg: 6, impactFrom: 9, impactK: 1.3, maxDmg: 45, credit: 8,
+              groundPitch: -0.42, groundSpeed: 18, spin: 6, bounce: 10 },
+      perch: { maxAlt: 8, time: 0.6, stRegen: 2.2, takeoffSpeed: 20, takeoffPitch: 0.45, hop: 2.5, turn: 1.6 },
+      pillars: { n: 14, ring: [110, 560], h: [24, 58], r: [5, 9], gap: 60, seed: 77 },
+      trees: { hK: 3, rK: 0.7, cell: 24 },
+      food: {
+        n: 18, eatR: 4.5, eatAlt: 6, respawn: 18, flee: 24, roam: 36, seed: 91,
+        kinds: { chicken: { hp: 15, speed: 4.5, share: 0.5 }, goat: { hp: 30, speed: 6, share: 0.25 }, sheep: { hp: 25, speed: 4, share: 0.25 } },
+      },
+      spawns: 10, palettes: 8, nameKey: 'vsd-name', peerPrefix: 'vsd-dm-',
+      /* Room (lobby, persistence, host take-over): the match starts from a lobby (warm-up, no damage) when the host
+         presses Start; fragChoices / timeChoices = the host's settings there. The host sends the room record (scores
+         of everyone who was ever in the room, by seat key, the phase and the clock) every recEvery s; every client
+         keeps the last one in localStorage (roomKey, for roomKeep s) and tokenKey holds this browser's seat token.
+         A guest that hears nothing from the host for hostTimeout s (or sees the connection close) looks for a new
+         host: the guest that joined first claims the room code at once, the others wait migrateDelay s and join it;
+         whoever finds the code free hosts it from the saved record. They give up after migrateWait s. */
+      fragChoices: [5, 10, 15, 20], timeChoices: [300, 600, 900],
+      recEvery: 1, roomKey: 'vsd-dm-room', tokenKey: 'vsd-dm-token', roomKeep: 6 * 3600,
+      hostTimeout: 6, migrateDelay: 2.5, migrateWait: 45,
+    },
   };
 
   M.define('data', data);

@@ -3,19 +3,23 @@
  *
  * - Game files (same origin): network first, so a new deploy shows up on the next load;
  *   the cached copy is used when offline or when the network is slower than NET_TIMEOUT.
+ *   Versioned requests (?v=..., test links and the pages' script loaders) never take the cached copy on a timeout:
+ *   it may be an older build, and a new page with old scripts shows raw text keys and dead buttons. They wait for
+ *   the network and fall back to the cache only when it fails (offline).
  * - Versioned CDN libraries and fonts: cache first (their URLs never change content).
  * - Everything else (PeerJS signalling for co-op) goes straight to the network.
  * Bump VERSION only when the list of precached files changes.
  */
-const VERSION = 'vsd-v10';
+const VERSION = 'vsd-v20';
 const NET_TIMEOUT = 4000;
 const SHELL = [
   './', 'index.html', 'i18n.js', 'pwa.js', 'manifest.webmanifest',
   'mp/', 'mp/index.html', 'mp/game.js', 'mp/sim.js',
-  'campaign/', 'campaign/index.html', 'campaign/game.js', 'shared/dragon.js',
-  'campaign/core/umd.js', 'campaign/core/math.js', 'campaign/core/events.js', 'campaign/core/data.js',
-  'campaign/core/terrain.js', 'campaign/core/clock.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/upgrades.js', 'campaign/core/settlement.js', 'campaign/core/loot.js', 'campaign/core/flight.js', 'campaign/core/walk.js', 'campaign/core/prey.js', 'campaign/core/region.js', 'campaign/core/cave.js', 'campaign/core/lair.js', 'campaign/core/mother.js', 'campaign/core/nav.js', 'campaign/core/perception.js', 'campaign/core/defenders.js', 'campaign/core/alert.js', 'campaign/core/tips.js', 'campaign/core/crops.js', 'campaign/core/state.js', 'campaign/core/save.js', 'campaign/core/controls.js', 'campaign/core/quality.js',
-  'campaign/render/flora.js', 'campaign/render/terrain.js', 'campaign/render/prey-view.js', 'campaign/render/settlement-view.js', 'campaign/render/loot-view.js', 'campaign/render/watch-view.js', 'campaign/render/defender-view.js', 'campaign/render/corn-view.js', 'campaign/render/cave-view.js', 'campaign/render/compass.js', 'campaign/render/sky.js', 'campaign/render/hatch-scene.js',
+  'campaign/', 'campaign/index.html', 'campaign/game.js', 'shared/dragon.js', 'shared/qr.js',
+  'campaign/core/umd.js', 'campaign/core/math.js', 'campaign/core/events.js', 'campaign/core/data.js', 'campaign/core/dem-bend.js',
+  'campaign/core/terrain.js', 'campaign/core/clock.js', 'campaign/core/growth.js', 'campaign/core/hunger.js', 'campaign/core/upgrades.js', 'campaign/core/settlement.js', 'campaign/core/castle.js', 'campaign/core/loot.js', 'campaign/core/relics.js', 'campaign/core/flight.js', 'campaign/core/walk.js', 'campaign/core/prey.js', 'campaign/core/region.js', 'campaign/core/cave.js', 'campaign/core/lair.js', 'campaign/core/mother.js', 'campaign/core/nav.js', 'campaign/core/aerie.js', 'campaign/core/map.js', 'campaign/core/missions.js', 'campaign/core/story.js', 'campaign/core/perception.js', 'campaign/core/defenders.js', 'campaign/core/caravan.js', 'campaign/core/alert.js', 'campaign/core/tips.js', 'campaign/core/msglog.js', 'campaign/core/crops.js', 'campaign/core/state.js', 'campaign/core/save.js', 'campaign/core/controls.js', 'campaign/core/quality.js', 'campaign/core/freed.js', 'campaign/core/dm.js', 'campaign/core/dmnet.js',
+  'campaign/dm/', 'campaign/dm/index.html', 'campaign/dm/game.js',
+  'campaign/render/flora.js', 'campaign/render/bridge-view.js', 'campaign/render/ruins-view.js', 'campaign/render/terrain.js', 'campaign/render/prey-view.js', 'campaign/render/settlement-view.js', 'campaign/render/castle-kit.js', 'campaign/render/castle-view.js', 'campaign/render/loot-view.js', 'campaign/render/target-view.js', 'campaign/render/caravan-view.js', 'campaign/render/watch-view.js', 'campaign/render/defender-view.js', 'campaign/render/corn-view.js', 'campaign/render/cave-view.js', 'campaign/render/compass.js', 'campaign/render/map-view.js', 'campaign/render/aerie-view.js', 'campaign/render/sky.js', 'campaign/render/hatch-scene.js', 'campaign/render/story-card.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'icons/icon-maskable-192.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
 ];
@@ -62,6 +66,9 @@ async function networkFirst(req, url) {
     return res;
   });
   network.catch(() => {}); // a late failure after the timeout is not an error
+  if (url.searchParams.has('v')) {                     // a specific build: wait for it, the cache only offline
+    try { return await network; } catch (_) { return (await cache.match(key, { ignoreSearch: true })) || Response.error(); }
+  }
   const timeout = new Promise(resolve => setTimeout(resolve, NET_TIMEOUT));
   try {
     const res = await Promise.race([network, timeout]);

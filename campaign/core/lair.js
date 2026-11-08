@@ -65,7 +65,7 @@
     }
     ev.push(...LT.bank(cs));                                       // T19: carried loot goes onto the hoard ('hoard:banked')
     d.eatT = 0;
-    cs.inLair = true;
+    cs.inLair = true; cs.inAerie = null;
     cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
     if (d.pilot) { d.pilot.breathing = false; d.pilot.boosting = false; }
     CV.place(cs, at || 'tunnel');                                 // T10: standing in the cave hall (tunnel, or the nest on waking)

@@ -9,14 +9,14 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog'), SY = C.need('story');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't125.1 2026-10-31 README campaign section, phase 2 done';
+  const BUILD = 't217.2 2026-11-06 rebased on campaign-phase-3 (base repair #61 merged)';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -61,10 +61,12 @@
   const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
   const dragon = cs.dragon;
+  let castleView = null;
   function loadRegion(id) {
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     if (townView) townView.dispose();
+    if (castleView) { castleView.dispose(); castleView = null; }
     regionId = id;
     region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
     scene.add(region.group);
@@ -74,6 +76,8 @@
     townView = VRender.settlements.build(ST.ensureTown(cs));         // T12: buildings and pens of the region
     townView.town = cs.town;
     scene.add(townView.group);
+    castleView = VRender.castleView ? VRender.castleView.build(cs.town, { tier: qTier }) : null;   // T04: castles of the region (LOD, night, smoke)
+    if (castleView) scene.add(castleView.group);
     scene.fog.color.set(region.fog); caveOn = null;
     skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
@@ -130,6 +134,10 @@
   scene.add(caveView.group);
   const lootView = VRender.loot.build();                           // T19: tithe chests and strongboxes, the carried one
   scene.add(lootView.group);
+  const targetView = VRender.target.build();                       // T12: gold ring + beam around the mission objective
+  scene.add(targetView.group);
+  const caravanView = VRender.caravan.build();                     // Phase 3 T15: the intercept mission's tithe wagon
+  scene.add(caravanView.group);
   /** Region <-> cave: visibility, outdoor lights (intensity only, so no shader recompile) and fog. Every frame, cheap.
    *  Outside, render/sky.js sets the lights and the fog colour from the clock every frame (T21). */
   function syncScene() {
@@ -138,6 +146,7 @@
     if (region) region.group.visible = !inCave;
     if (preyView) preyView.group.visible = !inCave;
     if (townView) townView.group.visible = !inCave;
+    if (castleView) castleView.group.visible = !inCave;
     sky.visible = !inCave;
     if (!inCave) skyView.update(cs.clock ? cs.clock.t : D.clock.start);
     if (inCave === caveOn) return;
@@ -226,6 +235,8 @@
     if (tk === momShown) return;
     momShown = tk;
     momEl.hidden = !tk;
+    document.body.classList.toggle('mom', !!tk);                 // the message lines move below her caption
+    if (tk) ML.push(msgs, { title: t(tk), kind: 'mother', show: false }, stamp());   // the message log keeps her lines
     if (tk) { momText.textContent = t(tk); momEl.classList.toggle('good', tk.indexOf('.good.') > 0 || tk === 'c.mother.visit'); }
     if (tk) $('#hint').hidden = true;                             // she replaces the old hunting tip
   }
@@ -252,6 +263,64 @@
     }
     if (momArrow.hidden === show) momArrow.hidden = !show;
   }
+  /* ---------- map screen (Phase 3 T07): render/map-view.js over core/map.js; map button (touch and mouse), Tab ---------- */
+  const STAGE_IDS = ['hatchling', 'drake', 'wyrm', 'elder'];
+  const mapView = VRender.mapView.build($('#map'), { t, stageName: s => t('c.stage.' + (STAGE_IDS[s] || 'drake')),
+                                                     help: t(isTouch ? 'c.map.helpTouch' : 'c.map.helpKeys') });
+  function openMap() {
+    if (state !== 'play' || !cs.dragon.pilot || mapView.isOpen) return;
+    for (const k in keys) keys[k] = false;
+    mouseBreath = false; touch.breath = touch.boost = touch.grab = touch.eat = false; touch.x = touch.y = 0;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    mapView.open(cs);
+  }
+  function closeMap() { if (mapView.isOpen) mapView.close(); travelMode(false); }
+  /* ---------- fast travel (Phase 3 T09): the map stone in the cave and the aerie panel open the map in travel mode;
+     core/map.js has the rules (canTravel: only from the lair or an aerie, only to the lair or a found aerie, never during a
+     mission or with mission loot), state.travel does the region change ---------- */
+  const mapEl = $('#map'), travelEl = $('#mapTravel'), travelList = $('#mapTravelList');
+  let travelOn = false;
+  function travelMode(on) { travelOn = on; mapEl.classList.toggle('travel', on); travelEl.hidden = !on; mapView.setPad(on ? travelEl.offsetHeight + 12 : 0); }
+  function destName(d) { return d.kind === 'lair' ? t('c.travel.lair') : t('c.travel.aerie', { region: t(TR.region(d.region).nameKey) }); }
+  function renderTravel() {
+    travelList.innerHTML = '';
+    const at = MP.here(cs), list = MP.destinations(cs).filter(d => d.id !== at);
+    let why = null;
+    for (const d of list) {
+      const c = MP.canTravel(cs, at, d.id);
+      if (!c.ok && !why) why = c.why;
+      const b = document.createElement('button');
+      b.className = c.ok ? 'cta' : 'ghost'; b.disabled = !c.ok; b.dataset.id = d.id;
+      b.textContent = t('c.travel.fly', { place: destName(d) });
+      travelList.append(b);
+    }
+    $('#mapTravelHead').textContent = t(list.length ? 'c.travel.head' : 'c.travel.none');
+    $('#mapTravelWhy').textContent = why ? t('c.travel.why.' + why) : '';
+    $('#mapTravelWhy').hidden = !why;
+    if (travelOn) mapView.setPad(travelEl.offsetHeight + 12);
+  }
+  function openTravel() {
+    if (state !== 'play' || !MP.here(cs)) return;
+    if (stationOpen) closeStation();
+    openMap();
+    if (!mapView.isOpen) return;
+    travelMode(true); renderTravel(); mapView.setPad(travelEl.offsetHeight + 12);
+    mapView.setView('world');
+    if (!isTouch) setTimeout(() => { const b = travelList.querySelector('button:not(:disabled)'); if (b) b.focus({ preventScroll: true }); }, 0);
+  }
+  function travelTo(id) {
+    if (!travelOn || state !== 'play') return;
+    const from = MP.here(cs), ev = ST.travel(cs, id);
+    if (ev.some(e => e.e === 'travel:refused')) { renderTravel(); return; }
+    closeMap();
+    if (from === 'lair') closeStation(); else closeAerie();
+    pilot = dragon.pilot;
+    onEvents(ev);
+  }
+  travelList.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) travelTo(b.dataset.id); });
+  $('#mapBtn').addEventListener('click', e => { e.stopPropagation(); if (mapView.isOpen) closeMap(); else openMap(); });
+  $('#mapClose').addEventListener('click', closeMap);
+
   /* ---------- compass strip (T109): markers from core/nav.js; tap a marker for its name and distance ---------- */
   const compassEl = $('#compass'), compassTag = $('#compassTag');
   const compass = VRender.compass.build(compassEl, { t, fov: D.nav.fov });
@@ -262,7 +331,7 @@
     return t(L.key, p);
   }
   function compassHud(dt) {
-    const on = state === 'play' && !!pilot && !cs.inLair;
+    const on = state === 'play' && !!pilot && !cs.inLair && !cs.inAerie;
     if (on !== compassOn) { compassEl.hidden = !on; compassOn = on; if (!on) { compassTag.hidden = true; tagT = 0; } }
     if (!on) return;
     const list = NV.markers(cs);
@@ -311,11 +380,27 @@
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
   let confirmQ = false, enterQ = false, landQ = false;          // one-shots: Enter / Move slot (travel), Move slot (enter cave), F / Move slot (land, fly)
   addEventListener('keydown', e => {
+    if (mapView.isOpen) {                                        // T07: the map takes the keys while open
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && travelOn && document.activeElement && travelEl.contains(document.activeElement)) return;   // T09: the focused Fly there button
+      if (e.code === 'Tab' || e.code === 'Escape') closeMap();
+      else if (e.code === 'Equal' || e.code === 'NumpadAdd') mapView.zoomBy(1.4);
+      else if (e.code === 'Minus' || e.code === 'NumpadSubtract') mapView.zoomBy(1 / 1.4);
+      e.preventDefault(); return;
+    }
+    if (storyCard.open) {                                         // Phase 3 T17: a story card takes the keys while open
+      if (e.code === 'Escape' && storyCard.card.kind === 'act') storyCard.close(); else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape') storyCard.next();
+      e.preventDefault(); return;
+    }
+    if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) openMap(); return; }
+    if (logOpen) { if (e.code === 'KeyL' || e.code === 'Escape') closeLog(); e.preventDefault(); return; }   // the log takes the keys while open
+    if (e.code === 'KeyL' && !e.shiftKey && !e.repeat && state === 'play') { e.preventDefault(); openLog(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape' && state === 'play' && stationOpen) { closeStation(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && stationOpen && document.activeElement && document.activeElement.tagName === 'BUTTON' && lairEl.contains(document.activeElement)) return;   // T20: Enter presses the focused panel button (Buy, Eat)
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && cs.inAerie && document.activeElement && aerieEl.contains(document.activeElement)) return;   // T08: Enter presses the focused aerie button
+    if (e.code === 'KeyE' && !e.repeat && state === 'play' && cs.inAerie) { aerieAct('leave'); return; }
     if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play' && cs.inLair) { useStation(cs.station); return; }   // T10: E uses the station in reach
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')) return;
@@ -324,7 +409,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.code);
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CFGJKLWZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+L chalice (T12), Shift+W workshop run-in (T14), Shift+C wagon (T15), Shift+F / G free the village, tribute now (T16), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -412,6 +497,7 @@
   }
   function setState(s) {
     const prev = state; state = s;
+    if (s !== 'play') { closeMap(); closeLog(); }                 // T07: pause, menu, hatch close the map (and the message log)
     const inGame = s === 'play' || s === 'paused';
     $('#intro').hidden = s !== 'intro';
     $('#hatch').hidden = !(s === 'hatch' && hatchCard);
@@ -545,6 +631,8 @@
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
   function camDesired(out) {
     if (cs.inLair) { const c = CV.camera(pilot.pos, pilot.yaw, heroScale); return out.set(c.pos[0], c.pos[1], c.pos[2]); }   // T10: inside the dome
+    if (cs.inAerie) { const k = Math.pow(heroScale, 0.75), bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);   // T08: in front of the ledge, looking back at the dragon and the cleft
+      const kk = Math.max(k, 1.6); return out.set(pilot.pos[0] + bx * 17 * kk + bz * 6 * kk, pilot.pos[1] + 3 * kk, pilot.pos[2] + bz * 17 * kk - bx * 6 * kk); }
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
     const k = Math.pow(heroScale, 0.75), gc = D.groundCam, gb = heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back
     const back = lerp(22, gc.back, gb) * k, up = lerp(7 - pilot.pitch * 6, gc.height, gb) * k;   // T07: lower and closer on the ground
@@ -647,7 +735,7 @@
     hurt = Math.max(0, hurt - dt * 1.8);
     vig.style.opacity = Math.max(hurt, hs === 'starving' && state === 'play' ? 0.3 + Math.sin(time * 4) * 0.12 : 0);
     if (hintT > 0 && state === 'play') { hintT -= dt; if (hintT <= 0 || stationOpen) { hintT = 0; $('#hint').hidden = true; } }   // T23: a station panel closes the tip
-    if (toastT > 0) { toastT -= dt || 0.016; if (toastT <= 0) toastEl.style.opacity = 0; }
+    msgHud(dt);                                                  // messages: queue, reading time, tap to close (core/msglog.js)
     promptHud(dt);
     alertHud(dt);
     goldHud(dt);
@@ -682,10 +770,24 @@
     if (alertPulse > 0) { alertRow.classList.add('pulse'); if ((alertPulse -= dt || 0.016) <= 0) alertRow.classList.remove('pulse'); }
   }
   let goldPulse = 0;                                             // T19: HUD gold pulse after banking
-  const toastEl = $('#toast'); let toastT = 0, hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
+  /* Phase 3 T17: story cards (render/story-card.js). An act card shows once, when nothing else is open; the world waits. */
+  const storyCard = VRender.storyCard.build(document.body, { t });
+  function storyTick() {
+    if (stationOpen || logOpen || mapView.isOpen || !$('#lairDeath').hidden || !dragon.pilot) return;
+    const c = SY.pendingCard(cs);
+    if (c) storyCard.show(Object.assign({ kind: 'act' }, c), x => { SY.mark(cs, x.id); saveNow('story'); });
+  }
+  const logEl = $('#logPanel'); let logOpen = false;             // the message log (openLog below)
+  const toastEl = $('#toast'); let hurt = 0, shake = 0, died = null, arrowTip = false, boltTip = false;
   /** Reactions to core events: toasts, flashes, shakes. Rules already happened in core/state. */
+  const missionName = id => t('c.mission.' + id);                 // T10
+  const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
   function onEvents(ev) {
     for (const e of ev) {
+      if (e.e === 'mission:success' || e.e === 'mission:failed') {   // Phase 3 T17: the story outcome line, after the mission's own message
+        const k = SY.outcome(e.id, e.e === 'mission:success');
+        if (k) queueMicrotask(() => toast(t(k), '', 5, 'mission'));
+      }
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
       else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
       else if (e.e === 'clock:phase') {                          // T21: night falls / day breaks (outside only; the nest panel shows the time)
@@ -701,6 +803,9 @@
       else if (e.e === 'livestock:inside' && !insideToast) { insideToast = true; toast(t('c.toast.inside'), t('c.toast.insideSub'), 3); }
       else if (e.e === 'livestock:out') insideToast = false;
       else if (e.e === 'livestock:released') toast(t('c.toast.released'), t('c.toast.releasedSub'), 2.6);
+      else if (e.e === 'horn:blow') { toast(t('c.toast.horn'), t('c.toast.hornSub', { region: t(TR.region(cs.region).nameKey) }), 3.2); alertPulse = 2; }   // T05
+      else if (e.e === 'gate:closed') flashPrompt(t('c.prompt.gateShut'), 2.2);
+      else if (e.e === 'gate:open') flashPrompt(t('c.prompt.gateOpen'), 1.8);
       else if (e.e === 'bell:ring') toast(t('c.toast.bell', { place: t('c.place.' + (cs.town.places.find(p => p.id === e.place) || {}).type) }), t('c.toast.bellSub'), 2.8);
       else if (e.e === 'defender:killed' && e.kind === 'archer') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.archerFell' : 'c.prompt.archerBurned'), 1.8);
       else if (e.e === 'defender:killed' && e.kind === 'ballista') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.ballistaFell' : 'c.prompt.crewBurned'), 2.2);
@@ -714,25 +819,53 @@
       else if (e.e === 'breath:blocked') flashPrompt(t('c.breath.' + e.why), 2.2);
       else if (e.e === 'dragon:landed') shake = Math.max(shake, 0.25 * heroScale);
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
+      else if (e.e === 'loot:taken' && e.relic) { flashPrompt(null); toast(t('c.toast.relicTaken', { relic: lootName(e) }), t('c.toast.relicTakenSub'), 3.5, 'mission'); }   // Phase 3 T12
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
+      else if (e.e === 'relic:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.trophy.bankedAerie', { relic: lootName(e) })); toast(t('c.toast.relicBanked', { relic: lootName(e) }), t('c.toast.relicBankedSub'), 3.5, 'mission'); }   // Phase 3 T12
+      else if (e.e === 'settlement:freed') toast(t('c.toast.freed', { place: t('c.place.' + e.type) }), t('c.toast.freedSub'), 4);   // Phase 3 T16
+      else if (e.e === 'tribute:arrived') toast(t('c.toast.tribute'), t('c.toast.tributeSub'), 3);
+      else if (e.e === 'freed:none') flashPrompt(t('c.dbg.freedNone'), 1.8);
       else if (e.e === 'loot:tooHeavy') flashPrompt(t('c.prompt.lootHeavy', { loot: lootName(e) }), 2.2);
       else if (e.e === 'loot:dropped') toast(t('c.toast.lootDropped'), t('c.toast.lootDroppedSub', { loot: lootName(e) }), 2.5);
-      else if (e.e === 'hoard:banked') { goldPulse = 2; toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
+      else if (e.e === 'hoard:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.aerie.banked', { gold: e.gold, total: e.total })); toast(t('c.toast.banked', { gold: e.gold }), t(e.tier > e.from ? 'c.toast.bankedTier' : 'c.toast.bankedSub', { total: e.total }), 3.5); }   // after lair:enter (the cut inside)
       else if (e.e === 'prey:dropped') toast(t('c.toast.dropped'), t('c.toast.droppedSub'), 2.5);
       else if (e.e === 'eat:cancel') flashPrompt(t('c.prompt.interrupted'), 1.5);
       else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
       else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
       else if (e.e === 'dragon:died') { died = e; hurt = 0; shake = 0; hero.flash = 0; fadeEl.classList.add('now'); requestAnimationFrame(() => fadeEl.classList.remove('now')); }
-      else if (e.e === 'region:enter') swapRegion(e.respawn);
+      else if (e.e === 'region:enter') swapRegion(e.respawn || e.travel);
+      else if (e.e === 'travel:done') { leaveCave(); toast(t('c.travel.done', { place: destName(MP.destinations(cs).find(d => d.id === e.to) || { kind: 'lair' }) }), t(e.to === 'lair' ? 'c.travel.doneLair' : 'c.travel.doneAerie'), 3); }   // T09
       else if (e.e === 'save') saveNow(e.why);
+      else if (e.e === 'mission:accepted') toast(t('c.mission.accepted', { m: missionName(e.id) }), t('c.mission.acceptedSub', { time: mmss(e.time) }), 3.5, 'mission');   // T10 (the board and the HUD come with T11)
+      else if (e.e === 'mission:refused') flashPrompt(t('c.mission.refused.' + e.why), 2);
+      else if (e.e === 'mission:started') toast(t('c.mission.started', { m: missionName(e.id) }), t('c.mission.startedSub', { time: mmss(e.time) }), 3, 'mission');
+      else if (e.e === 'mission:done') toast(t('c.mission.done'), t('c.mission.doneSub'), 3.5, 'mission');
+      else if (e.e === 'mission:undone') toast(t('c.mission.undone'), t('c.mission.undoneSub'), 3, 'mission');
+      else if (e.e === 'building:rebuilt' && e.mission) toast(t('c.mission.rebuilt'), t('c.mission.rebuiltSub'), 3.5, 'mission');   // T14: the burned workshop stands again for the destroy mission
+      else if (e.e === 'mission:success') { goldPulse = 2; toast(t('c.mission.success', { m: missionName(e.id) }), t('c.mission.successSub', { gold: e.gold, bonus: e.bonus }), 4.5, 'mission'); }
+      else if (e.e === 'mission:failed' && e.why === 'death' && !$('#lairDeath').hidden) {   // T12: the death card covers the toast - say it there
+        const b = document.createElement('b'), sm = document.createElement('small');
+        b.className = 'mFail'; b.textContent = t('c.mission.failed', { m: missionName(e.id) }); sm.textContent = t('c.lair.diedMission');
+        $('#lairDeath').append(b, sm);
+        ML.push(msgs, { title: b.textContent, sub: sm.textContent, kind: 'mission', show: false }, stamp());
+      }
+      else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' || e.why === 'caravan' ? e.why : 'other')), 4.5, 'mission');
+      else if (e.e === 'caravan:departed') toast(t('c.caravan.departed'), t(isTouch ? 'c.caravan.departedSubTouch' : 'c.caravan.departedSub'), 4, 'mission');   // T15
+      else if (e.e === 'caravan:stopped') toast(t('c.caravan.stopped'), t(isTouch ? 'c.caravan.stoppedSubTouch' : 'c.caravan.stoppedSub'), 4, 'mission');
+      else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2, 'mission');
+      else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
+      else if (e.e === 'aerie:enter') openAerie();
+      else if (e.e === 'aerie:leave') closeAerie();
+      else if (e.e === 'aerie:rest') { aerieMsg(t('c.aerie.rested')); renderAerie(); }
       else if (e.e === 'lair:enter') { enterCave(e.respawn ? died : null); died = null; }
       else if (e.e === 'lair:stored') lairMsg(t('c.lair.stored', { prey: t('c.prey.' + e.type) }));
       else if (e.e === 'lair:full') lairMsg(t('c.lair.full'));
       else if (e.e === 'lair:spoiled') { if (cs.inLair) lairMsg(t('c.lair.spoiled', { prey: t('c.prey.' + e.type) })); renderLair(); }
       else if (e.e === 'lair:leave') { leaveCave(); if (!cs.stats.eaten && !MO.lesson(cs)) showTip(12); }   // first hunt without a mother: how to grab and eat
       else if (e.e === 'corn:burning' && !cornToast) { cornToast = true; toast(t('c.toast.corn'), t('c.toast.cornSub'), 2.2); }
+      else if (e.e === 'building:charred') toast(t('c.toast.charred', { b: t('c.building.' + e.type) }), t('c.toast.charredSub'), 2.2);   // T06
       else if (e.e === 'building:ruined' && e.type !== 'palisade') toast(t('c.toast.burned', { b: t('c.building.' + e.type) }), t('c.toast.burnedSub'), 2.2);
-      else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t('c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
+      else if (e.e === 'place:discovered') toast(t('c.toast.discovered', { place: t(e.key || 'c.place.' + e.type) }), t('c.toast.discoveredSub'), 3);
       else if (e.e === 'tip') showTip(D.tips.show, 'c.tip.' + e.id);   // T23: one-time tips
       else if (e.e === 'mother:done') toast(t('c.mother.done'), t('c.mother.doneSub'), 4);
       else if (e.e === 'stage:up') { refreshStage(); lairMsg(t('c.lair.grew', { stage: stageName(e.to) })); if (!cs.inLair) toast(t('c.toast.grew', { stage: stageName(e.to) }), t('c.toast.grewSub'), 4); }
@@ -747,6 +880,7 @@
     eat: '<path d="M4 12a8 8 0 0 0 16 0zM8 12l2-3 2 3 2-3 2 3"/>',
     travel: '<path d="M4 12h14M13 6l6 6-6 6"/>',
     cave: '<path d="M3 20c0-9 4-15 9-15s9 6 9 15M9 20c0-4 1.5-7 3-7s3 3 3 7"/>',
+    aerie: '<path d="M3 20l3-10 4-6 3 4 3-3 5 15zM10 20l1.5-7 2 2 .5 5M7 20h10"/>',
     land: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
     fly: '<path d="M12 20V8M7 13l5-5 5 5M4 4h16"/>',
     nest: '<path d="M3 14c2 4 16 4 18 0M5 13c3-2 11-2 14 0M8 10l2 3M16 10l-2 3"/>',
@@ -754,6 +888,9 @@
     exit: '<path d="M4 20c0-9 3-15 8-15s8 6 8 15M12 20v-6M9 17l3-3 3 3"/>',
     hoard: '<path d="M3 19h18M5 19c0-4 3-7 7-7s7 3 7 7M8 12l1-3h6l1 3M10 9V7h4v2"/>',
     altar: '<path d="M5 20h14M7 20l1-8h8l1 8M6 12h12M12 4l2 3-2 3-2-3z"/>',
+    board: '<path d="M7 21V4M17 21V4M4 6h16v9H4zM7 9h4M7 12h3M13 9h4"/>',   // Phase 3 T11: the mission board
+    trophy: '<path d="M8 4h8v4a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 12v5M8 20h8l-1-3H9z"/>',   // Phase 3 T12: the trophy wall (a cup)
+    mapStone: '<path d="M6 21l2-17h8l2 17zM9 9h6M11 9v5M9 14h5"/>',
   };
   const slotHtml = icon => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[icon] + '</svg><span></span>';
   function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
@@ -771,7 +908,7 @@
     const noFire = !HN.effects(dragon.hunger).canBreath || LT.blocksBreath(cs.carriedLoot);   // starving (T08) or a strongbox (T19): Breath dims
     if (noFire !== breathDim) { bBreath.classList.toggle('dim', noFire); breathDim = noFire; }
   }
-  function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? secs : 0; }
+  function flashPrompt(text, secs) { promptFlash = text; promptFlashT = text ? Math.max(secs || 0, Math.min(D.messages.max * 0.6, String(text).length / D.messages.perChar)) : 0; }   // long enough to read
   function promptHud(dt) {
     promptFlashT = Math.max(0, promptFlashT - dt);
     slotsHud();
@@ -781,8 +918,13 @@
     else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
     else if (state === 'play' && cs.exitSmall && !cs.inLair) text = t('c.prompt.tooSmall.' + cs.exitSmall.to);   // T11: gated exit, phone and desktop
     else if (cs.inLair) text = stationOpen ? '' : cs.station ? t('c.prompt.station.' + cs.station + (isTouch ? 'Touch' : '')) : t(isTouch ? 'c.prompt.caveTouch' : 'c.prompt.cave');
+    else if (cs.inAerie) text = '';
+    else if (cs.hint === 'aerieBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieBankTouch' : 'c.prompt.aerieBank');   // T08
+    else if (cs.hint === 'aerie') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieTouch' : 'c.prompt.aerie');
     else if (cs.hint === 'lairBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairBankTouch' : 'c.prompt.lairBank');   // T19
+    else if (cs.hint === 'lootCarry' && cs.carriedLoot && cs.carriedLoot.relic) text = t('c.prompt.relicCarry', { relic: lootName(cs.carriedLoot) });   // Phase 3 T12
     else if (cs.hint === 'lootCarry') text = t('c.prompt.lootCarry', { loot: lootName(cs.carriedLoot) });
+    else if (cs.hint === 'lootGrab' && (lootItem(cs.lootTarget) || {}).relic) text = t(isTouch ? 'c.prompt.relicGrabTouch' : 'c.prompt.relicGrab', { relic: lootName(lootItem(cs.lootTarget)) });   // T12
     else if (cs.hint === 'lootGrab') text = t(isTouch ? 'c.prompt.lootGrabTouch' : 'c.prompt.lootGrab', { loot: lootName(lootItem(cs.lootTarget)) });
     else if (cs.hint === 'lootHeavy') text = t('c.prompt.lootHeavy', { loot: lootName(lootItem(cs.lootTarget)) });
     else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
@@ -805,14 +947,26 @@
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
   }
   /** T19: loot names (kind of a carried or lying item) and the item lying in this town by id. */
-  const lootName = it => t('c.loot.' + ((it && it.kind) || 'tithe'));
+  const lootName = it => (it && it.relic ? t('c.relic.' + it.relic) : t('c.loot.' + ((it && it.kind) || 'tithe')));   // T12: a relic by its name
   const lootItem = id => (id && cs.town && cs.town.items ? cs.town.items.find(it => it.id === id) : null);
-  function toast(title, sub, secs) {
+  /* ---------- messages (Pavel's request): the big lines wait in a queue instead of replacing each other, each stays by
+     its length (data.messages), a tap closes it; every one goes into the message log (logPanel) ---------- */
+  const msgs = ML.create();
+  const stamp = () => ({ t: cs.clock ? cs.clock.t : null, played: cs.stats ? cs.stats.played : 0 });
+  function toast(title, sub, secs, kind) { ML.push(msgs, { title, sub, secs, kind: kind || 'info' }, stamp()); if (logOpen) renderLog(); }
+  let msgShown = null;
+  function msgHud(dt) {
+    const cur = state === 'play' && !stationOpen ? ML.step(msgs, dt || 0.016) : (state === 'play' ? msgs.cur : null);
+    if (cur === msgShown) return;
+    msgShown = cur;
+    if (!cur) { toastEl.style.opacity = 0; toastEl.classList.remove('tap'); return; }
     toastEl.innerHTML = '';
-    toastEl.append(title);
-    if (sub) { const sm = document.createElement('small'); sm.textContent = sub; toastEl.append(sm); }
-    toastEl.style.opacity = 1; toastT = secs || 3;
+    toastEl.append(cur.title);
+    if (cur.sub) { const sm = document.createElement('small'); sm.textContent = cur.sub; toastEl.append(sm); }
+    toastEl.classList.toggle('mission', cur.kind === 'mission');
+    toastEl.style.opacity = 1; toastEl.classList.add('tap');
   }
+  toastEl.addEventListener('pointerdown', e => { if (!msgShown) return; e.preventDefault(); e.stopPropagation(); ML.dismiss(msgs); msgShown = undefined; msgHud(0); });
   const stageName = i => t('c.stage.' + D.stages[i].id);
 
   /* ---------- survival tick: hunger, its effects, growth moments ---------- */
@@ -868,6 +1022,137 @@
       $('#hoardTier').textContent = g ? t('c.hoard.tier', { tier: tr + 1, max: T0.length }) + (nx ? ' - ' + t('c.hoard.next', { next: nx }) : '') : t('c.hoard.empty');
     }
     if (stationOpen === 'altar') renderAltar();
+    if (stationOpen === 'board') renderBoard();
+    if (stationOpen === 'trophy') renderTrophy();
+  }
+  /* ---------- Phase 3 T12: the trophy wall - one row per niche: the relic and its story line, or an empty niche ---------- */
+  let trophyShown = '';
+  function renderTrophy() {
+    const w = RL.wall(cs), key = w.map(n => n.id + ':' + n.has).join(',');
+    if (key === trophyShown) return;
+    trophyShown = key;
+    const list = $('#trophyList'); list.innerHTML = '';
+    for (const n of w) {
+      const li = document.createElement('li'), b = document.createElement('b'), sm = document.createElement('small');
+      li.className = n.has ? 'has' : '';
+      b.textContent = n.has ? t('c.relic.' + n.id) : t('c.trophy.empty');
+      sm.textContent = n.has ? t('c.relic.' + n.id + '.story') : n.id ? t('c.trophy.hint', { m: t('c.mission.' + RL.missionOf(n.id).id) }) : t('c.trophy.later');
+      li.append(b, sm); list.append(li);
+    }
+    $('#trophyCount').textContent = t('c.trophy.count', { n: w.filter(n => n.has).length, max: w.length });
+  }
+  /* ---------- Phase 3 T11: the mission board - list (locked ones greyed with the reason), briefing, Accept / Drop ---------- */
+  const boardList = $('#boardList'), boardBrief = $('#boardBrief');
+  let boardShown = '', briefId = null;
+  function boardWhy(r) { return r.why === 'stage' ? t('c.board.locked.stage', { stage: stageName(r.def.minStage || 0) }) : t('c.board.locked.' + r.why); }
+  function renderBoard() {
+    const rows = MS.list(cs), on = MS.active(cs);
+    const key = rows.map(r => r.id + ':' + r.why).join(',') + '|' + (on ? on.id + on.state : '') + '|' + briefId + '|' + (window.I18N ? I18N.lang : '');
+    if (key === boardShown) return;
+    boardShown = key;
+    boardList.hidden = !!briefId; boardBrief.hidden = !briefId;
+    if (briefId) return renderBrief(rows.find(r => r.id === briefId), on);
+    boardList.innerHTML = '';
+    for (const r of rows) {
+      const li = document.createElement('li'), b = document.createElement('button'), nm = document.createElement('b'), sm = document.createElement('small');
+      const mine = on && on.id === r.id;
+      nm.textContent = t('c.mission.' + r.id);
+      sm.textContent = mine ? t('c.board.yours') : r.why && r.why !== 'busy' ? boardWhy(r) : t('c.board.line', { time: mmss(r.def.time), gold: (r.def.reward && r.def.reward.gold) || 0 });
+      b.dataset.id = r.id; b.classList.toggle('locked', !!r.why && !mine && r.why !== 'busy'); b.classList.toggle('on', !!mine);
+      b.append(nm, sm); li.append(b); boardList.append(li);
+    }
+  }
+  function renderBrief(r, on) {
+    if (!r) { briefId = null; boardShown = ''; renderBoard(); return; }
+    const mine = on && on.id === r.id;
+    $('#briefName').textContent = t('c.mission.' + r.id);
+    $('#briefText').textContent = t('c.brief.' + r.id);
+    $('#briefTime').textContent = mmss(r.def.time);
+    $('#briefReward').textContent = t('c.board.gold', { gold: (r.def.reward && r.def.reward.gold) || 0 });
+    const why = mine ? (on.state === 'accepted' ? t('c.board.accepted') : t('c.board.yours')) : r.why ? boardWhy(r) : '';
+    $('#briefWhy').textContent = why; $('#briefWhy').hidden = !why;
+    $('#briefAccept').hidden = !!mine; $('#briefAccept').disabled = !!r.why;
+    $('#briefDrop').hidden = !(mine && on.state === 'accepted');
+    if (!isTouch) setTimeout(() => (r.why ? $('#briefBack') : $('#briefAccept')).focus({ preventScroll: true }), 0);
+  }
+  boardList.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !cs.inLair || state !== 'play') return;
+    briefId = b.dataset.id; boardShown = ''; renderBoard();
+  });
+  $('#briefBack').onclick = () => { briefId = null; boardShown = ''; renderBoard(); };
+  $('#briefAccept').onclick = () => {
+    if (!briefId || !cs.inLair || state !== 'play') return;
+    const id = briefId, ev = ST.caveAct(cs, 'board', briefId);
+    if (ev.some(x => x.e === 'mission:accepted')) lairMsg(t('c.board.go'));
+    onEvents(ev); boardShown = ''; renderBoard();
+    const sb = ev.some(x => x.e === 'mission:accepted') && SY.brief(cs, id);   // Phase 3 T17: the story briefing, the first time
+    if (sb) storyCard.show(Object.assign({ kind: 'brief' }, sb), () => saveNow());
+  };
+  $('#briefDrop').onclick = () => {
+    if (!cs.inLair || state !== 'play') return;
+    onEvents(ST.caveAct(cs, 'board', null)); boardShown = ''; renderBoard();
+  };
+  /* ---------- message log (Pavel's request): the current mission (timer, objective, briefing), then every message
+     newest first with the time of day; log button under pause, L on desktop, a tap on the mission timer ---------- */
+  function openLog() {
+    if (state !== 'play' || logOpen) return;
+    if (mapView.isOpen) closeMap();
+    for (const k in keys) keys[k] = false;
+    mouseBreath = false; touch.breath = touch.boost = touch.grab = touch.eat = false; touch.x = touch.y = 0;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    logOpen = true; logEl.hidden = false; $('#logBtn').classList.add('on');
+    renderLog();
+    if (!isTouch) setTimeout(() => $('#logClose').focus({ preventScroll: true }), 0);
+  }
+  function closeLog() {
+    if (!logOpen) return;
+    logOpen = false; logEl.hidden = true; $('#logBtn').classList.remove('on');
+    if (document.activeElement && logEl.contains(document.activeElement)) document.activeElement.blur();
+  }
+  const kindLabel = k => t('c.log.kind.' + k);
+  function renderLog() {
+    const a = MS.active(cs), box = $('#logMission');
+    box.innerHTML = '';
+    if (a) {
+      const ts = MS.timerState(cs), ob = MS.objective(cs);
+      const h = document.createElement('b'); h.textContent = missionName(a.id); box.append(h);
+      const st = document.createElement('p'); st.className = 'state';
+      st.textContent = t('c.log.state.' + a.state, { time: mmss(ts ? ts.left : a.left) }); box.append(st);
+      if (ob) { const o = document.createElement('p'); o.className = 'obj'; o.textContent = t(ob.key, ob.p ? Object.fromEntries(Object.entries(ob.p).map(([k, v]) => [k, t(v)])) : undefined); box.append(o); }
+      const br = document.createElement('p'); br.className = 'brief'; br.textContent = t('c.brief.' + a.id); box.append(br);
+    } else {
+      const p = document.createElement('p'); p.className = 'none'; p.textContent = t('c.log.noMission'); box.append(p);
+    }
+    const list = $('#logList'); list.innerHTML = '';
+    const all = ML.entries(msgs);
+    $('#logEmpty').hidden = all.length > 0;
+    for (const e of all) {
+      const li = document.createElement('li'); li.className = e.kind;
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = e.t == null ? '' : CK.hours(e.t);
+      const tx = document.createElement('div'), b = document.createElement('b');
+      b.textContent = e.title + (e.n > 1 ? ' (x' + e.n + ')' : '');
+      tx.append(b);
+      if (e.sub) { const sm = document.createElement('small'); sm.textContent = e.sub; tx.append(sm); }
+      if (e.kind !== 'info') { const k = document.createElement('i'); k.textContent = kindLabel(e.kind); tx.prepend(k); }
+      li.append(tm, tx); list.append(li);
+    }
+  }
+  $('#logBtn').addEventListener('click', e => { e.stopPropagation(); if (logOpen) closeLog(); else openLog(); });
+  $('#logClose').onclick = () => closeLog();
+  $('#missionHud').addEventListener('click', e => { e.stopPropagation(); openLog(); });
+  /* ---------- Phase 3 T11: mission HUD - timer under the compass, objective line ---------- */
+  const mHud = $('#missionHud'), mTimer = $('#missionTimer'), mObj = $('#missionObj');
+  let mShown = '';
+  function missionHud() {
+    const ms = state === 'play' && pilot && !cs.inLair && !cs.inAerie ? MS.timerState(cs) : null;
+    if (!ms) { if (mShown) { mHud.hidden = true; document.body.classList.remove('mHud'); mShown = ''; } return; }
+    const ob = MS.objective(cs), p = {};
+    if (ob) for (const k in ob.p || {}) p[k] = t(ob.p[k]);
+    const txt = mmss(ms.left), cls = ms.level + (ms.running ? '' : ' paused'), line = ob ? t(ob.key, p) : '';
+    const key = txt + '|' + cls + '|' + line;
+    if (key === mShown) return;
+    if (!mShown) { mHud.hidden = false; document.body.classList.add('mHud'); }
+    mShown = key; mTimer.textContent = txt; mTimer.className = cls; mObj.textContent = line;
   }
   /** T20: the altar panel - every upgrade with its effect and cost; Buy while the hoard has the gold (core/upgrades.js). */
   const altarList = $('#altarList');
@@ -911,10 +1196,10 @@
     stationOpen = id;
     lairEl.dataset.station = id;
     $('#lairTitle').dataset.i18n = 'c.cave.' + id; $('#lairTitle').textContent = t('c.cave.' + id);
-    deathCard(death || null); if (death) { toastEl.style.opacity = 0; toastT = 0; }
-    lairShown = ''; altarShown = ''; renderLair();
+    deathCard(death || null); if (death) ML.clear(msgs);
+    lairShown = ''; altarShown = ''; boardShown = ''; trophyShown = ''; briefId = null; renderLair();
     lairEl.hidden = false;
-    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
+    if (!isTouch) setTimeout(() => (id === 'nest' ? $('#restBtn') : id === 'larder' && larderList.querySelector('button') || id === 'altar' && altarList.querySelector('button:not(:disabled)') || id === 'board' && boardList.querySelector('button') || $('#leaveBtn')).focus({ preventScroll: true }), 0);
   }
   function closeStation() {
     stationOpen = null;
@@ -925,6 +1210,7 @@
   function useStation(id) {
     if (!id || !cs.inLair || state !== 'play') return;
     if (id === 'exit') { onEvents(ST.caveAct(cs, 'exit')); return; }
+    if (id === 'mapStone') { if (mapView.isOpen) closeMap(); else openTravel(); return; }   // T09: the map in travel mode
     if (stationOpen === id) closeStation(); else openStation(id);
   }
   /** lair:enter: the dragon stands in the cave (tunnel, or the nest after death / hatching); the camera cuts inside. */
@@ -957,14 +1243,45 @@
     onEvents(ev.filter(x => x.e !== 'prey:eaten')); renderLair();
   });
   $('#leaveBtn').onclick = () => closeStation();
+  /* ---------- the aerie panel (Phase 3 T08; core/aerie.js does the rules, state.aerieAct the actions) ---------- */
+  const aerieEl = $('#aeriePanel');
+  function aerieMsg(text) { $('#aerieMsg').textContent = text || ''; }
+  function renderAerie() {
+    if (!cs.inAerie) return;
+    const d = dragon;
+    $('#aerieWhere').textContent = t(TR.region(cs.inAerie).nameKey);
+    $('#aerieVitals').textContent = t('c.lair.vitals', { hp: Math.round(100 * d.hp / G.statsOf(d.stage).hpMax), st: Math.round(pilot ? pilot.st : 100), hunger: Math.round(d.hunger) });
+    $('#aerieGold').textContent = t('c.hoard.gold', { gold: (cs.hoard && cs.hoard.gold) || 0 });
+  }
+  function openAerie() {
+    closeStation(); aerieMsg('');
+    pilot = dragon.pilot; snapCam();
+    touch.breath = touch.boost = touch.grab = touch.eat = false; mouseBreath = false; actionKind = null; enterQ = confirmQ = landQ = false;
+    document.querySelectorAll('#btns .on').forEach(b => b.classList.remove('on'));
+    $('#hint').hidden = true; hintT = 0;
+    renderAerie();
+    aerieEl.hidden = false;
+    if (!isTouch) setTimeout(() => $('#aerieRestBtn').focus({ preventScroll: true }), 0);
+  }
+  function closeAerie() {
+    aerieEl.hidden = true; aerieMsg('');
+    if (document.activeElement && aerieEl.contains(document.activeElement)) document.activeElement.blur();
+    pilot = dragon.pilot; snapCam();
+  }
+  function aerieAct(id) { if (!cs.inAerie || state !== 'play') return; onEvents(ST.aerieAct(cs, id)); renderAerie(); }
+  $('#aerieRestBtn').onclick = () => aerieAct('rest');
+  $('#aerieLeaveBtn').onclick = () => aerieAct('leave');
+  $('#aerieTravelBtn').onclick = () => openTravel();             // T09: fast travel from the aerie
   /** Debug: rest from anywhere (enters the lair first when in the Ash Wastes, else rests in place). */
   function rest() { onEvents(ST.lairRest(cs)); renderLair(); }
   /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
+  // region jumps: keys 4 / 5 / 6, Shift+4 for the 4th region (Digit7+ are taken by sight / time / to post)
+  const DBG_REGION_KEYS = [['4', 'Digit4'], ['5', 'Digit5'], ['6', 'Digit6'], ['Shift+4', 'ShiftDigit4']];
   const DEBUG_KEYS = [
     ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
     ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],
     ['Z', 'die now (wake in the lair)', 'KeyZ', 'die'],
-    ['L', 'fly into the lair (Ash Wastes)', 'KeyL', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
+    ['Shift+Z', 'fly into the lair (Ash Wastes)', 'ShiftKeyZ', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near a region exit (again: the next exit)', 'KeyT', 'to exit'],
     ['C', 'become a Drake now (Farmlands test)', 'KeyC', 'drake now'],
     ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
@@ -989,14 +1306,31 @@
     [',', 'stand on the ground in front of the next loot item of this region (tithe chest / strongbox), facing it', 'Comma', 'to loot'],
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
     ["'", 'upgrades: all owned (free), again: none (their cost back into the hoard)', 'Quote', 'upgrades'],
+    ['Shift+0', 'map: reveal the whole region and discover every place in it (map test)', 'ShiftDigit0', 'map reveal'],
     ['=', 'fly to the next ballista (150 out, 30 up, passing it at an angle, it has seen you): watch the aim line, turn to dodge', 'Equal', 'to ballista'],
-    ...Object.keys(D.regions).map((id, i) => [String(4 + i), 'jump to ' + id + ' (also from the cave, any stage)', 'Digit' + (4 + i), 'to ' + id]),
+    ...Object.keys(D.regions).map((id, i) => [DBG_REGION_KEYS[i][0], 'jump to ' + id + ' (also from the cave, any stage)', DBG_REGION_KEYS[i][1], 'to ' + id]),
+    ['Shift+5', 'castle gate: close / open (portcullis solid while closed, T03)', 'ShiftDigit5', 'gate'],
+    ['Shift+6', 'fly low over the castle wall walk, slow, along the wall (land test, T03)', 'ShiftDigit6', 'to wall'],
+    ['Shift+7', 'castle alarm: the keep horn sounds now (the whole region on alert, the gate drops), T05', 'ShiftDigit7', 'horn'],
+    ['Shift+8', 'fly a low pass along the outside of a castle wall (60 out, wall walk height + 15): archers volley, a bastion aims, T05', 'ShiftDigit8', 'wall pass'],
+    ['Shift+9', 'castle fire: every wooden roof and hoarding of the castle catches fire now (they burn out in about a minute; stone stays, charred), T06', 'ShiftDigit9', 'castle fire'],
+    ['Shift+1', 'aerie of this region: found, fly in from 120 out, facing the mouth (T08)', 'ShiftDigit1', 'to aerie'],
+    ['Shift+2', 'find every aerie (fast travel test, T09)', 'ShiftDigit2', 'all aeries'],
+    ['Shift+3', 'mission: accept the next one of the catalogue that is open (any stage; won ones and ones waiting for a rest are skipped; the timer starts outside the lair region or an aerie), T10', 'ShiftDigit3', 'mission'],
+    ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
+    ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
+    ['Shift+C', 'tithe wagon: accepts its mission if needed, goes to the Veltava Bend and flies 90 behind the wagon, 30 up, facing it (breathe fire on it until it stops, land, Grab the chest), T15', 'ShiftKeyC', 'wagon'],
+    ['Shift+L', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyL', 'chalice'],
+    ['Shift+W', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyW', 'workshop'],
+    ['Shift+F', 'free the village: its Order buildings fall to ruins, its archers fall, the Order flag drops (Farmlands village), Phase 3 T16', 'ShiftKeyF', 'free village'],
+    ['Shift+G', 'tribute now: the next food tribute of a freed village arrives in the larder (Phase 3 T16)', 'ShiftKeyG', 'tribute now'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
   let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
   let fastTime = false;                                          // T21: debug / - the clock runs x40
+  let dbgMission = -1;                                           // T10: catalogue index of the last Shift+3 accept
   let dbgPen = -1, dbgLoot = -1;                                 // T19: item index of the last ',' press                                               // T18: pen index of the last '.' press
   let dbgExit = 0, dbgExitRegion = null, dbgTown = -1, dbgPost = -1, dbgCorn = -1, dbgBal = -1;           // dbgTown: settlement index of the last '1' press (T12)                         // T: which exit the next press jumps to
   function debugKey(code) {
@@ -1004,6 +1338,11 @@
     if (code === 'KeyY') { qSampler = null; applyQuality(QL.next(qTier), 'debug'); flashPrompt(t('c.dbg.quality', { tier: qTier }), 1.5); return; }
     if (state !== 'play') return;
     if (code === 'KeyN') feed(100);
+    if (code === 'ShiftDigit0') {                                 // T07: no fog, every place of the region discovered
+      C.need('map').reveal(cs, regionId, 0, 0, 1e5);
+      for (const pl of SE.layout(regionId).places) cs.discovered[pl.id] = true;
+      flashPrompt('map: ' + regionId + ' revealed', 1.5);
+    }
     if (code === 'KeyI') {                                        // T08: a grazing goat 4 m (x scale) in front, to test the ground pick up
       const g = cs.field.list.filter(q => q.type === 'goat' && q.state !== 'carried').sort((a, b) => Math.hypot(a.pos[0] - pilot.pos[0], a.pos[2] - pilot.pos[2]) - Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]))[0];
       if (g) {
@@ -1021,7 +1360,7 @@
     if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK' && !cs.inLair) { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
     if (code === 'KeyZ' && !cs.inLair) dragon.hp = 0;               // core/state sees HP 0 on the next step: death
-    if (code === 'KeyL' && !cs.inLair) {
+    if (code === 'ShiftKeyZ' && !cs.inLair) {                   // was L (L opens the message log now)
       const m = LR.mouthPos(regionId);
       if (m) { const L0 = TR.region(regionId).lair; pilot.pos = [m[0], m[1], m[2] + L0.r * 0.5]; pilot.yaw = Math.PI; pilot.pitch = 0; snapCam(); }
       else rest();
@@ -1068,20 +1407,53 @@
       const pl = cs.town.places[dbgTown], a = Math.atan2(pilot.pos[0] - pl.x, pilot.pos[2] - pl.z) || 0;
       const x = pl.x + Math.sin(a) * 150, z = pl.z + Math.cos(a) * 150;
       Object.assign(pilot, { mode: 'air', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + 30, z], yaw: a + Math.PI, pitch: 0, speed: stats.cruise });
-      snapCam(); flashPrompt(t('c.dbg.town', { place: t('c.place.' + pl.type) }), 1.5);
+      snapCam(); flashPrompt(t('c.dbg.town', { place: t(NV.placeKey(pl)) }), 1.5);
     }
+    /** T19: landed in front of a loot item, facing it (also the chalice, Phase 3 T12) */
+    const standAtLoot = it => {
+      const b = cs.town.buildings.find(q => q.id === it.building) || { pos: it.home };
+      let dx = it.pos[0] - b.pos[0], dz = it.pos[2] - b.pos[2];
+      const l = Math.hypot(dx, dz) || 1, sc = ST.scaleOf(cs), f = 1.5 + D.settlement.pad * sc;
+      dx /= l; dz /= l;
+      const x = it.pos[0] + dx * f, z = it.pos[2] + dz * f;
+      Object.assign(pilot, { mode: 'ground', tr: null, vel: [0, 0, 0], pos: [x, TR.surfaceAt(regionId, x, z) + D.walk.stand * sc, z], yaw: Math.atan2(-dx, -dz), pitch: 0, roll: 0, rollX: 0, speed: 0, boosting: false });
+      snapCam(); flashPrompt(t('c.dbg.loot', { loot: lootName(it) }), 1.5);
+    };
     if (code === 'Comma' && !cs.inLair && cs.town) {              // T19: landed in front of the next tithe chest / strongbox
-      const list = (cs.town.items || []).filter(it => !it.taken);
+      const list = (cs.town.items || []).filter(it => !it.taken && !it.hidden);
       if (!list.length) flashPrompt(t('c.dbg.noLoot'), 1.5);
+      else { dbgLoot = (dbgLoot + 1) % list.length; standAtLoot(list[dbgLoot]); }
+    }
+    if (code === 'ShiftKeyF' && !cs.inLair && cs.town) onEvents(C.need('freed').freeDebug(cs));   // Phase 3 T16
+    if (code === 'ShiftKeyG') {
+      if (!C.need('freed').freedAll(cs).length) flashPrompt(t('c.dbg.tributeNone'), 1.8);
+      else cs.tributeT = D.tribute.every;                        // arrives on the next frame (or waits for room in the larder)
+    }
+    if (code === 'ShiftKeyL' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
+      const m = RL.missionOf('ember_chalice'), a = MS.active(cs);
+      if (RL.has(cs, 'ember_chalice')) flashPrompt(t('c.dbg.relicOwned'), 1.5);
+      else if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
       else {
-        dbgLoot = (dbgLoot + 1) % list.length;
-        const it = list[dbgLoot], b = cs.town.buildings.find(q => q.id === it.building) || { pos: it.home };
-        let dx = it.pos[0] - b.pos[0], dz = it.pos[2] - b.pos[2];
-        const l = Math.hypot(dx, dz) || 1, sc = ST.scaleOf(cs), f = 1.5 + D.settlement.pad * sc;
-        dx /= l; dz /= l;
-        const x = it.pos[0] + dx * f, z = it.pos[2] + dz * f;
-        Object.assign(pilot, { mode: 'ground', tr: null, vel: [0, 0, 0], pos: [x, TR.surfaceAt(regionId, x, z) + D.walk.stand * sc, z], yaw: Math.atan2(-dx, -dz), pitch: 0, roll: 0, rollX: 0, speed: 0, boosting: false });
-        snapCam(); flashPrompt(t('c.dbg.loot', { loot: lootName(it) }), 1.5);
+        if (!a) { cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', m.id)); cs.debugForce = false; }
+        RL.sync(cs);
+        const it = (cs.town.items || []).find(q => q.relic === 'ember_chalice' && !q.taken && !q.hidden);
+        if (it) standAtLoot(it);
+        else if (!cs.carriedLoot) { onEvents(RL.giveDebug(cs)); flashPrompt(t('c.dbg.relicClaws'), 1.5); }
+      }
+    }
+    if (code === 'ShiftKeyW' && !cs.inLair) {                     // Phase 3 T14: run-in on the siege workshop (destroy mission)
+      const m = MS.def('a2_workshop'), a = MS.active(cs);
+      if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
+      else if (cs.region !== m.region || !cs.town) flashPrompt(t('c.dbg.workshopBend'), 2);
+      else {
+        if (!a) { cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', m.id)); cs.debugForce = false; }
+        const b = cs.town.buildings.find(q => q.id === m.target);
+        if (b) {
+          const ang = 0.75, x = b.pos[0] + Math.sin(ang) * 160, z = b.pos[2] + Math.cos(ang) * 160;   // as test/destroy-bot.js RUN_BEARING
+          const y = Math.max(TR.surfaceAt(regionId, x, z) + 20, b.pos[1] + b.h + 30);
+          Object.assign(pilot, { mode: 'air', tr: null, pos: [x, y, z], yaw: ang + Math.PI, pitch: -0.2, speed: stats.cruise });
+          snapCam(); flashPrompt(t(b.ruin ? 'c.dbg.workshopRuin' : 'c.dbg.workshop'), 2);
+        }
       }
     }
     if (code === 'Quote') {                                       // T20: every upgrade at once, or none (refunded)
@@ -1103,12 +1475,15 @@
     }
     if (code === 'Digit2' && !cs.inLair && cs.town) {            // T13: fire test on the nearest standing building
       let best = null, bd = 400;
-      for (const b of cs.town.buildings) { const d = Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]); if (!b.ruin && !(b.fire > 0) && d < bd) { bd = d; best = b; } }
+      for (const b of cs.town.buildings) { const d = Math.hypot(b.pos[0] - pilot.pos[0], b.pos[2] - pilot.pos[2]); if (SE.burnable(b) && !(b.fire > 0) && d < bd) { bd = d; best = b; } }
       if (best) { best.fire = 1e-3; best.heat = 0; flashPrompt(t('c.dbg.ignite', { b: t('c.building.' + best.type) }), 1.5); } else flashPrompt(t('c.dbg.noBuilding'), 1.5);
     }
     if (code === 'Digit3' && cs.town) {                         // T13: ruins come back now (as if fire.rebuild s had passed)
       let n = 0;
-      for (const b of cs.town.buildings) if (b.ruin) { b.ruinAt = cs.stats.played - D.fire.rebuild - 1; n++; }
+      for (const b of cs.town.buildings) {
+        if (b.ruin) { b.ruinAt = cs.stats.played - D.fire.rebuild - 1; n++; }
+        if (b.char) { b.charAt = cs.stats.played - D.fire.rebuild - 1; n++; }   // T06: charred castle pieces too
+      }
       const rs = cs.regionStates && cs.regionStates[cs.region];
       if (rs && rs.ruins) for (const r of rs.ruins) r.at = cs.stats.played - D.fire.rebuild - 1;
       flashPrompt(t('c.dbg.rebuilt', { n }), 1.5);
@@ -1158,7 +1533,90 @@
         snapCam(); flashPrompt(t('c.dbg.post', { kind: t('c.post.' + v.kind) }), 1.5);
       }
     }
-    const dbgRegion = /^Digit[4-6]$/.test(code) ? Object.keys(D.regions)[+code.slice(5) - 4] : null;
+    if (code === 'ShiftDigit7' || code === 'ShiftDigit8') {      // T05: castle horn / a low pass along a wall
+      const CA = VCamp.need('castle'), pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair || !cs.squad) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else if (code === 'ShiftDigit7') onEvents(CA.blowHorn(cs.squad, { pos: pilot.pos, pad: D.settlement.pad * ST.scaleOf(cs) }));
+      else {
+        // the long wall facing south (the side the dragon comes from, away from the cliff), 60 out, turned a little to it
+        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall' && b.len > 20).sort((a, b) => CA.outward(a, pl)[1] - CA.outward(b, pl)[1])[0];
+        const [nx, nz] = CA.outward(w, pl), x = (w.seg[0] + w.seg[2]) / 2 + nx * 60, z = (w.seg[1] + w.seg[3]) / 2 + nz * 60;
+        const yaw = Math.atan2(-nx, -nz) + Math.PI * 0.1;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, w.pos[1] + D.buildings.wall.walkTop + 15, z], yaw, pitch: 0, speed: 18 });
+        snapCam(); flashPrompt(t('c.dbg.wallPass'), 2);
+      }
+    }
+    if (code === 'ShiftDigit9') {                                // T06: the castle's wooden parts and inner wooden buildings alight
+      const pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else {
+        let n = 0;
+        for (const b of cs.town.buildings) if (b.place === pl.id && SE.burnable(b) && !(b.fire > 0) && D.buildings[b.type].hp > 0) { b.fire = 1e-3; b.heat = 0; n++; }
+        flashPrompt(t('c.dbg.castleFire', { n }), 2);
+      }
+    }
+    if (code === 'ShiftDigit5' || code === 'ShiftDigit6') {      // T03: castle gate toggle / over the wall walk
+      const CA = VCamp.need('castle'), pl = cs.town && cs.town.places.find(p => p.castle);
+      if (!pl || cs.inLair) flashPrompt(t('c.dbg.noCastle'), 1.5);
+      else if (code === 'ShiftDigit5') {
+        if (CA.gateOpen(cs.town)) CA.closeGate(cs.town); else CA.openGate(cs.town);
+        flashPrompt(t(CA.gateOpen(cs.town) ? 'c.dbg.gateOpen' : 'c.dbg.gateClosed'), 1.5);
+      } else {
+        const w = cs.town.buildings.filter(b => b.place === pl.id && b.type === 'wall').sort((a, b) => b.len - a.len)[0];
+        const x = (w.seg[0] + w.seg[2]) / 2, z = (w.seg[1] + w.seg[3]) / 2;
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, SE.solidAt(cs.town, x, z) + 6, z], yaw: w.yaw, pitch: 0, speed: 15 });
+        snapCam(); flashPrompt(t('c.dbg.wall'), 2);
+      }
+    }
+    if (code === 'ShiftDigit2') {                                 // T09: every aerie found (the map stone lists them)
+      for (const id of Object.keys(D.regions)) { const s = AE.site(id); if (s) cs.discovered[s.id] = true; }
+      flashPrompt(t('c.dbg.allAeries'), 1.5); if (travelOn) renderTravel();
+    }
+    if (code === 'ShiftDigit3') {                                 // T10: accept the next mission of the catalogue (forced)
+      if (MS.active(cs)) flashPrompt(t('c.mission.refused.busy'), 1.5);
+      else {
+        const n = D.missions.length, rows = MS.list(cs);           // the next one that can be accepted (stage lock ignored), else show why not
+        let k = 1;
+        while (k < n && rows[(dbgMission + k) % n].why && rows[(dbgMission + k) % n].why !== 'stage') k++;
+        dbgMission = (dbgMission + k) % n;
+        cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', D.missions[dbgMission].id)); cs.debugForce = false;
+      }
+      if (travelOn) renderTravel();
+    }
+    if (code === 'ShiftKeyJ') { if (!MS.active(cs)) flashPrompt(t('c.dbg.noMission'), 1.5); else onEvents(ST.missionAct(cs, 'finish')); }   // T10
+    if (code === 'ShiftKeyK') { if (!MS.active(cs)) flashPrompt(t('c.dbg.noMission'), 1.5); else onEvents(ST.missionAct(cs, 'fail')); if (travelOn) renderTravel(); }   // T10
+    if (code === 'ShiftDigit1') {                                 // T08: in front of this region's aerie, already found
+      const s = AE.site(cs.region);
+      if (!s || cs.inLair || cs.inAerie) flashPrompt(t('c.dbg.noAerie'), 1.5);
+      else {
+        cs.discovered[s.id] = true;
+        const x = s.mouth[0] + s.dir[0] * 120, z = s.mouth[2] + s.dir[1] * 120, y = Math.max(s.mouth[1] + 12, TR.surfaceAt(cs.region, x, z) + 15);
+        Object.assign(pilot, { mode: 'air', tr: null, pos: [x, y, z], yaw: s.facing + Math.PI, pitch: -0.08, speed: stats.cruise });
+        snapCam(); flashPrompt(t('c.dbg.aerie'), 2);
+      }
+    }
+    if (code === 'ShiftKeyC') {                                   // Phase 3 T15: the tithe wagon - its mission, the Bend, 90 out behind it
+      const m = D.missions.find(q => q.type === 'intercept'), a = MS.active(cs);
+      if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
+      else {
+        if (cs.inLair) onEvents(ST.lairLeave(cs));
+        if (cs.inAerie) onEvents(ST.aerieAct(cs, 'leave'));
+        if (!a) { cs.debugForce = true; onEvents(ST.missionAct(cs, 'accept', m.id)); cs.debugForce = false; }
+        if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
+        if (cs.region !== m.region) onEvents(RG.enter(cs, m.region, cs.region));
+        ST.ensureTown(cs);
+        onEvents(MS.step(cs, 0, []));                             // the timer starts (outside the lair region)
+        onEvents(CA.step(cs, 0));                                 // the wagon is there
+        const cv = cs.caravans && cs.caravans[m.caravan];
+        if (!cv) flashPrompt(t('c.dbg.noCaravan'), 1.5);
+        else {
+          const x = cv.pos[0] - Math.sin(cv.yaw) * 90, z = cv.pos[2] - Math.cos(cv.yaw) * 90;
+          Object.assign(pilot, { mode: 'air', tr: null, pos: [x, Math.max(cv.pos[1], TR.surfaceAt(cs.region, x, z)) + 30, z], yaw: cv.yaw, pitch: -0.12, speed: stats.cruise });
+          snapCam(); flashPrompt(t('c.dbg.caravan'), 2);
+        }
+      }
+    }
+    const dbgRi = DBG_REGION_KEYS.findIndex(k => k[1] === code), dbgRegion = dbgRi >= 0 ? Object.keys(D.regions)[dbgRi] || null : null;
     if (dbgRegion) {                                             // jump straight to any region (Farmlands too as a hatchling), out of the cave first
       if (cs.inLair) onEvents(ST.lairLeave(cs));
       if ((pilot.mode || 'air') !== 'air') Object.assign(pilot, { mode: 'air', tr: null, speed: stats.cruise });
@@ -1181,7 +1639,9 @@
     requestAnimationFrame(frame);
     const rawDt = (now - last) / 1000;
     let dt = Math.min(0.05, rawDt); last = now;
-    if (state === 'paused') dt = 0;
+    if (state === 'paused' || logOpen || storyCard.open) dt = 0;   // the message log and story cards (T17) pause the world (drawn under the panel)
+    if (state === 'play' && !storyCard.open) storyTick();
+    if (mapView.isOpen) { mapView.tick(Math.min(0.1, rawDt)); return; }   // T07: the region scene is paused (not drawn) under the map
     time += reduceMotion ? dt * 0.3 : dt;
     if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
 
@@ -1203,6 +1663,7 @@
       const gb = heroPose.ground || 0, kc = Math.pow(heroScale, 0.75);   // T07: on the ground look a little ahead of the head
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
+      else if (cs.inAerie) camLook.set(pilot.pos[0], pilot.pos[1] - (isTouch ? 4 : 1) * Math.max(kc, 1.6), pilot.pos[2]);   // touch: the dragon above the panel
       camera.position.copy(camPos);
       if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
       shake = Math.max(0, shake - dt * 1.5);
@@ -1220,12 +1681,16 @@
     motherHud();
     motherArrow();
     compassHud(dt);
+    missionHud();                                                // Phase 3 T11
     preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
+    targetView.update(cs, pilot && !cs.inLair ? pilot.pos : null, time);
+    caravanView.update(cs, time, camera, dt);                    // T15
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
     }
+    if (castleView) castleView.update(dt, { town: cs.town, cam: camera.position, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
     townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
       if (cornView) { scene.remove(cornView.group); cornView.dispose(); }
@@ -1265,20 +1730,88 @@
     tog.style.cssText = 'pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;padding:0 10px;border-radius:20px;font:700 12px/1 ui-monospace,Menlo,monospace;margin-right:8px';
     $('#pauseBtn').before(tog);
     tog.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleDebug(); });
+    // tabs by category (one open at a time, tap again to close) so a phone shows only a few buttons; 'info' shows / hides the readout
     const bar = document.createElement('div');
     bar.id = 'debugBar';
-    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;pointer-events:auto;margin-bottom:6px';
-    for (const [, what, code, label] of DEBUG_KEYS) {
-      if (!label) continue;
+    bar.style.cssText = 'display:grid;gap:6px;pointer-events:auto;margin-bottom:6px;justify-items:end';
+    const tabs = document.createElement('div'), body = document.createElement('div');
+    tabs.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end';
+    body.style.cssText = 'display:grid;gap:6px;background:rgba(6,10,8,.6);border:1px solid rgba(233,225,204,.16);border-radius:6px;padding:6px;max-width:100%';
+    const BTN = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+    const byCode = new Map(DEBUG_KEYS.filter(k => k[3]).map(k => [k[2], k]));
+    const keyBtn = code => {
+      const k = byCode.get(code);
+      if (!k) return null;
+      byCode.delete(code);
       const b = document.createElement('button');
-      b.textContent = label; b.title = what;
-      b.style.cssText = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+      b.textContent = k[3]; b.title = k[1]; b.style.cssText = BTN;
       b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.style.background = 'rgba(255,148,71,.45)'; debugKey(code); });
       const up = () => { b.style.background = 'rgba(6,10,8,.8)'; };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
-      bar.appendChild(b);
+      return b;
+    };
+    const regionCodes = Object.keys(D.regions).map((id, i) => DBG_REGION_KEYS[i] && DBG_REGION_KEYS[i][1]).filter(Boolean);
+    const GROUPS = [                                               // [tab, [[row title, codes]]]; codes left over land in 'more'
+      ['go to', [['regions', ['ShiftKeyZ', ...regionCodes, 'KeyT', 'ShiftDigit1']],
+                 ['places', ['Digit1', 'Digit9', 'Equal', 'Comma', 'Period', 'Digit0']],
+                 ['prey', ['KeyP', 'KeyI', 'KeyO']],
+                 ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
+      ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
+      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyF', 'ShiftKeyG']]]],
+      ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyL', 'ShiftKeyW', 'ShiftKeyC']]]],
+      ['save', [['', ['KeyV', 'KeyX', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
+    ];
+    const panes = [];
+    for (const [name, rows] of GROUPS) {
+      const pane = document.createElement('div');
+      pane.style.cssText = 'display:grid;gap:6px'; pane.hidden = true;
+      for (const [title, codes] of rows) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+        if (title) { const h = document.createElement('span'); h.textContent = title; h.style.cssText = 'font:500 10px/1 ui-monospace,Menlo,monospace;color:#9aa79f;text-transform:uppercase;letter-spacing:.08em;min-width:52px'; row.appendChild(h); }
+        for (const c of codes) { const b = keyBtn(c); if (b) row.appendChild(b); }
+        if (row.querySelector('button')) pane.appendChild(row);
+      }
+      panes.push([name, pane]);
     }
+    if (byCode.size) {                                             // a new debug key without a group still gets a button
+      const pane = document.createElement('div'), row = document.createElement('div');
+      pane.hidden = true; row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+      for (const c of [...byCode.keys()]) row.appendChild(keyBtn(c));
+      pane.appendChild(row); panes.push(['more', pane]);
+    }
+    let open = null, info = true;
+    try { const sv = JSON.parse(localStorage.getItem('vcamp-dbg-ui') || '{}'); open = sv.open || null; info = sv.info !== false; } catch (_) {}
+    const tabBtns = [];
+    const paint = () => {
+      for (const [name, pane] of panes) pane.hidden = name !== open;
+      body.hidden = !panes.some(([n]) => n === open);
+      for (const [name, b] of tabBtns) {
+        const on = name === 'info' ? info : name === open;
+        b.style.background = on ? 'rgba(255,148,71,.35)' : 'rgba(6,10,8,.8)';
+        b.style.borderColor = on ? 'rgba(255,148,71,.8)' : 'rgba(233,225,204,.25)';
+      }
+      if (dbgEl) dbgEl.hidden = !info;
+      try { localStorage.setItem('vcamp-dbg-ui', JSON.stringify({ open, info })); } catch (_) {}
+    };
+    for (const name of [...panes.map(p => p[0]), 'info']) {
+      const b = document.createElement('button');
+      b.textContent = name === 'info' ? 'info' : name + ' ▾';
+      b.style.cssText = BTN + ';font-weight:700';
+      b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        if (name === 'info') info = !info; else open = open === name ? null : name;
+        for (const [n, x] of tabBtns) x.setAttribute('aria-expanded', String(n === open));
+        paint();
+      });
+      tabBtns.push([name, b]); tabs.appendChild(b);
+    }
+    for (const [, pane] of panes) body.appendChild(pane);
+    bar.append(tabs, body);
     dbgBox.prepend(bar);
+    paint();
   }
   const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2);
   function debugHud() {
@@ -1286,7 +1819,7 @@
       // a fixed box holds the (touch) action buttons and the read-only panel
       dbgBox = document.createElement('div');
       dbgBox.id = 'debugBox';
-      dbgBox.style.cssText = 'position:fixed;right:8px;top:calc(60px + env(safe-area-inset-top,0px));z-index:5;max-width:calc(100vw - 16px);pointer-events:none';
+      dbgBox.style.cssText = 'position:fixed;right:58px;top:calc(60px + env(safe-area-inset-top,0px));z-index:8;max-width:calc(100vw - 66px);pointer-events:none';
       dbgEl = document.createElement('div');
       dbgEl.id = 'debugPanel';
       dbgEl.style.cssText = 'font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.72);border:1px solid rgba(233,225,204,.16);padding:8px 10px;border-radius:4px;pointer-events:none;white-space:pre;overflow:hidden;opacity:.92';
@@ -1307,18 +1840,19 @@
     L.push('STORY   act ' + ((cs.story && cs.story.act) || 1) + '  mother ' + (mo ? 'lesson ' + mo.lesson + (ml ? ' ' + ml.id : '') + ' (' + mo.at + ')' + (mm ? ' ' + mm.phase + (mm.hidden ? ' hidden' : '') + ' prog ' + mm.prog.toFixed(1) : '') : '-'));
     L.push('PERF    ' + regionId + '  ' + Math.round(dbgN / secs) + ' fps');
     L.push('        draw ' + r.calls + '  tris ' + Math.round(r.triangles / 1000) + 'k  chunks ' + i.visible + '/' + i.chunks);
+    if (castleView && castleView.list.length) { const ci = castleView.info(); L.push('CASTLE  lod ' + ci.lod + '  draw ' + ci.calls + '  tris ' + Math.round(ci.tris / 1000) + 'k'); }
     L.push('        trees ' + i.trees + '  rocks ' + i.rocks + '  geo ' + renderer.info.memory.geometries + '  tex ' + renderer.info.memory.textures + '  swap ' + Math.round(lastSwapMs) + ' ms');
     L.push('QUALITY ' + qTier + ' (' + qSource + (qAutoFps != null ? ' ' + Math.round(qAutoFps) + ' fps' : '') + (qSampler && !qSampler.done ? ', measuring ' + Math.round(qSampler.time) + '/' + D.quality.auto.sample + ' s' : '') + ')' +
       '  px ' + f2(renderer.getPixelRatio()) + '  flora x' + f2(qSet.flora) + '  fog ' + Math.round(qSet.fogFar));
     if (pilot) {
       const st = D.stages[dragon.stage], next = D.stages[dragon.stage + 1];
-      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = HN.effects(dragon.hunger);
+      const ready = G.readyStage(dragon.foodXp, dragon.stage), e = LT.effects(HN.effects(dragon.hunger), cs.carriedLoot);   // T12: with the carry penalty (strongbox, relic)
       L.push('DRAGON  ' + st.id + (ready > dragon.stage ? '  READY: ' + D.stages[ready].id : ''));
       L.push('        food ' + Math.round(dragon.foodXp) + (next ? '/' + next.foodFrom : ' max') + '  growth ' + f2(G.growthValue(dragon.foodXp)) + '  scale ' + f2(heroScale));
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
-      const lc = (pilot.mode || 'air') === 'air' ? WK.canLand(pilot, regionId, ST.solids(cs, heroScale).solidAt) : null;
+      const lc = (pilot.mode || 'air') === 'air' ? (s => WK.canLand(pilot, regionId, s.solidAt, s.walkTop))(ST.solids(cs, heroScale)) : null;
       L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
@@ -1326,6 +1860,10 @@
       L.push('PREY    ' + pc.total + ' total  graze ' + (pc.graze || 0) + '  flee ' + (pc.flee || 0) + '  charge ' + (pc.charge || 0));
       L.push('HUNT    hint ' + (cs.hint || '-') + '  target ' + (cs.target != null ? cs.target : '-') + (cs.swoop != null ? ' SWOOP' : '') + '  carrying ' + (cp ? cp.type + ' (' + cp.food + ')' : '-') + '  eat ' + f1(dragon.eatT) + '/' + ST.eatTime(cs));
       L.push('LAIR    ' + (cs.inLair ? 'INSIDE x ' + f1(pilot.pos[0]) + ' z ' + f1(pilot.pos[2]) + '  station ' + (cs.station || '-') + (stationOpen ? ' (panel)' : '') + (cs.debugScale ? '  DEBUG SCALE ' + cs.debugScale : '') : 'mouth ' + Math.round(LR.distToMouth(cs))) + '  deaths ' + (dragon.deaths || 0) + '  larder ' + (cs.larder.map(it => it.type + ' ' + f1(it.food)).join(', ') || '-'));
+      { const cvi = CA.info(cs); L.push('CARAVAN ' + (!cvi ? '-  (Shift+C: the wagon)' : cvi.id + '  ' + cvi.state + '  hp ' + Math.ceil(cvi.hp) + '/' + cvi.hpMax + '  road ' + Math.round(cvi.s) + '/' + Math.round(cvi.end) + '  escort ' + cvi.alive + '/' + cvi.escort)); }   // T15
+      { const ms = MS.timerState(cs); L.push('MISSION ' + (!ms ? '-  (Shift+3: accept next)' : ms.id + '  ' + ms.state + '  left ' + mmss(ms.left) + '  ' + ms.level + (ms.running ? '' : '  paused') + '  (Shift+J done, Shift+K fail)') + '  completed ' + ((cs.missions && cs.missions.completed.length) || 0)); }   // T10
+      { const ae = AE.site(cs.region); L.push('AERIE   ' + (!ae ? '-' : (cs.inAerie ? 'INSIDE' : AE.found(cs) ? 'found' : 'not found') + '  mouth ' + Math.round(AE.distToMouth(cs)) + '  at x ' + Math.round(ae.x) + ' z ' + Math.round(ae.z) + '  (Shift+1: to aerie)')); }   // T08
+      L.push('TRAVEL  at ' + (MP.here(cs) || '-') + '  to ' + MP.destinations(cs).map(d => d.id).join(', ') + (cs.mission ? '  mission ' + cs.mission.state : '') + '  (Shift+2 all aeries, Shift+3 mission)');   // T09
       { const nv = cs.nav || {}; L.push('SMELL   range ' + Math.round(NV.smellRange(cs)) + '  scents ' + ((nv.scents || []).map(q => q.type + ' x' + q.n + ' ' + Math.round(q.dist) + (Math.abs(q.off) > 0.005 ? ' ~' + f2(q.off) : '')).join(', ') || '-')); }
       { const ti = townView ? townView.info : null, near = cs.town ? SE.near(cs.town, pilot.pos[0], pilot.pos[2], 400) : null;
         { const ci = cornView ? cornView.info : null, cl = (cs.crops && cs.crops.list) || [];
@@ -1345,7 +1883,7 @@
       { const pl = (cs.town && cs.town.pens) || [];
         L.push('STOCK   ' + (pl.map(pn => { const c = PR.penCount(cs.field, pn.id); return pn.id.split('.').slice(1).join('.') + ' ' + pn.type + ' ' + (c ? c.penned + (c.inside ? ' +' + c.inside + ' in barn' : '') : '-'); }).join(', ') || '-') + '  taken ' + (cs.stats.livestockTaken || 0)); }
       { const its = (cs.town && cs.town.items) || [], cl = cs.carriedLoot;
-        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + cl.gold : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0));
+        L.push('LOOT    ' + (its.map(it => it.id.split('.').slice(1).join('.') + (it.taken ? ' taken' : '')).join(', ') || '-') + '  claws ' + (cl ? cl.kind + ' ' + (cl.relic || cl.gold) : '-') + '  hoard ' + ((cs.hoard && cs.hoard.gold) || 0) + ' tier ' + LT.tier((cs.hoard && cs.hoard.gold) || 0) + '  banked ' + (cs.stats.lootBanked || 0) + '  relics ' + (((cs.hoard && cs.hoard.relics) || []).join(',') || '-'));
         L.push('UPGRADE ' + ((cs.upgrades || []).join(', ') || '-') + '  can buy ' + (UP.affordable(cs).join(', ') || '-')); }
       L.push('TRAVEL  exit ' + (cs.exit ? cs.exit.to + ' (' + f1(cs.exitT) + ' s)' : '-'));
       L.push('SAVE    ' + (saveOff ? 'OFF ' : '') + (lastSave ? lastSave.why + ' at ' + lastSave.at + 's ' + (lastSave.ok ? 'ok' : 'not stored') : 'none yet') + '  next timer ' + Math.max(0, Math.round(D.save.every - (cs.saveT || 0))) + 's');
@@ -1365,5 +1903,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

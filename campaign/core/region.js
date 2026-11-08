@@ -75,7 +75,7 @@
     const carried = d.carried == null || !cs.field ? null : PR.byId(cs.field, d.carried);
     const alt = p ? p.pos[1] - T.surfaceAt(cs.region, p.pos[0], p.pos[2]) : null;
     const at = entryPoint(toId, fromId, alt);
-    cs.region = toId;
+    cs.region = toId; cs.inAerie = null;                         // Phase 3 T08
     cs.field = PR.spawnRegion(toId, cs.rng, at.pos);
     d.carried = null; d.eatT = 0;
     if (carried) {

@@ -1,7 +1,7 @@
 // Data consistency: catches broken tuning edits before they reach the game.
 'use strict';
 const { ok, core } = require('./harness.js');
-const D = core('data');
+const D = core('data'), RG = core('region');
 const { wrap } = core('math');
 
 // Stages ascend and keep the "bigger = stronger but slower and hungrier" rule
@@ -44,7 +44,10 @@ ids.forEach(id => {
     ok(to.entries && to.entries[id], 'target has a matching entry: ' + ex.to + ' from ' + id);
     // leaving through the middle of the arc should enter on the opposite side of the next region
     const mid = (ex.angleFrom + ex.angleTo) / 2;
-    ok(Math.abs(Math.abs(wrap(to.entries[id].angle - mid)) - Math.PI) < 1e-9, 'entry is opposite the exit: ' + id + ' -> ' + ex.to);
+    // (or, Phase 3 T02, anywhere on the target's own arc back: the Bend's entry follows the real river, off centre)
+    const back = (to.exits || []).find(b => b.to === id);
+    ok(Math.abs(Math.abs(wrap(to.entries[id].angle - mid)) - Math.PI) < 1e-9 || (back && RG.inArc(to.entries[id].angle, back.angleFrom, back.angleTo)),
+      'entry is opposite the exit: ' + id + ' -> ' + ex.to);
   });
 });
 const ash = D.regions.ash;
