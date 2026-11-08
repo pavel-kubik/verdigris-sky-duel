@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't218.1 2026-11-08 save v3 (mission, relic, caravan, explored map, gate, story)';
+  const BUILD = 't218.2 2026-11-08 debug keys never clash with game keys (X was save + reload, Shift+W / F / G / L with Boost)';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
