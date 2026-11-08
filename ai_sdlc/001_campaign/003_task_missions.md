@@ -427,8 +427,8 @@ v2 -> v3: empty missions, no relics, nothing explored except the cells around di
   `aerieFound` replaces `<id>.aerie` in `discovered`; `gate: 'closed'` is written for the loaded castle town and closes
   the portcullis on the first town build after the load; the calm garrison then opens it as after a search. Charred
   stone stays in `ruins` (`char: true`, v2 shape). Migration v2 -> v3 sets `seedExplored` and `apply` reveals
-  `data.map.reveal` around every discovered place and the lair. A save with every region fully explored is about
-  6 KB. Corrupt v3: missing `missions` or `story`, a non-object `missions.active` or a non-number `left`, a
+  `data.map.reveal` around every discovered place and the lair. A new dragon's save with every region fully
+  explored is about 2 KB (the explored bitsets are under 1 KB). Corrupt v3: missing `missions` or `story`, a non-object `missions.active` or a non-number `left`, a
   non-string `explored`.
 
 ## 6. Rendering and UI
