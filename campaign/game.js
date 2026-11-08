@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't219.2 2026-11-08 tips after the story step (her castle raid line holds a tip back); tips for the Bend, castle, map, aeries, missions; balancing';
+  const BUILD = 't220.2 2026-11-08 README phase 3 section, Phase 3 marked done, intro news line';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */

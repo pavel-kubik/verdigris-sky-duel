@@ -45,7 +45,7 @@ Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 
 - **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/ (or **Campaign (alpha)** on the home screen)
 
-A single-player dragon campaign in its own page, built mobile first: everything plays on a touch phone, and every keyboard action has a touch button. **Phase 1 (Survival MVP)** and **Phase 2 (Kingdom + hoard)** are done. A hatchling hatches next to its mother, learns to fly and hunt from her, grows into a **Drake** in the **Ash Wastes** and **Wildwood**, then raids the Order's settlements in the **River Farmlands** for gold, carries it home into its cave and spends it on upgrades. Later phases (missions, Highlands, Lowlands, endgame) are planned in [`ai_sdlc/001_campaign/000_spec.md`](ai_sdlc/001_campaign/000_spec.md).
+A single-player dragon campaign in its own page, built mobile first: everything plays on a touch phone, and every keyboard action has a touch button. **Phase 1 (Survival MVP)**, **Phase 2 (Kingdom + hoard)** and **Phase 3 (Castle, map + missions)** are done. A hatchling hatches next to its mother, learns to fly and hunt from her, grows into a **Drake** in the **Ash Wastes** and **Wildwood**, raids the Order's settlements in the **River Farmlands** for gold, carries it home into its cave and spends it on upgrades - then flies on to the **Veltava Bend** and takes missions against **Vyshgard Castle**. Later phases (Highlands, Lowlands, endgame) are planned in [`ai_sdlc/001_campaign/000_spec.md`](ai_sdlc/001_campaign/000_spec.md).
 
 - **Mother:** she flies with the hatchling, leads it to a herd and teaches each skill once (a caption at the top); after the lessons she flies off and comes back to visit now and then.
 - **Hunting:** fly low over a herd and hold Grab to swoop and grab prey, then hold Eat to eat it in flight. A hatchling can lift goats and deer; a boar is too heavy and fights back - roast it with fire breath and eat the roast chunks (half the food).
@@ -57,11 +57,21 @@ A single-player dragon campaign in its own page, built mobile first: everything 
 - **Raiding:** tithe chests and strongboxes hold gold. Burn the guards or come at night, grab the chest (in flight or on foot), take off under fire and fly it into the cave: the gold goes on the hoard. Carrying loot slows the dragon.
 - **Perception and alert:** guards see in cones (shorter at night, blocked by hills and buildings) and hear landings; a guard first wonders (?) then raises the alarm (!). Raids raise the Order's **alert** from 0 to 3: more archers, then patrols on the roads, then a ballista in the village. A few quiet minutes away lower it one level.
 - **Upgrades** (altar, bought once each with hoard gold): Prey sense (longer smell, names the prey, rings around animals), Iron scales (less arrow and bolt damage), Wing muscles (stamina), Hotter fire (faster cooking and burning), Guard sight (shows the guards' sight cones).
+- **Veltava Bend:** the fourth region, east of the Farmlands (a Drake only), built from the real terrain of Prague: the river loops round the old city under the castle rock, with Karlsbridge, Hradchan, Staromark and the other places named on the compass.
+- **Vyshgard Castle:** walls with wall walks, towers, bastions and a gatehouse on the rock above the river, readable from far away by day and with torches and lit windows at night. Archers stand on the walls and towers, ballistae on the bastions, the gate drops on alarm and the keep horn puts the whole Bend on alert. Wooden roofs, hoardings and the workshop burn; stone stays, charred. You can land in the courtyard and on the wall walks.
+- **Map:** Tab / the Map button opens a drawn map: the world view and each region with its terrain, fog over ground you have not flown over yet, the places and aeries you found and the mission target. Drag to pan, scroll / pinch to zoom.
+- **Aeries:** small dragon caves in Wildwood, the Farmlands and the Bend. Fly in (or E / Enter aerie near it): loot you carry in is banked, **Rest** heals and saves. Growing up still needs the nest at home.
+- **Fast travel:** the **map stone** in the cave flies you to any aerie you found, and an aerie flies you back home - not while a mission or mission loot is on.
+- **Missions:** the **mission board** in the cave offers three Act 2 missions in the Bend, each with a briefing and a clock (9-10 min): **The Ember Chalice** (steal: land in the castle courtyard, take the relic from the chapel door and escape), **The Siege Workshop** (destroy: burn the castle workshop to a ruin) and **The Tithe Wagon** (intercept: stop the escorted wagon on its way across Karlsbridge before it reaches the gate, land and take its chest). The clock starts when you leave the Ash Wastes or an aerie, stops in the cave and in aeries, and the mission is won by flying into the lair or an aerie after the objective: gold, plus a bonus for spare time. Death or the end of the clock fails it; rest at the nest or an aerie before you try again.
+- **Relics:** a relic in your claws slows you and blocks fire; it is lost on death or timeout. A banked relic stands in its niche on the **trophy wall** in the cave.
+- **Freed village:** burn every Order building of the Farmlands village and kill its archers at once: the Order flag falls, the Order does not come back there, and the villagers bring food to your larder now and then.
+- **Story:** Act 1 and Act 2 cards, mission briefings and outcome lines; the mother speaks on your first raid on the castle.
+- **Messages:** L / the Messages button opens the log of the last messages and mission states; tap a message to close it.
 - **Day and night:** a full day takes 20 minutes; at night guards see about half as far.
-- **Tips:** one-time hints for landing, the compass, the cave, raiding, alert, night, the altar and the Farmlands; touch tips name buttons.
-- **Regions:** at the edge of a region a travel prompt appears - press Enter or tap the travel button to fly to the other region. The Farmlands open once the dragon is a Drake.
-- **Death:** the dragon wakes in the cave with half vitality; prey and loot in its claws are lost.
-- **Save:** progress is saved in `localStorage` (`vsd-campaign`, save v2; a phase 1 save migrates) on rest, region change, landing, entering the cave, buying an upgrade, death and every minute. It keeps the hoard, upgrades, alert, ruins, discovered places, the time of day and whether the dragon is flying, on the ground or in the cave. **Continue** on the start screen resumes it.
+- **Tips:** one-time hints for landing, the compass, the cave, raiding, alert, night, the altar, the Farmlands, the Bend, the castle, the map, aeries, fast travel, the mission board, the timer, relics and the freed village; touch tips name buttons.
+- **Regions:** at the edge of a region a travel prompt appears - press Enter or tap the travel button to fly to the other region. The Farmlands and the Veltava Bend open once the dragon is a Drake.
+- **Death:** the dragon wakes in the cave with half vitality; prey and loot in its claws are lost, and a running mission fails.
+- **Save:** progress is saved in `localStorage` (`vsd-campaign`, save v3; phase 1 and phase 2 saves migrate) on rest, region change, landing, entering the cave or an aerie, buying an upgrade, death and every minute. It keeps the hoard, upgrades, alert, ruins, discovered places, the explored map, aeries, the running mission and its clock, relics, freed villages, the castle gate and charred pieces, the story, the time of day and whether the dragon is flying, on the ground or in the cave. **Continue** on the start screen resumes it.
 
 | Action | Keyboard / mouse | Touch |
 |---|---|---|
@@ -73,18 +83,21 @@ A single-player dragon campaign in its own page, built mobile first: everything 
 | Eat (hold) | X | Eat |
 | Land / take off | F | Land / Fly |
 | Walk on foot and in the cave | W A S D | Left stick |
-| Use a cave station (nest, larder, hoard, altar, tunnel) | E or Enter | The station's button |
+| Use a cave station (nest, larder, hoard, altar, mission board, trophy wall, map stone, tunnel) | E or Enter | The station's button (Missions, Trophies, Map stone, ...) |
+| Enter an aerie | Fly into it, or E near it | Enter aerie button or fly into it |
+| Map (drag to pan) | Tab, scroll to zoom | Map button, pinch to zoom |
+| Message log | L | Messages button |
 | Enter the cave | Fly into the mouth | Enter cave button or fly into the mouth |
 | Name of a compass mark | Click the mark | Tap the mark |
 | Travel to the next region | Enter | Travel button at the region edge |
-| Panel buttons (Rest, Sleep, Eat, Buy) | Click or Enter on the focused button | Tap |
+| Panel buttons (Rest, Sleep, Eat, Buy, Accept, Fly there) | Click or Enter on the focused button | Tap |
 | Close a panel / pause | Esc | II |
 
 **Code layout.** Rules live in `campaign/core/` as pure UMD modules (no DOM, no Three.js) that run in the browser (`window.VCamp`) and in Node; all tunables are in `campaign/core/data.js`. Rendering is in `campaign/render/` and `campaign/game.js`; the dragon model is `shared/dragon.js`. Phase specs and task tables are in [`ai_sdlc/001_campaign/`](ai_sdlc/001_campaign/).
 
-**Tests.** `node campaign/test/run.js` runs every campaign test (unit tests, save v1 / v2 and death rules, a seeded hunter bot that must reach Drake in 25-35 simulated minutes and a seeded raid bot that must bank a strongbox from the outpost; about 40 s). `node mp/sim.test.js` tests the co-op simulation.
+**Tests.** `node campaign/test/run.js` runs every campaign test (unit tests, save v1 / v2 / v3 and death rules, a seeded hunter bot that must reach Drake in 25-35 simulated minutes, a seeded raid bot that must bank a strongbox from the outpost and seeded mission bots that must win the steal, destroy and intercept missions in time; about a minute). `node mp/sim.test.js` tests the co-op simulation.
 
-**Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, dragon parameters) and one button per debug action (feed, hunger, damage, die, to lair, to herd, to exit, Drake, alert, calm, to a ballista / loot / pen / town, ignite, gold, upgrades, next day phase, fast time, tips reset, save + reload, wipe save, reset); on desktop the same actions have hotkeys listed in the panel. The panel also shows fps, draw calls and the quality tier. `?region=wild` starts in Wildwood, `?region=farm` in the River Farmlands, and `window.__vcamp` exposes the game state.
+**Debug.** `campaign/?debug` shows a **DBG** button with a debug panel (build, fps, draw calls, quality tier, dragon parameters) and one button per debug action, grouped in tabs: feed, hunger, damage, die, to lair, to herd, to exit, Drake, alert, calm, to a ballista / loot / pen / town, ignite, gold, upgrades, next day phase, fast time, and for phase 3 the castle gate, alarm and fire, castle wall passes, aerie and every aerie, reveal the map, accept / finish / fail a mission, jump to the tithe wagon, the chalice or the siege workshop, free the village, tribute now, tips reset, save + reload, wipe save, reset. On desktop the same actions have hotkeys listed in the panel. `?region=wild` starts in Wildwood, `?region=farm` in the River Farmlands, `?region=bend` in the Veltava Bend, `campaign/preview/castle.html` shows the castle kit, and `window.__vcamp` exposes the game state.
 
 ## Languages
 
