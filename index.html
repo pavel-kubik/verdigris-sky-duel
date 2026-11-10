@@ -990,7 +990,7 @@ xrPanel.renderOrder=999;xrPanel.frustumCulled=false;xrPanel.visible=false;xrPane
 let xrHudAt=-Infinity,xrPlayAt=0;
 const xr=VXR.attach({renderer,scene,camera,button:$('#vrBtn'),
   onStart(){xrPanel.visible=true;xrHudAt=-Infinity;mode='duel';setState('play');},
-  onEnd(){xrPanel.visible=false;touch.x=touch.y=0;touch.breath=touch.boost=false;if(state==='play')setState('paused');resize();},
+  onEnd(){xrPanel.visible=false;xrBarsClear();touch.x=touch.y=0;touch.breath=touch.boost=false;if(state==='play')setState('paused');resize();},
   onError(){showBanner(t('vr.failed'));}});
 xr.rig.add(xrPanel);
 function xrInput(now){
@@ -1017,6 +1017,29 @@ function drawXrHud(){
   xrTex.needsUpdate=true;
 }
 
+/* floating bars in VR: HP over every foe, HP + fire over the player's head (the 2D HUD draws these on the flat screen) */
+const XR_SLOW=0.5;   // VR plays at half speed: the headset needs more time to read and aim
+const xrBars=[],xrBarGeo=new THREE.PlaneGeometry(1,1).translate(.5,0,0),xrV=new V3();
+function xrBar(parent,w,h,y,col){
+  const g=new THREE.Group(),mk=(c,o)=>{const m=new THREE.Mesh(xrBarGeo,new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:o,depthTest:false,depthWrite:false,fog:false}));m.renderOrder=998;m.frustumCulled=false;return m;};
+  const back=mk(0x0c1310,.6),fill=mk(col,1);fill.renderOrder=999;
+  back.scale.set(w+.3,h+.3,1);back.position.set(-w/2-.15,0,-.01);fill.position.set(-w/2,0,0);
+  g.add(back,fill);g.position.y=y;g.frustumCulled=false;g.userData={w,h,fill};parent.add(g);return g;
+}
+function xrBarSet(b,v){b.userData.fill.scale.set(Math.max(.001,b.userData.w*Math.max(0,Math.min(1,v))),b.userData.h,1);}
+function xrBarsClear(){xrBars.forEach(b=>b.root.parent&&b.root.parent.remove(b.root));xrBars.length=0;}
+function xrBarsUpdate(){
+  camera.getWorldPosition(xrV);
+  for(let i=xrBars.length-1;i>=0;i--){const b=xrBars[i];if(b.f&&(b.f.dead||!foes.includes(b.f))){b.root.parent.remove(b.root);xrBars.splice(i,1);}}
+  foes.forEach(f=>{if(f.dead||xrBars.some(b=>b.f===f))return;const root=new THREE.Group(),hp=xrBar(root,8,.8,0,0xe5484f);scene.add(root);xrBars.push({f,root,hp});});
+  if(!xrBars.some(b=>b.me)){const root=new THREE.Group(),hp=xrBar(root,7,.6,0,0x62c48a),st=xrBar(root,7,.6,-1,0xf0a040);scene.add(root);xrBars.push({me:true,root,hp,st});}
+  xrBars.forEach(b=>{
+    if(b.me){b.root.position.set(P.pos.x,P.pos.y+4.5,P.pos.z);xrBarSet(b.hp,P.hp/100);xrBarSet(b.st,P.st/100);}
+    else{b.root.position.set(b.f.pos.x,b.f.pos.y+6,b.f.pos.z);xrBarSet(b.hp,b.f.hp/b.f.max);}
+    b.root.lookAt(xrV);
+  });
+}
+
 /* ---------- main loop ---------- */
 let last=performance.now();let lastHp=-1,lastSt=-1;
 function frame(now){
@@ -1024,6 +1047,7 @@ function frame(now){
   if(inXR)xrInput(now);
   let dt=Math.max(0,Math.min(0.05,(now-last)/1000));last=now;   // XR frame times can run ahead of the window clock
   if(state==='paused'||state==='over'||state==='brief'||state==='tutdone')dt=state==='over'?dt*0.25:0;
+  if(inXR)dt*=XR_SLOW;
   time+=dt;
   clouds.forEach((c,i)=>{c.position.x+=dt*(1.5+i%3);if(c.position.x>560)c.position.x=-560;});
 
@@ -1080,6 +1104,7 @@ function frame(now){
   renderer.render(scene,camera);
   if(!inXR)drawHud();
   else if(now-xrHudAt>100){xrHudAt=now;drawXrHud();}
+  if(inXR&&state!=='preview')xrBarsUpdate();
 }
 $('#loading').remove();
 buildPips();updIntroBtns();
