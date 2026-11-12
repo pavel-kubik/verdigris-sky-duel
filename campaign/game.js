@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't220.2 2026-11-08 README phase 3 section, Phase 3 marked done, intro news line';
+  const BUILD = 'gfx.1 2026-11-12 textured dragon, castles, animals; volcano with lava; living forest (fell / burn) in every mode';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -29,6 +29,7 @@
   const qPick = QL.pick({ param: params.get('q'), stored: store(D.quality.storeKey), isTouch });
   let qTier = qPick.tier, qSource = qPick.source, qSet = QL.settings(qTier, window.devicePixelRatio, FOG);
   let qSampler = qPick.auto ? QL.sampler() : null;
+  if (window.VTex) VTex.quality(qTier === 'low' ? 0 : 1);       // the low tier keeps the textures but skips their per-pixel relief
   renderer.setPixelRatio(qSet.pixelRatio);
   scene.fog = new THREE.Fog(0x7d6a58, qSet.fogNear, qSet.fogFar);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);

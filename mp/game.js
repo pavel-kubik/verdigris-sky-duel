@@ -43,6 +43,7 @@
   const sunLight = new THREE.DirectionalLight(0xffc68c, 1.3); sunLight.position.copy(sunDir).multiplyScalar(300); scene.add(sunLight);
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
+  if (window.VTex && matchMedia('(pointer: coarse)').matches) VTex.quality(0);   // phones: textures without the per-pixel relief
   /* ---------- terrain (deterministic so every peer sees the same world) ---------- */
   function seeded(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const wr = seeded(2026);

@@ -50,7 +50,7 @@
     geo.setAttribute('position', new THREE.Float32BufferAttribute(keep, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, side: THREE.BackSide }));
+    return new THREE.Mesh(geo, (mm => (root.VTex ? root.VTex.detail(mm, { map: 'rock', scale: 12, strength: 0.7, bump: 1.6 }) : mm))(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, side: THREE.BackSide })));
   }
 
   function floorMesh(rnd) {
@@ -62,7 +62,7 @@
       for (let j = 0; j < 3; j++) cols.push(c.r, c.g, c.b);
     }
     g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 }));
+    const m = new THREE.Mesh(g, (mm => (root.VTex ? root.VTex.detail(mm, { map: 'rock', scale: 12, strength: 0.7, bump: 1.6 }) : mm))(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 })));
     m.position.y = K.floor;
     return m;
   }

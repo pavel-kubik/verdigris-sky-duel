@@ -8,7 +8,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'dm.5 2026-11-06 no silent practice: host retries, says why, Practice alone; ?peer= server';
+  const BUILD = 'dm.6 2026-11-12 living forest: trees break and burn (synced), textured models';
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   const C = window.VCamp;
@@ -52,6 +52,7 @@
   const sunLight = new THREE.DirectionalLight(0xffd6a0, 1.25); sunLight.position.copy(sunDir).multiplyScalar(300); scene.add(sunLight);
   const rim = new THREE.DirectionalLight(0x7fb7ff, 0.35); rim.position.set(200, 120, 250); scene.add(rim);
 
+  if (window.VTex && isTouch) VTex.quality(0);                 // phones: textures without the per-pixel relief
   /* ---------- the arena: Wildwood terrain, trees, buildings, pillars ---------- */
   const A = DM.arena();
   const region = VRender.terrain.build(X.region, { isTouch, flora: isTouch ? 0.5 : 1, far: FOG_FAR, particles: isTouch ? 0.5 : 1 });

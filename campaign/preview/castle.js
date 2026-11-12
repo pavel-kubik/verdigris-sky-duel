@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't220.2 2026-11-08 README phase 3 section, Phase 3 marked done, intro news line';
+  const BUILD = 'gfx.1 2026-11-12 textured dragon, castles, animals; volcano with lava; living forest (fell / burn) in every mode';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);

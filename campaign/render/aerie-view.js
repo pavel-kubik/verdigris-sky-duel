@@ -73,7 +73,7 @@
     { const [x, z] = at(-1, 0); M.add(tor, x, my + 0.1, z, f, 2.4, 2.4, 1.6, COL.twig, Math.PI / 2); }
     rock.dispose(); box.dispose(); cyl.dispose(); tor.dispose();
     const group = new THREE.Group(); group.name = 'aerie:' + regionId;
-    const mesh = new THREE.Mesh(M.geometry(), new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.97 }));
+    const mesh = new THREE.Mesh(M.geometry(), (m => (root.VTex ? root.VTex.detail(m, { map: 'rock', scale: 10, strength: 0.75, bump: 1.6 }) : m))(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.97 })));
     group.add(mesh);
     return {
       group, triangles: M.count,

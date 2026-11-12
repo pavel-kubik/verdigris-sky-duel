@@ -104,7 +104,7 @@
     }
     box.dispose(); cyl.dispose(); cone.dispose();
     const group = new THREE.Group(); group.name = 'bridges:' + id;
-    const mesh = new THREE.Mesh(M.geometry(), new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }));
+    const mesh = new THREE.Mesh(M.geometry(), (m => (root.VTex ? root.VTex.detail(m, { map: 'stone', scale: 6, strength: 0.6, bump: 1.4 }) : m))(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 })));
     group.add(mesh);
     return {
       group, count: list.length, triangles: M.count,

@@ -111,4 +111,22 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   ok(S.shoot(w, 1, [1e6, 0, 0], [0, 0, 1]) === null, 'fireball far from shooter rejected');
   ok(S.shoot(w, 1, 'x', [0, 0, 1]) === null, 'malformed fireball rejected');
 }
+
+// 6. The living forest: the same trees in every browser; tree events are recorded, sent on and jolt the dragon
+{
+  const a = S.trees(), VF = require('../shared/forest.js');
+  ok(a.length === S.FOREST.n && a === S.trees(), 'the forest is seeded and cached: ' + a.length + ' trees');
+  ok(a.every(t => t.y >= 3 && Number.isFinite(t.x) && S.FOREST.kinds.some(k => k[0] === t.kind)), 'trees stand on dry ground');
+  ok(JSON.stringify(VF.scatter(S.FOREST, S.H).slice(0, 20)) === JSON.stringify(a.slice(0, 20)), 'the solo duel scatters the same forest');
+  const w = S.newWorld(mulberry(4));
+  const p = S.addPlayer(w, 1, 'A');
+  p.sinv = 0;
+  ok(S.treeEvents(w, 1, [{ k: 'f', i: 5, dx: 1, dz: 0 }, { k: 'i', i: 6 }, { k: 'f', i: 99999 }, { k: 'q', i: 1 }], VF.RULES.jolt.dmg) === 2, 'two valid tree events');
+  ok(p.hp === 100 - VF.RULES.jolt.dmg, 'the jolt costs ' + VF.RULES.jolt.dmg + ' vitality');
+  ok(w.ev.filter(e => e.e === 'tree').length === 2 && S.treeEvents(w, 1, [{ k: 'f', i: 5 }], 4) === 0 && p.hp === 96, 'a tree falls once (no second jolt)');
+  ok(S.treeEvents(w, 7, [{ k: 'f', i: 8 }]) === 0, 'unknown players are ignored');
+  ok(S.forestState(w, 150).length === 2, 'state for a player who joins later');
+  S.restart(w);
+  ok(S.forestState(w, 150).length === 0, 'restart: the forest stands again');
+}
 console.log('sim.test.js: ' + checks + ' checks passed');

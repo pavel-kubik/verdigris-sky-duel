@@ -266,6 +266,7 @@ scene.add(new THREE.HemisphereLight(0xa6cbc4,0x3b2a1a,0.85));
 const sunLight=new THREE.DirectionalLight(0xffc68c,1.3);sunLight.position.copy(sunDir).multiplyScalar(300);scene.add(sunLight);
 const rim=new THREE.DirectionalLight(0x7fb7ff,0.35);rim.position.set(200,120,250);scene.add(rim);
 
+if(window.VTex&&matchMedia('(pointer: coarse)').matches)VTex.quality(0);   // phones: textures without the per-pixel relief
 /* ---------- terrain ---------- */
 function H(x,z){
   const r=Math.hypot(x,z);
