@@ -13,8 +13,10 @@
  *     button: an element or a list of them; they stay hidden unless the device supports immersive VR, a click enters VR
  *     skip: selector of controls the VR menu leaves out (links are always left out: following one would end the session)
  *     xr.rig: parent of the camera; the headset pose is relative to it, so in VR a game moves the rig and never the camera
- *     xr.follow(pos, yaw, dt): moves the rig; the yaw is smoothed (dt null: snapped) and there is never pitch or roll, so the
- *       horizon stays level
+ *     xr.follow(pos, yaw, dt, at, shake): moves the rig; the yaw is smoothed (dt null: snapped) and there is never pitch or
+ *       roll, so the horizon stays level: game logic never turns the headset camera, only the rig about the vertical axis.
+ *       at: the dragon the view follows ([x, y, z] or a Vector3). shake: the mode's camera shake; it moves the rig (never
+ *       turns it) and only with the "camera effects" setting, which is off unless the player turns it on.
  *     xr.eye: the rig position in the world (use it where the flat game uses camera.position)
  *     xr.view(): a stand-in for the camera in VR for code that needs { position, quaternion, fov } and a view height in pixels
  *       (xr.view().viewH) to size point sprites
@@ -89,6 +91,7 @@
     preset: ['comfortable', 'recommended', 'advanced', 'custom'],
     scale: [0.7, 0.8, 0.9, 1, 1.1, 1.2],   // render scale (the eye buffer; 1 = what the headset recommends)
     foveation: [0, 0.33, 0.66, 1],    // fixed foveation: the edge of the view is drawn coarser
+    effects: [false, true],           // camera effects in VR (the hit shake); off: the view is never shaken
     adaptive: [true, false],          // lower the quality a step while frames run over the budget
     compact: [true, false],           // dragons as skinned meshes (far fewer draw calls)
     debug: [false, true],             // the head-locked debug overlay
@@ -96,7 +99,11 @@
   /** Device settings: not part of a preset. */
   const DEVICE = { scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
   /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
-  const PRESETS = { comfortable: {}, recommended: {}, advanced: {} };
+  const PRESETS = {
+    comfortable: { effects: false },
+    recommended: { effects: false },
+    advanced: { effects: true },
+  };
   function defaults() { return Object.assign({ preset: 'recommended' }, DEVICE, PRESETS.recommended); }
 
   /* ---------- adaptive quality (pure): frames over the budget for a second lower the quality one level ---------- */
@@ -421,12 +428,13 @@
     const viewProxy = { position: rig.position, quaternion: new THREE.Quaternion(), fov: 90, viewH: 1000 };
     const api = {
       rig, eye: rig.position, bars, cf, setComfort,
-      follow(pos, yaw, dt) {
+      follow(pos, yaw, dt, at, shake) {
         rig.position.copy(pos);
         if (snap || dt == null) { rig.rotation.y = yaw; snap = false; st.have = false; measure(); return; }
         const d = Math.atan2(Math.sin(yaw - rig.rotation.y), Math.cos(yaw - rig.rotation.y));
         rig.rotation.y += d * (1 - Math.exp(-dt * YAW_RATE));
         measure();
+        if (shake > 0 && cf.effects) { rig.position.x += (Math.random() - 0.5) * shake * 2; rig.position.y += (Math.random() - 0.5) * shake * 2; }
       },
       view() {
         camera.getWorldQuaternion(viewProxy.quaternion);

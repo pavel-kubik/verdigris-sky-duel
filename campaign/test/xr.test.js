@@ -127,6 +127,18 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   ok(C.save({ setItem() { throw new Error('full'); } }, d) === false, 'a failed save is reported, not thrown');
 }
 
+/* ---------- stable horizon: game logic only ever yaws the rig; camera effects are off unless asked for ---------- */
+{
+  const C = comfort, src = read('shared/xr.js');
+  ok(C.defaults().effects === false && C.PRESETS.comfortable.effects === false, 'camera effects are off by default and in the Comfortable preset');
+  ok(!/rig\.rotation\.(x|z)\s*[+\-*]?=/.test(src) && !/rig\.(quaternion|lookAt|rotateX|rotateZ)/.test(src), 'shared/xr.js never pitches or rolls the rig');
+  for (const f of ['index.html', 'mp/game.js', 'campaign/game.js', 'campaign/dm/game.js']) {
+    const code = read(f);
+    ok(!/xr\.rig\.(rotation|quaternion|lookAt)/.test(code), f + ' leaves the rig rotation to xr.follow');
+    ok(/xr\.follow\([^;]*shake\)/.test(code) && /shake ?= ?xr\.cf\.effects ?\?/.test(code), f + ' shakes the view in VR only with the camera effects setting');
+  }
+}
+
 /* ---------- performance: render scale 1.0 and medium foveation to start with, adaptive fallback ---------- */
 {
   const C = comfort, d = C.defaults(), B = 1000 / 90;

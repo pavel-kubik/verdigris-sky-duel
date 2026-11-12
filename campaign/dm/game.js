@@ -882,7 +882,7 @@
     const f = MT.fwd(pilot.yaw, m === 'air' ? pilot.pitch : 0);
     camLook.set(pilot.pos[0] + (m === 'down' || m === 'fall' ? 0 : f[0] * lookAhead), pilot.pos[1] + (m === 'air' ? f[1] * lookAhead : 0) + 2, pilot.pos[2] + (m === 'down' || m === 'fall' ? 0 : f[2] * lookAhead));
     void f0;
-    if (renderer.xr.isPresenting) { xr.follow(camPos, yaw + Math.PI, dt); shake = 0; pMat.uniforms.uScale.value = xr.pointScale() || pMat.uniforms.uScale.value; return; }   // VR: no pitch, roll, shake or FOV change
+    if (renderer.xr.isPresenting) { xr.follow(camPos, yaw + Math.PI, dt, pilot.pos, shake); shake = xr.cf.effects ? Math.max(0, shake - dt * 1.5) : 0; pMat.uniforms.uScale.value = xr.pointScale() || pMat.uniforms.uScale.value; return; }   // VR: no pitch, roll or FOV change; shake only with the camera effects setting
     camera.position.copy(camPos);
     if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - .5) * shake * 2; camera.position.y += (Math.random() - .5) * shake * 2; }
     shake = Math.max(0, shake - dt * 1.5);

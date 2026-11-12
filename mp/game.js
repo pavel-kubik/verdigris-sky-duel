@@ -765,7 +765,7 @@
       camPos.lerp(desired, 1 - Math.exp(-dt * 4.5));
       const f = S.fwd(pilot.yaw, pilot.pitch);
       camLook.set(pilot.pos[0] + f[0] * 12, pilot.pos[1] + f[1] * 12 + 2, pilot.pos[2] + f[2] * 12);
-      if (inXR) { xr.follow(camPos, pilot.yaw + Math.PI, dt); shake = 0; pMat.uniforms.uScale.value = xr.pointScale() || pMat.uniforms.uScale.value; }   // no pitch, roll, shake or FOV change in VR
+      if (inXR) { xr.follow(camPos, pilot.yaw + Math.PI, dt, pilot.pos, shake); shake = xr.cf.effects ? Math.max(0, shake - dt * 1.5) : 0; pMat.uniforms.uScale.value = xr.pointScale() || pMat.uniforms.uScale.value; }   // VR: no pitch, roll or FOV change; shake only with the camera effects setting
       else {
         camera.position.copy(camPos);
         if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - .5) * shake * 2; camera.position.y += (Math.random() - .5) * shake * 2; }
