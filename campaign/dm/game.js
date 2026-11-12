@@ -8,7 +8,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'dm.6 2026-11-12 living forest: trees break and burn (synced), textured models';
+  const BUILD = 'dm.7 2026-11-12 VR on Meta Quest (WebXR): lobby, room, menu and leaderboard in the headset';
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   const C = window.VCamp;
@@ -734,6 +734,7 @@
   let W = 1, Hh = 1, dpr = 1;
   function updateScale() { pMat.uniforms.uScale.value = (Hh * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); }
   function resize() {
+    if (renderer.xr.isPresenting) return;
     W = innerWidth; Hh = innerHeight; dpr = Math.min(window.devicePixelRatio || 1, 2);
     renderer.setSize(W, Hh, false); camera.aspect = W / Hh; camera.updateProjectionMatrix();
     hud.width = W * dpr; hud.height = Hh * dpr; updateScale();
@@ -790,6 +791,59 @@
     hx.fillStyle = 'rgba(235,227,205,.5)'; hx.font = '600 10px "Barlow Semi Condensed",sans-serif'; hx.fillText('300 m', rx, ry + R - 6);
   }
 
+  /* ---------- VR (shared/xr.js): Enter VR in the lobby or in the game; the lobby, room, menu, QR and leaderboard panels are
+     mirrored in the headset. The deathmatch runs at full speed in VR: every dragon shares one world clock.
+     A fireball, X sit / fly, Y leaderboard, B menu / back. ---------- */
+  const xr = VXR.attach({ renderer, scene, camera, button: [$('#vrBtn'), $('#vrBtn2')], skip: '#vrBtn,#vrBtn2,.langSwitch,.installBtn,#copyBtn,#qrCopy,#qrShare,#shareGameBtn,#roomInvite',
+    onEnd() { touch.x = touch.y = 0; touch.breath = touch.boost = false; resize(); },
+    onError() { showBanner(t('vr.failed')); } });
+  const xrSeat = new V3(A.spawns[0].pos[0], A.spawns[0].pos[1] + 2, A.spawns[0].pos[2] + 26);
+  function xrInput(now) {
+    const vis = id => { const el = $(id); return el.hidden ? null : el; };
+    const root = vis('#notice') || vis('#qrPanel') || vis('#boardPanel') || (vis('#menu') ? [vis('#room'), vis('#menu')] : null) || vis('#lobby');
+    const p = xr.frame(now, root, qrOpen ? { image: $('#qrCanvas') } : null); if (!p) return;
+    touch.x = p.sx; touch.y = p.sy; touch.breath = p.breath; touch.boost = p.boost;
+    if (mode !== 'game') return;
+    if (p.ball) fireBall();
+    if (p.roll) DM.tryRoll(pilot, p.roll);
+    if (p.x) landOrFly();
+    if (p.y) { if (boardOpen) hideBoard(); else showBoard(false); }
+    if (p.pause && $('#notice').hidden) { if (qrOpen) closeQr(); else if (boardOpen && !view.over) hideBoard(); else if (!view.over) toggleMenu(); }
+  }
+  function drawXrHud(g) {
+    if (mode !== 'game') { VXR.hudText(g, t('dm.title'), 24, 60, 590, 40, '#ebe3cd', 1); VXR.hudText(g, status.textContent || t('vr.menuHint'), 24, 120, 590, 28, '#ffd27a', 4); return; }
+    VXR.hudBar(g, t('hud.vitality'), Math.max(0, view.hp) / X.hp, '#62c48a', 24, 44, 360);
+    VXR.hudBar(g, t('hud.fire'), pilot.st / 100, '#f0a040', 24, 108, 360);
+    const y = VXR.hudText(g, $('#clock').textContent + '   ' + $('#goal').textContent, 24, 176, 370, 30, '#ebe3cd', 1);
+    VXR.hudText(g, 'X  ' + (pilot.mode === 'perch' ? t('dm.btn.fly') : t('dm.btn.land')) + '    Y  ' + t('dm.board.btn'), 24, y + 4, 370, 24, 'rgba(235,227,205,.7)', 1);
+    const msg = bannerT > 0 ? VXR.textOf(banner) : !promptEl.hidden ? promptEl.textContent : feedEl.firstChild ? feedEl.firstChild.textContent : '';
+    if (msg) VXR.hudText(g, msg, 24, 262, 370, 26, '#ffd27a', 2);
+    // radar: forward is up, 300 m range; dragons in their colours, food amber
+    const R = 112, rx = 510, ry = 160, k = R / 50;
+    g.fillStyle = 'rgba(12,19,16,.6)'; g.strokeStyle = 'rgba(235,227,205,.18)'; g.lineWidth = k;
+    g.beginPath(); g.arc(rx, ry, R, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.arc(rx, ry, R / 2, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = pal(view.myColor).ui; g.beginPath(); g.moveTo(rx, ry - 6 * k); g.lineTo(rx - 4 * k, ry + 4 * k); g.lineTo(rx + 4 * k, ry + 4 * k); g.closePath(); g.fill();
+    const cs = Math.cos(pilot.yaw), sn = Math.sin(pilot.yaw);
+    const dot = (x, z, color, r) => {
+      const dx = x - pilot.pos[0], dz = z - pilot.pos[2];
+      const lf = dx * sn + dz * cs, lr = -(dx * cs - dz * sn);
+      let px = lr / 300 * R, py = -lf / 300 * R; const l = Math.hypot(px, py); if (l > R - 4 * k) { px *= (R - 4 * k) / l; py *= (R - 4 * k) / l; }
+      g.fillStyle = color; g.beginPath(); g.arc(rx + px, ry + py, r * k, 0, Math.PI * 2); g.fill();
+    };
+    view.food.forEach(f => dot(f.pos[0], f.pos[2], 'rgba(224,160,64,.8)', 1.8));
+    view.players.forEach(e => { if (!e.down) dot(e.pos.x, e.pos.z, pal(e.color).ui, 3.4); });
+  }
+  /* floating bars in VR: HP over every other dragon (in its colour), HP + fire over mine */
+  function xrBars() {
+    const list = [];
+    if (mode === 'game') {
+      view.players.forEach((e, id) => { if (!e.down) list.push({ id: 'p' + id, x: e.pos.x, y: e.pos.y + 4.6, z: e.pos.z, w: 6, rows: [[e.hp / X.hp, pal(e.color).body]] }); });
+      if (pilot.mode !== 'down') list.push({ id: 'me', x: pilot.pos[0], y: pilot.pos[1] + 4.5, z: pilot.pos[2], w: 7, h: 0.6, rows: [[Math.max(0, view.hp) / X.hp, 0x62c48a], [pilot.st / 100, 0xf0a040]] });
+    }
+    xr.bars(list);
+  }
+
   /* ---------- the room tick (the host keeps ticking in background tabs) ---------- */
   /** One network step: the host steps the world (its own events and snapshot go to the view), a guest sends its pose. */
   function netTick(dt) {
@@ -828,6 +882,7 @@
     const f = MT.fwd(pilot.yaw, m === 'air' ? pilot.pitch : 0);
     camLook.set(pilot.pos[0] + (m === 'down' || m === 'fall' ? 0 : f[0] * lookAhead), pilot.pos[1] + (m === 'air' ? f[1] * lookAhead : 0) + 2, pilot.pos[2] + (m === 'down' || m === 'fall' ? 0 : f[2] * lookAhead));
     void f0;
+    if (renderer.xr.isPresenting) { xr.follow(camPos, yaw + Math.PI, dt); shake = 0; pMat.uniforms.uScale.value = xr.pointScale() || pMat.uniforms.uScale.value; return; }   // VR: no pitch, roll, shake or FOV change
     camera.position.copy(camPos);
     if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - .5) * shake * 2; camera.position.y += (Math.random() - .5) * shake * 2; }
     shake = Math.max(0, shake - dt * 1.5);
@@ -851,8 +906,9 @@
   let last = performance.now(), lastHp = -1, lastSt = -1, miniT = 0, lobbyTh = 0.9, fps = 0, fpsT = 0, fpsN = 0;
   const lobbyAt = A.spawns[0].pos;
   function frame(now) {
-    requestAnimationFrame(frame);
-    const rawDt = (now - last) / 1000, dt = Math.min(0.05, rawDt); last = now;
+    const inXR = renderer.xr.isPresenting;
+    if (inXR) xrInput(now);
+    const rawDt = Math.max(0, (now - last) / 1000), dt = Math.min(0.05, rawDt); last = now;   // XR frame times can run ahead of the window clock
     time += dt; fpsN++; fpsT += rawDt; if (fpsT > 1) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; }
 
     if (mode === 'lobby') {
@@ -864,9 +920,12 @@
       if (breathe) breathFx(mouthW, MT.fwd(A.spawns[0].yaw, -0.1), [0, 0, 0], dt * 0.4);
       lobbyTh += dt * 0.22;
       const tgt = new V3(lobbyAt[0], lobbyAt[1] + 0.2, lobbyAt[2]);
-      camera.position.set(tgt.x + Math.sin(lobbyTh) * Math.cos(0.25) * 28, tgt.y + Math.sin(0.25) * 28, tgt.z + Math.cos(lobbyTh) * Math.cos(0.25) * 28);
-      camera.lookAt(tgt);
-      if (W > 720) camera.setViewOffset(W, Hh, -185, 0, W, Hh); else camera.setViewOffset(W, Hh, 0, Hh * 0.26, W, Hh);
+      if (inXR) xr.follow(xrSeat, 0, null);                       // VR: a seat in front of the dragon, the lobby on the panel
+      else {
+        camera.position.set(tgt.x + Math.sin(lobbyTh) * Math.cos(0.25) * 28, tgt.y + Math.sin(0.25) * 28, tgt.z + Math.cos(lobbyTh) * Math.cos(0.25) * 28);
+        camera.lookAt(tgt);
+        if (W > 720) camera.setViewOffset(W, Hh, -185, 0, W, Hh); else camera.setViewOffset(W, Hh, 0, Hh * 0.26, W, Hh);
+      }
     } else {
       if (view.myDown && pilot.mode !== 'down') { pilot.mode = 'down'; pilot.landed = false; }
       reportLocal(DM.step(pilot, readInput(), dt, E));
@@ -943,12 +1002,13 @@
     });
     preyView.update({ list: flist }, time, null, null);
     VForest.step(Fo, dt);
-    region.update(camera.position, time, { dt, camera, viewH: renderer.domElement.height });
+    if (inXR) { const v = xr.view(); region.update(xr.eye, time, { dt, camera: v, viewH: v.viewH }); }
+    else region.update(camera.position, time, { dt, camera, viewH: renderer.domElement.height });
     updateParticles(dt);
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.style.opacity = 0; }
-    sky.position.copy(camera.position);
+    sky.position.copy(inXR ? xr.eye : camera.position);
     renderer.render(scene, camera);
-    drawHud();
+    if (inXR) { xr.drawHud(now, drawXrHud); xrBars(); } else drawHud();
   }
 
   /* ---------- boot ---------- */
@@ -971,5 +1031,5 @@
   if (window.I18N) { I18N.apply(); I18N.onChange(() => { roomSig = ''; showRejoin(); if (mode === 'lobby') { setStatus(''); lobbyStatus(); } else $('#goal').textContent = t('dm.goalShort', { n: view.fl }); }); }
   $('#loading').remove();
   $('#lobby').hidden = false;
-  requestAnimationFrame(frame);
+  renderer.setAnimationLoop(frame);
 })();

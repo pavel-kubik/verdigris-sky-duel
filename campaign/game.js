@@ -13,10 +13,11 @@
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+  let padUi = isTouch;                                         // context slots and their prompts: touch, and the Quest controllers in VR
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 'gfx.1 2026-11-12 textured dragon, castles, animals; volcano with lava; living forest (fell / burn) in every mode';
+  const BUILD = 'vr.1 2026-11-12 every mode in VR on Meta Quest (WebXR): campaign with menus, map and stations in the headset';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -232,7 +233,7 @@
   let momShown = '';
   function motherHud() {
     const key = state === 'play' && !stationOpen ? MO.line(cs) : null;   // T10: a station panel replaces her caption while open
-    const tk = key && isTouch && window.I18N && I18N.t(key + 'Touch') !== key + 'Touch' ? key + 'Touch' : key;
+    const tk = key && padUi && window.I18N && I18N.t(key + 'Touch') !== key + 'Touch' ? key + 'Touch' : key;
     if (tk === momShown) return;
     momShown = tk;
     momEl.hidden = !tk;
@@ -267,7 +268,7 @@
   /* ---------- map screen (Phase 3 T07): render/map-view.js over core/map.js; map button (touch and mouse), Tab ---------- */
   const STAGE_IDS = ['hatchling', 'drake', 'wyrm', 'elder'];
   const mapView = VRender.mapView.build($('#map'), { t, stageName: s => t('c.stage.' + (STAGE_IDS[s] || 'drake')),
-                                                     help: t(isTouch ? 'c.map.helpTouch' : 'c.map.helpKeys') });
+                                                     help: t(padUi ? 'c.map.helpTouch' : 'c.map.helpKeys') });
   function openMap() {
     if (state !== 'play' || !cs.dragon.pilot || mapView.isOpen) return;
     for (const k in keys) keys[k] = false;
@@ -481,6 +482,7 @@
   let hatchScene = null, hatchCard = false, hatchLineShown = null;   // the hatching scene (see startHatchScene)
   let W = 1, Hh = 1;
   function resize() {
+    if (renderer.xr.isPresenting) return;
     W = innerWidth; Hh = innerHeight;
     renderer.setSize(W, Hh, false);
     camera.aspect = W / Hh; camera.updateProjectionMatrix();
@@ -577,7 +579,7 @@
       hatchLineShown = key;
     }
     if (r.card && !hatchCard) showHatchCard();
-    renderer.render(hatchScene.scene, hatchScene.camera);
+    if (!renderer.xr.isPresenting) renderer.render(hatchScene.scene, hatchScene.camera);   // VR skips the scene: the card is on the menu panel
   }
   $('#hatchSkip').addEventListener('click', e => { e.preventDefault(); skipHatch(); });
   /** Hatching card -> the hatchling wakes in the lair (panel open, a first hint), saved right away. */
@@ -587,7 +589,7 @@
     const ev = LR.hatch(cs);
     setState('play');
     onEvents(ev);
-    flashPrompt(t(isTouch ? 'c.lair.hatchedTouch' : 'c.lair.hatched'), 10);
+    flashPrompt(t(padUi ? 'c.lair.hatchedTouch' : 'c.lair.hatched'), 10);
     saveNow('start');
   }
   $('#hatchBtn').onclick = hatchNow;
@@ -716,8 +718,10 @@
     hero.anim(time, dt, { phase, amp: 1, mouth: false, turn: 0.4, look: 0 });
     // camera trails just outside and behind the circling dragon, looking inward at the volcano
     const P = hero.root.position, ox = Math.sin(a), oz = Math.cos(a), mx = -Math.cos(a), mz = Math.sin(a);
-    camera.position.set(P.x + ox * 34 - mx * 26, P.y + 9, P.z + oz * 34 - mz * 26);
-    camera.lookAt(P.x * 0.82 + mx * 8, P.y - 14, P.z * 0.82 + mz * 8);
+    camPos.set(P.x + ox * 34 - mx * 26, P.y + 9, P.z + oz * 34 - mz * 26); camLook.set(P.x * 0.82 + mx * 8, P.y - 14, P.z * 0.82 + mz * 8);
+    if (renderer.xr.isPresenting) { xr.follow(camPos, Math.atan2(camLook.x - camPos.x, camLook.z - camPos.z) + Math.PI, dt); return; }
+    camera.position.copy(camPos);
+    camera.lookAt(camLook);
   }
 
   /* ---------- HUD ---------- */
@@ -790,7 +794,7 @@
         if (k) queueMicrotask(() => toast(t(k), '', 5, 'mission'));
       }
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
-      else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(isTouch ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
+      else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(padUi ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
       else if (e.e === 'clock:phase') {                          // T21: night falls / day breaks (outside only; the nest panel shows the time)
         if (!cs.inLair && state === 'play' && (e.phase === 'night' || e.phase === 'day')) toast(t('c.clock.' + e.phase), t('c.clock.' + e.phase + 'Sub'), 3);
       }
@@ -851,8 +855,8 @@
         ML.push(msgs, { title: b.textContent, sub: sm.textContent, kind: 'mission', show: false }, stamp());
       }
       else if (e.e === 'mission:failed') toast(t('c.mission.failed', { m: missionName(e.id) }), t('c.mission.failedSub.' + (e.why === 'death' || e.why === 'timeout' || e.why === 'caravan' ? e.why : 'other')), 4.5, 'mission');
-      else if (e.e === 'caravan:departed') toast(t('c.caravan.departed'), t(isTouch ? 'c.caravan.departedSubTouch' : 'c.caravan.departedSub'), 4, 'mission');   // T15
-      else if (e.e === 'caravan:stopped') toast(t('c.caravan.stopped'), t(isTouch ? 'c.caravan.stoppedSubTouch' : 'c.caravan.stoppedSub'), 4, 'mission');
+      else if (e.e === 'caravan:departed') toast(t('c.caravan.departed'), t(padUi ? 'c.caravan.departedSubTouch' : 'c.caravan.departedSub'), 4, 'mission');   // T15
+      else if (e.e === 'caravan:stopped') toast(t('c.caravan.stopped'), t(padUi ? 'c.caravan.stoppedSubTouch' : 'c.caravan.stoppedSub'), 4, 'mission');
       else if (e.e === 'mission:cancelled') toast(t('c.mission.cancelled'), '', 2, 'mission');
       else if (e.e === 'aerie:found') toast(t('c.toast.aerieFound'), t('c.toast.aerieFoundSub', { region: t(TR.region(e.region).nameKey) }), 3.5);   // T08
       else if (e.e === 'aerie:enter') openAerie();
@@ -897,7 +901,7 @@
   function slotSet(b, icon, label) { b.innerHTML = slotHtml(icon); b.lastChild.textContent = label; b.setAttribute('aria-label', label); }
   /** Context slots follow core/controls.js; a held Action keeps its latched kind and stays visible until released. */
   function slotsHud() {
-    slotNow = state === 'play' && isTouch ? CT.slots(cs) : { action: null, move: null, roll: true };
+    slotNow = state === 'play' && padUi ? CT.slots(cs) : { action: null, move: null, roll: true };
     const ak = actionKind || slotNow.action || '';
     if (ak !== actionShown) { if (ak) slotSet(bAction, ak, t('c.btn.' + ak)); bAction.classList.toggle('off', !ak); actionShown = ak; }
     const mv = slotNow.move, mk = mv ? (mv.kind === 'travel' ? 'c.btn.travel.' + mv.to : 'c.btn.' + mv.kind) : '';
@@ -916,33 +920,33 @@
     let text = '', bar = -1;
     const ex = state === 'play' && cs.exit;
     if (promptFlashT > 0 && promptFlash) text = promptFlash;
-    else if (ex && !isTouch) text = t('c.prompt.travel.' + ex.to);
+    else if (ex && !padUi) text = t('c.prompt.travel.' + ex.to);
     else if (state === 'play' && cs.exitSmall && !cs.inLair) text = t('c.prompt.tooSmall.' + cs.exitSmall.to);   // T11: gated exit, phone and desktop
-    else if (cs.inLair) text = stationOpen ? '' : cs.station ? t('c.prompt.station.' + cs.station + (isTouch ? 'Touch' : '')) : t(isTouch ? 'c.prompt.caveTouch' : 'c.prompt.cave');
+    else if (cs.inLair) text = stationOpen ? '' : cs.station ? t('c.prompt.station.' + cs.station + (padUi ? 'Touch' : '')) : t(padUi ? 'c.prompt.caveTouch' : 'c.prompt.cave');
     else if (cs.inAerie) text = '';
-    else if (cs.hint === 'aerieBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieBankTouch' : 'c.prompt.aerieBank');   // T08
-    else if (cs.hint === 'aerie') text = t(isTouch && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieTouch' : 'c.prompt.aerie');
-    else if (cs.hint === 'lairBank') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairBankTouch' : 'c.prompt.lairBank');   // T19
+    else if (cs.hint === 'aerieBank') text = t(padUi && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieBankTouch' : 'c.prompt.aerieBank');   // T08
+    else if (cs.hint === 'aerie') text = t(padUi && slotNow.move && slotNow.move.kind === 'aerie' ? 'c.prompt.aerieTouch' : 'c.prompt.aerie');
+    else if (cs.hint === 'lairBank') text = t(padUi && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairBankTouch' : 'c.prompt.lairBank');   // T19
     else if (cs.hint === 'lootCarry' && cs.carriedLoot && cs.carriedLoot.relic) text = t('c.prompt.relicCarry', { relic: lootName(cs.carriedLoot) });   // Phase 3 T12
     else if (cs.hint === 'lootCarry') text = t('c.prompt.lootCarry', { loot: lootName(cs.carriedLoot) });
-    else if (cs.hint === 'lootGrab' && (lootItem(cs.lootTarget) || {}).relic) text = t(isTouch ? 'c.prompt.relicGrabTouch' : 'c.prompt.relicGrab', { relic: lootName(lootItem(cs.lootTarget)) });   // T12
-    else if (cs.hint === 'lootGrab') text = t(isTouch ? 'c.prompt.lootGrabTouch' : 'c.prompt.lootGrab', { loot: lootName(lootItem(cs.lootTarget)) });
+    else if (cs.hint === 'lootGrab' && (lootItem(cs.lootTarget) || {}).relic) text = t(padUi ? 'c.prompt.relicGrabTouch' : 'c.prompt.relicGrab', { relic: lootName(lootItem(cs.lootTarget)) });   // T12
+    else if (cs.hint === 'lootGrab') text = t(padUi ? 'c.prompt.lootGrabTouch' : 'c.prompt.lootGrab', { loot: lootName(lootItem(cs.lootTarget)) });
     else if (cs.hint === 'lootHeavy') text = t('c.prompt.lootHeavy', { loot: lootName(lootItem(cs.lootTarget)) });
-    else if (cs.hint === 'lair') text = t(isTouch && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
-    else if (cs.hint === 'lairStore') { text = t(!isTouch ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / ST.eatTime(cs); }
-    else if (cs.hint === 'eat') { text = t(isTouch ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / ST.eatTime(cs); }
+    else if (cs.hint === 'lair') text = t(padUi && slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairTouch' : 'c.prompt.lair');
+    else if (cs.hint === 'lairStore') { text = t(!padUi ? 'c.prompt.lairStore' : slotNow.move && slotNow.move.kind === 'cave' ? 'c.prompt.lairStoreEnterTouch' : 'c.prompt.lairStoreTouch'); if (dragon.eatT > 0) bar = dragon.eatT / ST.eatTime(cs); }
+    else if (cs.hint === 'eat') { text = t(padUi ? 'c.prompt.eatTouch' : 'c.prompt.eat'); bar = dragon.eatT / ST.eatTime(cs); }
     else if (cs.fire && dragon.carried == null && (pilot.breathing || cs.fire.cook > 0) && PR.byId(cs.field, cs.fire.id)) {   // roast progress
       const q = PR.byId(cs.field, cs.fire.id);
-      text = cs.fire.kept ? t('c.prompt.turnBack', { prey: t('c.prey.' + q.type) }) : !cs.fire.inRange ? (cs.fire.cook > 0 ? t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire') : t('c.prompt.fireFar'))
-        : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(isTouch ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
+      text = cs.fire.kept ? t('c.prompt.turnBack', { prey: t('c.prey.' + q.type) }) : !cs.fire.inRange ? (cs.fire.cook > 0 ? t(padUi ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire') : t('c.prompt.fireFar'))
+        : pilot.breathing ? t('c.prompt.roasting', { prey: t('c.prey.' + q.type) }) : t(padUi ? 'c.prompt.keepFireTouch' : 'c.prompt.keepFire');
       bar = cs.fire.cook;
     }
-    else if (cs.hint === 'grab') text = pilot.mode === 'ground' ? t(isTouch ? 'c.prompt.pickupTouch' : 'c.prompt.pickup', { prey: t('c.prey.' + ((PR.byId(cs.field, cs.target) || {}).type || 'goat')) }) : t(isTouch ? 'c.prompt.grabTouch' : 'c.prompt.grab');
-    else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(isTouch ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
-    else if (cs.hint === 'heavy') text = t(isTouch ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
+    else if (cs.hint === 'grab') text = pilot.mode === 'ground' ? t(padUi ? 'c.prompt.pickupTouch' : 'c.prompt.pickup', { prey: t('c.prey.' + ((PR.byId(cs.field, cs.target) || {}).type || 'goat')) }) : t(padUi ? 'c.prompt.grabTouch' : 'c.prompt.grab');
+    else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(padUi ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
+    else if (cs.hint === 'heavy') text = t(padUi ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
     else if (cs.hint === 'near') text = t('c.prompt.near');
-    else if (cs.hint === 'land') text = t(isTouch ? 'c.prompt.landTouch' : 'c.prompt.land');
-    else if (cs.hint === 'walk') text = t(isTouch ? 'c.prompt.walkTouch' : 'c.prompt.walk');
+    else if (cs.hint === 'land') text = t(padUi ? 'c.prompt.landTouch' : 'c.prompt.land');
+    else if (cs.hint === 'walk') text = t(padUi ? 'c.prompt.walkTouch' : 'c.prompt.walk');
     if (text !== promptShown) { promptText.textContent = text; promptEl.hidden = !text; promptShown = text; }
     promptBar.hidden = bar < 0;
     if (bar >= 0) promptBar.firstChild.style.transform = 'scaleX(' + Math.min(1, bar) + ')';
@@ -1634,24 +1638,92 @@
     }
   }
 
+  /* ---------- VR (shared/xr.js): Enter VR on the intro or in the game. Every panel of the flat page (intro, hatching card,
+     story cards, pause, cave stations, aerie, map, journal) is mirrored on the menu panel in the headset.
+     Left stick steer / walk, right trigger breath, left trigger boost / run, right-stick flick roll,
+     A = the Move slot (land, take off, fly on, enter, use the cave station), right grip (hold) = the Action slot (grab, eat),
+     B pause / back, Y map, X journal. The campaign plays at VXR.SLOW in VR, like the duel. ---------- */
+  const xr = VXR.attach({ renderer, scene, camera, button: [$('#vrBtn'), $('#vrBtn2')], skip: '#vrBtn,#vrBtn2,.langSwitch,.installBtn',
+    onEnd() { padUi = isTouch; touch.x = touch.y = 0; touch.breath = touch.boost = touch.grab = touch.eat = false; actionKind = null; saveNow('vr'); if (state === 'play') setState('paused'); resize(); },
+    onError() { toast(t('vr.failed'), '', 4); } });
+  let xrGrip = false;
+  function xrMenu() {
+    if (state === 'intro') return $('#intro');
+    if (state === 'hatch') { skipHatch(); return hatchCard ? $('#hatch') : null; }
+    if (storyCard.open) return $('#story');
+    if (state === 'paused') return $('#pause');
+    if (mapView.isOpen) return travelOn ? [$('#mapTravel'), $('#mapBar'), $('#mapZoom')] : [$('#mapBar'), $('#mapZoom')];
+    if (logOpen) return $('#logPanel');
+    if (stationOpen) return $('#lair');
+    if (cs.inAerie && state === 'play') return $('#aeriePanel');
+    return null;
+  }
+  function xrInput(now) {
+    padUi = true;
+    const p = xr.frame(now, xrMenu(), mapView.isOpen ? { image: $('#mapCanvas') } : null); if (!p) return;
+    touch.x = p.sx; touch.y = p.sy; touch.breath = p.breath; touch.boost = p.boost;
+    if (p.pause) {                                                // B: back out of whatever is open, else pause
+      if (storyCard.open) storyCard.next();
+      else if (mapView.isOpen) closeMap();
+      else if (logOpen) closeLog();
+      else if (stationOpen) closeStation();
+      else if (state === 'play') setState('paused');
+      else if (state === 'paused') setState('play');
+    }
+    if (state !== 'play' || p.menu) { if (xrGrip) { xrGrip = false; actionKind = null; touch.grab = touch.eat = false; } return; }
+    if (p.roll) F.tryRoll(pilot, p.roll);
+    if (p.y) openMap();
+    if (p.x) openLog();
+    if (p.ball) {                                                 // A: the Move slot; in the cave the station in reach
+      if (slotNow.move) { const mi = CT.moveInput(slotNow.move); if (mi.confirm) confirmQ = true; if (mi.enter) enterQ = true; if (mi.land) landQ = true; }
+      else if (CT.isStation(slotNow.action)) useStation(slotNow.action);
+    }
+    if (p.grip && !xrGrip && slotNow.action && !CT.isStation(slotNow.action)) { actionKind = slotNow.action; Object.assign(touch, CT.input(actionKind, true)); }   // latched at the press, like the touch button
+    if (!p.grip && xrGrip) { actionKind = null; touch.grab = touch.eat = false; }
+    xrGrip = p.grip;
+  }
+  function drawXrHud(g) {
+    if (state !== 'play' && state !== 'paused' || !pilot) { VXR.hudText(g, 'Verdigris', 24, 60, 590, 40, '#ebe3cd', 1); VXR.hudText(g, t('vr.menuHint'), 24, 120, 590, 28, '#ffd27a', 2); return; }
+    const hs = HN.stateOf(dragon.hunger);
+    [[t('hud.vitality'), dragon.hp / stats.hpMax, '#62c48a'], [t('hud.fire'), pilot.st / 100, '#f0a040'], [t('c.hud.hunger'), dragon.hunger / D.hunger.max, hs === 'starving' ? '#e5484f' : hs === 'hungry' ? '#e0a040' : '#c9bf7c']].forEach((b, i) => {
+      g.fillStyle = '#ebe3cd'; g.font = '600 20px ' + VXR.FONT; g.fillText(b[0], 24, 30 + i * 40);
+      g.fillStyle = 'rgba(235,227,205,.18)'; g.fillRect(120, 17 + i * 40, 170, 14);
+      g.fillStyle = b[2]; g.fillRect(120, 17 + i * 40, 170 * Math.max(0, Math.min(1, b[1])), 14);
+    });
+    let y = VXR.hudText(g, $('#regionText').textContent, 320, 32, 300, 26, '#ebe3cd', 1);
+    y = VXR.hudText(g, $('#stageText').textContent + ($('#goldRow').hidden ? '' : '   ' + t('c.hud.gold') + ' ' + $('#goldText').textContent), 320, y, 300, 20, 'rgba(235,227,205,.7)', 1);
+    if (!mHud.hidden) VXR.hudText(g, mTimer.textContent + '  ' + mObj.textContent, 320, y + 4, 300, 20, '#ff9447', 2);
+    if (compassOn && compassEl.width) { try { g.drawImage(compassEl, 24, 128, 592, Math.min(60, 592 * compassEl.height / compassEl.width)); } catch (_) { } }
+    const mv = slotNow.move, ak = actionKind || slotNow.action;
+    const hints = [mv ? 'A  ' + t(mv.kind === 'travel' ? 'c.btn.travel.' + mv.to : 'c.btn.' + mv.kind) : ak && CT.isStation(ak) ? 'A  ' + t('c.btn.' + ak) : '',
+                   ak && !CT.isStation(ak) ? t('vr.hud.grip') + '  ' + t('c.btn.' + ak) : ''].filter(Boolean).join('     ');
+    if (hints) VXR.hudText(g, hints, 24, 218, 592, 24, '#62c48a', 1);
+    const msg = state === 'paused' ? t('vr.resume') : promptShown || (msgShown ? msgShown.title + (msgShown.sub ? ' - ' + msgShown.sub : '') : '') || (!momEl.hidden ? t('c.mother.name') + ': ' + momText.textContent : '');
+    if (msg) VXR.hudText(g, msg, 24, 254, 592, 24, '#ffd27a', 3);
+    if (!promptBar.hidden) { g.fillStyle = 'rgba(235,227,205,.18)'; g.fillRect(24, 226, 592, 6); g.fillStyle = '#ff9447'; g.fillRect(24, 226, 592 * Math.min(1, parseFloat((promptBar.firstChild.style.transform.match(/scaleX\(([\d.]+)/) || [0, 0])[1])), 6); }
+  }
+
   /* ---------- main loop ---------- */
   let last = performance.now(), time = 0;
   function frame(now) {
-    requestAnimationFrame(frame);
-    const rawDt = (now - last) / 1000;
+    const inXR = renderer.xr.isPresenting;
+    if (inXR) xrInput(now);
+    const rawDt = Math.max(0, (now - last) / 1000);              // XR frame times can run ahead of the window clock
     let dt = Math.min(0.05, rawDt); last = now;
+    if (inXR) dt *= VXR.SLOW;                                    // VR plays slower: the headset needs more time to read and aim
     if (state === 'paused' || logOpen || storyCard.open) dt = 0;   // the message log and story cards (T17) pause the world (drawn under the panel)
     if (state === 'play' && !storyCard.open) storyTick();
-    if (mapView.isOpen) { mapView.tick(Math.min(0.1, rawDt)); return; }   // T07: the region scene is paused (not drawn) under the map
+    const mapOn = mapView.isOpen;
+    if (mapOn) { mapView.tick(Math.min(0.1, rawDt)); if (!inXR) return; dt = 0; }   // T07: the region scene is paused (not drawn) under the map; VR keeps drawing it, frozen
     time += reduceMotion ? dt * 0.3 : dt;
-    if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); return; }
+    if (state === 'hatch' && hatchScene) { runHatch(dt); if (debug) debugHud(dt); if (!inXR) return; }
 
     if (state === 'intro' || !pilot) {
       idleHero(dt);
       const h = hero.root.position;                               // herds graze under the intro flight
       PR.step(cs.field, { pos: [h.x, h.y + 400, h.z], inv: 0 }, dt, { stats, rng });
     } else {
-      if (state === 'play') {
+      if (state === 'play' && !mapOn) {
         if (fastTime && cs.clock) cs.clock.t = (cs.clock.t + dt * 39 / D.clock.dayLength) % 1;   // T21 debug /: x40 (the step adds the 1x)
         onEvents(ST.step(cs, readInput(), dt));
         survive(dt);
@@ -1666,18 +1738,22 @@
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
       else if (cs.inAerie) camLook.set(pilot.pos[0], pilot.pos[1] - (isTouch ? 4 : 1) * Math.max(kc, 1.6), pilot.pos[2]);   // touch: the dragon above the panel
-      camera.position.copy(camPos);
-      if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
-      shake = Math.max(0, shake - dt * 1.5);
-      camera.lookAt(camLook);
-      const fovT = pilot.boosting && state === 'play' ? 72 : 60;
-      if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
+      if (inXR) { xr.follow(camPos, cs.inLair || cs.inAerie ? Math.atan2(camLook.x - camPos.x, camLook.z - camPos.z) + Math.PI : pilot.yaw + Math.PI, dt); shake = 0; }   // VR: no pitch, roll, shake or FOV change
+      else {
+        camera.position.copy(camPos);
+        if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
+        shake = Math.max(0, shake - dt * 1.5);
+        camera.lookAt(camLook);
+        const fovT = pilot.boosting && state === 'play' ? 72 : 60;
+        if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
+      }
       hud(dt);
     }
     syncScene();
     caveView.update(cs, time);
-    sky.position.copy(camera.position);
-    region.update(camera.position, time, { dt, camera, viewH: renderer.domElement.height });
+    const vw = inXR ? xr.view() : camera, eye = vw.position, viewH = inXR ? vw.viewH : renderer.domElement.height;   // VR: the rig, not the camera, is in the world
+    sky.position.copy(eye);
+    region.update(eye, time, { dt, camera: vw, viewH });
     if (dt > 0) updateParticles(dt);
     if (state === 'intro' || !pilot) mom.root.visible = false;
     motherHud();
@@ -1687,20 +1763,20 @@
     preyView.update(cs.field, time, carryPose(), { sense: pilot && !cs.inLair && UP.effects(cs).preyHighlight ? { x: pilot.pos[0], z: pilot.pos[2], range: NV.smellRange(cs) } : null });   // T20 prey sense
     lootView.update(cs, lootPose(), time);
     targetView.update(cs, pilot && !cs.inLair ? pilot.pos : null, time);
-    caravanView.update(cs, time, camera, dt);                    // T15
+    caravanView.update(cs, time, vw, dt);                    // T15
     if (townView && townView.town !== cs.town) {                // T17: alert 3 adds the village platform (a new town)
       scene.remove(townView.group); townView.dispose();
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
     }
-    if (castleView) castleView.update(dt, { town: cs.town, cam: camera.position, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
-    townView.update(cs.town, dt, { cam: camera.position, particles: qSet.particles, pxScale: renderer.domElement.height * 0.5, lights: fireLights, time });
+    if (castleView) castleView.update(dt, { town: cs.town, cam: eye, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
+    townView.update(cs.town, dt, { cam: eye, particles: qSet.particles, pxScale: viewH * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
       if (cornView) { scene.remove(cornView.group); cornView.dispose(); }
       cornView = VRender.corn.build(cs.crops, { density: qSet.flora });
       scene.add(cornView.group);
     }
     cornView.group.visible = !cs.inLair;
-    cornView.update(cs.crops, dt, { pxScale: renderer.domElement.height * 0.5, time });
+    cornView.update(cs.crops, dt, { pxScale: viewH * 0.5, time });
     if (!defView) { defView = VRender.defenders.build(); scene.add(defView.group); }   // T15: peasants, archers, arrows
     defView.group.visible = !cs.inLair;
     defView.update(cs.squad, { time });
@@ -1713,6 +1789,10 @@
     targetRing();
     fireTargetRing();
     renderer.render(scene, camera);
+    if (inXR) {
+      xr.drawHud(now, drawXrHud);
+      xr.bars(pilot && state !== 'intro' && state !== 'hatch' && !cs.inLair ? [{ id: 'me', x: pilot.pos[0], y: pilot.pos[1] + 4.5 * heroScale, z: pilot.pos[2], w: 7 * heroScale, h: 0.6 * heroScale, rows: [[dragon.hp / stats.hpMax, 0x62c48a], [pilot.st / 100, 0xf0a040]] }] : []);
+    }
     sampleQuality(rawDt);
     if (debug) debugHud(dt);
   }
@@ -1928,7 +2008,7 @@
   if (debug) { const f = document.querySelector('#intro .foot'); if (f) f.prepend(Object.assign(document.createElement('code'), { textContent: 'build ' + BUILD + ' ', style: 'font-size:11px;opacity:.7;display:block' })); }
   $('#loading').remove();
   setState('intro');
-  requestAnimationFrame(frame);
+  renderer.setAnimationLoop(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
   if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };

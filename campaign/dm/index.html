@@ -173,6 +173,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   <div class="right">
     <button class="chip" id="boardBtn" aria-label="Leaderboard" data-i18n="dm.board.btn" data-i18n-attr="aria-label:dm.board.title">Board</button>
     <button class="chip" id="roomChip" title="Copy invite link" data-i18n-attr="title:mp.copyInvite"><span data-i18n="mp.room">Room</span> <span id="roomCode">-</span></button>
+    <button class="chip" id="vrBtn2" hidden data-i18n="vr.short">VR</button>
     <button id="menuBtn" aria-label="Menu" data-i18n-attr="aria-label:mp.menu">II</button>
   </div>
 </div>
@@ -202,6 +203,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   </ul>
   <label for="nameIn"><span data-i18n="mp.lobby.name">Your dragon's name</span><input id="nameIn" maxlength="16" autocomplete="nickname" placeholder="Verdigris"></label>
   <button class="cta" id="hostBtn" data-i18n="mp.lobby.host">Host a game</button>
+  <button class="ghost" id="vrBtn" hidden data-i18n="intro.vr">Enter VR</button>
   <button class="ghost" id="practiceBtn" hidden data-i18n="dm.practiceBtn">Practice alone (nobody can join)</button>
   <div class="or" data-i18n="mp.lobby.or">or join a friend</div>
   <div class="join">
@@ -272,7 +274,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   /* Game scripts carry the page's ?v= so a test link with a new v also fetches fresh scripts (no stale cache). */
   (function () {
     var v = (location.search.match(/[?&]v=([^&]+)/) || [])[1], q = v ? '?v=' + v : '';
-    ['../../i18n.js', '../../pwa.js', '../../shared/textures.js', '../../shared/dragon.js', '../../shared/forest.js', '../../shared/forest-view.js', '../../shared/qr.js',
+    ['../../i18n.js', '../../pwa.js', '../../shared/textures.js', '../../shared/dragon.js', '../../shared/forest.js', '../../shared/forest-view.js', '../../shared/qr.js', '../../shared/xr.js',
      '../core/umd.js', '../core/math.js', '../core/data.js', '../core/terrain.js', '../core/castle.js', '../core/settlement.js', '../core/flight.js', '../core/walk.js', '../core/dm.js', '../core/dmnet.js',
      '../render/flora.js', '../render/terrain.js', '../render/prey-view.js', '../render/settlement-view.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });

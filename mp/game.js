@@ -545,6 +545,7 @@
   let W = 1, Hh = 1, dpr = 1;
   function updateScale() { pMat.uniforms.uScale.value = (Hh * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); }
   function resize() {
+    if (renderer.xr.isPresenting) return;
     W = innerWidth; Hh = innerHeight; dpr = Math.min(window.devicePixelRatio || 1, 2);
     renderer.setSize(W, Hh, false); camera.aspect = W / Hh; camera.updateProjectionMatrix();
     hud.width = W * dpr; hud.height = Hh * dpr; updateScale();
@@ -607,6 +608,56 @@
     hx.fillStyle = 'rgba(235,227,205,.5)'; hx.font = '600 10px "Barlow Semi Condensed",sans-serif'; hx.fillText('250 m', rx, ry + R - 6);
   }
 
+  /* ---------- VR (shared/xr.js): Enter VR in the lobby or in the game; the lobby, menu and end panels are mirrored in the headset.
+     The co-op runs at full speed in VR: every dragon shares one world clock. ---------- */
+  const xrSeat = new V3(0, 92, 26);
+  const xr = VXR.attach({ renderer, scene, camera, button: [$('#vrBtn'), $('#vrBtn2')], skip: '#vrBtn,#vrBtn2,.langSwitch,.installBtn,#copyBtn',
+    onEnd() { touch.x = touch.y = 0; touch.breath = touch.boost = false; resize(); },
+    onError() { showBanner(t('vr.failed')); } });
+  function xrInput(now) {
+    const root = ['#notice', '#over', '#menu', '#lobby'].map($).find(el => !el.hidden) || null;
+    const p = xr.frame(now, root); if (!p) return;
+    touch.x = p.sx; touch.y = p.sy; touch.breath = p.breath; touch.boost = p.boost;
+    if (mode !== 'game') return;
+    if (p.ball) fireBall();
+    if (p.roll) S.tryRoll(pilot, p.roll);
+    if (p.pause && $('#notice').hidden && !view.over) toggleMenu();
+  }
+  function drawXrHud(g) {
+    if (mode !== 'game') { VXR.hudText(g, t('mp.title'), 24, 60, 590, 40, '#ebe3cd', 1); VXR.hudText(g, status.textContent || t('vr.menuHint'), 24, 120, 590, 28, '#ffd27a', 4); return; }
+    VXR.hudBar(g, t('hud.vitality'), view.hp / 100, '#62c48a', 24, 44, 360);
+    VXR.hudBar(g, t('hud.fire'), pilot.st / 100, '#f0a040', 24, 108, 360);
+    const y = VXR.hudText(g, t('hud.wave') + ' ' + (view.wave || '-') + '   ' + t('mp.teamScore') + ' ' + view.score, 24, 176, 370, 30, '#ebe3cd', 1);
+    VXR.hudText(g, $('#foes').textContent + (roomCode ? '   ' + t('mp.room') + ' ' + roomCode : ''), 24, y + 4, 370, 24, 'rgba(235,227,205,.7)', 1);
+    const msg = bannerT > 0 ? VXR.textOf(banner) : feedEl.firstChild ? feedEl.firstChild.textContent : '';
+    if (msg) VXR.hudText(g, msg, 24, 262, 370, 26, '#ffd27a', 2);
+    // radar: forward is up, 250 m range
+    const R = 112, rx = 510, ry = 160, k = R / 52;
+    g.fillStyle = 'rgba(12,19,16,.6)'; g.strokeStyle = 'rgba(235,227,205,.18)'; g.lineWidth = k;
+    g.beginPath(); g.arc(rx, ry, R, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.arc(rx, ry, R / 2, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = PALETTES[view.myColor % PALETTES.length].ui; g.beginPath(); g.moveTo(rx, ry - 6 * k); g.lineTo(rx - 4 * k, ry + 4 * k); g.lineTo(rx + 4 * k, ry + 4 * k); g.closePath(); g.fill();
+    const cs = Math.cos(pilot.yaw), sn = Math.sin(pilot.yaw);
+    const dot = (pos, color, r) => {
+      const dx = pos.x - pilot.pos[0], dz = pos.z - pilot.pos[2];
+      const lf = dx * sn + dz * cs, lr = -(dx * cs - dz * sn);
+      let px = lr / 250 * R, py = -lf / 250 * R; const l = Math.hypot(px, py); if (l > R - 4 * k) { px *= (R - 4 * k) / l; py *= (R - 4 * k) / l; }
+      g.fillStyle = color; g.beginPath(); g.arc(rx + px, ry + py, r * k, 0, Math.PI * 2); g.fill();
+    };
+    view.foes.forEach(e => { if (!e.dead) dot(e.pos, '#e5484f', 3.2); });
+    view.players.forEach(e => dot(e.pos, PALETTES[e.color % PALETTES.length].ui, 3.6));
+  }
+  /* floating bars in VR: HP over every wyvern and teammate (in the dragon's colour), HP + fire over my dragon */
+  function xrBars() {
+    const list = [];
+    if (mode === 'game') {
+      view.foes.forEach((e, id) => { if (!e.dead) list.push({ id: 'f' + id, x: e.pos.x, y: e.pos.y + 6, z: e.pos.z, w: 8, rows: [[e.hp / e.max, 0xe5484f]] }); });
+      view.rows.forEach(r => { const e = view.players.get(r[0]); if (e && !e.down) list.push({ id: 'p' + r[0], x: e.pos.x, y: e.pos.y + 4.5, z: e.pos.z, w: 6, rows: [[r[9] / 100, PALETTES[e.color % PALETTES.length].body]] }); });
+      if (!pilot.down) list.push({ id: 'me', x: pilot.pos[0], y: pilot.pos[1] + 4.5, z: pilot.pos[2], w: 7, h: 0.6, rows: [[view.hp / 100, 0x62c48a], [pilot.st / 100, 0xf0a040]] });
+    }
+    xr.bars(list);
+  }
+
   /* ---------- simulation tick (host keeps ticking in background tabs) ---------- */
   function hostTick(dt) {
     S.setPose(world, view.myId, S.poseOf(pilot));
@@ -637,8 +688,9 @@
   const camPos = new V3(0, 100, -30), camLook = new V3();
   let last = performance.now(), lastHp = -1, lastSt = -1, teamT = 0, lobbyTh = 0.9;
   function frame(now) {
-    requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const inXR = renderer.xr.isPresenting;
+    if (inXR) xrInput(now);
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;   // XR frame times can run ahead of the window clock
     time += dt;
     clouds.forEach((c, i) => { c.position.x += dt * (1.5 + i % 3); if (c.position.x > 560) c.position.x = -560; });
 
@@ -651,9 +703,12 @@
       if (breathe) for (let i = 0; i < 2; i++) spawnP(mouthW.x, mouthW.y, mouthW.z, (Math.random() - .5) * 4, -3 + (Math.random() - .5) * 4, 30, 0.6, 0.7, 4, 0, 1.2);
       lobbyTh += dt * 0.22;
       const tgt = new V3(0, 90.2, 0.3);
-      camera.position.set(tgt.x + Math.sin(lobbyTh) * Math.cos(0.25) * 28, tgt.y + Math.sin(0.25) * 28, tgt.z + Math.cos(lobbyTh) * Math.cos(0.25) * 28);
-      camera.lookAt(tgt);
-      if (W > 720) camera.setViewOffset(W, Hh, -185, 0, W, Hh); else camera.setViewOffset(W, Hh, 0, Hh * 0.24, W, Hh);
+      if (inXR) xr.follow(xrSeat, 0, null);                       // VR: a seat in front of the dragon, the lobby on the panel
+      else {
+        camera.position.set(tgt.x + Math.sin(lobbyTh) * Math.cos(0.25) * 28, tgt.y + Math.sin(0.25) * 28, tgt.z + Math.cos(lobbyTh) * Math.cos(0.25) * 28);
+        camera.lookAt(tgt);
+        if (W > 720) camera.setViewOffset(W, Hh, -185, 0, W, Hh); else camera.setViewOffset(W, Hh, 0, Hh * 0.24, W, Hh);
+      }
     } else {
       // my dragon
       if (view.myDown && !pilot.down) pilot.down = true;
@@ -710,12 +765,15 @@
       camPos.lerp(desired, 1 - Math.exp(-dt * 4.5));
       const f = S.fwd(pilot.yaw, pilot.pitch);
       camLook.set(pilot.pos[0] + f[0] * 12, pilot.pos[1] + f[1] * 12 + 2, pilot.pos[2] + f[2] * 12);
-      camera.position.copy(camPos);
-      if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - .5) * shake * 2; camera.position.y += (Math.random() - .5) * shake * 2; }
-      shake = Math.max(0, shake - dt * 1.5);
-      camera.lookAt(camLook);
-      const fovT = pilot.boosting ? 72 : 60;
-      if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); updateScale(); }
+      if (inXR) { xr.follow(camPos, pilot.yaw + Math.PI, dt); shake = 0; pMat.uniforms.uScale.value = xr.pointScale() || pMat.uniforms.uScale.value; }   // no pitch, roll, shake or FOV change in VR
+      else {
+        camera.position.copy(camPos);
+        if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - .5) * shake * 2; camera.position.y += (Math.random() - .5) * shake * 2; }
+        shake = Math.max(0, shake - dt * 1.5);
+        camera.lookAt(camLook);
+        const fovT = pilot.boosting ? 72 : 60;
+        if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); updateScale(); }
+      }
 
       // DOM HUD
       const hp = Math.round(view.hp), st = Math.round(pilot.st);
@@ -730,12 +788,12 @@
       $('#vignette').style.opacity = Math.max(hurt, view.hp < 30 && !pilot.down ? 0.35 + Math.sin(time * 5) * 0.15 : 0);
     }
     VForest.step(Fo, dt); if (window.VTex) VTex.tick(time);
-    forestView.update(dt, time, camera, renderer.domElement.height);
+    if (inXR) { const v = xr.view(); forestView.update(dt, time, v, v.viewH); } else forestView.update(dt, time, camera, renderer.domElement.height);
     updateParticles(dt);
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.style.opacity = 0; }
-    sky.position.copy(camera.position);
+    sky.position.copy(inXR ? xr.eye : camera.position);
     renderer.render(scene, camera);
-    drawHud();
+    if (inXR) { xr.drawHud(now, drawXrHud); xrBars(); } else drawHud();
   }
 
   /* ---------- boot ---------- */
@@ -752,5 +810,5 @@
   if (window.I18N) I18N.onChange(() => { if (mode === 'lobby') { setStatus(''); lobbyStatus(); } });
   $('#loading').remove();
   $('#lobby').hidden = false;
-  requestAnimationFrame(frame);
+  renderer.setAnimationLoop(frame);
 })();

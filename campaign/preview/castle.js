@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 'gfx.1 2026-11-12 textured dragon, castles, animals; volcano with lava; living forest (fell / burn) in every mode';
+  const BUILD = 'vr.1 2026-11-12 every mode in VR on Meta Quest (WebXR): campaign with menus, map and stations in the headset';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);

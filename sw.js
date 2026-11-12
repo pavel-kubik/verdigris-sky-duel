@@ -10,7 +10,7 @@
  * - Everything else (PeerJS signalling for co-op) goes straight to the network.
  * Bump VERSION only when the list of precached files changes.
  */
-const VERSION = 'vsd-v21';
+const VERSION = 'vsd-v22';
 const NET_TIMEOUT = 4000;
 const SHELL = [
   './', 'index.html', 'i18n.js', 'pwa.js', 'manifest.webmanifest',

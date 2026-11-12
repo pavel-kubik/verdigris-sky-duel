@@ -145,6 +145,7 @@ p{margin:0;color:var(--mute);line-height:1.45}
 body.mom #toast{top:calc(26% + 72px)}
 #toast.mission small{color:#ffd34d}
 #missionHud{cursor:pointer}
+#vrBtn2{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);height:40px;border-radius:20px;padding:0 12px;font-size:13px;font-weight:700}
 #pauseBtn{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--bone);width:40px;height:40px;border-radius:50%;font-size:14px;font-weight:700}
 #legend{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px 14px;max-width:min(620px,70vw);font-size:12px;color:var(--mute);pointer-events:none}
 kbd{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--bone);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin-right:4px;background:rgba(12,19,16,.5)}
@@ -311,6 +312,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
     <div class="row"><button class="cta" id="badNewBtn" data-i18n="c.save.badNew">Start new</button><button class="ghost" id="badKeepBtn" data-i18n="c.save.badKeep">Keep it</button></div>
   </div>
   <div class="row" id="startRow"><button class="cta" id="startBtn" data-i18n="c.start">Hatch</button><button class="ghost" id="newBtn" hidden data-i18n="c.save.new">New hatchling</button></div>
+  <button class="ghost" id="vrBtn" hidden data-i18n="intro.vr">Enter VR</button>
   <a class="ghost" href="../" data-i18n="c.back">Back to the duel</a>
   <div class="foot"><span data-i18n="c.wipNote">Early build - the world is still forming.</span><div class="langSwitch"></div></div>
   <button class="ghost installBtn" hidden data-i18n="install.btn">Install app</button>
@@ -326,6 +328,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   <div id="regionName"><i id="todIcon" data-phase="day" role="img" aria-label="day"></i><span id="regionText">-</span><span id="alertRow" hidden><i></i><i></i><i></i></span><span id="stageRow"><i id="growRing"></i><small id="stageText">Hatchling</small></span><span id="goldRow" hidden aria-label="Gold" data-i18n-attr="aria-label:c.hud.gold"><i class="coin"></i><small id="goldText">0</small><i id="goldLoot" hidden></i></span></div>
   <div id="hudBtns"><button id="mapBtn" aria-label="Map" data-i18n-attr="aria-label:c.map.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14"/></svg></button>
   <button id="pauseBtn" aria-label="Pause" data-i18n-attr="aria-label:hud.pause">II</button>
+  <button id="vrBtn2" hidden data-i18n="vr.short">VR</button>
   <button id="logBtn" aria-label="Messages" data-i18n-attr="aria-label:c.log.open"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h10l3 3v15H6z M9 9h7 M9 13h7 M9 17h4"/></svg></button>
   </div>
 </div>
@@ -422,7 +425,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
      Load order = dependency order (core: pure logic, then render: THREE-side builders, then game.js). */
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
-    ['../i18n.js', '../pwa.js', '../shared/textures.js', '../shared/dragon.js', '../shared/forest.js', '../shared/forest-view.js',
+    ['../i18n.js', '../pwa.js', '../shared/textures.js', '../shared/dragon.js', '../shared/forest.js', '../shared/forest-view.js', '../shared/xr.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/loot.js', 'core/relics.js', 'core/freed.js',
      'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/caravan.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/story.js', 'core/tips.js', 'core/msglog.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js', 'core/dm.js', 'core/dmnet.js',
      'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/volcano-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/caravan-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'render/story-card.js', 'game.js'
