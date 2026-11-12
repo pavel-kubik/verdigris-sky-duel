@@ -170,7 +170,7 @@ body:not(.tut) .tutOnly{display:none}
     <div><b id="sMesh">-</b><span data-i18n="intro.mesh">Meshes</span></div>
   </div>
   <p data-i18n="intro.text">A green wyrm built from primitives in Three.js. Drag to orbit, scroll or pinch to zoom.</p>
-  <div class="row" style="justify-content:flex-start"><button class="cta" id="tutBtn">Learn to fly</button><button class="ghost" id="startBtn">Start the duel</button></div>
+  <div class="row" style="justify-content:flex-start"><button class="cta" id="tutBtn">Learn to fly</button><button class="ghost" id="startBtn">Start the duel</button><button class="ghost" id="vrBtn" hidden data-i18n="intro.vr">Enter VR</button></div>
   <a class="ghost" href="mp/" style="text-align:center;text-decoration:none" data-i18n="intro.coop">Co-op multiplayer (beta)</a>
   <a class="ghost" href="campaign/dm/" style="text-align:center;text-decoration:none" data-i18n="dm.intro.link">Deathmatch (beta)</a>
   <a class="ghost" href="campaign/" style="text-align:center;text-decoration:none" data-i18n="intro.campaign">Campaign (alpha)</a>
@@ -234,6 +234,7 @@ body:not(.tut) .tutOnly{display:none}
 <script src="shared/dragon.js"></script>
 <script src="shared/forest.js"></script>
 <script src="shared/forest-view.js"></script>
+<script src="shared/xr.js"></script>
 <script>
 (function(){
 "use strict";
@@ -799,6 +800,7 @@ function updIntroBtns(){
 /* ---------- resize ---------- */
 let W=1,Hh=1,dpr=1;
 function resize(){
+  if(renderer.xr.isPresenting)return;
   W=innerWidth;Hh=innerHeight;dpr=Math.min(window.devicePixelRatio||1,2);
   renderer.setSize(W,Hh,false);camera.aspect=W/Hh;camera.updateProjectionMatrix();
   hud.width=W*dpr;hud.height=Hh*dpr;
@@ -979,28 +981,92 @@ function drawHud(){
     }
   });
   if(mode==='tut')tutMarks().forEach(drawMark);
-  // radar
-  const R=52,rx=isTouch?W-R-18:W-R-20,ry=isTouch?176+R:Hh-R-20;
-  hx.fillStyle='rgba(12,19,16,.6)';hx.strokeStyle='rgba(235,227,205,.18)';hx.lineWidth=1;
-  hx.beginPath();hx.arc(rx,ry,R,0,Math.PI*2);hx.fill();hx.stroke();
-  hx.beginPath();hx.arc(rx,ry,R/2,0,Math.PI*2);hx.stroke();
-  hx.fillStyle='#62c48a';hx.beginPath();hx.moveTo(rx,ry-6);hx.lineTo(rx-4,ry+4);hx.lineTo(rx+4,ry+4);hx.closePath();hx.fill();
+  const R=52;
+  drawRadar(hx,isTouch?W-R-18:W-R-20,isTouch?176+R:Hh-R-20,R);
+}
+/* radar: shared by the 2D HUD and the VR panel; k scales the marks with the radius (52 = the 2D HUD) */
+function drawRadar(g,rx,ry,R){
+  const k=R/52;
+  g.fillStyle='rgba(12,19,16,.6)';g.strokeStyle='rgba(235,227,205,.18)';g.lineWidth=k;
+  g.beginPath();g.arc(rx,ry,R,0,Math.PI*2);g.fill();g.stroke();
+  g.beginPath();g.arc(rx,ry,R/2,0,Math.PI*2);g.stroke();
+  g.fillStyle='#62c48a';g.beginPath();g.moveTo(rx,ry-6*k);g.lineTo(rx-4*k,ry+4*k);g.lineTo(rx+4*k,ry+4*k);g.closePath();g.fill();
   const cs=Math.cos(P.yaw),sn=Math.sin(P.yaw);
   foes.forEach(f=>{if(f.dead)return;const dx=f.pos.x-P.pos.x,dz=f.pos.z-P.pos.z;
     // local: forward = up on radar, dragon right = right on radar
-    const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4){px*=(R-4)/l;py*=(R-4)/l;}
-    hx.fillStyle=f.pos.y>P.pos.y+10?'#ff8a8f':f.pos.y<P.pos.y-10?'#a8262c':'#e5484f';hx.beginPath();hx.arc(rx+px,ry+py,3.2,0,Math.PI*2);hx.fill();});
-  if(mode==='tut')tutMarks().forEach(m=>{const dx=m.pos.x-P.pos.x,dz=m.pos.z-P.pos.z;const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4){px*=(R-4)/l;py*=(R-4)/l;}
-    hx.fillStyle=m.col;hx.beginPath();hx.arc(rx+px,ry+py,4,0,Math.PI*2);hx.fill();});
-  hx.fillStyle='rgba(235,227,205,.5)';hx.font='600 10px "Barlow Semi Condensed",sans-serif';hx.textAlign='center';hx.fillText('250 m',rx,ry+R-6);
+    const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4*k){px*=(R-4*k)/l;py*=(R-4*k)/l;}
+    g.fillStyle=f.pos.y>P.pos.y+10?'#ff8a8f':f.pos.y<P.pos.y-10?'#a8262c':'#e5484f';g.beginPath();g.arc(rx+px,ry+py,3.2*k,0,Math.PI*2);g.fill();});
+  if(mode==='tut')tutMarks().forEach(m=>{const dx=m.pos.x-P.pos.x,dz=m.pos.z-P.pos.z;const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4*k){px*=(R-4*k)/l;py*=(R-4*k)/l;}
+    g.fillStyle=m.col;g.beginPath();g.arc(rx+px,ry+py,4*k,0,Math.PI*2);g.fill();});
+  g.fillStyle='rgba(235,227,205,.5)';g.font='600 '+Math.round(10*k)+'px "Barlow Semi Condensed",sans-serif';g.textAlign='center';g.fillText('250 m',rx,ry+R-6*k);
+}
+
+/* ---------- VR (shared/xr.js): Enter VR, Quest controllers, HUD panel ---------- */
+const xrHud=document.createElement('canvas');xrHud.width=640;xrHud.height=320;
+const xg=xrHud.getContext('2d'),xrTex=new THREE.CanvasTexture(xrHud);
+const xrPanel=new THREE.Mesh(new THREE.PlaneGeometry(1.2,.6),new THREE.MeshBasicMaterial({map:xrTex,transparent:true,depthTest:false,depthWrite:false,fog:false}));
+xrPanel.renderOrder=999;xrPanel.frustumCulled=false;xrPanel.visible=false;xrPanel.position.set(0,-1.15,-2);xrPanel.rotation.x=-.52;   // about 30 deg below the eye line (the dragon is at 18), tilted to the player
+let xrHudAt=-Infinity,xrPlayAt=0;
+const xr=VXR.attach({renderer,scene,camera,button:$('#vrBtn'),
+  onStart(){xrPanel.visible=true;xrHudAt=-Infinity;mode='duel';setState('play');},
+  onEnd(){xrPanel.visible=false;xrBarsClear();touch.x=touch.y=0;touch.breath=touch.boost=false;if(state==='play')setState('paused');resize();},
+  onError(){showBanner(t('vr.failed'));}});
+xr.rig.add(xrPanel);
+function xrInput(now){
+  const p=xr.pad();if(!p)return;
+  touch.x=p.sx;touch.y=p.sy;touch.breath=p.breath;touch.boost=p.boost;
+  if(p.ball){if(state==='play')fireBall();else if(state==='over'&&now-xrPlayAt>1200){setState('play');resetGame();}}   // the pause keeps a mashed A from skipping the score
+  if(p.pause){if(state==='play')setState('paused');else if(state==='paused')setState('play');}
+  if(p.roll)doRoll(p.roll);
+  if(state!=='over')xrPlayAt=now;
+}
+function drawXrHud(){
+  const g=xg,font='"Barlow Semi Condensed",sans-serif';
+  g.clearRect(0,0,640,320);g.fillStyle='rgba(12,19,16,.55)';g.fillRect(0,0,640,320);
+  g.textAlign='left';
+  [[t('hud.vitality'),P.hp,'#62c48a',52],[t('hud.fire'),P.st,'#f0a040',122]].forEach(([label,v,col,y])=>{
+    g.fillStyle='#ebe3cd';g.font='600 26px '+font;g.fillText(label,24,y);
+    g.fillStyle='rgba(235,227,205,.18)';g.fillRect(24,y+10,360,18);
+    g.fillStyle=col;g.fillRect(24,y+10,360*Math.max(0,v)/100,18);
+  });
+  g.fillStyle='#ebe3cd';g.font='600 34px '+font;g.fillText(t('hud.wave')+' '+wave+'   '+t('hud.score')+' '+score,24,212);
+  const msg=state==='paused'?t('vr.resume'):state==='over'?t('vr.again'):'';
+  if(msg){g.fillStyle='#ffd27a';g.font='700 38px '+font;g.fillText(msg,24,280);}
+  drawRadar(g,510,160,112);
+  xrTex.needsUpdate=true;
+}
+
+/* floating bars in VR: HP over every foe, HP + fire over the player's head (the 2D HUD draws these on the flat screen) */
+const XR_SLOW=0.5;   // VR plays at half speed: the headset needs more time to read and aim
+const xrBars=[],xrBarGeo=new THREE.PlaneGeometry(1,1).translate(.5,0,0),xrV=new V3();
+function xrBar(parent,w,h,y,col){
+  const g=new THREE.Group(),mk=(c,o)=>{const m=new THREE.Mesh(xrBarGeo,new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:o,depthTest:false,depthWrite:false,fog:false}));m.renderOrder=998;m.frustumCulled=false;return m;};
+  const back=mk(0x0c1310,.6),fill=mk(col,1);fill.renderOrder=999;
+  back.scale.set(w+.3,h+.3,1);back.position.set(-w/2-.15,0,-.01);fill.position.set(-w/2,0,0);
+  g.add(back,fill);g.position.y=y;g.frustumCulled=false;g.userData={w,h,fill};parent.add(g);return g;
+}
+function xrBarSet(b,v){b.userData.fill.scale.set(Math.max(.001,b.userData.w*Math.max(0,Math.min(1,v))),b.userData.h,1);}
+function xrBarsClear(){xrBars.forEach(b=>b.root.parent&&b.root.parent.remove(b.root));xrBars.length=0;}
+function xrBarsUpdate(){
+  camera.getWorldPosition(xrV);
+  for(let i=xrBars.length-1;i>=0;i--){const b=xrBars[i];if(b.f&&(b.f.dead||!foes.includes(b.f))){b.root.parent.remove(b.root);xrBars.splice(i,1);}}
+  foes.forEach(f=>{if(f.dead||xrBars.some(b=>b.f===f))return;const root=new THREE.Group(),hp=xrBar(root,8,.8,0,0xe5484f);scene.add(root);xrBars.push({f,root,hp});});
+  if(!xrBars.some(b=>b.me)){const root=new THREE.Group(),hp=xrBar(root,7,.6,0,0x62c48a),st=xrBar(root,7,.6,-1,0xf0a040);scene.add(root);xrBars.push({me:true,root,hp,st});}
+  xrBars.forEach(b=>{
+    if(b.me){b.root.position.set(P.pos.x,P.pos.y+4.5,P.pos.z);xrBarSet(b.hp,P.hp/100);xrBarSet(b.st,P.st/100);}
+    else{b.root.position.set(b.f.pos.x,b.f.pos.y+6,b.f.pos.z);xrBarSet(b.hp,b.f.hp/b.f.max);}
+    b.root.lookAt(xrV);
+  });
 }
 
 /* ---------- main loop ---------- */
 let last=performance.now();let lastHp=-1,lastSt=-1;
 function frame(now){
-  requestAnimationFrame(frame);
-  let dt=Math.min(0.05,(now-last)/1000);last=now;
+  const inXR=renderer.xr.isPresenting;
+  if(inXR)xrInput(now);
+  let dt=Math.max(0,Math.min(0.05,(now-last)/1000));last=now;   // XR frame times can run ahead of the window clock
   if(state==='paused'||state==='over'||state==='brief'||state==='tutdone')dt=state==='over'?dt*0.25:0;
+  if(inXR)dt*=XR_SLOW;
   time+=dt;
   clouds.forEach((c,i)=>{c.position.x+=dt*(1.5+i%3);if(c.position.x>560)c.position.x=-560;});
 
@@ -1035,14 +1101,17 @@ function frame(now){
     if(dt>0)camPos.lerp(desired,1-Math.exp(-dt*4.5));
     forwardOf(P.yaw,P.pitch,fwd);
     camLook.copy(P.pos).addScaledVector(fwd,12).add(new V3(0,2,0));
-    camera.position.copy(camPos);
-    if(shake>0&&!reduceMotion){camera.position.x+=(Math.random()-.5)*shake*2;camera.position.y+=(Math.random()-.5)*shake*2;}
-    shake=Math.max(0,shake-dt*1.5);
-    camera.lookAt(camLook);
-    const fovT=P.boosting&&state==='play'?72:60;
-    if(Math.abs(camera.fov-fovT)>0.1){camera.fov+=(fovT-camera.fov)*Math.min(1,dt*3);camera.updateProjectionMatrix();pMat.uniforms.uScale.value=(Hh*renderer.getPixelRatio())/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));}
+    if(inXR){xr.follow(camPos,P.yaw+Math.PI,dt);shake=0;pMat.uniforms.uScale.value=xr.pointScale()||pMat.uniforms.uScale.value;}   // no pitch, roll, shake or FOV change in VR
+    else{
+      camera.position.copy(camPos);
+      if(shake>0&&!reduceMotion){camera.position.x+=(Math.random()-.5)*shake*2;camera.position.y+=(Math.random()-.5)*shake*2;}
+      shake=Math.max(0,shake-dt*1.5);
+      camera.lookAt(camLook);
+      const fovT=P.boosting&&state==='play'?72:60;
+      if(Math.abs(camera.fov-fovT)>0.1){camera.fov+=(fovT-camera.fov)*Math.min(1,dt*3);camera.updateProjectionMatrix();pMat.uniforms.uScale.value=(Hh*renderer.getPixelRatio())/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));}
+    }
   }
-  sky.position.copy(camera.position);
+  sky.position.copy(inXR?xr.rig.position:camera.position);
   VForest.step(Fo,dt);if(window.VTex)VTex.tick(time);
   forestView.update(dt,time,camera,renderer.domElement.height);
 
@@ -1054,13 +1123,15 @@ function frame(now){
   hurt=Math.max(0,hurt-dt*1.8);vig.style.opacity=Math.max(hurt,P.hp<30&&state==='play'?0.35+Math.sin(time*5)*0.15:0);
   if(bannerT>0){bannerT-=dt||0.016;if(bannerT<=0)banner.style.opacity=0;}
   renderer.render(scene,camera);
-  drawHud();
+  if(!inXR)drawHud();
+  else if(now-xrHudAt>100){xrHudAt=now;drawXrHud();}
+  if(inXR&&state!=='preview')xrBarsUpdate();
 }
 $('#loading').remove();
 buildPips();updIntroBtns();
 if(window.I18N)I18N.onChange(()=>{updIntroBtns();showStats();$('#viewBtn').textContent=t(mode==='tut'?'pause.exitTut':'pause.view');T.lastStep=T.lastGoal='';updCard();});
 setState('preview');
-requestAnimationFrame(frame);
+renderer.setAnimationLoop(frame);
 })();
 </script>
 
