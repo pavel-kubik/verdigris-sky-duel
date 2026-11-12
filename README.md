@@ -55,6 +55,31 @@ The campaign adds **Grab** (G / Grab button, hold), **Eat** (X / Eat button, hol
 
 Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 
+## Meta Quest 3 (VR)
+
+Every mode plays in immersive VR through WebXR (`shared/xr.js`), with nothing to install: the solo duel, the tutorial, the co-op, the deathmatch and the campaign. On the headset, open the game in Quest Browser and choose **Enter VR** on the start screen of the mode (or the **VR** button at the top once you are flying); the buttons only appear on devices that support VR. Play seated. To leave VR, press the Meta button; single-player modes pause and the flat page comes back.
+
+- **View:** the camera follows the dragon with a level horizon - no pitch, roll, shake or zoom.
+- **Status panel** (below your eye line): vitality and fire, the radar, and what the mode shows on the flat screen - wave and score, the lesson goal, the match clock, or in the campaign hunger, region, gold, mission clock, compass and the current prompt.
+- **Floating bars:** vitality over every foe and teammate, vitality and fire over your own dragon, the roast over a tutorial chicken.
+- **Menus:** whatever panel is open on the flat page (home screen, lesson briefing, pause, lobby, room settings, leaderboard, cave stations, mission board, aerie, map, journal, story cards) is mirrored on a panel in front of you. Flick a stick up or down to choose, press **A** or the right trigger to press the button, **B** to go back. Text fields cannot be typed in VR: enter your name or a room code on the flat page first (an invite link fills the code in).
+- **Speed:** the duel, the tutorial and the campaign run at half speed in VR; the co-op and the deathmatch run at full speed, because all players share one clock.
+
+| Action | Quest controllers |
+|---|---|
+| Turn, climb, dive (walk in the campaign) | Left stick |
+| Fire breath (hold) | Right trigger |
+| Boost (hold) | Left trigger |
+| Barrel roll | Flick the right stick left / right |
+| Fireball (duel, tutorial, co-op, deathmatch) | A |
+| Pause / menu / back | B |
+| Deathmatch: sit down / fly, leaderboard | X, Y |
+| Campaign: land, take off, fly on, enter, use a cave station | A |
+| Campaign: grab / eat (hold) | Right grip |
+| Campaign: journal, map | X, Y |
+
+In the campaign the status panel names what **A** and the grip do right now (the same context buttons as on a phone). The hatching cutscene is skipped in VR - the hatching card follows at once.
+
 ## Campaign (alpha, `/campaign/`)
 
 - **Play:** https://pavel-kubik.github.io/verdigris-sky-duel/campaign/ (or **Campaign (alpha)** on the home screen)

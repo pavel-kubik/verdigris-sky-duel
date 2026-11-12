@@ -170,7 +170,7 @@ body:not(.tut) .tutOnly{display:none}
     <div><b id="sMesh">-</b><span data-i18n="intro.mesh">Meshes</span></div>
   </div>
   <p data-i18n="intro.text">A green wyrm built from primitives in Three.js. Drag to orbit, scroll or pinch to zoom.</p>
-  <div class="row" style="justify-content:flex-start"><button class="cta" id="tutBtn">Learn to fly</button><button class="ghost" id="startBtn">Start the duel</button></div>
+  <div class="row" style="justify-content:flex-start"><button class="cta" id="tutBtn">Learn to fly</button><button class="ghost" id="startBtn">Start the duel</button><button class="ghost" id="vrBtn" hidden data-i18n="intro.vr">Enter VR</button></div>
   <a class="ghost" href="mp/" style="text-align:center;text-decoration:none" data-i18n="intro.coop">Co-op multiplayer (beta)</a>
   <a class="ghost" href="campaign/dm/" style="text-align:center;text-decoration:none" data-i18n="dm.intro.link">Deathmatch (beta)</a>
   <a class="ghost" href="campaign/" style="text-align:center;text-decoration:none" data-i18n="intro.campaign">Campaign (alpha)</a>
@@ -234,6 +234,7 @@ body:not(.tut) .tutOnly{display:none}
 <script src="shared/dragon.js"></script>
 <script src="shared/forest.js"></script>
 <script src="shared/forest-view.js"></script>
+<script src="shared/xr.js"></script>
 <script>
 (function(){
 "use strict";
@@ -728,11 +729,15 @@ function brief(i){
   T.speed=L.speed;T.canEat=!L.noEat;setUnlocks(L.unlock);
   if(L.reset!=null)resetPose(L.reset);
   L.setup();
-  $('#bfEye').textContent=t('tut.briefEye',{i:i+1,n:LESSONS.length,grp:t('tut.grp.'+L.grp)});
-  $('#bfTitle').textContent=LT(L);$('#bfText').textContent=t('l.'+L.k+'.text');
-  $('#bfKeys').innerHTML=(isTouch?L.touch.map(r=>[K(t(r[0]).replace(/ /g,' ')),t(r[1])]):L.desk.map(r=>[K(r[0]),t(r[1])])).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
+  briefText();
   $('#bfInvertRow').hidden=!L.invert;$('#bfInvert').checked=invert;
   updCard();setState('brief');
+}
+function briefText(){
+  const L=T.lesson,i=T.i,vr=renderer.xr.isPresenting;if(!L||L===FREE)return;
+  $('#bfEye').textContent=t('tut.briefEye',{i:i+1,n:LESSONS.length,grp:t('tut.grp.'+L.grp)});
+  $('#bfTitle').textContent=LT(L);$('#bfText').textContent=t('l.'+L.k+(vr&&VR_TEXT[L.k]?'.textVr':'.text'));
+  $('#bfKeys').innerHTML=(vr?L.desk.map(r=>['<kbd>'+t(VR_KEYS[r[0]])+'</kbd>',t(r[1])]):isTouch?L.touch.map(r=>[K(t(r[0]).replace(/ /g,' ')),t(r[1])]):L.desk.map(r=>[K(r[0]),t(r[1])])).map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
 }
 function tutGo(){if(state==='brief')setState('play');}
 function tutNext(){
@@ -799,6 +804,7 @@ function updIntroBtns(){
 /* ---------- resize ---------- */
 let W=1,Hh=1,dpr=1;
 function resize(){
+  if(renderer.xr.isPresenting)return;
   W=innerWidth;Hh=innerHeight;dpr=Math.min(window.devicePixelRatio||1,2);
   renderer.setSize(W,Hh,false);camera.aspect=W/Hh;camera.updateProjectionMatrix();
   hud.width=W*dpr;hud.height=Hh*dpr;
@@ -979,28 +985,70 @@ function drawHud(){
     }
   });
   if(mode==='tut')tutMarks().forEach(drawMark);
-  // radar
-  const R=52,rx=isTouch?W-R-18:W-R-20,ry=isTouch?176+R:Hh-R-20;
-  hx.fillStyle='rgba(12,19,16,.6)';hx.strokeStyle='rgba(235,227,205,.18)';hx.lineWidth=1;
-  hx.beginPath();hx.arc(rx,ry,R,0,Math.PI*2);hx.fill();hx.stroke();
-  hx.beginPath();hx.arc(rx,ry,R/2,0,Math.PI*2);hx.stroke();
-  hx.fillStyle='#62c48a';hx.beginPath();hx.moveTo(rx,ry-6);hx.lineTo(rx-4,ry+4);hx.lineTo(rx+4,ry+4);hx.closePath();hx.fill();
+  const R=52;
+  drawRadar(hx,isTouch?W-R-18:W-R-20,isTouch?176+R:Hh-R-20,R);
+}
+/* radar: shared by the 2D HUD and the VR panel; k scales the marks with the radius (52 = the 2D HUD) */
+function drawRadar(g,rx,ry,R){
+  const k=R/52;
+  g.fillStyle='rgba(12,19,16,.6)';g.strokeStyle='rgba(235,227,205,.18)';g.lineWidth=k;
+  g.beginPath();g.arc(rx,ry,R,0,Math.PI*2);g.fill();g.stroke();
+  g.beginPath();g.arc(rx,ry,R/2,0,Math.PI*2);g.stroke();
+  g.fillStyle='#62c48a';g.beginPath();g.moveTo(rx,ry-6*k);g.lineTo(rx-4*k,ry+4*k);g.lineTo(rx+4*k,ry+4*k);g.closePath();g.fill();
   const cs=Math.cos(P.yaw),sn=Math.sin(P.yaw);
   foes.forEach(f=>{if(f.dead)return;const dx=f.pos.x-P.pos.x,dz=f.pos.z-P.pos.z;
     // local: forward = up on radar, dragon right = right on radar
-    const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4){px*=(R-4)/l;py*=(R-4)/l;}
-    hx.fillStyle=f.pos.y>P.pos.y+10?'#ff8a8f':f.pos.y<P.pos.y-10?'#a8262c':'#e5484f';hx.beginPath();hx.arc(rx+px,ry+py,3.2,0,Math.PI*2);hx.fill();});
-  if(mode==='tut')tutMarks().forEach(m=>{const dx=m.pos.x-P.pos.x,dz=m.pos.z-P.pos.z;const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4){px*=(R-4)/l;py*=(R-4)/l;}
-    hx.fillStyle=m.col;hx.beginPath();hx.arc(rx+px,ry+py,4,0,Math.PI*2);hx.fill();});
-  hx.fillStyle='rgba(235,227,205,.5)';hx.font='600 10px "Barlow Semi Condensed",sans-serif';hx.textAlign='center';hx.fillText('250 m',rx,ry+R-6);
+    const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4*k){px*=(R-4*k)/l;py*=(R-4*k)/l;}
+    g.fillStyle=f.pos.y>P.pos.y+10?'#ff8a8f':f.pos.y<P.pos.y-10?'#a8262c':'#e5484f';g.beginPath();g.arc(rx+px,ry+py,3.2*k,0,Math.PI*2);g.fill();});
+  if(mode==='tut')tutMarks().forEach(m=>{const dx=m.pos.x-P.pos.x,dz=m.pos.z-P.pos.z;const lf=dx*sn+dz*cs,lr=-(dx*cs-dz*sn);let px=lr/250*R,py=-lf/250*R;const l=Math.hypot(px,py);if(l>R-4*k){px*=(R-4*k)/l;py*=(R-4*k)/l;}
+    g.fillStyle=m.col;g.beginPath();g.arc(rx+px,ry+py,4*k,0,Math.PI*2);g.fill();});
+  g.fillStyle='rgba(235,227,205,.5)';g.font='600 '+Math.round(10*k)+'px "Barlow Semi Condensed",sans-serif';g.textAlign='center';g.fillText('250 m',rx,ry+R-6*k);
+}
+
+/* ---------- VR (shared/xr.js): Enter VR, Quest controllers, HUD panel, the menus of the flat page mirrored in the headset ---------- */
+const VR_KEYS={'A D':'vr.k.turn','W':'vr.k.fwd','S':'vr.k.back','W S':'vr.k.pitch','A D W S':'vr.k.stick','Shift':'vr.k.boost','Space':'vr.k.breath','F':'vr.k.ball','Q':'vr.k.rollL','E':'vr.k.rollR','Q E':'vr.k.roll'};
+const VR_TEXT={find:1,boost:1,roll:1,hunt:1};   // lessons whose briefing names keys or screen corners have a headset wording
+const xrMenus={preview:'#intro',brief:'#brief',paused:'#pause',over:'#over',tutdone:'#tutDone'};
+const xrHome=new V3(0,92,26);
+const xr=VXR.attach({renderer,scene,camera,button:$('#vrBtn'),skip:'#vrBtn,.langSwitch,.installBtn,.enterk',
+  onStart(){if(state==='brief')briefText();},
+  onEnd(){touch.x=touch.y=0;touch.breath=touch.boost=false;if(state==='play')setState('paused');if(state==='brief')briefText();resize();},
+  onError(){showBanner(t('vr.failed'));}});
+function xrInput(now){
+  const p=xr.frame(now,xrMenus[state]?$(xrMenus[state]):null);if(!p)return;
+  touch.x=p.sx;touch.y=p.sy;touch.breath=p.breath;touch.boost=p.boost;
+  if(p.ball)fireBall();
+  if(p.pause){if(state==='play')setState('paused');else if(state==='paused')setState('play');}
+  if(p.roll)doRoll(p.roll);
+}
+function drawXrHud(g){
+  VXR.hudBar(g,t('hud.vitality'),P.hp/100,'#62c48a',24,44,360);
+  VXR.hudBar(g,t('hud.fire'),P.st/100,'#f0a040',24,108,360);
+  const tut=mode==='tut'&&T.lesson;
+  let y=VXR.hudText(g,tut?T.lastGoal:t('hud.wave')+' '+wave+'   '+t('hud.score')+' '+score,24,176,370,tut?26:34,'#ebe3cd',2);
+  const msg=state==='paused'?t('vr.resume'):+rollEl.style.opacity>0?t('tut.rollNow'):bannerT>0?VXR.textOf(banner):tut&&T.tipT>0?$('#tcTip').textContent:'';
+  if(msg)VXR.hudText(g,msg,24,Math.max(y+8,252),370,30,'#ffd27a',2);
+  drawRadar(g,510,160,112);
+}
+/* floating bars in VR: HP over every foe, HP + fire over the player's head, the roast over a chicken (the 2D HUD draws these on the flat screen) */
+function xrBars(){
+  const list=[];
+  if(state!=='preview'){
+    foes.forEach((f,i)=>{if(!f.dead)list.push({id:f,x:f.pos.x,y:f.pos.y+6,z:f.pos.z,w:8,rows:[[f.hp/f.max,0xe5484f]]});});
+    list.push({id:'me',x:P.pos.x,y:P.pos.y+4.5,z:P.pos.z,w:7,h:.6,rows:[[P.hp/100,0x62c48a],[P.st/100,0xf0a040]]});
+    if(mode==='tut')T.chickens.forEach(c=>{if(!c.gone)list.push({id:c,x:c.center.x,y:c.center.y+3.5,z:c.center.z,w:5,rows:[[c.cook/100,c.cook>=100?0x62c48a:0xff9447]]});});
+  }
+  xr.bars(list);
 }
 
 /* ---------- main loop ---------- */
 let last=performance.now();let lastHp=-1,lastSt=-1;
 function frame(now){
-  requestAnimationFrame(frame);
-  let dt=Math.min(0.05,(now-last)/1000);last=now;
+  const inXR=renderer.xr.isPresenting;
+  if(inXR)xrInput(now);
+  let dt=Math.max(0,Math.min(0.05,(now-last)/1000));last=now;   // XR frame times can run ahead of the window clock
   if(state==='paused'||state==='over'||state==='brief'||state==='tutdone')dt=state==='over'?dt*0.25:0;
+  if(inXR)dt*=VXR.SLOW;   // VR plays at half speed: the headset needs more time to read and aim
   time+=dt;
   clouds.forEach((c,i)=>{c.position.x+=dt*(1.5+i%3);if(c.position.x>560)c.position.x=-560;});
 
@@ -1011,10 +1059,13 @@ function frame(now){
     hero.root.updateMatrixWorld(true);hero.mouth.getWorldPosition(mouthW);
     if(Math.sin(time*0.7)>0.88){forwardOf(0,-0.1,fwd);for(let i=0;i<2;i++)spawnP(mouthW.x,mouthW.y,mouthW.z,fwd.x*30+(Math.random()-.5)*4,fwd.y*30+(Math.random()-.5)*4,fwd.z*30,0.6,0.7,4,0,0,1.2);}
     orbit.idle+=dt;if(orbit.idle>2.5&&orbit.pts.size===0)orbit.th+=dt*0.22;
-    const tgt=new V3(0,90+0.2,0.3);
-    camera.position.set(tgt.x+Math.sin(orbit.th)*Math.cos(orbit.ph)*orbit.dist,tgt.y+Math.sin(orbit.ph)*orbit.dist,tgt.z+Math.cos(orbit.th)*Math.cos(orbit.ph)*orbit.dist);
-    camera.lookAt(tgt);
-    if(W>720)camera.setViewOffset(W,Hh,-185,0,W,Hh);else camera.setViewOffset(W,Hh,0,Hh*0.2,W,Hh);
+    if(inXR)xr.follow(xrHome,0,null);   // VR: a seat in front of the dragon, the home menu on the panel
+    else{
+      const tgt=new V3(0,90+0.2,0.3);
+      camera.position.set(tgt.x+Math.sin(orbit.th)*Math.cos(orbit.ph)*orbit.dist,tgt.y+Math.sin(orbit.ph)*orbit.dist,tgt.z+Math.cos(orbit.th)*Math.cos(orbit.ph)*orbit.dist);
+      camera.lookAt(tgt);
+      if(W>720)camera.setViewOffset(W,Hh,-185,0,W,Hh);else camera.setViewOffset(W,Hh,0,Hh*0.2,W,Hh);
+    }
     updateParticles(dt);
   }else{
     if(camera.view&&camera.view.enabled)camera.clearViewOffset();
@@ -1035,16 +1086,19 @@ function frame(now){
     if(dt>0)camPos.lerp(desired,1-Math.exp(-dt*4.5));
     forwardOf(P.yaw,P.pitch,fwd);
     camLook.copy(P.pos).addScaledVector(fwd,12).add(new V3(0,2,0));
-    camera.position.copy(camPos);
-    if(shake>0&&!reduceMotion){camera.position.x+=(Math.random()-.5)*shake*2;camera.position.y+=(Math.random()-.5)*shake*2;}
-    shake=Math.max(0,shake-dt*1.5);
-    camera.lookAt(camLook);
-    const fovT=P.boosting&&state==='play'?72:60;
-    if(Math.abs(camera.fov-fovT)>0.1){camera.fov+=(fovT-camera.fov)*Math.min(1,dt*3);camera.updateProjectionMatrix();pMat.uniforms.uScale.value=(Hh*renderer.getPixelRatio())/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));}
+    if(inXR){xr.follow(camPos,P.yaw+Math.PI,dt);shake=0;pMat.uniforms.uScale.value=xr.pointScale()||pMat.uniforms.uScale.value;}   // no pitch, roll, shake or FOV change in VR
+    else{
+      camera.position.copy(camPos);
+      if(shake>0&&!reduceMotion){camera.position.x+=(Math.random()-.5)*shake*2;camera.position.y+=(Math.random()-.5)*shake*2;}
+      shake=Math.max(0,shake-dt*1.5);
+      camera.lookAt(camLook);
+      const fovT=P.boosting&&state==='play'?72:60;
+      if(Math.abs(camera.fov-fovT)>0.1){camera.fov+=(fovT-camera.fov)*Math.min(1,dt*3);camera.updateProjectionMatrix();pMat.uniforms.uScale.value=(Hh*renderer.getPixelRatio())/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));}
+    }
   }
-  sky.position.copy(camera.position);
+  sky.position.copy(inXR?xr.rig.position:camera.position);
   VForest.step(Fo,dt);if(window.VTex)VTex.tick(time);
-  forestView.update(dt,time,camera,renderer.domElement.height);
+  if(inXR){const v=xr.view();forestView.update(dt,time,v,v.viewH);}else forestView.update(dt,time,camera,renderer.domElement.height);
 
   // DOM HUD
   const hp=Math.round(P.hp),st=Math.round(P.st);
@@ -1054,13 +1108,14 @@ function frame(now){
   hurt=Math.max(0,hurt-dt*1.8);vig.style.opacity=Math.max(hurt,P.hp<30&&state==='play'?0.35+Math.sin(time*5)*0.15:0);
   if(bannerT>0){bannerT-=dt||0.016;if(bannerT<=0)banner.style.opacity=0;}
   renderer.render(scene,camera);
-  drawHud();
+  if(!inXR)drawHud();
+  else{xr.drawHud(now,drawXrHud);xrBars();}
 }
 $('#loading').remove();
 buildPips();updIntroBtns();
 if(window.I18N)I18N.onChange(()=>{updIntroBtns();showStats();$('#viewBtn').textContent=t(mode==='tut'?'pause.exitTut':'pause.view');T.lastStep=T.lastGoal='';updCard();});
 setState('preview');
-requestAnimationFrame(frame);
+renderer.setAnimationLoop(frame);
 })();
 </script>
 
