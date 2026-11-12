@@ -45,8 +45,11 @@
 
   /** Merges [geometry, colour, weather?] parts into one non-indexed geometry with colours. weather: stone gets darker
    *  toward the ground and mossy in the lowest metre (a vertex-colour gradient). */
+  /* texture of a part by its colour (VTex.detail kinds): 0 masonry, 1 roof slates, 2 timber, 3 thatch, 4 plain */
+  const TEXK = {};
+  [[1, ['slate', 'lead', 'spire']], [2, ['timber', 'darkWood', 'shingle']], [3, ['thatch']], [4, ['order', 'gold', 'slit', 'iron', 'win']]].forEach(([k, names]) => names.forEach(n => { TEXK[COL[n]] = k; }));
   function merge(parts) {
-    const pos = [], nor = [], col = [], c = new THREE.Color(), moss = new THREE.Color(COL.moss);
+    const pos = [], nor = [], col = [], tk = [], c = new THREE.Color(), moss = new THREE.Color(COL.moss);
     for (const [g0, hex, weather] of parts) {
       const g = g0.index ? g0.toNonIndexed() : g0;
       g.computeVertexNormals();
@@ -58,11 +61,12 @@
           c.multiplyScalar(k);
           if (y < 1.2) c.lerp(moss, 0.45 * (1 - y / 1.2));
         }
-        pos.push(p[i], p[i + 1], p[i + 2]); nor.push(n[i], n[i + 1], n[i + 2]); col.push(c.r, c.g, c.b);
+        pos.push(p[i], p[i + 1], p[i + 2]); nor.push(n[i], n[i + 1], n[i + 2]); col.push(c.r, c.g, c.b); tk.push(TEXK[hex] || 0);
       }
       g.dispose(); if (g !== g0) g0.dispose();
     }
     const out = new THREE.BufferGeometry();
+    out.setAttribute('vtk', new THREE.Float32BufferAttribute(tk, 1));
     out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -72,10 +76,10 @@
   /** Concatenates already merged (non-indexed, coloured) geometries. */
   function mergeGeos(list) {
     const out = new THREE.BufferGeometry();
-    for (const a of ['position', 'normal', 'color']) {
+    for (const a of ['position', 'normal', 'color', 'vtk']) {
       const arr = new Float32Array(list.reduce((n, g) => n + g.attributes[a].array.length, 0));
       let o = 0; for (const g of list) { arr.set(g.attributes[a].array, o); o += g.attributes[a].array.length; }
-      out.setAttribute(a, new THREE.BufferAttribute(arr, 3));
+      out.setAttribute(a, new THREE.BufferAttribute(arr, a === 'vtk' ? 1 : 3));
     }
     for (const g of list) g.dispose();
     out.computeBoundingSphere();
@@ -299,8 +303,14 @@
     const tier = opts.tier || 'mid', K = D.castle;
     const group = new THREE.Group(), full = new THREE.Group(), sil = new THREE.Group();
     group.add(full, sil);
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const matC = new THREE.MeshLambertMaterial({ vertexColors: true });   // T06: the instance-coloured (charrable) pieces
+    // textured masonry, slates and timber (shared/textures.js); the low tier keeps the cheap vertex-lit material
+    const mk0 = () => {
+      const m = tier === 'low' || !root.VTex ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+      if (root.VTex) root.VTex.detail(m, { map: 'stone', kinds: ['roof', 'wood', 'thatch'], scale: 7, strength: 0.6, bump: 1.4, local: true });
+      return m;
+    };
+    const mat = mk0();
+    const matC = mk0();   // T06: the instance-coloured (charrable) pieces
     const geos = models(tier), meshes = [], disposables = [mat, matC];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
 

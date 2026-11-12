@@ -10,7 +10,8 @@
  *   detail(material, opts)   -> material: adds a triplanar detail texture to any lit material without UVs
  *       opts: { map (texture or name), scale (world units per tile), strength (0..1 albedo), bump (0 = off),
  *               local (object space, for things that move: animals, falling trees),
- *               top (texture or name for upward faces), topScale }
+ *               top (texture or name for upward faces), topScale,
+ *               kinds: [a, b, c] textures for vertices whose float attribute `vtk` is 1, 2, 3 (0 = map, 4 = plain) }
  *       The detail texture is authored around mid grey, so vertex colours and instance colours keep their palette.
  *       Bump needs a per-pixel lit material (MeshStandardMaterial / MeshPhongMaterial); on MeshLambertMaterial only
  *       the albedo is textured.
@@ -302,8 +303,11 @@
   }
 
   /* ---------- triplanar detail for materials without UVs ---------- */
-  const VERT_PARS = 'varying vec3 vtPos;\nvarying vec3 vtNrm;\n';
+  const VERT_PARS = 'varying vec3 vtPos;\nvarying vec3 vtNrm;\n#ifdef VT_KINDS\nattribute float vtk;\nvarying float vtK;\n#endif\n';
   const VERT_MAIN = [
+    '#ifdef VT_KINDS',
+    '  vtK = vtk;',
+    '#endif',
     '#ifdef VT_LOCAL',
     '  vtPos = position; vtNrm = normal;',
     '#else',
@@ -317,12 +321,18 @@
   const FRAG_PARS = [
     'uniform sampler2D vtMap;', 'uniform vec4 vtP;', 'varying vec3 vtPos;', 'varying vec3 vtNrm;',
     '#ifdef VT_TOP', 'uniform sampler2D vtTop;', '#endif',
+    '#ifdef VT_KINDS', 'uniform sampler2D vtMap1;', 'uniform sampler2D vtMap2;', 'uniform sampler2D vtMap3;', 'varying float vtK;', '#endif',
     'vec3 vtTri( sampler2D m, vec3 q, vec3 b ) { return texture2D( m, q.zy ).rgb * b.x + texture2D( m, q.xz ).rgb * b.y + texture2D( m, q.xy ).rgb * b.z; }',
   ].join('\n');
   const FRAG_COL = [
     '{',
     '  vec3 vtN = normalize( vtNrm ); vec3 vtB = max( abs( vtN ) - 0.18, 0.0 ); vtB /= ( vtB.x + vtB.y + vtB.z + 1e-4 );',
-    '  vec3 vtC = vtTri( vtMap, vtPos * vtP.x, vtB );',
+    '  vec3 vtC;',
+    '  #ifdef VT_KINDS',
+    '    if ( vtK > 3.5 ) vtC = vec3( 0.5 ); else if ( vtK > 2.5 ) vtC = vtTri( vtMap3, vtPos * vtP.x, vtB ); else if ( vtK > 1.5 ) vtC = vtTri( vtMap2, vtPos * vtP.x, vtB ); else if ( vtK > 0.5 ) vtC = vtTri( vtMap1, vtPos * vtP.x, vtB ); else vtC = vtTri( vtMap, vtPos * vtP.x, vtB );',
+    '  #else',
+    '    vtC = vtTri( vtMap, vtPos * vtP.x, vtB );',
+    '  #endif',
     '  #ifdef VT_TOP',
     '    vtC = mix( vtC, texture2D( vtTop, vtPos.xz * vtP.w ).rgb, smoothstep( 0.62, 0.86, vtN.y ) );',
     '  #endif',
@@ -339,8 +349,17 @@
     '  if ( vtA.x > vtA.y && vtA.x > vtA.z ) { vtU = vtQ.zy; vtUx = vtQx.zy; vtUy = vtQy.zy; }',
     '  else if ( vtA.y > vtA.z ) { vtU = vtQ.xz; vtUx = vtQx.xz; vtUy = vtQy.xz; }',
     '  else { vtU = vtQ.xy; vtUx = vtQx.xy; vtUy = vtQy.xy; }',
-    '  float vtH0 = texture2D( vtMap, vtU ).g;',
-    '  vec2 vtD = vec2( texture2D( vtMap, vtU + vtUx ).g - vtH0, texture2D( vtMap, vtU + vtUy ).g - vtH0 ) * vtP.z;',
+    '  vec2 vtD;',
+    '  #ifdef VT_KINDS',
+    '    if ( vtK > 3.5 ) vtD = vec2( 0.0 );',
+    '    else if ( vtK > 2.5 ) vtD = vec2( texture2D( vtMap3, vtU + vtUx ).g, texture2D( vtMap3, vtU + vtUy ).g ) - texture2D( vtMap3, vtU ).g;',
+    '    else if ( vtK > 1.5 ) vtD = vec2( texture2D( vtMap2, vtU + vtUx ).g, texture2D( vtMap2, vtU + vtUy ).g ) - texture2D( vtMap2, vtU ).g;',
+    '    else if ( vtK > 0.5 ) vtD = vec2( texture2D( vtMap1, vtU + vtUx ).g, texture2D( vtMap1, vtU + vtUy ).g ) - texture2D( vtMap1, vtU ).g;',
+    '    else vtD = vec2( texture2D( vtMap, vtU + vtUx ).g, texture2D( vtMap, vtU + vtUy ).g ) - texture2D( vtMap, vtU ).g;',
+    '  #else',
+    '    vtD = vec2( texture2D( vtMap, vtU + vtUx ).g, texture2D( vtMap, vtU + vtUy ).g ) - texture2D( vtMap, vtU ).g;',
+    '  #endif',
+    '  vtD *= vtP.z;',
     '  vec3 vtSx = dFdx( -vViewPosition ), vtSy = dFdy( -vViewPosition );',
     '  vec3 vtR1 = cross( vtSy, normal ), vtR2 = cross( normal, vtSx );',
     '  float vtDet = dot( vtSx, vtR1 );',
@@ -358,10 +377,13 @@
     const bump = lit && Q > 0 ? (opts.bump == null ? 1 : opts.bump) : 0;
     const U = { vtMap: { value: map }, vtP: { value: new THREE.Vector4(1 / (opts.scale || 8), opts.strength == null ? 0.6 : opts.strength, bump * 1.6, 1 / (opts.topScale || opts.scale || 8)) } };
     if (top) U.vtTop = { value: top };
+    const kinds = opts.kinds ? opts.kinds.map(get) : null;
+    if (kinds) { U.vtMap1 = { value: kinds[0] || map }; U.vtMap2 = { value: kinds[1] || map }; U.vtMap3 = { value: kinds[2] || map }; }
     mat.defines = Object.assign({}, mat.defines || {});
     if (opts.local) mat.defines.VT_LOCAL = '';
     if (bump > 0) mat.defines.VT_BUMP = '';
     if (top) mat.defines.VT_TOP = '';
+    if (kinds) mat.defines.VT_KINDS = '';
     mat.extensions = Object.assign({}, mat.extensions || {}, { derivatives: true });
     const prev = mat.onBeforeCompile, prevKey = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
     mat.onBeforeCompile = function (sh, r) {
