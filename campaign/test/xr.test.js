@@ -6,7 +6,7 @@ const { ok } = require('./harness.js');
 
 const root = path.join(__dirname, '..', '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const { mapPads, menuNav, wrapText, SLOW } = require('../../shared/xr.js');
+const { mapPads, menuNav, wrapText, SLOW, comfort } = require('../../shared/xr.js');
 
 const near = (a, b) => Math.abs(a - b) < 1e-9;
 /** xr-standard pad: buttons by index (true = pressed, number = analog value), axes [0, 0, stickX, stickY]. */
@@ -73,6 +73,15 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   ok(mapPads(null, pad({ 1: true }), mapPads(null, pad({ 1: true })).prev).grip, 'a grip stays held (not an edge)');
 }
 
+/* ---------- stick clicks: one-frame edges (left: the debug overlay, right: the comfort menu) ---------- */
+{
+  let m = mapPads(pad({ 3: true }), null, null);
+  ok(m.ls && !m.rs, 'a click of the left stick is ls');
+  ok(!mapPads(pad({ 3: true }), null, m.prev).ls, 'holding the stick down does not repeat');
+  m = mapPads(null, pad({ 3: true }), null);
+  ok(m.rs && !m.ls && !m.ball && !m.pause, 'a click of the right stick is rs and nothing else');
+}
+
 /* ---------- menu: a stick flick up / down is one step, the right trigger confirms once ---------- */
 {
   let m = mapPads(pad({}, 0, 0.9), null, null);
@@ -98,6 +107,23 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   ok(wrapText('abcdefghijkl x', 5, w).join('|') === 'abcdefghijkl|x', 'a long word gets its own line');
   ok(wrapText('', 5, w).length === 0 && wrapText(null, 5, w).length === 0, 'no text, no lines');
   ok(SLOW > 0 && SLOW <= 1, 'the VR time scale slows the single-player modes, never speeds them up');
+}
+
+/* ---------- comfort settings: defaults, stored values, URL overrides ---------- */
+{
+  const C = comfort, store = v => ({ v, getItem() { return this.v; }, setItem(k, x) { this.k = k; this.v = x; } });
+  const d = C.defaults();
+  for (const k in C.OPTIONS) ok(d[k] === C.OPTIONS[k][0] || C.PRESETS.recommended[k] === d[k], 'default of ' + k + ' is its first option or the Recommended preset');
+  ok(d.preset === 'recommended' && d.debug === false, 'a new player gets the Recommended preset, the debug overlay off');
+  ok(JSON.stringify(C.load(null, '')) === JSON.stringify(d), 'no storage (private mode): the defaults');
+  ok(JSON.stringify(C.load(store('{broken'), '')) === JSON.stringify(d), 'a broken stored value: the defaults');
+  ok(JSON.stringify(C.load({ getItem() { throw new Error('denied'); } }, '')) === JSON.stringify(d), 'storage that throws: the defaults');
+  ok(C.sanitize({ debug: 'yes', preset: 'nope', extra: 1 }).debug === false && C.sanitize({ extra: 1 }).extra === undefined, 'unknown values and keys are dropped');
+  ok(C.load(store('{"debug":true}'), '').debug === true, 'a stored value is read');
+  ok(C.load(store('{"debug":true}'), '?v=3&comfort=debug:false').debug === false, '?comfort=key:value overrides the stored value');
+  const s = store(null);
+  ok(C.save(s, C.set(C.defaults(), 'debug', true)) && s.k === C.KEY && JSON.parse(s.v).debug === true, 'save writes JSON under the comfort key');
+  ok(C.save({ setItem() { throw new Error('full'); } }, d) === false, 'a failed save is reported, not thrown');
 }
 
 /* ---------- page wiring ---------- */

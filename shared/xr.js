@@ -3,8 +3,11 @@
  * the tutorial, the co-op, the deathmatch and the campaign. Runs in the browser (window.VXR); the pure parts (mapPads, menuNav,
  * wrapText) also run in Node for tests.
  *   VXR.SLOW                         time scale of the single-player modes in VR (the headset needs more time to read and aim)
- *   VXR.mapPads(left, right, prev) -> { sx, sy, breath, boost, ball, pause, roll, x, y, grip, gripL, nav, ok, prev }
+ *   VXR.mapPads(left, right, prev) -> { sx, sy, breath, boost, ball, pause, roll, x, y, grip, gripL, nav, ok, ls, rs, prev }
  *     pure; left / right are Gamepads or null; pass the returned prev back in on the next frame
+ *   VXR.comfort                      the VR comfort settings (pure): OPTIONS, PRESETS, defaults(), sanitize(), preset(), set(),
+ *     load(storage, search), save(storage, s). Stored in localStorage 'vsd-comfort'; ?comfort=key:value,key:value overrides
+ *     for one page load (test links). Nothing here runs outside an immersive session.
  *   VXR.menuNav(sel, n, nav) -> the new selected row (clamped)
  *   VXR.attach({ renderer, scene, camera, button, skip, onStart, onEnd, onError }) -> xr
  *     button: an element or a list of them; they stay hidden unless the device supports immersive VR, a click enters VR
@@ -23,12 +26,15 @@
  *     xr.drawHud(now, fn): redraws the status panel below the eye line 10 times a second; fn(g, w, h) paints on it
  *     xr.bars(list): floating bars in the world, [{ id, x, y, z, w, rows: [[value 0..1, colour], ...] }]; [] removes them
  *     xr.pointScale(): the eye-buffer equivalent of height / (2 tan(fov / 2)) for point sprites, or 0 before the first VR frame
+ *     xr.cf: the comfort settings in use; xr.setComfort(key, value) changes one (and stores it)
+ *   Debug overlay (head-locked, small): click the LEFT stick in VR. Frame time, fps, CPU time per frame, draw calls,
+ *     triangles, speed and turn rate of the view.
  */
 (function (root) {
   'use strict';
   const DEAD = 0.15, FLICK_ON = 0.7, FLICK_OFF = 0.3, YAW_RATE = 6, SLOW = 0.5;
   // xr-standard layout (WebXR Gamepads Module)
-  const TRIGGER = 0, GRIP = 1, FACE_LOW = 4, FACE_HIGH = 5, STICK_X = 2, STICK_Y = 3;
+  const TRIGGER = 0, GRIP = 1, STICK = 3, FACE_LOW = 4, FACE_HIGH = 5, STICK_X = 2, STICK_Y = 3;
   const FONT = '"Barlow Semi Condensed",sans-serif';
 
   const axis = (gp, i) => (gp && gp.axes && +gp.axes[i]) || 0;
@@ -37,17 +43,17 @@
   /**
    * Left stick steers (up = positive sy), right trigger breathes, left trigger boosts, A is the fireball, B pauses and a flick of
    * the right stick rolls. X and Y (left controller) and the grips are for the mode to use. nav is a flick of either stick up
-   * (-1) or down (+1) and ok a press of the right trigger: the VR menu uses them. ball, pause, roll, x, y, nav and ok are
-   * one-frame edges.
+   * (-1) or down (+1) and ok a press of the right trigger: the VR menu uses them. ls and rs are clicks of the left and the right
+   * stick (the debug overlay and the comfort menu). ball, pause, roll, x, y, nav, ok, ls and rs are one-frame edges.
    */
   function mapPads(left, right, prev) {
-    const p = prev || { a: false, b: false, x: false, y: false, t: false, flick: 0, navF: 0 };
+    const p = prev || { a: false, b: false, x: false, y: false, t: false, ls: false, rs: false, flick: 0, navF: 0 };
     let sx = axis(left, STICK_X), sy = -axis(left, STICK_Y);
     const m = Math.hypot(sx, sy);
     if (m < DEAD) sx = sy = 0;
     else { const k = (Math.min(1, m) - DEAD) / (1 - DEAD) / m; sx *= k; sy *= k; }
     const a = held(right, FACE_LOW), b = held(right, FACE_HIGH), x = held(left, FACE_LOW), y = held(left, FACE_HIGH), rx = axis(right, STICK_X);
-    const breath = held(right, TRIGGER);
+    const breath = held(right, TRIGGER), ls = held(left, STICK), rs = held(right, STICK);
     let flick = p.flick, roll = 0;
     if (!flick && Math.abs(rx) > FLICK_ON) roll = flick = rx > 0 ? 1 : -1;
     else if (flick && Math.abs(rx) < FLICK_OFF) flick = 0;
@@ -57,7 +63,7 @@
     else if (navF && Math.abs(ny) < FLICK_OFF) navF = 0;
     return { sx, sy, breath, boost: held(left, TRIGGER), ball: a && !p.a, pause: b && !p.b, roll,
              x: x && !p.x, y: y && !p.y, grip: held(right, GRIP), gripL: held(left, GRIP), nav, ok: breath && !p.t,
-             prev: { a, b, x, y, t: breath, flick, navF } };
+             ls: ls && !p.ls, rs: rs && !p.rs, prev: { a, b, x, y, t: breath, ls, rs, flick, navF } };
   }
 
   /** The selected row after a stick flick: clamped, so holding a direction never wraps past the ends. */
@@ -75,6 +81,47 @@
     if (line) out.push(line);
     return out;
   }
+
+  /* ---------- comfort settings (pure): one object, stored as JSON; every comfort feature reads its switch here ---------- */
+  const CF_KEY = 'vsd-comfort';
+  /** Every setting and the values it can take; the first value is the default (= the Recommended preset). */
+  const OPTIONS = {
+    preset: ['recommended', 'comfortable', 'advanced', 'custom'],
+    debug: [false, true],             // the head-locked debug overlay
+  };
+  /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
+  const PRESETS = { comfortable: {}, recommended: {}, advanced: {} };
+  function defaults() { const s = {}; for (const k in OPTIONS) s[k] = OPTIONS[k][0]; return Object.assign(s, PRESETS.recommended); }
+  /** The option of `key` that `v` names (a stored value, or text from the URL), or undefined. */
+  function optionOf(key, v) { const o = OPTIONS[key]; return o ? o.find(x => x === v || String(x) === String(v)) : undefined; }
+  /** A full, valid settings object from anything (a parsed JSON blob, null ...). */
+  function sanitize(raw) {
+    const s = defaults();
+    if (raw && typeof raw === 'object') for (const k in OPTIONS) { const v = optionOf(k, raw[k]); if (v !== undefined) s[k] = v; }
+    return s;
+  }
+  /** `s` with the preset applied (in place). */
+  function preset(s, name) { if (PRESETS[name]) Object.assign(s, PRESETS[name], { preset: name }); return s; }
+  /** Sets one value (in place); changing a value a preset owns turns the preset into 'custom'. */
+  function setOption(s, key, value) {
+    const v = optionOf(key, value);
+    if (v === undefined) return s;
+    if (key === 'preset') return v === 'custom' ? Object.assign(s, { preset: v }) : preset(s, v);
+    s[key] = v;
+    if (key in PRESETS.recommended) s.preset = Object.keys(PRESETS).find(n => Object.keys(PRESETS[n]).every(k => PRESETS[n][k] === s[k])) || 'custom';
+    return s;
+  }
+  /** Stored settings, then ?comfort=key:value,key:value from the page URL on top (not stored). storage may be null. */
+  function loadComfort(storage, search) {
+    let raw = null;
+    try { raw = JSON.parse(storage.getItem(CF_KEY)); } catch (_) { }
+    const s = sanitize(raw);
+    const m = /[?&]comfort=([^&#]*)/.exec(search || '');
+    if (m) for (const pair of decodeURIComponent(m[1]).split(',')) { const i = pair.indexOf(':'); if (i > 0) setOption(s, pair.slice(0, i).trim(), pair.slice(i + 1).trim()); }
+    return s;
+  }
+  function saveComfort(storage, s) { try { storage.setItem(CF_KEY, JSON.stringify(s)); return true; } catch (_) { return false; } }
+  const comfort = { KEY: CF_KEY, OPTIONS, PRESETS, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
 
   /* ---------- the VR menu: a mirror of the DOM panel that is open on the flat page ---------- */
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -185,19 +232,57 @@
     const rig = new THREE.Group();
     scene.add(rig); rig.add(camera);
     let prev = null, snap = true, scale = 0, busy = false;
+    let storage = null;
+    try { storage = root.localStorage; } catch (_) { }
+    const cf = loadComfort(storage, root.location ? root.location.search : '');
+    /* the motion of the view and the cost of a frame, on the real clock (the modes pass a slowed game dt to follow) */
+    const st = { now: 0, dt: 0, t0: 0, speed: 0, turn: 0, acc: 0, accMax: 0, accCpu: 0, n: 0, calls: 0, tris: 0, at: -Infinity, have: false, yaw: 0 };
+    const lastPos = new THREE.Vector3();
+    const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 
     /* panels: canvases on planes fixed to the rig (they turn with the dragon, not with the head) */
-    function panel(cw, ch, w, h, x, y, z, tilt, order) {
+    function panel(cw, ch, w, h, x, y, z, tilt, order, parent) {
       const canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
       const tex = new THREE.CanvasTexture(canvas);
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false }));
       mesh.renderOrder = order; mesh.frustumCulled = false; mesh.visible = false; mesh.position.set(x, y, z); mesh.rotation.x = tilt;
-      rig.add(mesh);
+      (parent || rig).add(mesh);
       return { canvas, g: canvas.getContext('2d'), tex, mesh };
     }
     const hud = panel(640, 320, 1.2, 0.6, 0, -1.15, -2, -0.52, 999);   // about 30 deg below the eye line (the dragon is at 18), tilted to the player
     const menuP = panel(1024, 768, 2, 1.5, 0, 0.12, -2.4, 0, 1001);
+    const dbg = panel(448, 224, 0.26, 0.13, -0.4, 0.3, -1, 0, 1003, camera);   // head-locked: a child of the camera, up and left of the centre
     let hudAt = -Infinity;
+
+    /* debug overlay: 4 times a second; the numbers are averages over that quarter second */
+    function drawDebug(now) {
+      const n = Math.max(1, st.n), ms = st.acc / n, g = dbg.g, session = renderer.xr.getSession(), layer = session && session.renderState.baseLayer;
+      g.clearRect(0, 0, 448, 224); g.fillStyle = 'rgba(0,0,0,.72)'; g.fillRect(0, 0, 448, 224);
+      g.font = '600 30px monospace'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+      g.fillStyle = ms > 1000 / ((session && session.frameRate) || 90) * 1.08 ? '#ff7a6b' : '#8dffb0';
+      g.fillText(ms.toFixed(1) + ' ms  max ' + st.accMax.toFixed(0) + '  ' + (ms > 0 ? 1000 / ms : 0).toFixed(0) + ' fps', 12, 38);
+      g.fillStyle = '#ebe3cd';
+      g.fillText('cpu ' + (st.accCpu / n).toFixed(1) + ' ms   ' + ((session && session.frameRate) || '?') + ' Hz', 12, 80);
+      g.fillText('calls ' + st.calls + '  tris ' + (st.tris / 1000).toFixed(0) + 'k', 12, 122);
+      g.fillText('speed ' + st.speed.toFixed(0) + ' m/s  turn ' + st.turn.toFixed(0) + ' d/s', 12, 164);
+      g.fillText(debugLine(layer), 12, 206);
+      dbg.tex.needsUpdate = true;
+      st.acc = st.accMax = st.accCpu = st.n = 0; st.at = now;
+    }
+    const debugLine = layer => 'fov ' + (layer && layer.fixedFoveation != null ? (+layer.fixedFoveation).toFixed(2) : '-');
+    /* the speed and the turn rate of the view (the rig), smoothed over about 0.1 s */
+    function measure() {
+      if (st.dt && st.have) {
+        const k = 1 - Math.exp(-st.dt * 8);
+        st.speed += (rig.position.distanceTo(lastPos) / st.dt - st.speed) * k;
+        st.turn += (Math.abs(wrap(rig.rotation.y - st.yaw)) / st.dt * 180 / Math.PI - st.turn) * k;
+      }
+      lastPos.copy(rig.position); st.yaw = rig.rotation.y; st.have = true;
+    }
+    function setComfort(key, value) {
+      setOption(cf, key, value); saveComfort(storage, cf);
+      dbg.mesh.visible = cf.debug && renderer.xr.isPresenting;
+    }
     let menu = null, menuSel = 0, menuScanAt = -Infinity, menuDrawn = '', menuSince = 0;
 
     /* floating bars */
@@ -232,14 +317,15 @@
 
     renderer.xr.addEventListener('sessionstart', () => {
       prev = null; snap = true; scale = 0; hudAt = -Infinity; menu = null; menuDrawn = '';
-      hud.mesh.visible = true;
+      st.now = 0; st.have = false; st.speed = st.turn = 0; st.at = -Infinity;
+      hud.mesh.visible = true; dbg.mesh.visible = cf.debug;
       const layer = renderer.xr.getSession().renderState.baseLayer;
       if (layer && 'fixedFoveation' in layer) layer.fixedFoveation = 1;   // r128 has no setFoveation; the outer view costs less
       if (o.onStart) o.onStart();
     });
     renderer.xr.addEventListener('sessionend', () => {
       rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
-      hud.mesh.visible = menuP.mesh.visible = false; menu = null;
+      hud.mesh.visible = menuP.mesh.visible = dbg.mesh.visible = false; menu = null;
       bars([]);
       if (o.onEnd) o.onEnd();
     });
@@ -258,12 +344,13 @@
 
     const viewProxy = { position: rig.position, quaternion: new THREE.Quaternion(), fov: 90, viewH: 1000 };
     const api = {
-      rig, eye: rig.position, bars,
+      rig, eye: rig.position, bars, cf, setComfort,
       follow(pos, yaw, dt) {
         rig.position.copy(pos);
-        if (snap || dt == null) { rig.rotation.y = yaw; snap = false; return; }
+        if (snap || dt == null) { rig.rotation.y = yaw; snap = false; st.have = false; measure(); return; }
         const d = Math.atan2(Math.sin(yaw - rig.rotation.y), Math.cos(yaw - rig.rotation.y));
         rig.rotation.y += d * (1 - Math.exp(-dt * YAW_RATE));
+        measure();
       },
       view() {
         camera.getWorldQuaternion(viewProxy.quaternion);
@@ -285,6 +372,11 @@
       frame(now, menuRoot, opts) {
         const p = api.pad();
         if (!p) return null;
+        st.t0 = performance.now();
+        const d = st.now ? now - st.now : 0;
+        st.now = now; st.dt = d > 0 && d < 250 ? d / 1000 : 0;
+        if (d > 0) { st.acc += d; st.n++; if (d > st.accMax) st.accMax = d; }
+        if (p.ls) setComfort('debug', !cf.debug);
         const roots = [].concat(menuRoot || []).filter(Boolean);
         if (!roots.length) {
           if (menu) { menu = null; menuP.mesh.visible = false; menuDrawn = ''; }
@@ -308,7 +400,9 @@
         }
         return Object.assign(p, { menu: true, sx: 0, sy: 0, breath: false, boost: false, ball: false, roll: 0, grip: false, gripL: false, x: false, y: false });
       },
-      drawHud(now, fn) {
+      drawHud(now, fn) {                                          // every mode calls this right after it has rendered the frame
+        st.accCpu += performance.now() - st.t0; st.calls = renderer.info.render.calls; st.tris = renderer.info.render.triangles;
+        if (cf.debug && now - st.at >= 250) drawDebug(now);
         if (now - hudAt < 100) return;
         hudAt = now;
         const g = hud.g;
@@ -344,7 +438,7 @@
   /** Text of an element with its child nodes joined by ' - ' (a banner: title and small print). */
   const textOf = el => (el ? [].map.call(el.childNodes, n => clean(n.textContent)).filter(Boolean).join(' - ') : '');
 
-  const api = { SLOW, FONT, mapPads, menuNav, wrapText, attach, hudBar, hudText, textOf };
+  const api = { SLOW, FONT, mapPads, menuNav, wrapText, comfort, attach, hudBar, hudText, textOf };
   root.VXR = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof self !== 'undefined' ? self : this);
