@@ -13,9 +13,13 @@
  *     button: an element or a list of them; they stay hidden unless the device supports immersive VR, a click enters VR
  *     skip: selector of controls the VR menu leaves out (links are always left out: following one would end the session)
  *     xr.rig: parent of the camera; the headset pose is relative to it, so in VR a game moves the rig and never the camera
- *     xr.follow(pos, yaw, dt, at, shake): moves the rig; the yaw is smoothed (dt null: snapped) and there is never pitch or
- *       roll, so the horizon stays level: game logic never turns the headset camera, only the rig about the vertical axis.
- *       at: the dragon the view follows ([x, y, z] or a Vector3). shake: the mode's camera shake; it moves the rig (never
+ *     xr.follow(pos, yaw, dt, at, shake): moves the rig (dt null: placed at once) and there is never pitch or roll, so the
+ *       horizon stays level: game logic never turns the headset camera, only the rig about the vertical axis.
+ *       Turning (setting 'turn'): 'snap' turns the view in steps of 'snapAngle' behind a 100 ms fade once the dragon's
+ *       heading is a step away; 'smooth' follows it, never faster than 'smoothSpeed' deg/s. Either way the view stays
+ *       behind the dragon as the view (not the dragon) faces, so between turns the world only slides, it does not swing.
+ *       'ease': speed changes of the dragon (boost, a jolt) reach the view over half a second; the dragon pulls ahead.
+ *       at: the dragon the view follows ([x, y, z] or a Vector3; null: pos is used as it is). shake: the mode's camera shake; it moves the rig (never
  *       turns it) and only with the "camera effects" setting, which is off unless the player turns it on.
  *     xr.eye: the rig position in the world (use it where the flat game uses camera.position)
  *     xr.view(): a stand-in for the camera in VR for code that needs { position, quaternion, fov } and a view height in pixels
@@ -24,7 +28,9 @@
  *     xr.frame(now, menuRoot, opts): xr.pad() plus the VR menu. menuRoot is the DOM panel that is open on the flat page (or
  *       null; a list shows several as one menu): its texts and buttons are mirrored on a panel in front of the player, the sticks move the selection, A or the
  *       right trigger presses the selected button. While a menu is open the returned pad has menu = true and no flight input.
- *       opts.image: a canvas drawn beside the menu (the campaign map, a QR code).
+ *       opts.image: a canvas drawn beside the menu (the campaign map, a QR code). opts.ground: the stick walks (it is
+ *       not eased as a flight stick). opts.keepBoost: the boost works whatever the 'boost' setting says (a boost lesson).
+ *       The returned stick is shaped by the 'assist' setting: gentler turns and dives, no instant reversals.
  *     xr.drawHud(now, fn): redraws the status panel below the eye line 10 times a second; fn(g, w, h) paints on it
  *     xr.bars(list): floating bars in the world, [{ id, x, y, z, w, rows: [[value 0..1, colour], ...] }]; [] removes them
  *     xr.pointScale(): the eye-buffer equivalent of height / (2 tan(fov / 2)) for point sprites, or 0 before the first VR frame
@@ -94,6 +100,12 @@
     preset: ['comfortable', 'recommended', 'advanced', 'custom'],
     scale: [0.7, 0.8, 0.9, 1, 1.1, 1.2],   // render scale (the eye buffer; 1 = what the headset recommends)
     foveation: [0, 0.33, 0.66, 1],    // fixed foveation: the edge of the view is drawn coarser
+    turn: ['snap', 'smooth'],         // how the view follows the dragon's turns
+    snapAngle: [15, 30, 45],          // deg a snap turn
+    smoothSpeed: [30, 45, 60, 90, 0],   // deg/s cap of a smooth turn; 0 = none
+    ease: [true, false],              // speed changes reach the view over half a second
+    boost: [true, false],             // the boost works in VR
+    assist: ['gentle', 'normal', 'free'],   // stick shaping: turn and dive limits, no instant reversals
     rest: ['off', 'subtle', 'strong'],   // rest frame: saddle bow and horns fixed to the seat
     effects: [false, true],           // camera effects in VR (the hit shake); off: the view is never shaken
     adaptive: [true, false],          // lower the quality a step while frames run over the budget
@@ -104,9 +116,9 @@
   const DEVICE = { scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
   /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
   const PRESETS = {
-    comfortable: { rest: 'strong', effects: false },
-    recommended: { rest: 'subtle', effects: false },
-    advanced: { rest: 'off', effects: true },
+    comfortable: { turn: 'snap', snapAngle: 30, smoothSpeed: 30, ease: true, boost: false, assist: 'gentle', rest: 'strong', effects: false },
+    recommended: { turn: 'snap', snapAngle: 30, smoothSpeed: 45, ease: true, boost: true, assist: 'normal', rest: 'subtle', effects: false },
+    advanced: { turn: 'smooth', snapAngle: 30, smoothSpeed: 0, ease: false, boost: true, assist: 'free', rest: 'off', effects: true },
   };
   function defaults() { return Object.assign({ preset: 'recommended' }, DEVICE, PRESETS.recommended); }
 
@@ -172,6 +184,36 @@
     return s;
   }
   function saveComfort(storage, s) { try { storage.setItem(CF_KEY, JSON.stringify(s)); return true; } catch (_) { return false; } }
+  /* ---------- turning and acceleration (pure) ---------- */
+  const DEG = Math.PI / 180, FADE = 0.05;                        // a snap turn: 50 ms to black, 50 ms back
+  /** Snap turn: the yaw step (whole steps, rad) once the heading is a full step away from the view, else 0. */
+  function snapStep(delta, step) { return Math.abs(delta) >= step - 1e-9 ? Math.trunc(delta / step + (delta > 0 ? 1e-9 : -1e-9)) * step : 0; }
+  /** Smooth turn: this frame's yaw step, eased toward the heading and never faster than maxRate (rad/s; 0 = no cap). */
+  function smoothStep(delta, dt, maxRate) {
+    const s = delta * (1 - Math.exp(-dt * YAW_RATE)), m = maxRate * dt;
+    return maxRate > 0 ? Math.max(-m, Math.min(m, s)) : s;
+  }
+  /**
+   * Eased speed: e = { s: speed of the view along its heading (m/s), lag: how far the dragon has pulled ahead (m) }.
+   * The view's speed follows the dragon's (sWant) with a time constant of EASE.t; the gap that opens closes again slowly.
+   */
+  const EASE = { t: 0.5, pull: 1.2, min: -8, max: 14 };
+  function easeStep(e, sWant, dt) {
+    e.s += (sWant - e.s) * (1 - Math.exp(-dt / EASE.t));
+    e.lag = Math.max(EASE.min, Math.min(EASE.max, (e.lag + (sWant - e.s) * dt) * Math.exp(-dt * EASE.pull)));
+    return e;
+  }
+  /** Stick shaping: the share of a full turn / pitch a level lets through, and how fast the stick may move (1/s). */
+  const ASSIST = { gentle: { turn: 0.6, pitch: 0.6, slew: 2.5 }, normal: { turn: 0.85, pitch: 0.8, slew: 5 }, free: null };
+  function shapeStick(k, sx, sy, dt, level, ground) {
+    const a = ASSIST[level];
+    if (!a) { k.x = sx; k.y = sy; return k; }
+    const m = a.slew * dt, tx = sx * a.turn, ty = ground ? sy : sy * a.pitch;
+    k.x += Math.max(-m, Math.min(m, tx - k.x));
+    k.y = ground ? ty : k.y + Math.max(-m, Math.min(m, ty - k.y));
+    return k;
+  }
+
   /* ---------- rest frame (pure): tubes along polylines, as plain arrays ---------- */
   /**
    * The rest frame in rig space (origin = the seated head, -z ahead, metres): a saddle bow low in front, about 40 deg
@@ -215,7 +257,7 @@
     return { position: P, color: C, index: I };
   }
 
-  const comfort = { KEY: CF_KEY, restFrame, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
+  const comfort = { KEY: CF_KEY, restFrame, snapStep, smoothStep, easeStep, shapeStick, EASE, ASSIST, FADE, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
 
   /* ---------- the VR menu: a mirror of the DOM panel that is open on the flat page ---------- */
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -370,6 +412,18 @@
       if (level && restMeshes[level]) restMeshes[level].visible = true;
     }
     const pivot = new THREE.Vector3(); let havePivot = false;      // the dragon the view follows
+    /* the snap turn fade: a quad over each eye, drawn only during the 100 ms of a turn */
+    const fadeMat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false, uniforms: { uA: { value: 0 } },
+      vertexShader: 'void main(){gl_Position=vec4(position.xy,0.,1.);}', fragmentShader: 'uniform float uA;void main(){gl_FragColor=vec4(0.,0.,0.,uA);}' });
+    const fadeMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fadeMat);
+    fadeMesh.frustumCulled = false; fadeMesh.renderOrder = 1004; fadeMesh.visible = false; rig.add(fadeMesh);
+    let fadePhase = 0, fadeT = 0, pendingYaw = 0;                  // 1: going dark, 2: coming back
+    const want = new THREE.Vector3(), lastWant = new THREE.Vector3(), easeS = { s: 0, lag: 0 }, stick = { x: 0, y: 0 };
+    let easeOn = 0;                                               // 0: no last position yet, 1: no speed yet, 2: running
+    function place(pos, yaw) {                                    // at once: a seat, a respawn, the first frame
+      rig.position.copy(pos); rig.rotation.y = yaw;
+      fadePhase = 0; fadeMesh.visible = false; easeOn = 0; easeS.lag = 0; st.have = false; measure();
+    }
     function applyComfort() {
       if (!renderer.xr.isPresenting) return;
       dbg.mesh.visible = cf.debug;
@@ -455,7 +509,7 @@
 
     renderer.xr.addEventListener('sessionstart', () => {
       prev = null; snap = true; scale = 0; hudAt = -Infinity; menu = null; menuDrawn = '';
-      st.now = 0; st.have = false; st.speed = st.turn = 0; st.at = -Infinity;
+      st.now = 0; st.have = false; st.speed = st.turn = 0; st.at = -Infinity; stick.x = stick.y = 0;
       hud.mesh.visible = true;
       const session = renderer.xr.getSession();
       try {                                                       // Quest: 90 Hz when the browser offers it
@@ -469,7 +523,7 @@
     renderer.xr.addEventListener('sessionend', () => {
       rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
       hud.mesh.visible = menuP.mesh.visible = dbg.mesh.visible = false; menu = null;
-      showRest(null);
+      showRest(null); fadePhase = 0; fadeMesh.visible = false;
       if (root.VDragon && root.VDragon.compact) root.VDragon.compact(false);   // the flat screen draws the dragons as it always did
       bars([]);
       if (o.onEnd) o.onEnd();
@@ -494,10 +548,39 @@
       follow(pos, yaw, dt, at, shake) {
         havePivot = !!at;
         if (at) { if (at.isVector3) pivot.copy(at); else pivot.set(at[0], at[1], at[2]); }
-        rig.position.copy(pos);
-        if (snap || dt == null) { rig.rotation.y = yaw; snap = false; st.have = false; measure(); return; }
-        const d = Math.atan2(Math.sin(yaw - rig.rotation.y), Math.cos(yaw - rig.rotation.y));
-        rig.rotation.y += d * (1 - Math.exp(-dt * YAW_RATE));
+        if (snap || dt == null || rig.position.distanceToSquared(pos) > 3600) { snap = false; place(pos, yaw); return; }   // 60 m in a frame is a jump, not flight
+        const rd = st.dt;                                         // the real clock: what the player feels
+        let turned = false;
+        if (cf.turn === 'snap') {
+          if (!fadePhase) { pendingYaw = snapStep(wrap(yaw - rig.rotation.y), cf.snapAngle * DEG); if (pendingYaw) { fadePhase = 1; fadeT = 0; fadeMesh.visible = true; } }
+        } else if (!fadePhase) rig.rotation.y += smoothStep(wrap(yaw - rig.rotation.y), rd, cf.smoothSpeed * DEG);
+        if (fadePhase) {
+          fadeT += rd || FADE;
+          if (fadePhase === 1 && fadeT >= FADE) { rig.rotation.y = wrap(rig.rotation.y + pendingYaw); fadePhase = 2; fadeT = 0; turned = true; }
+          else if (fadePhase === 2 && fadeT >= FADE) { fadePhase = 0; fadeMesh.visible = false; }
+          fadeMat.uniforms.uA.value = fadePhase === 1 ? Math.min(1, fadeT / FADE) : fadePhase === 2 ? 1 - fadeT / FADE : 0;
+        }
+        /* behind the dragon as the view faces: the mode's chase position, turned about the dragon by the angle the view is off */
+        want.copy(pos);
+        const ry = rig.rotation.y;
+        if (havePivot) {
+          const a = wrap(ry - yaw), c = Math.cos(a), s = Math.sin(a), ox = pos.x - pivot.x, oz = pos.z - pivot.z;
+          want.x = pivot.x + ox * c + oz * s; want.z = pivot.z - ox * s + oz * c;
+        }
+        if (cf.ease && havePivot) {
+          const fx = -Math.sin(ry), fz = -Math.cos(ry);
+          if (dt > 0 && rd > 0 && !turned) {                      // not while paused, not across a snap
+            if (easeOn) {
+              const sWant = ((want.x - lastWant.x) * fx + (want.z - lastWant.z) * fz) / rd;
+              if (easeOn === 1) { easeS.s = sWant; easeOn = 2; }
+              easeStep(easeS, sWant, rd);
+            } else easeOn = 1;
+          }
+          lastWant.copy(want);
+          want.x -= fx * easeS.lag; want.z -= fz * easeS.lag;
+        } else { easeOn = 0; easeS.lag = 0; }
+        rig.position.copy(want);
+        if (turned) st.have = false;                              // a snap is not a turn rate
         measure();
         if (shake > 0 && cf.effects) { rig.position.x += (Math.random() - 0.5) * shake * 2; rig.position.y += (Math.random() - 0.5) * shake * 2; }
       },
@@ -526,6 +609,9 @@
         st.now = now; st.dt = d > 0 && d < 250 ? d / 1000 : 0;
         if (d > 0) { st.acc += d; st.n++; if (d > st.accMax) st.accMax = d; }
         if (p.ls) setComfort('debug', !cf.debug);
+        shapeStick(stick, p.sx, p.sy, st.dt, cf.assist, !!(opts && opts.ground));
+        p.sx = stick.x; p.sy = stick.y;
+        if (!cf.boost && !(opts && opts.keepBoost)) p.boost = false;
         if (cf.adaptive && adaptStep(adapt, d, 1000 / (renderer.xr.getSession().frameRate || 90), adaptLevels(cf))) applyQuality();
         const roots = [].concat(menuRoot || []).filter(Boolean);
         if (!roots.length) {

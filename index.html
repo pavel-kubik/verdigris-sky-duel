@@ -1009,13 +1009,14 @@ function drawRadar(g,rx,ry,R){
 const VR_KEYS={'A D':'vr.k.turn','W':'vr.k.fwd','S':'vr.k.back','W S':'vr.k.pitch','A D W S':'vr.k.stick','Shift':'vr.k.boost','Space':'vr.k.breath','F':'vr.k.ball','Q':'vr.k.rollL','E':'vr.k.rollR','Q E':'vr.k.roll'};
 const VR_TEXT={find:1,boost:1,roll:1,hunt:1};   // lessons whose briefing names keys or screen corners have a headset wording
 const xrMenus={preview:'#intro',brief:'#brief',paused:'#pause',over:'#over',tutdone:'#tutDone'};
-const xrHome=new V3(0,92,26);
+const xrHome=new V3(0,92,26),xrOpts={keepBoost:false};
 const xr=VXR.attach({renderer,scene,camera,button:$('#vrBtn'),skip:'#vrBtn,.langSwitch,.installBtn,.enterk',
   onStart(){if(state==='brief')briefText();},
   onEnd(){touch.x=touch.y=0;touch.breath=touch.boost=false;if(state==='play')setState('paused');if(state==='brief')briefText();resize();},
   onError(){showBanner(t('vr.failed'));}});
 function xrInput(now){
-  const p=xr.frame(now,xrMenus[state]?$(xrMenus[state]):null);if(!p)return;
+  xrOpts.keepBoost=mode==='tut';   // the boost lesson needs the boost, whatever the comfort setting
+  const p=xr.frame(now,xrMenus[state]?$(xrMenus[state]):null,xrOpts);if(!p)return;
   touch.x=p.sx;touch.y=p.sy;touch.breath=p.breath;touch.boost=p.boost;
   if(p.ball)fireBall();
   if(p.pause){if(state==='play')setState('paused');else if(state==='paused')setState('play');}

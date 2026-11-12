@@ -139,6 +139,43 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   }
 }
 
+/* ---------- turning: snap by default, smooth with a cap; eased speed; shaped stick ---------- */
+{
+  const C = comfort, d = C.defaults(), DEG = Math.PI / 180, step = 30 * DEG;
+  ok(d.turn === 'snap' && d.snapAngle === 30 && d.ease === true && d.boost === true, 'defaults: snap turn in 30 degree steps, eased speed, boost allowed');
+  ok(C.PRESETS.comfortable.boost === false && C.PRESETS.comfortable.assist === 'gentle' && C.PRESETS.advanced.assist === 'free' && C.PRESETS.advanced.turn === 'smooth', 'Comfortable caps the speed and steers gently; Advanced leaves everything free');
+  ok(C.snapStep(29 * DEG, step) === 0 && C.snapStep(-29 * DEG, step) === 0, 'no snap while the heading is less than a step away');
+  ok(near(C.snapStep(30 * DEG, step), step) && near(C.snapStep(-31 * DEG, step), -step), 'one step once it is a step away, either way');
+  ok(near(C.snapStep(100 * DEG, step), 3 * step), 'a big change of heading (a respawn) is taken in one snap of whole steps');
+  ok(Math.abs(C.smoothStep(2, 1 / 90, 45 * DEG)) <= 45 * DEG / 90 + 1e-12, 'a smooth turn never exceeds the cap');
+  ok(C.smoothStep(2, 1 / 90, 0) > 45 * DEG / 90, 'cap 0 means no cap');
+  ok(Math.abs(C.smoothStep(0.001, 1 / 90, 45 * DEG)) < 0.001, 'a smooth turn eases in on the heading and does not overshoot');
+  ok(C.FADE * 2 <= 0.12, 'the snap fade takes about 100 ms');
+  // boost: the dragon jumps from 30 to 54 m/s; the view takes its time
+  const e = { s: 30, lag: 0 }; let maxAcc = 0, maxLag = 0, t = 0;
+  for (; t < 0.5; t += 1 / 90) { const s0 = e.s; C.easeStep(e, 54, 1 / 90); maxAcc = Math.max(maxAcc, (e.s - s0) * 90); maxLag = Math.max(maxLag, e.lag); }
+  ok(e.s < 30 + 24 * 0.66 && e.s > 30 + 24 * 0.6, 'after half a second the view has taken up about 63 % of a speed change: ' + e.s.toFixed(1));
+  ok(maxAcc <= 24 / C.EASE.t + 0.5, 'the acceleration of the view is bounded: ' + maxAcc.toFixed(0) + ' m/s2 for a 24 m/s step');
+  for (; t < 8; t += 1 / 90) { C.easeStep(e, 54, 1 / 90); maxLag = Math.max(maxLag, e.lag); }
+  ok(near(Math.round(e.s), 54) && Math.abs(e.lag) < 0.2, 'then it flies at the dragon\'s speed again, at the usual distance');
+  ok(maxLag > 2 && maxLag <= C.EASE.max, 'in between the dragon pulls ahead, within a limit: ' + maxLag.toFixed(1) + ' m');
+  for (let i = 0; i < 900; i++) C.easeStep(e, -200, 1 / 90);
+  ok(e.lag >= C.EASE.min, 'the view never closes in on the dragon by more than ' + -C.EASE.min + ' m');
+  // stick shaping
+  let k = { x: 0, y: 0 };
+  C.shapeStick(k, 1, -1, 1 / 90, 'free');
+  ok(k.x === 1 && k.y === -1, 'free: the stick as it is');
+  k = { x: 0, y: 0 }; for (let i = 0; i < 90; i++) C.shapeStick(k, 1, -1, 1 / 90, 'gentle');
+  ok(near(k.x, C.ASSIST.gentle.turn) && near(k.y, -C.ASSIST.gentle.pitch), 'gentle: a full stick turns and dives at a share of the rate (no steep dives)');
+  let n = 0; while (k.x > -C.ASSIST.gentle.turn + 1e-6 && n < 900) { C.shapeStick(k, -1, 0, 1 / 90, 'gentle'); n++; }
+  ok(n / 90 > 0.4 && n / 90 < 0.6, 'gentle: a full reversal takes about half a second: ' + (n / 90).toFixed(2) + ' s');
+  k = { x: 0, y: 0 }; C.shapeStick(k, 0, 1, 1 / 90, 'gentle', true);
+  ok(k.y === 1, 'on the ground the stick walks at full speed at once');
+  const solo = read('index.html'), camp = read('campaign/game.js');
+  ok(/keepBoost=mode==='tut'/.test(solo), 'the tutorial keeps the boost for its boost lesson');
+  ok(/xrOpts\.ground = /.test(camp) && /cs\.inLair \|\| cs\.inAerie \? null : pilot\.pos/.test(camp), 'the campaign tells VR when the dragon walks, and keeps the cave camera where the cave puts it');
+}
+
 /* ---------- rest frame: low-poly, in the lower view, fixed to the seat ---------- */
 {
   const C = comfort;

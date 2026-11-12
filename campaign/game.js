@@ -1647,6 +1647,7 @@
     onEnd() { padUi = isTouch; touch.x = touch.y = 0; touch.breath = touch.boost = touch.grab = touch.eat = false; actionKind = null; saveNow('vr'); if (state === 'play') setState('paused'); resize(); },
     onError() { toast(t('vr.failed'), '', 4); } });
   let xrGrip = false;
+  const xrOpts = { image: null, ground: false };
   function xrMenu() {
     if (state === 'intro') return $('#intro');
     if (state === 'hatch') { skipHatch(); return hatchCard ? $('#hatch') : null; }
@@ -1660,7 +1661,8 @@
   }
   function xrInput(now) {
     padUi = true;
-    const p = xr.frame(now, xrMenu(), mapView.isOpen ? { image: $('#mapCanvas') } : null); if (!p) return;
+    xrOpts.image = mapView.isOpen ? $('#mapCanvas') : null; xrOpts.ground = !!(pilot && pilot.mode && pilot.mode !== 'air');   // on the ground the stick walks
+    const p = xr.frame(now, xrMenu(), xrOpts); if (!p) return;
     touch.x = p.sx; touch.y = p.sy; touch.breath = p.breath; touch.boost = p.boost;
     if (p.pause) {                                                // B: back out of whatever is open, else pause
       if (storyCard.open) storyCard.next();
@@ -1738,7 +1740,7 @@
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
       else if (cs.inAerie) camLook.set(pilot.pos[0], pilot.pos[1] - (isTouch ? 4 : 1) * Math.max(kc, 1.6), pilot.pos[2]);   // touch: the dragon above the panel
-      if (inXR) { xr.follow(camPos, cs.inLair || cs.inAerie ? Math.atan2(camLook.x - camPos.x, camLook.z - camPos.z) + Math.PI : pilot.yaw + Math.PI, dt, pilot.pos, shake); shake = xr.cf.effects ? Math.max(0, shake - dt * 1.5) : 0; }   // VR: no pitch, roll or FOV change; shake only with the camera effects setting
+      if (inXR) { xr.follow(camPos, cs.inLair || cs.inAerie ? Math.atan2(camLook.x - camPos.x, camLook.z - camPos.z) + Math.PI : pilot.yaw + Math.PI, dt, cs.inLair || cs.inAerie ? null : pilot.pos, shake); shake = xr.cf.effects ? Math.max(0, shake - dt * 1.5) : 0; }   // VR: no pitch, roll or FOV change; shake only with the camera effects setting
       else {
         camera.position.copy(camPos);
         if (shake > 0 && !reduceMotion) { camera.position.x += (Math.random() - 0.5) * shake * 2; camera.position.y += (Math.random() - 0.5) * shake * 2; }
