@@ -139,6 +139,23 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   }
 }
 
+/* ---------- rest frame: low-poly, in the lower view, fixed to the seat ---------- */
+{
+  const C = comfort;
+  ok(C.restFrame('off') === null && C.restFrame() === null, 'rest frame off: no geometry');
+  ok(C.defaults().rest === 'subtle' && C.PRESETS.comfortable.rest === 'strong' && C.PRESETS.advanced.rest === 'off', 'rest frame: Subtle by default, Strong in Comfortable, off in Advanced');
+  for (const level of ['subtle', 'strong']) {
+    const f = C.restFrame(level), n = f.position.length / 3;
+    ok(f.index.length / 3 < 800 && f.index.every(i => i >= 0 && i < n) && f.color.length === f.position.length, level + ' rest frame is low-poly and well formed: ' + f.index.length / 3 + ' triangles');
+    let top = -Infinity, near = Infinity, ahead = true;
+    for (let i = 0; i < n; i++) { const x = f.position[i * 3], y = f.position[i * 3 + 1], z = f.position[i * 3 + 2]; top = Math.max(top, y); near = Math.min(near, Math.hypot(x, y, z)); if (Math.abs(x) < 0.5 && z > 0) ahead = false; }
+    ok(near > 0.6, level + ' rest frame keeps clear of the head: nearest point ' + near.toFixed(2) + ' m');
+    ok(level === 'subtle' ? top < -0.2 : top < 0.1 && top > -0.1, level + ' rest frame: the horns end ' + (level === 'subtle' ? 'well under' : 'at') + ' the eye line (' + top.toFixed(2) + ' m)');
+    ok(ahead, level + ' rest frame is in front of the player');
+  }
+  ok(C.restFrame('strong').index.length > C.restFrame('subtle').index.length, 'Strong has more to hold on to than Subtle');
+}
+
 /* ---------- performance: render scale 1.0 and medium foveation to start with, adaptive fallback ---------- */
 {
   const C = comfort, d = C.defaults(), B = 1000 / 90;

@@ -29,6 +29,9 @@
  *     xr.bars(list): floating bars in the world, [{ id, x, y, z, w, rows: [[value 0..1, colour], ...] }]; [] removes them
  *     xr.pointScale(): the eye-buffer equivalent of height / (2 tan(fov / 2)) for point sprites, or 0 before the first VR frame
  *     xr.cf: the comfort settings in use; xr.setComfort(key, value) changes one (and stores it)
+ *   Rest frame (setting 'rest'): a saddle bow and two horns fixed to the rig, in the lower view. They never move against
+ *     the player's seat, whatever the dragon and the world do, which gives the eyes something that agrees with the body.
+ *     Strong adds taller horns, side rails and a speed / height line on the status panel.
  *   Debug overlay (head-locked, small): click the LEFT stick in VR. Frame time, fps, CPU time per frame, draw calls,
  *     triangles, speed and turn rate of the view.
  */
@@ -91,6 +94,7 @@
     preset: ['comfortable', 'recommended', 'advanced', 'custom'],
     scale: [0.7, 0.8, 0.9, 1, 1.1, 1.2],   // render scale (the eye buffer; 1 = what the headset recommends)
     foveation: [0, 0.33, 0.66, 1],    // fixed foveation: the edge of the view is drawn coarser
+    rest: ['off', 'subtle', 'strong'],   // rest frame: saddle bow and horns fixed to the seat
     effects: [false, true],           // camera effects in VR (the hit shake); off: the view is never shaken
     adaptive: [true, false],          // lower the quality a step while frames run over the budget
     compact: [true, false],           // dragons as skinned meshes (far fewer draw calls)
@@ -100,9 +104,9 @@
   const DEVICE = { scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
   /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
   const PRESETS = {
-    comfortable: { effects: false },
-    recommended: { effects: false },
-    advanced: { effects: true },
+    comfortable: { rest: 'strong', effects: false },
+    recommended: { rest: 'subtle', effects: false },
+    advanced: { rest: 'off', effects: true },
   };
   function defaults() { return Object.assign({ preset: 'recommended' }, DEVICE, PRESETS.recommended); }
 
@@ -168,7 +172,50 @@
     return s;
   }
   function saveComfort(storage, s) { try { storage.setItem(CF_KEY, JSON.stringify(s)); return true; } catch (_) { return false; } }
-  const comfort = { KEY: CF_KEY, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
+  /* ---------- rest frame (pure): tubes along polylines, as plain arrays ---------- */
+  /**
+   * The rest frame in rig space (origin = the seated head, -z ahead, metres): a saddle bow low in front, about 40 deg
+   * under the eye line, and two horns rising from it left and right of the status panel. 'strong': the horns reach the
+   * eye line and two side rails sit at the edge of the view. -> { position, color, index } arrays, or null for 'off'.
+   */
+  function restFrame(level) {
+    if (level !== 'subtle' && level !== 'strong') return null;
+    const P = [], C = [], I = [], SIDES = 5, strong = level === 'strong';
+    function tube(pts, r0, r1, col) {
+      const base = P.length / 3, n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], r = r0 + (r1 - r0) * i / (n - 1);
+        let tx = b[0] - a[0], ty = b[1] - a[1], tz = b[2] - a[2]; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+        const hl = Math.hypot(pts[i][0], pts[i][2]) || 1, ox = pts[i][0] / hl, oz = pts[i][2] / hl;   // outward from the seat: a steady reference
+        let ux = ty * oz, uy = tz * ox - tx * oz, uz = -ty * ox;  // t x outward
+        const ul = Math.hypot(ux, uy, uz) || 1; ux /= ul; uy /= ul; uz /= ul;
+        const vx = uy * tz - uz * ty, vy = uz * tx - ux * tz, vz = ux * ty - uy * tx;   // u x t
+        for (let j = 0; j < SIDES; j++) {
+          const an = j / SIDES * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an), k = 0.72 + 0.28 * (ca * uy + sa * vy);   // lit from above, baked
+          P.push(pts[i][0] + (ux * ca + vx * sa) * r, pts[i][1] + (uy * ca + vy * sa) * r, pts[i][2] + (uz * ca + vz * sa) * r);
+          C.push(col[0] * k, col[1] * k, col[2] * k);
+        }
+        if (i) for (let j = 0; j < SIDES; j++) {
+          const p0 = base + (i - 1) * SIDES + j, p1 = base + (i - 1) * SIDES + (j + 1) % SIDES, q0 = p0 + SIDES, q1 = p1 + SIDES;
+          I.push(p0, q0, p1, p1, q0, q1);
+        }
+      }
+    }
+    const R = 0.9, Y = -0.76, LEATHER = [0.2, 0.14, 0.09], HORN = [0.4, 0.37, 0.3];
+    const on = (az, y, r) => [Math.sin(az) * (r || R), y, -Math.cos(az) * (r || R)];
+    const bow = [];
+    for (let i = -8; i <= 8; i++) { const az = i / 8 * 1.35; bow.push(on(az, Y - 0.1 * (az * az) / (1.35 * 1.35))); }   // sinks a little to the sides
+    tube(bow, 0.045, 0.045, LEATHER);
+    for (const s of [-1, 1]) {
+      const horn = [], top = strong ? 0.02 : -0.3, az0 = s * 0.68;
+      for (let i = 0; i <= 6; i++) { const t = i / 6; horn.push(on(az0 + s * 0.1 * t * t, Y + 0.02 + (top - Y) * t, R - 0.12 * t * (1 - t))); }
+      tube(horn, 0.04, 0.008, HORN);
+      if (strong) { const rail = []; for (let i = 0; i <= 5; i++) { const t = i / 5; rail.push(on(s * (1.25 + 0.2 * t), Y - 0.08 + 0.42 * t * t, R)); } tube(rail, 0.035, 0.01, HORN); }
+    }
+    return { position: P, color: C, index: I };
+  }
+
+  const comfort = { KEY: CF_KEY, restFrame, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
 
   /* ---------- the VR menu: a mirror of the DOM panel that is open on the flat page ---------- */
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -309,9 +356,24 @@
       vpWant = Math.min(1, q.scale / fbScale);
       if (vpWant !== vpScale && !vpBusy) { vpBusy = true; session.requestAnimationFrame(viewportFrame); }
     }
+    /* rest frame: one unlit mesh fixed to the rig, built when a level is first shown */
+    const restMeshes = {};
+    function showRest(level) {
+      for (const k in restMeshes) restMeshes[k].visible = false;
+      const f = level && !restMeshes[level] ? restFrame(level) : null;
+      if (f) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(f.position, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(f.color, 3)); g.setIndex(f.index);
+        const m = restMeshes[level] = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+        m.frustumCulled = false; rig.add(m);
+      }
+      if (level && restMeshes[level]) restMeshes[level].visible = true;
+    }
+    const pivot = new THREE.Vector3(); let havePivot = false;      // the dragon the view follows
     function applyComfort() {
       if (!renderer.xr.isPresenting) return;
       dbg.mesh.visible = cf.debug;
+      showRest(cf.rest === 'off' ? null : cf.rest);
       if (root.VDragon && root.VDragon.compact) root.VDragon.compact(cf.compact);
       applyQuality();
     }
@@ -407,6 +469,7 @@
     renderer.xr.addEventListener('sessionend', () => {
       rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
       hud.mesh.visible = menuP.mesh.visible = dbg.mesh.visible = false; menu = null;
+      showRest(null);
       if (root.VDragon && root.VDragon.compact) root.VDragon.compact(false);   // the flat screen draws the dragons as it always did
       bars([]);
       if (o.onEnd) o.onEnd();
@@ -429,6 +492,8 @@
     const api = {
       rig, eye: rig.position, bars, cf, setComfort,
       follow(pos, yaw, dt, at, shake) {
+        havePivot = !!at;
+        if (at) { if (at.isVector3) pivot.copy(at); else pivot.set(at[0], at[1], at[2]); }
         rig.position.copy(pos);
         if (snap || dt == null) { rig.rotation.y = yaw; snap = false; st.have = false; measure(); return; }
         const d = Math.atan2(Math.sin(yaw - rig.rotation.y), Math.cos(yaw - rig.rotation.y));
@@ -494,6 +559,11 @@
         g.clearRect(0, 0, 640, 320); g.fillStyle = 'rgba(12,19,16,.55)'; g.fillRect(0, 0, 640, 320);
         g.textAlign = 'left'; g.textBaseline = 'alphabetic';
         fn(g, 640, 320);
+        if (cf.rest === 'strong' && havePivot) {                  // a steady readout: speed of the view and the dragon's height
+          g.font = '600 20px ' + FONT; g.textAlign = 'right'; g.fillStyle = 'rgba(235,227,205,.7)';
+          g.fillText(Math.round(st.speed) + ' m/s   ' + Math.round(pivot.y) + ' m', 628, 308);
+          g.textAlign = 'left';
+        }
         hud.tex.needsUpdate = true;
       },
       pointScale() {
