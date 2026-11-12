@@ -379,6 +379,10 @@
         nameKey: 'c.region.ash', radius: 1100, seed: 11, ceiling: 320,
         terrain: { amp: 0.9, base: 20, features: [
           { type: 'cone', x: 0, z: 0, r: 260, h: 150, crater: { r: 38, depth: 30 } },
+          // lava streams out of the crater (terrain.lavaFlows): a = direction (0 = +Z, the cave side stays clear),
+          // len, w = [width at the rim, at the foot], ph = how it wanders. Lava: no landing, no walking.
+          { type: 'lava', a: 1.3, len: 250, w: [3.5, 8], ph: 4.1 }, { type: 'lava', a: 2.25, len: 330, w: [4, 11], ph: 0.3 },
+          { type: 'lava', a: 3.4, len: 400, w: [5, 13], ph: 1.7 }, { type: 'lava', a: 4.7, len: 310, w: [4, 10], ph: 2.9 },
           { type: 'flatten', x: 0, z: 0, r: 1100, toward: 14, from: 700 },
         ] },
         palette: 'ash',
@@ -386,7 +390,8 @@
         // the mouth centre sits `above` units over the slope (terrain.lairPos computes it)
         lair: { x: 0, z: 150, above: 7, r: 18, facing: 0 },
         spawn: { x: 0, z: 260, y: 110, yaw: 0 },          // respawn point in front of the cave, facing away (+Z)
-        flora: { trees: 60, rocks: 140 },
+        // far: a living forest toward the rim (from .. full = thin to dense), so the Wastes are alive beyond the ash
+        flora: { trees: 60, rocks: 140, far: { trees: 640, from: 500, full: 800, kinds: 'ashfar' } },
         herds: [{ type: 'goat', count: 4, ring: [350, 900] }],
         exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }],     // radians, 0 = +Z; region edge arc on the +Z side
         entries: { wild: { angle: 0 } },
