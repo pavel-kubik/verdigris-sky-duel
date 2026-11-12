@@ -56,10 +56,13 @@
       const n = 0.92 + wr() * 0.12; col.push(c.r * n, c.g * n, c.b * n);
     }
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
-    scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 })));
+    const groundM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+    if (window.VTex) VTex.detail(groundM, { map: 'rock', top: 'ground', scale: 22, topScale: 11, strength: 0.62, bump: 1.5 });
+    scene.add(new THREE.Mesh(g, groundM));
     const water = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), new THREE.MeshStandardMaterial({ color: 0x2c5c63, roughness: .25, metalness: .2, transparent: true, opacity: .88 }));
     water.rotation.x = -Math.PI / 2; water.position.y = 0.6; scene.add(water);
-    const rockM = new THREE.MeshStandardMaterial({ color: 0x6a5f50, flatShading: true, roughness: 1 }), grassM = new THREE.MeshStandardMaterial({ color: 0x4d7a40, flatShading: true, roughness: 1 });
+    const rockM = new THREE.MeshStandardMaterial({ color: 0x8a7d6a, flatShading: true, roughness: 1 }), grassM = new THREE.MeshStandardMaterial({ color: 0x5d8a4c, flatShading: true, roughness: 1 });
+    if (window.VTex) { VTex.detail(rockM, { map: 'rock', scale: 9, strength: 0.8, bump: 1.6 }); VTex.detail(grassM, { map: 'ground', scale: 6, strength: 0.7, bump: 1 }); }
     for (let i = 0; i < 46; i++) {
       const a = wr() * Math.PI * 2, r = 60 + wr() * 320, x = Math.cos(a) * r, z = Math.sin(a) * r, hgt = 25 + wr() * 55, rad = 3 + wr() * 5;
       const m = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.55, rad, hgt, 6, 3), rockM); m.position.set(x, S.H(x, z) + hgt / 2 - 2, z); m.rotation.y = wr() * 3; scene.add(m);
@@ -73,6 +76,22 @@
       g2.position.set(Math.cos(a) * r, y, Math.sin(a) * r); scene.add(g2);
     }
   })();
+  /* ---------- the living forest (shared/forest.js + forest-view.js): the same trees and rules as in the campaign and
+     the deathmatch - fly into a tree and it breaks (a jolt), breathe fire on it and it burns ---------- */
+  const Fo = (function () {
+    const list = S.trees(), names = S.FOREST.kinds.map(k => k[0]);
+    return VForest.create(list.map(t => { const z = VForestView.size(t.kind, t.sc, t.sy); return Object.assign({}, t, { kind: names.indexOf(t.kind), r: z.r, h: z.h }); }));
+  })();
+  const forestView = VForestView.build(Fo, { kinds: S.FOREST.kinds.map(k => k[0]), groundAt: S.H, particles: matchMedia('(pointer: coarse)').matches ? 0.5 : 1 });
+  scene.add(forestView.group);
+  const treeOut = [];
+  let treeCool = 0, treeJolt = 0;
+  function sendTrees() {
+    if (!treeOut.length) return;
+    const a = treeOut.splice(0), d = treeJolt; treeJolt = 0;
+    if (role === 'host' && world) S.treeEvents(world, view.myId, a, d);
+    else if (hostConn && hostConn.open) { try { hostConn.send({ k: 't', a, d }); } catch (_) { } }
+  }
   const clouds = [];
   (function () {
     const m = new THREE.MeshStandardMaterial({ color: 0xf3e6d6, flatShading: true, roughness: 1, transparent: true, opacity: .82, emissive: 0x3a2a20 });
@@ -87,7 +106,7 @@
 
   /* ---------- dragon model ---------- */
   // Dragon model: shared/dragon.js. Co-op keeps its lighter model without toe claws.
-  const makeDragon = c => VDragon.makeDragon(c, { toes: false });
+  const makeDragon = c => VDragon.makeDragon(c);
 
   /* ---------- particles (visual only; damage lives in VSim) ---------- */
   const PMAX = 3000;
@@ -220,8 +239,10 @@
         case 'pop': {
           const b = ballViews.get(ev.id); if (b) { scene.remove(b.m); ballViews.delete(ev.id); }
           burst(ev.p, ev.h ? 40 : 12, ev.o === 0 ? 1 : 0, ev.h ? 20 : 8, 2.2, 0.6);
+          VForest.blast(Fo, ev.p, S.FOREST.blast);                             // a bursting fireball sets the trees around it alight
           break;
         }
+        case 'tree': VForest.apply(Fo, { e: ev.k === 'f' ? 'fell' : 'ignite', i: ev.i, dx: ev.dx, dz: ev.dz, g: 0 }); break;
         case 'hit': { const f = view.foes.get(ev.f); if (f) f.d.flash = 1; break; }
         case 'die':
           burst(ev.p, 30, 0, 18, 2, 0.7);
@@ -257,7 +278,7 @@
           $('#over').hidden = false;
           break;
         case 'restart':
-          view.over = false; $('#over').hidden = true;
+          view.over = false; $('#over').hidden = true; VForest.reset(Fo);
           ballViews.forEach(b => scene.remove(b.m)); ballViews.clear();
           showBanner(t('btn.again'), t('mp.wave1in'));
           break;
@@ -413,9 +434,10 @@
       const id = nextId++;
       const pl = S.addPlayer(world, id, String(m.name || 'Dragon'));
       guests.set(conn.peer, { conn, id, last: performance.now() });
-      conn.send({ k: 'w', id, color: pl.color, p: pl.pos, code: roomCode });
+      conn.send({ k: 'w', id, color: pl.color, p: pl.pos, code: roomCode, f: S.forestState(world, VForest.RULES.regrow) });
     } else if (m.k === 'p' && g) S.setPose(world, g.id, m);
     else if (m.k === 'b' && g) S.shoot(world, g.id, m.f, m.d);
+    else if (m.k === 't' && g) S.treeEvents(world, g.id, m.a, m.d);
   }
   function dropGuest(conn) {
     const g = guests.get(conn.peer);
@@ -449,6 +471,7 @@
           welcomed = true; clearTimeout(timer);
           role = 'guest'; roomCode = code; view.myId = m.id; lastSnapAt = performance.now();
           startGame(m.color, m.p);
+          VForest.restore(Fo, Array.isArray(m.f) ? m.f : []);
           showBanner(t('mp.joined', { c: code }), t('mp.flyTeam'));
         } else if (m.k === 's') {
           lastSnapAt = performance.now();
@@ -642,6 +665,15 @@
       hero.root.visible = !(pilot.inv > 0 && !pilot.down && pilot.rollT <= 0 && Math.floor(time * 12) % 2 === 0);
       hero.root.updateMatrixWorld(true); hero.mouth.getWorldPosition(mouthW);
       if (pilot.breathing) breathFx(mouthW, S.fwd(pilot.yaw, pilot.pitch), pilot.vel, dt);
+      // the forest: my dragon breaks the trees it flies into (jolt: slower, a little damage) and its breath sets them alight
+      treeCool = Math.max(0, treeCool - dt);
+      if (!pilot.down) {
+        const hits = VForest.hit(Fo, pilot.pos, S.FOREST.body, pilot.vel), J = Fo.rules.jolt;
+        hits.forEach(h => treeOut.push({ k: 'f', i: h.i, dx: h.dx, dz: h.dz }));
+        if (hits.length) { shake = Math.max(shake, 0.5); if (treeCool <= 0) { treeCool = J.cool; pilot.speed *= J.slow; treeJolt = J.dmg; } }
+        if (pilot.breathing) VForest.heat(Fo, [mouthW.x, mouthW.y, mouthW.z], S.fwd(pilot.yaw, pilot.pitch), S.FOREST.breath[0], Math.cos(S.FOREST.breath[1] * Math.PI / 180), dt).forEach(e => treeOut.push({ k: 'i', i: e.i }));
+      }
+      sendTrees();
 
       if (role === 'host') { hostTick(dt); applySnapshot(S.snapshot(world)); }
       else {
@@ -696,6 +728,8 @@
       hurt = Math.max(0, hurt - dt * 1.8);
       $('#vignette').style.opacity = Math.max(hurt, view.hp < 30 && !pilot.down ? 0.35 + Math.sin(time * 5) * 0.15 : 0);
     }
+    VForest.step(Fo, dt); if (window.VTex) VTex.tick(time);
+    forestView.update(dt, time, camera, renderer.domElement.height);
     updateParticles(dt);
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.style.opacity = 0; }
     sky.position.copy(camera.position);

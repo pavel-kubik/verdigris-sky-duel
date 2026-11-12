@@ -230,7 +230,10 @@ body:not(.tut) .tutOnly{display:none}
 <script src="i18n.js"></script>
 <script src="pwa.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="shared/textures.js"></script>
 <script src="shared/dragon.js"></script>
+<script src="shared/forest.js"></script>
+<script src="shared/forest-view.js"></script>
 <script>
 (function(){
 "use strict";
@@ -280,10 +283,13 @@ function H(x,z){
     const n=0.92+Math.random()*0.12;col.push(c.r*n,c.g*n,c.b*n);
   }
   g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();
-  scene.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1})));
+  const groundM=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1});
+  if(window.VTex)VTex.detail(groundM,{map:'rock',top:'ground',scale:22,topScale:11,strength:0.62,bump:1.5});
+  scene.add(new THREE.Mesh(g,groundM));
   const water=new THREE.Mesh(new THREE.PlaneGeometry(2600,2600),new THREE.MeshStandardMaterial({color:0x2c5c63,roughness:.25,metalness:.2,transparent:true,opacity:.88}));
   water.rotation.x=-Math.PI/2;water.position.y=0.6;scene.add(water);
-  const rockM=new THREE.MeshStandardMaterial({color:0x6a5f50,flatShading:true,roughness:1}),grassM=new THREE.MeshStandardMaterial({color:0x4d7a40,flatShading:true,roughness:1});
+  const rockM=new THREE.MeshStandardMaterial({color:0x8a7d6a,flatShading:true,roughness:1}),grassM=new THREE.MeshStandardMaterial({color:0x5d8a4c,flatShading:true,roughness:1});
+  if(window.VTex){VTex.detail(rockM,{map:'rock',scale:9,strength:0.8,bump:1.6});VTex.detail(grassM,{map:'ground',scale:6,strength:0.7,bump:1});}
   for(let i=0;i<46;i++){
     const a=Math.random()*Math.PI*2,r=60+Math.random()*320,x=Math.cos(a)*r,z=Math.sin(a)*r,hgt=25+Math.random()*55,rad=3+Math.random()*5;
     const m=new THREE.Mesh(new THREE.CylinderGeometry(rad*0.55,rad,hgt,6,3),rockM);m.position.set(x,H(x,z)+hgt/2-2,z);m.rotation.y=Math.random()*3;scene.add(m);
@@ -309,6 +315,12 @@ const clouds=[];
   }
 })();
 
+/* ---------- the living forest (shared/forest.js + forest-view.js): the same trees and rules as in the co-op, the
+   campaign and the deathmatch - fly into a tree and it breaks (a jolt), breathe fire on it and it burns ---------- */
+const Fo=(function(){const D=VForest.DUEL,names=D.kinds.map(k=>k[0]);return VForest.create(VForest.scatter(D,H).map(t=>{const z=VForestView.size(t.kind,t.sc,t.sy);return Object.assign({},t,{kind:names.indexOf(t.kind),r:z.r,h:z.h});}));})();
+const forestView=VForestView.build(Fo,{kinds:VForest.DUEL.kinds.map(k=>k[0]),groundAt:H,particles:matchMedia('(pointer: coarse)').matches?0.5:1});
+scene.add(forestView.group);
+let treeCool=0;
 /* ---------- dragon model: shared/dragon.js (VDragon) ---------- */
 const segGeo=new THREE.IcosahedronGeometry(1,1); // chickens and other small props
 const {makeDragon,GREEN,CRIMSON}=VDragon;
@@ -458,6 +470,7 @@ function showBanner(a,b){banner.innerHTML=a+(b?'<small>'+b+'</small>':'');banner
 /* ---------- state ---------- */
 let state='preview';
 function resetGame(){
+  VForest.reset(Fo);
   foes.forEach(f=>scene.remove(f.d.root));foes.length=0;
   balls.forEach(b=>scene.remove(b.m));balls.length=0;pN=0;
   Object.assign(P,{yaw:0,pitch:0,roll:0,speed:30,hp:100,st:100,ballCd:0,rollT:0,inv:0});P.pos.set(0,90,0);
@@ -502,7 +515,8 @@ const GOLD='#ffcf5a';
 const T={i:-1,lesson:null,speed:22,objs:[],rings:[],ri:0,chickens:[],wisp:null,wt:0,boostT:0,rolls:0,dodges:0,eaten:0,roasted:0,celebrate:0,tipT:0,lastGoal:'',lastStep:'',canEat:true};
 const START=new V3(0,80,-220);
 const ringGeo=new THREE.TorusGeometry(7,0.55,8,40);
-const islRock=new THREE.MeshStandardMaterial({color:0x6a5f50,flatShading:true,roughness:1}),islGrass=new THREE.MeshStandardMaterial({color:0x4d7a40,flatShading:true,roughness:1});
+const islRock=new THREE.MeshStandardMaterial({color:0x8a7d6a,flatShading:true,roughness:1}),islGrass=new THREE.MeshStandardMaterial({color:0x5d8a4c,flatShading:true,roughness:1});
+if(window.VTex){VTex.detail(islRock,{map:'rock',scale:9,strength:0.8,bump:1.6,local:true});VTex.detail(islGrass,{map:'ground',scale:6,strength:0.7,bump:1,local:true});}
 const RAW=new THREE.Color(0xf3efe4),GOLDEN=new THREE.Color(0xe0a040),ROAST=new THREE.Color(0xa0561f);
 const rollEl=$('#rollNow'),aimV=new V3();
 const K=s=>s.split(' ').map(k=>'<kbd>'+(k==='Space'?t('key.space'):k)+'</kbd>').join('');
@@ -833,8 +847,12 @@ function updatePlayer(dt){
   hero.anim(time,dt,{phase:P.phase,amp:glide?0.35:P.boosting?1.1:1,mouth:P.breathing,turn:-sx,look:0});
   hero.root.updateMatrixWorld(true);
   hero.mouth.getWorldPosition(mouthW);
+  treeCool=Math.max(0,treeCool-dt);
+  {const J=Fo.rules.jolt,hits=VForest.hit(Fo,[P.pos.x,P.pos.y,P.pos.z],VForest.DUEL.body,[P.vel.x,P.vel.y,P.vel.z]);
+    if(hits.length){shake=Math.max(shake,0.5);if(treeCool<=0){treeCool=J.cool;P.speed*=J.slow;if(mode==='duel'){P.hp-=J.dmg;hurt=Math.max(hurt,0.3);hero.flash=Math.max(hero.flash,0.4);}}}}   // nothing hurts in the tutorial
   if(P.breathing){
     const n=Math.ceil(dt*70),aim=breathAim();
+    VForest.heat(Fo,[mouthW.x,mouthW.y,mouthW.z],[aim.x,aim.y,aim.z],VForest.DUEL.breath[0],Math.cos(VForest.DUEL.breath[1]*Math.PI/180),dt);
     for(let i=0;i<n;i++){
       const sp=0.12;const vx=aim.x+(Math.random()-.5)*sp,vy=aim.y+(Math.random()-.5)*sp,vz=aim.z+(Math.random()-.5)*sp;
       const s=62+Math.random()*12;
@@ -902,7 +920,7 @@ function updateBalls(dt){
       P.hp-=13;hit=true;hurt=1;shake=Math.max(shake,0.5);hero.flash=1;
     }
     if(p.y<H(p.x,p.z)||p.y<0.6)hit=true;
-    if(hit||b.life<=0){burst(p,hit?40:12,b.owner==='p'?0:1,hit?20:8,2.2,0.6);scene.remove(b.m);balls.splice(i,1);}
+    if(hit||b.life<=0){burst(p,hit?40:12,b.owner==='p'?0:1,hit?20:8,2.2,0.6);if(b.owner!=='t')VForest.blast(Fo,[p.x,p.y,p.z],VForest.DUEL.blast);scene.remove(b.m);balls.splice(i,1);}
   }
 }
 function updateParticles(dt){
@@ -1024,6 +1042,8 @@ function frame(now){
     if(Math.abs(camera.fov-fovT)>0.1){camera.fov+=(fovT-camera.fov)*Math.min(1,dt*3);camera.updateProjectionMatrix();pMat.uniforms.uScale.value=(Hh*renderer.getPixelRatio())/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));}
   }
   sky.position.copy(camera.position);
+  VForest.step(Fo,dt);if(window.VTex)VTex.tick(time);
+  forestView.update(dt,time,camera,renderer.domElement.height);
 
   // DOM HUD
   const hp=Math.round(P.hp),st=Math.round(P.st);

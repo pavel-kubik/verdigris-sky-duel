@@ -13,6 +13,7 @@
  *   apply(F, ev)                  a 'fell' / 'ignite' event from another browser (or a late joiner's snapshot)
  *   snapshot(F) / restore(F, s)   compact state for a player who joins later
  *   reset(F)                      every tree standing again
+ *   scatter(opts, H)              seeded tree places on a height field (the duel world: DUEL)
  * hit / heat / blast / step return events [{ e: 'fell', i, dx, dz } | { e: 'ignite', i, g } | { e: 'burnt', i } |
  * { e: 'regrow', i }]; 'fell' and 'ignite' with g = 0 are the ones to send to the other players.
  * Tree state: st 0 standing, 1 felled; fire 0 none, 1 burning, 2 burnt (a charred snag or log).
@@ -176,10 +177,32 @@
     }
     F.burning.clear(); F.down.clear();
   }
+  /**
+   * Seeded places for a forest on a height field: o = { n, seed, rMax, kinds: [[name, share]] }, H(x, z) -> ground.
+   * Dry (above o.low, default 3), below the peaks (o.high, default 46), gentle ground. The same list in every browser.
+   * -> [{ x, y, z, kind (name), sc, sy, yaw, tint }]
+   */
+  function scatter(o, H) {
+    let a = o.seed | 0;
+    const rnd = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const out = [], low = o.low == null ? 3 : o.low, high = o.high == null ? 46 : o.high;
+    for (let tries = 0; out.length < o.n && tries < o.n * 40; tries++) {
+      const an = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * o.rMax, x = Math.cos(an) * r, z = Math.sin(an) * r, y = H(x, z);
+      const k = rnd(), sc = 0.8 + rnd() * 0.7, sy = 0.9 + rnd() * 0.25, yaw = rnd() * Math.PI * 2, tint = rnd();
+      if (y < low || y > high || Math.abs(H(x + 3, z) - H(x - 3, z)) + Math.abs(H(x, z + 3) - H(x, z - 3)) > 3.6) continue;
+      let acc = 0, kind = o.kinds[0][0];
+      for (const kk of o.kinds) { acc += kk[1]; if (k < acc) { kind = kk[0]; break; } }
+      out.push({ x, y, z, kind, sc, sy, yaw, tint });
+    }
+    return out;
+  }
+  /** The duel world's forest (solo and co-op share the terrain): scatter options, the dragon's body radius, breath [range, half angle in degrees]. */
+  const DUEL = { n: 460, seed: 4242, rMax: 720, kinds: [['conifer', 0.45], ['broadleaf', 0.25], ['pine', 0.18], ['birch', 0.12]], body: 2.3, breath: [44, 16], blast: 9 };
+
   /** Standing trees as [[x, z, r]] (what a pilot can still crash into). */
   function standing(F) { return F.list.filter(t => t.st === 0).map(t => [t.x, t.z, t.r]); }
 
-  const api = { RULES, create, near, hit, heat, blast, step, apply, snapshot, restore, reset, standing, hash };
+  const api = { RULES, create, near, hit, heat, blast, step, apply, snapshot, restore, reset, standing, scatter, DUEL, hash };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.VForest = api;
 })(typeof self !== 'undefined' ? self : this);

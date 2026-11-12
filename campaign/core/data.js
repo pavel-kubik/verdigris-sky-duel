@@ -608,7 +608,7 @@
               groundPitch: -0.42, groundSpeed: 18, spin: 6, bounce: 10 },
       perch: { maxAlt: 8, time: 0.6, stRegen: 2.2, takeoffSpeed: 20, takeoffPitch: 0.45, hop: 2.5, turn: 1.6 },
       pillars: { n: 14, ring: [110, 560], h: [24, 58], r: [5, 9], gap: 60, seed: 77 },
-      trees: { hK: 3, rK: 0.7, cell: 24 },
+      trees: { hK: 3, rK: 0.7, cell: 24, body: 2.3 },                 // body: the dragon's radius against the forest (shared/forest.js)
       food: {
         n: 18, eatR: 4.5, eatAlt: 6, respawn: 18, flee: 24, roam: 36, seed: 91,
         kinds: { chicken: { hp: 15, speed: 4.5, share: 0.5 }, goat: { hp: 30, speed: 6, share: 0.25 }, sheep: { hp: 25, speed: 4, share: 0.25 } },

@@ -160,7 +160,8 @@
       } else if (m.k === 'r' && m.r) {
         S.lastRec = Object.assign({}, m.r, { code: S.code });
         emit({ t: 'record', rec: S.lastRec });
-      } else if (m.k === 'moved') onHostLost({ why: 'moved' });   // our host stepped down: join the room's new host
+      } else if (m.k === 'f' && Array.isArray(m.f)) emit({ t: 'forest', f: m.f });
+      else if (m.k === 'moved') onHostLost({ why: 'moved' });   // our host stepped down: join the room's new host
     }
     /** Closes the current peer and connections (the game view stays). */
     function dropNet() {
@@ -261,9 +262,11 @@
         S.guests.set(conn.peer, { conn, id, last: clock.now() });
         conn.send({ k: 'w', id, color: pl.color, p: pl.pos, y: pl.yaw, code: S.code, host: w.players[S.myId] ? w.players[S.myId].name : '' });
         try { conn.send({ k: 'r', r: DM.exportRoom(w) }); } catch (_) { }
+        try { conn.send({ k: 'f', f: DM.forestState(w) }); } catch (_) { }      // trees already down or burnt
       } else if (m.k === 'p' && g) DM.setPose(w, g.id, m);
       else if (m.k === 'b' && g) DM.shoot(w, g.id, m.f, m.d);
       else if (m.k === 'c' && g) DM.reportCrash(w, g.id, m.d, m.w);
+      else if (m.k === 't' && g) DM.treeEvents(w, g.id, m.a);
     }
     function dropGuest(conn) {
       const g = S.guests.get(conn.peer);
@@ -320,10 +323,16 @@
       if (S.role === 'host' && S.world) DM.reportCrash(S.world, S.myId, dmg, kind);
       else send(S.hostConn, { k: 'c', d: dmg, w: kind });
     }
+    /** Trees this browser's dragon felled or set alight: [{ k: 'f' | 'i', i, dx, dz }] -> the host tells everyone. */
+    function trees(list) {
+      if (!list || !list.length) return;
+      if (S.role === 'host' && S.world) DM.treeEvents(S.world, S.myId, list);
+      else send(S.hostConn, { k: 't', a: list });
+    }
     const hostOnly = fn => (...a) => (S.role === 'host' && S.world ? fn(S.world, ...a) : false);
 
     return {
-      host, practice, join, rejoin, leave, tick, shoot, crash,
+      host, practice, join, rejoin, leave, tick, shoot, crash, trees,
       startMatch: hostOnly(DM.startMatch), restart: hostOnly(DM.restart), setSettings: hostOnly(DM.setSettings),
       get role() { return S.role; }, get code() { return S.code; }, get world() { return S.world; }, get myId() { return S.myId; },
       get migrating() { return S.migrating; }, get peer() { return S.peer; }, get hostConn() { return S.hostConn; },

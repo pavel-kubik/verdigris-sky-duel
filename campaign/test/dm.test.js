@@ -112,7 +112,36 @@ const E = DM.env([]);
   ok(!c2, 'gentle skim does not crash');
 }
 
-// 7. Trees: flying into a crown crashes
+// 7b. The living forest (shared/forest.js): flying into a tree breaks it - the dragon is jolted, it does not fall
+{
+  const VF = require('../../shared/forest.js');
+  const x = A.homes[3][0] + 2, z = A.homes[3][1] + 2, g = T.surfaceAt(X.region, x, z);
+  const forest = VF.create([{ x, y: T.surfaceAt(X.region, x, z + 20), z: z + 20, r: 5, h: 15 }]);
+  const E3 = DM.env(null, forest);
+  const p = DM.newPilot([x, g + 6, z], 0);
+  let fell = null, jolt = null, speedBefore = 0;
+  for (let i = 0; i < 120 && !fell; i++) { speedBefore = p.speed; DM.step(p, {}, dt, E3).forEach(e => { if (e.e === 'tree') fell = e; if (e.e === 'crash') jolt = e; }); }
+  ok(fell && fell.k === 'f' && fell.i === 0, 'the tree is felled');
+  ok(forest.list[0].st === 1 && forest.list[0].dz > 0.9, 'it falls along the flight');
+  ok(jolt && jolt.kind === 'tree' && jolt.soft && jolt.dmg === VF.RULES.jolt.dmg, 'the dragon takes the jolt damage');
+  ok(p.mode === 'air' && p.speed < speedBefore, 'slowed, still flying');
+  let again = 0;
+  for (let i = 0; i < 60; i++) DM.step(p, {}, dt, E3).forEach(e => { if (e.e === 'tree') again++; });
+  ok(again === 0, 'a felled tree is no obstacle');
+  // the host records tree events by tree number and hands them to late joiners
+  const w = DM.newWorld({ rng: mulberry(3) });
+  DM.addPlayer(w, 1, 'A');
+  ok(DM.treeEvents(w, 1, [{ k: 'f', i: 12, dx: 1, dz: 0 }, { k: 'i', i: 12 }, { k: 'i', i: 40 }, { k: 'x', i: 1 }, { k: 'f', i: -2 }]) === 3, 'three valid tree events');
+  ok(DM.treeEvents(w, 1, [{ k: 'f', i: 12, dx: 1, dz: 0 }]) === 0, 'a tree falls once');
+  ok(DM.treeEvents(w, 99, [{ k: 'f', i: 13 }]) === 0, 'unknown players are ignored');
+  ok(w.ev.filter(e => e.e === 'tree').length === 3, 'events go to everyone');
+  const st = DM.forestState(w);
+  ok(st.length === 2 && st.some(r => r[0] === 12 && r[1] === 1 && r[2] === 2) && st.some(r => r[0] === 40 && r[1] === 0 && r[2] === 2), 'state for a late joiner');
+  DM.restart(w);
+  ok(DM.forestState(w).length === 0, 'a new round: the forest stands again');
+}
+
+// 7. Trees without a forest (plain solid crowns): flying into a crown crashes
 {
   const x = A.homes[3][0] + 2, z = A.homes[3][1] + 2, g = T.surfaceAt(X.region, x, z);
   const E2 = DM.env([[x, z + 20, 5]]);

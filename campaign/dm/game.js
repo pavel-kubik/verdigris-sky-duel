@@ -54,19 +54,26 @@
 
   /* ---------- the arena: Wildwood terrain, trees, buildings, pillars ---------- */
   const A = DM.arena();
-  const region = VRender.terrain.build(X.region, { isTouch, flora: isTouch ? 0.5 : 1, far: FOG_FAR });
+  const region = VRender.terrain.build(X.region, { isTouch, flora: isTouch ? 0.5 : 1, far: FOG_FAR, particles: isTouch ? 0.5 : 1 });
   scene.add(region.group);
   scene.fog.color.set(region.fog);
   if (region.sky) { skyU.top.value.set(region.sky.top); skyU.mid.value.set(region.sky.mid); skyU.bot.value.set(region.sky.bot); }
   const townView = VRender.settlements.build(A.town);
   scene.add(townView.group);
-  const E = DM.env(region.trees);
+  /* the living forest (shared/forest.js): the same trees and rules as in the campaign and the co-op. A dragon's own
+     browser decides what it fells and sets alight and tells the host, who tells everyone (by tree number). */
+  const Fo = region.forest;
+  const E = DM.env(region.trees, Fo);
+  const treeOut = [];
+  function treeApply(k, id, dx, dz) { const i = Fo.byId.get(id); if (i != null) VForest.apply(Fo, { e: k === 'f' ? 'fell' : 'ignite', i, dx, dz, g: 0 }); }
   (function pillars() {
     const n = A.pillars.length;
     const rockG = new THREE.CylinderGeometry(0.62, 1, 1, 7, 3); rockG.translate(0, 0.5, 0);
     const capG = new THREE.CylinderGeometry(0.72, 0.62, 1, 7); capG.translate(0, -0.5, 0);
-    const rock = new THREE.InstancedMesh(rockG, new THREE.MeshStandardMaterial({ color: 0x6a5f50, flatShading: true, roughness: 1 }), n);
-    const cap = new THREE.InstancedMesh(capG, new THREE.MeshStandardMaterial({ color: 0x4d7a40, flatShading: true, roughness: 1 }), n);
+    const rockM = new THREE.MeshStandardMaterial({ color: 0x8a7d6a, flatShading: true, roughness: 1 }), capM = new THREE.MeshStandardMaterial({ color: 0x5d8a4c, flatShading: true, roughness: 1 });
+    if (window.VTex) { VTex.detail(rockM, { map: 'rock', scale: 9, strength: 0.8, bump: 1.6 }); VTex.detail(capM, { map: 'ground', scale: 6, strength: 0.7, bump: 1 }); }
+    const rock = new THREE.InstancedMesh(rockG, rockM, n);
+    const cap = new THREE.InstancedMesh(capG, capM, n);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new V3(0, 1, 0);
     A.pillars.forEach((p, i) => {
       q.setFromAxisAngle(up, p.id * 1.7);
@@ -140,7 +147,7 @@
   }
 
   /* ---------- view state ---------- */
-  const makeDragon = c => VDragon.makeDragon(c, { toes: false });
+  const makeDragon = c => VDragon.makeDragon(c);
   const fbGeo = new THREE.IcosahedronGeometry(1, 1), fbMat = new THREE.MeshBasicMaterial({ color: 0xffd27a });
   const ballViews = new Map();
   const view = { players: new Map(), food: new Map(), myId: 0, myColor: 0, hp: X.hp, myDown: false, rows: [], names: {}, colors: {}, tl: X.timeLimit, fl: X.fragLimit, tm: X.timeLimit, ph: null, hid: 1, over: false, winner: 0 };
@@ -211,8 +218,10 @@
         case 'pop': {
           const b = ballViews.get(ev.id); if (b) { scene.remove(b.m); ballViews.delete(ev.id); }
           burst(ev.p, ev.h ? 40 : 12, 0, ev.h ? 20 : 8, 2.2, 0.6);
+          VForest.blast(Fo, ev.p, X.ball.splashR);              // a bursting fireball sets the trees around it alight (in every browser)
           break;
         }
+        case 'tree': treeApply(ev.k, ev.i, ev.dx, ev.dz); break;
         case 'hurt':
           if (ev.pl === view.myId) { hurt = Math.min(1, hurt + 0.6); shake = Math.max(shake, ev.k === 'breath' ? 0.15 : 0.45); hero.flash = 1; }
           else { const p = view.players.get(ev.pl); if (p) p.d.flash = 1; }
@@ -256,11 +265,12 @@
           showBoard(true, ev.board);
           break;
         case 'start':
+          VForest.reset(Fo);
           showBanner(t('dm.start'), t('dm.goal', { n: ev.fl }));
           feed(t('dm.feed.start'), true);
           break;
         case 'restart':
-          view.over = false; view.winner = 0;
+          view.over = false; view.winner = 0; VForest.reset(Fo);
           $('#boardPanel').hidden = true; boardOpen = false;
           ballViews.forEach(b => scene.remove(b.m)); ballViews.clear();
           showBanner(t('dm.newRound'), t('dm.room.waitShort'));
@@ -411,8 +421,9 @@
   /** Local crash / impact damage goes to the host (the host's own: straight into the world). */
   function reportLocal(evs) {
     evs.forEach(ev => {
+      if (ev.e === 'tree') { treeOut.push({ k: 'f', i: Fo.ids[ev.i], dx: ev.dx, dz: ev.dz }); return; }
       if (ev.e === 'crash') {
-        shake = Math.max(shake, 0.9);
+        shake = Math.max(shake, ev.soft ? 0.5 : 0.9);
         burst([pilot.pos[0], pilot.pos[1], pilot.pos[2]], 30, 1, 10, 2.2, 0.9);
         flashPrompt(t('dm.crash.' + ev.kind), 2);
       }
@@ -515,6 +526,7 @@
         if (mode === 'game') { applyEvents(ev.e || []); applySnapshot(ev.s); }
         break;
       case 'record': saveRoom(ev.rec); break;
+      case 'forest': VForest.restore(Fo, ev.f.map(r => [Fo.byId.get(r[0]), r[1], r[2], r[3], r[4]]).filter(r => r[0] != null)); break;
       case 'migrating':
         showBanner(ev.why === 'stepdown' || ev.why === 'moved' ? t('dm.mig.moved') : t('dm.mig.lost'), t('dm.mig.finding'));
         feed(t('dm.mig.finding'));
@@ -863,7 +875,12 @@
       poseDragon(hero, pilot, heroPose, dt, phase, pilot.breathing, pilot.sx);
       hero.root.visible = !(pilot.inv > 0 && pilot.mode === 'air' && pilot.rollT <= 0 && Math.floor(time * 12) % 2 === 0);
       hero.root.updateMatrixWorld(true); hero.mouth.getWorldPosition(mouthW);
-      if (pilot.breathing) breathFx(mouthW, MT.fwd(pilot.yaw, pilot.mode === 'perch' ? -0.12 : pilot.pitch), pilot.vel, dt);
+      if (pilot.breathing) {
+        const bf = MT.fwd(pilot.yaw, pilot.mode === 'perch' ? -0.12 : pilot.pitch);
+        breathFx(mouthW, bf, pilot.vel, dt);
+        VForest.heat(Fo, [mouthW.x, mouthW.y, mouthW.z], bf, X.breath.range, Math.cos(X.breath.cone * Math.PI / 180), dt).forEach(e => treeOut.push({ k: 'i', i: Fo.ids[e.i] }));
+      }
+      if (treeOut.length) { N.trees(treeOut.splice(0)); }
       if (pilot.mode === 'fall' && Math.random() < 0.5) spawnP(pilot.pos[0], pilot.pos[1], pilot.pos[2], (Math.random() - .5) * 3, 2, (Math.random() - .5) * 3, 0.8, 1.4, 1.5, 1, 0.5);
 
       netTick(dt);
@@ -924,7 +941,8 @@
       flist.push(f);
     });
     preyView.update({ list: flist }, time, null, null);
-    region.update(camera.position, time);
+    VForest.step(Fo, dt);
+    region.update(camera.position, time, { dt, camera, viewH: renderer.domElement.height });
     updateParticles(dt);
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.style.opacity = 0; }
     sky.position.copy(camera.position);
