@@ -442,7 +442,7 @@
     if (code === 'Digit1') { pilot.pos = [A.homes[0][0], TR.surfaceAt(X.region, A.homes[0][0], A.homes[0][1]) + 6, A.homes[0][1] - 20]; pilot.yaw = 0; pilot.mode = 'air'; }
     if (code === 'Digit2') { const p = A.pillars[0]; pilot.pos = [p.x, p.top + 5, p.z - 30]; pilot.yaw = 0; pilot.pitch = 0; pilot.mode = 'air'; }
     if (code === 'Digit3') { const b = A.town.buildings[0]; pilot.pos = [b.pos[0], b.pos[1] + b.h + 5, b.pos[2] - 30]; pilot.yaw = 0; pilot.mode = 'air'; }
-    const world = N.N.role === 'host' ? N.world : null;
+    const world = N.role === 'host' ? N.world : null;
     if (code === 'Digit4' && world) { const pl = world.players[view.myId]; if (pl) DM.damage(world, pl, 25, 0, 'crash'); }
     if (code === 'Digit5' && world) { if (!world.players[99]) DM.addPlayer(world, 99, 'Dummy'); const d = world.players[99]; d.sinv = 0; d.down = false; const f = MT.fwd(pilot.yaw, 0); d.pos = [pilot.pos[0] + f[0] * 40, pilot.pos[1], pilot.pos[2] + f[2] * 40]; d.yaw = pilot.yaw + Math.PI; d.mode = 2; }
     if (code === 'Digit6' && world) DM.endMatch(world);
