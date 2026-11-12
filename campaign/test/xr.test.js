@@ -113,7 +113,8 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
 {
   const C = comfort, store = v => ({ v, getItem() { return this.v; }, setItem(k, x) { this.k = k; this.v = x; } });
   const d = C.defaults();
-  for (const k in C.OPTIONS) ok(d[k] === C.OPTIONS[k][0] || C.PRESETS.recommended[k] === d[k], 'default of ' + k + ' is its first option or the Recommended preset');
+  for (const k in C.OPTIONS) ok(C.OPTIONS[k].includes(d[k]), 'the default of ' + k + ' is one of its options');
+  ok(Object.keys(d).length === Object.keys(C.OPTIONS).length, 'every setting has options');
   ok(d.preset === 'recommended' && d.debug === false, 'a new player gets the Recommended preset, the debug overlay off');
   ok(JSON.stringify(C.load(null, '')) === JSON.stringify(d), 'no storage (private mode): the defaults');
   ok(JSON.stringify(C.load(store('{broken'), '')) === JSON.stringify(d), 'a broken stored value: the defaults');
@@ -124,6 +125,36 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   const s = store(null);
   ok(C.save(s, C.set(C.defaults(), 'debug', true)) && s.k === C.KEY && JSON.parse(s.v).debug === true, 'save writes JSON under the comfort key');
   ok(C.save({ setItem() { throw new Error('full'); } }, d) === false, 'a failed save is reported, not thrown');
+}
+
+/* ---------- performance: render scale 1.0 and medium foveation to start with, adaptive fallback ---------- */
+{
+  const C = comfort, d = C.defaults(), B = 1000 / 90;
+  ok(d.scale === 1 && d.foveation === 0.66 && d.adaptive === true && d.compact === true, 'defaults: render scale 1.0, foveation 0.66, adaptive quality and compact dragons on');
+  const run = (a, ms, seconds, max) => { let out = 0; for (let t = 0; t < seconds * 1000; t += ms) out += C.adaptStep(a, ms, B, max) || 0; return out; };
+  let a = C.adaptState();
+  ok(run(a, B, 30, 5) === 0 && a.level === 0, '90 Hz on the budget: the quality stays');
+  a = C.adaptState();
+  ok(run(a, 14, 2.5, 5) === 0 && a.level === 0, 'slow frames while the session warms up do not count');
+  run(a, 14, 0.8, 5);
+  ok(a.level === 1, 'a second over the budget lowers the quality one level');
+  run(a, 14, 60, 5);
+  ok(a.level === 5, 'it keeps stepping down while frames stay slow, and never below the last level: ' + a.level);
+  run(a, B, C.ADAPT.wait - 2, 5);
+  ok(a.level === 5, 'a few good seconds do not raise it yet');
+  run(a, B, 4, 5);
+  ok(a.level === 4, 'a run of good seconds raises it one level');
+  const wait = a.wait;
+  run(a, 14, 2.2, 5);
+  ok(a.level === 5 && a.wait === wait * 2, 'a raise that fails at once doubles the wait (no pumping)');
+  a = C.adaptState(); run(a, B, 5, 5);
+  ok(C.adaptStep(a, 400, B, 5) === 0 && a.acc < 1000, 'one long hitch (a pause, a loading spike) is ignored');
+  ok(C.adaptLevels(d) === 5, 'from scale 1.0 and foveation 0.66 there are 5 levels: foveation, then 0.9 0.8 0.7 0.6');
+  ok(C.adaptQuality(0, d).scale === 1 && C.adaptQuality(0, d).foveation === 0.66, 'level 0 is what the player set');
+  ok(C.adaptQuality(1, d).scale === 1 && C.adaptQuality(1, d).foveation === 1, 'level 1 only raises the foveation');
+  ok(C.adaptQuality(2, d).scale === 0.9 && C.adaptQuality(5, d).scale === 0.6, 'then the render scale goes down a step a level');
+  ok(C.adaptQuality(99, d).scale === C.ADAPT.floor, 'the render scale never goes below the floor');
+  ok(C.adaptQuality(3, Object.assign({}, d, { scale: 0.7, foveation: 1 })).scale === 0.6 && C.adaptLevels(Object.assign({}, d, { scale: 0.7, foveation: 1 })) === 1, 'a low setting has fewer levels left');
 }
 
 /* ---------- page wiring ---------- */

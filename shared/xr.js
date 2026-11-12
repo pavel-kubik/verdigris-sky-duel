@@ -84,14 +84,54 @@
 
   /* ---------- comfort settings (pure): one object, stored as JSON; every comfort feature reads its switch here ---------- */
   const CF_KEY = 'vsd-comfort';
-  /** Every setting and the values it can take; the first value is the default (= the Recommended preset). */
+  /** Every setting and the values it can take. */
   const OPTIONS = {
-    preset: ['recommended', 'comfortable', 'advanced', 'custom'],
+    preset: ['comfortable', 'recommended', 'advanced', 'custom'],
+    scale: [0.7, 0.8, 0.9, 1, 1.1, 1.2],   // render scale (the eye buffer; 1 = what the headset recommends)
+    foveation: [0, 0.33, 0.66, 1],    // fixed foveation: the edge of the view is drawn coarser
+    adaptive: [true, false],          // lower the quality a step while frames run over the budget
+    compact: [true, false],           // dragons as skinned meshes (far fewer draw calls)
     debug: [false, true],             // the head-locked debug overlay
   };
+  /** Device settings: not part of a preset. */
+  const DEVICE = { scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
   /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
   const PRESETS = { comfortable: {}, recommended: {}, advanced: {} };
-  function defaults() { const s = {}; for (const k in OPTIONS) s[k] = OPTIONS[k][0]; return Object.assign(s, PRESETS.recommended); }
+  function defaults() { return Object.assign({ preset: 'recommended' }, DEVICE, PRESETS.recommended); }
+
+  /* ---------- adaptive quality (pure): frames over the budget for a second lower the quality one level ---------- */
+  const ADAPT = { over: 1.08, good: 1.03, window: 1000, warm: 3000, wait: 15, maxWait: 120, step: 0.1, floor: 0.6 };
+  function adaptState() { return { acc: 0, n: 0, t: 0, level: 0, good: 0, wait: ADAPT.wait, upAt: -1e9 }; }
+  /** Levels below the player's settings: first full foveation, then the render scale 10 % a level down to the floor. */
+  function adaptLevels(s) { return (s.foveation < 1 ? 1 : 0) + Math.max(0, Math.round((s.scale - ADAPT.floor) / ADAPT.step)); }
+  function adaptQuality(level, s) {
+    const fov = s.foveation < 1 ? 1 : 0, k = Math.max(0, Math.min(level, adaptLevels(s)) - fov);
+    return { foveation: level >= 1 && fov ? 1 : s.foveation, scale: Math.max(Math.min(ADAPT.floor, s.scale), Math.round((s.scale - k * ADAPT.step) * 100) / 100) };
+  }
+  /**
+   * Feed the time of every frame (ms); budget is the frame time of the display (11.1 ms at 90 Hz). Returns -1 when the
+   * quality has to go a level down (a.level is already raised), +1 when it may come back up, else 0. A second whose
+   * average is over the budget lowers it; `wait` good seconds in a row raise it, and a raise that fails within 5 s
+   * doubles the wait, so the picture does not pump.
+   */
+  function adaptStep(a, ms, budget, maxLevel) {
+    if (!(ms > 0) || ms > 250) return 0;                          // a hitch or a pause is not load
+    a.t += ms; a.acc += ms; a.n++;
+    if (a.acc < ADAPT.window) return 0;
+    const avg = a.acc / a.n;
+    a.acc = 0; a.n = 0;
+    if (a.t < ADAPT.warm) return 0;                               // shaders compile in the first seconds
+    if (avg > budget * ADAPT.over) {
+      a.good = 0;
+      if (a.level >= maxLevel) return 0;
+      if (a.t - a.upAt < 5000) a.wait = Math.min(ADAPT.maxWait, a.wait * 2);
+      a.level++;
+      return -1;
+    }
+    if (avg > budget * ADAPT.good) { a.good = 0; return 0; }
+    if (a.level > 0 && ++a.good >= a.wait) { a.good = 0; a.level--; a.upAt = a.t; return 1; }
+    return 0;
+  }
   /** The option of `key` that `v` names (a stored value, or text from the URL), or undefined. */
   function optionOf(key, v) { const o = OPTIONS[key]; return o ? o.find(x => x === v || String(x) === String(v)) : undefined; }
   /** A full, valid settings object from anything (a parsed JSON blob, null ...). */
@@ -121,7 +161,7 @@
     return s;
   }
   function saveComfort(storage, s) { try { storage.setItem(CF_KEY, JSON.stringify(s)); return true; } catch (_) { return false; } }
-  const comfort = { KEY: CF_KEY, OPTIONS, PRESETS, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
+  const comfort = { KEY: CF_KEY, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
 
   /* ---------- the VR menu: a mirror of the DOM panel that is open on the flat page ---------- */
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -240,6 +280,35 @@
     const lastPos = new THREE.Vector3();
     const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 
+    /* render quality: the eye buffer is allocated at cf.scale when the session starts; below that the views are scaled
+       (XRView.requestViewportScale: no reallocation, takes effect on the next frame), which is also what the adaptive
+       fallback uses. One callback on a change, nothing per frame. */
+    let fbScale = 1, vpScale = 1, vpWant = 1, vpBusy = false, vpOk = true;
+    const adapt = adaptState();
+    function viewportFrame(time, frame) {
+      vpBusy = false;
+      const session = renderer.xr.getSession(), pose = session && frame.getViewerPose(renderer.xr.getReferenceSpace());
+      if (!session) return;
+      if (!pose) { vpBusy = true; session.requestAnimationFrame(viewportFrame); return; }
+      vpOk = false;
+      for (const v of pose.views) if (v.requestViewportScale) { v.requestViewportScale(vpWant); vpOk = true; }
+      vpScale = vpWant; scale = 0;                                // the point sprites follow the new eye viewport
+    }
+    function applyQuality() {
+      const session = renderer.xr.getSession();
+      if (!session) return;
+      const q = adaptQuality(cf.adaptive ? adapt.level : 0, cf), layer = session.renderState.baseLayer;
+      if (layer && 'fixedFoveation' in layer) layer.fixedFoveation = q.foveation;   // r128 has no setFoveation
+      vpWant = Math.min(1, q.scale / fbScale);
+      if (vpWant !== vpScale && !vpBusy) { vpBusy = true; session.requestAnimationFrame(viewportFrame); }
+    }
+    function applyComfort() {
+      if (!renderer.xr.isPresenting) return;
+      dbg.mesh.visible = cf.debug;
+      if (root.VDragon && root.VDragon.compact) root.VDragon.compact(cf.compact);
+      applyQuality();
+    }
+
     /* panels: canvases on planes fixed to the rig (they turn with the dragon, not with the head) */
     function panel(cw, ch, w, h, x, y, z, tilt, order, parent) {
       const canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
@@ -269,7 +338,7 @@
       dbg.tex.needsUpdate = true;
       st.acc = st.accMax = st.accCpu = st.n = 0; st.at = now;
     }
-    const debugLine = layer => 'fov ' + (layer && layer.fixedFoveation != null ? (+layer.fixedFoveation).toFixed(2) : '-');
+    const debugLine = layer => 'fov ' + (layer && layer.fixedFoveation != null ? (+layer.fixedFoveation).toFixed(2) : '-') + ' x' + (fbScale * vpScale).toFixed(2) + (vpOk ? '' : '!') + ' L' + (cf.adaptive ? adapt.level : '-');
     /* the speed and the turn rate of the view (the rig), smoothed over about 0.1 s */
     function measure() {
       if (st.dt && st.have) {
@@ -281,7 +350,7 @@
     }
     function setComfort(key, value) {
       setOption(cf, key, value); saveComfort(storage, cf);
-      dbg.mesh.visible = cf.debug && renderer.xr.isPresenting;
+      applyComfort();
     }
     let menu = null, menuSel = 0, menuScanAt = -Infinity, menuDrawn = '', menuSince = 0;
 
@@ -318,14 +387,20 @@
     renderer.xr.addEventListener('sessionstart', () => {
       prev = null; snap = true; scale = 0; hudAt = -Infinity; menu = null; menuDrawn = '';
       st.now = 0; st.have = false; st.speed = st.turn = 0; st.at = -Infinity;
-      hud.mesh.visible = true; dbg.mesh.visible = cf.debug;
-      const layer = renderer.xr.getSession().renderState.baseLayer;
-      if (layer && 'fixedFoveation' in layer) layer.fixedFoveation = 1;   // r128 has no setFoveation; the outer view costs less
+      hud.mesh.visible = true;
+      const session = renderer.xr.getSession();
+      try {                                                       // Quest: 90 Hz when the browser offers it
+        const rates = session.supportedFrameRates;
+        if (session.updateTargetFrameRate && rates && Array.prototype.indexOf.call(rates, 90) >= 0) session.updateTargetFrameRate(90).catch(() => {});
+      } catch (_) { }
+      Object.assign(adapt, adaptState()); vpScale = 1; vpBusy = false;
+      applyComfort();
       if (o.onStart) o.onStart();
     });
     renderer.xr.addEventListener('sessionend', () => {
       rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
       hud.mesh.visible = menuP.mesh.visible = dbg.mesh.visible = false; menu = null;
+      if (root.VDragon && root.VDragon.compact) root.VDragon.compact(false);   // the flat screen draws the dragons as it always did
       bars([]);
       if (o.onEnd) o.onEnd();
     });
@@ -333,6 +408,7 @@
     async function enter() {
       if (busy || renderer.xr.isPresenting) return;
       busy = true;
+      fbScale = cf.scale; renderer.xr.setFramebufferScaleFactor(fbScale);
       try { await renderer.xr.setSession(await navigator.xr.requestSession('immersive-vr')); }
       catch (e) { console.warn('VR not started', e); if (o.onError) o.onError(e); }
       busy = false;
@@ -377,6 +453,7 @@
         st.now = now; st.dt = d > 0 && d < 250 ? d / 1000 : 0;
         if (d > 0) { st.acc += d; st.n++; if (d > st.accMax) st.accMax = d; }
         if (p.ls) setComfort('debug', !cf.debug);
+        if (cf.adaptive && adaptStep(adapt, d, 1000 / (renderer.xr.getSession().frameRate || 90), adaptLevels(cf))) applyQuality();
         const roots = [].concat(menuRoot || []).filter(Boolean);
         if (!roots.length) {
           if (menu) { menu = null; menuP.mesh.visible = false; menuDrawn = ''; }

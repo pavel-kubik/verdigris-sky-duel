@@ -16,6 +16,9 @@
  *     opts.toes (default true): toes and claws on the feet; false leaves plain paws.
  *     dispose(): removes root from its parent and frees the dragon's materials (geometry is shared).
  *   GREEN, CRIMSON palettes; STAND = model units from the root down to the soles of a standing dragon
+ *   compact(on): VR draws every dragon as one skinned mesh per material (7 draw calls instead of about 90; the joints
+ *     are the bones, every vertex follows one joint, so the pose is the same). Off (the default, and always on the flat
+ *     screen) nothing changes: the skinned meshes are not even built. shared/xr.js switches it with the session.
  * Legs are hip / knee / foot joints: all at 0 = the tucked flight pose. anim(o.ground, o.gait, o.stride, o.fold) poses
  * the standing legs (2-bone IK), the walk cycle and the folded wings (campaign T07).
  */
@@ -334,6 +337,39 @@ function wingGeo(part){
   return {skin:s.build(),wing:w.build(),horn:h.p.length?h.build():null};
 }
 
+/* ---------- compact drawing (VR): see compact() in the header ---------- */
+let COMPACT=false;
+const CULL_R=14;                                                // wings spread 9.2 to a side, the tail reaches 10 back
+/** One geometry from joint geometries: list [{ geo, bone, flip }]; vertices keep their joint space and get the bone index. */
+function skinGeo(list){
+  let nv=0,ni=0;
+  list.forEach(e=>{nv+=e.geo.attributes.position.count;ni+=e.geo.index?e.geo.index.count:e.geo.attributes.position.count;});
+  const pos=new Float32Array(nv*3),nor=new Float32Array(nv*3),uv=new Float32Array(nv*2),col=new Float32Array(nv*3).fill(1);
+  const si=new Uint16Array(nv*4),sw=new Float32Array(nv*4),idx=new (nv>65535?Uint32Array:Uint16Array)(ni);
+  let v=0,q=0;
+  list.forEach(e=>{
+    const a=e.geo.attributes,n=a.position.count;
+    pos.set(a.position.array.subarray(0,n*3),v*3);
+    if(a.normal)nor.set(a.normal.array.subarray(0,n*3),v*3);
+    if(a.uv)uv.set(a.uv.array.subarray(0,n*2),v*2);
+    if(a.color)col.set(a.color.array.subarray(0,n*3),v*3);
+    for(let i=0;i<n;i++){si[(v+i)*4]=e.bone;sw[(v+i)*4]=1;}
+    const ix=e.geo.index?e.geo.index.array:null,m=ix?ix.length:n;
+    for(let i=0;i<m;i+=3){
+      const i0=ix?ix[i]:i,i1=ix?ix[i+1]:i+1,i2=ix?ix[i+2]:i+2;
+      idx[q++]=v+i0;idx[q++]=v+(e.flip?i2:i1);idx[q++]=v+(e.flip?i1:i2);
+    }
+    v+=n;
+  });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+  g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  g.setAttribute('skinIndex',new THREE.BufferAttribute(si,4));g.setAttribute('skinWeight',new THREE.BufferAttribute(sw,4));
+  g.setIndex(new THREE.BufferAttribute(idx,1));
+  g.boundingSphere=new THREE.Sphere(new V3(0,0,0),CULL_R);       // in root space, for the frustum test (the vertices are in joint space)
+  return g;
+}
+
 function makeDragon(c,opts){
   const toes=!opts||opts.toes!==false,TX=HOST.VTex||null;
   const tex=n=>(TX?(n==='eye'?TX.get(n):TX.albedo(n)):null),nrm=(n,k)=>(TX?TX.normal(n,k):null);
@@ -357,9 +393,10 @@ function makeDragon(c,opts){
   const mats=[mBody,mBelly,mWing,mHorn,mMouth,mTooth];
   const wingGlow=[((c.wing>>16)&255)/255*0.2,((c.wing>>8)&255)/255*0.2,(c.wing&255)/255*0.2];
   const matOf={skin:mBody,belly:mBelly,wing:mWing,horn:mHorn,mouth:mMouth,teeth:mTooth,eye:mEye};
+  const parts=[];                                               // every joint mesh: { joint, key, k (material), mesh }
   const put=(parent,key,make)=>{
     const G=cached(key,make);
-    for(const k in G)if(G[k]){const m=new THREE.Mesh(G[k],matOf[k]);parent.add(m);}
+    for(const k in G)if(G[k]){const m=new THREE.Mesh(G[k],matOf[k]);parent.add(m);parts.push({joint:parent,key,k,mesh:m});}
   };
   const root=new THREE.Group(),body=new THREE.Group();root.add(body);
   put(body,'torso',torsoGeo);
@@ -415,7 +452,31 @@ function makeDragon(c,opts){
   const claws=new THREE.Object3D();claws.position.set(0,-1.35,-0.9);body.add(claws);
 
   let meshes=0;root.traverse(o=>{if(o.isMesh)meshes++;});
-  const d={root,body,neck,tail,jaw,head,mouth,wings,legs,claws,mats,meshes,flash:0};
+  const d={root,body,neck,tail,jaw,head,mouth,wings,legs,claws,mats,meshes,flash:0,compact:false};
+  /* Compact drawing (VR): the joint groups are the bones of one skeleton; per material one skinned mesh whose vertices
+     stay in joint space (bone inverses = identity) and follow exactly one joint. Built at the first switch. */
+  let skinned=null,skinMats=null,skeleton=null;
+  d.setCompact=function(on){
+    on=!!on&&!!THREE.SkinnedMesh;
+    if(on&&!skinned){
+      const joints=[];parts.forEach(p=>{if(joints.indexOf(p.joint)<0)joints.push(p.joint);});
+      root.updateMatrixWorld(true);
+      const rootInv=new THREE.Matrix4().copy(root.matrixWorld).invert(),rel=new THREE.Matrix4();
+      const flip=joints.map(j=>rel.multiplyMatrices(rootInv,j.matrixWorld).determinant()<0);   // a mirrored wing: turn its triangles round
+      skeleton=new THREE.Skeleton(joints,joints.map(()=>new THREE.Matrix4()));
+      skinned=[];skinMats=[];
+      for(const k in matOf){
+        const mine=parts.filter(p=>p.k===k);if(!mine.length)continue;
+        const geo=cached('skin|'+k+'|'+mine.map(p=>p.key).join(','),()=>skinGeo(mine.map(p=>({geo:p.mesh.geometry,bone:joints.indexOf(p.joint),flip:flip[joints.indexOf(p.joint)]}))));
+        const mat=matOf[k].clone();mat.skinning=true;
+        if(mat.emissive)mat.emissive=matOf[k].emissive;        // one colour object: the hit flash reaches both
+        const sm=new THREE.SkinnedMesh(geo,mat);sm.bind(skeleton,new THREE.Matrix4());sm.visible=false;
+        root.add(sm);skinned.push(sm);skinMats.push(mat);
+      }
+    }
+    d.compact=on;
+    if(skinned){parts.forEach(p=>{p.mesh.visible=!on;});skinned.forEach(sm=>{sm.visible=on;});}
+  };
   const wrapA=x=>{x=(x+Math.PI)%(2*Math.PI);if(x<0)x+=2*Math.PI;return x-Math.PI;};
   /* One leg: foot target in body space (side plane), 2-bone IK, rotations blended in by g (0 = tucked). */
   function poseLeg(L,g,gait,stride,bob){
@@ -439,6 +500,7 @@ function makeDragon(c,opts){
    *      stride (0..1 step size, from the ground speed), fold (wing fold 0..1, default = ground) }
    */
   d.anim=function(time,dt,o){
+    if(d.compact!==COMPACT)d.setCompact(COMPACT);
     const ph=o.phase,a=Math.sin(ph),amp=o.amp,g=Math.max(0,Math.min(1,o.ground||0)),fold=o.fold==null?g:Math.max(0,Math.min(1,o.fold));
     const stride=g*(o.stride||0),gait=o.gait||0;
     wings.forEach(w=>{
@@ -465,10 +527,12 @@ function makeDragon(c,opts){
   d.dispose=function(){
     if(root.parent)root.parent.remove(root);
     mats.forEach(m=>m.dispose());mEye.dispose();
+    if(skinMats)skinMats.forEach(m=>m.dispose());
+    if(skeleton)skeleton.dispose();
   };
   return d;
 }
 const GREEN={body:0x2f7f50,dark:0x1f5c3c,belly:0xc9bf7c,wing:0x3f936a,horn:0xe7dcc1,eye:0xffd23a};
 const CRIMSON={body:0x8c2026,dark:0x5a1218,belly:0x3d1717,wing:0x6d1a28,horn:0x2a2121,eye:0x8ff7ff};
-root.VDragon={makeDragon,GREEN,CRIMSON,STAND};
+root.VDragon={makeDragon,GREEN,CRIMSON,STAND,compact(on){COMPACT=!!on;},get compacted(){return COMPACT;}};
 })(typeof self!=='undefined'?self:this);
