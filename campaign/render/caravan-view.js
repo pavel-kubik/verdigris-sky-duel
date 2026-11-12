@@ -14,7 +14,10 @@
   const D = C.need('data');
   const VIS = 1.5;
 
-  function mat(color, o) { return new THREE.MeshStandardMaterial(Object.assign({ color, flatShading: true, roughness: 0.9 }, o || {})); }
+  function mat(color, o) {
+    const m = new THREE.MeshStandardMaterial(Object.assign({ color, flatShading: true, roughness: 0.9 }, o || {}));
+    return root.VTex && !(o && o.metalness) ? root.VTex.detail(m, { map: 'wood', scale: 2.5, strength: 0.55, bump: 1, local: true }) : m;
+  }
 
   function wagon() {
     const g = new THREE.Group();

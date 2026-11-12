@@ -364,6 +364,42 @@
     return [L.x, surfaceAt(id, L.x, L.z) + L.above, L.z];
   }
 
+  /* Lava streams down a volcano: features { type: 'lava', a (direction, 0 = +Z), len, w: [width at the rim, at the
+     foot], ph } on a region with a crater. A stream leaves the crater at its rim, wanders a little on its way down,
+     widens into a pool near its end and stops. lavaAt is 1 on the centre line and falls to 0 over LAVA_HALO stream
+     half-widths (the glowing ground beside it); above LAVA_IN the point is in the lava itself. */
+  const flowCache = new Map(), LAVA_HALO = 2.2, LAVA_IN = 1 - 1 / LAVA_HALO;
+  function lavaFlows(id) {
+    let L = flowCache.get(id);
+    if (L) return L;
+    const R = region(id), c = R.terrain.features.find(ff => ff.type === 'cone' && ff.crater);
+    L = c ? R.terrain.features.filter(ff => ff.type === 'lava').map(f => ({ f, cone: c, r0: c.crater.r * 0.85, r1: c.crater.r * 0.85 + f.len })) : [];
+    flowCache.set(id, L);
+    return L;
+  }
+  function flowAngle(s, r) { const d = r - s.r0; return s.f.a + 0.15 * Math.sin(d * 0.017 + s.f.ph) + 0.05 * Math.sin(d * 0.06 + s.f.ph * 2.3); }
+  /** Full width of stream s at radius r from the crater centre (0 outside its length). */
+  function flowWidth(s, r) {
+    if (r < s.r0 || r > s.r1) return 0;
+    const k = (r - s.r0) / (s.r1 - s.r0);
+    return (s.f.w[0] + (s.f.w[1] - s.f.w[0]) * smooth(k)) * (1 + 0.9 * smooth(clamp((k - 0.68) / 0.2, 0, 1))) * (1 - smooth(clamp((k - 0.9) / 0.1, 0, 1)));
+  }
+  function lavaAt(id, x, z) {
+    const L = lavaFlows(id);
+    if (!L.length) return 0;
+    const c = L[0].cone, dx = x - c.x, dz = z - c.z, r = Math.hypot(dx, dz);
+    let best = 0;
+    for (const s of L) {
+      const w = flowWidth(s, r);
+      if (w <= 0) continue;
+      let da = Math.atan2(dx, dz) - flowAngle(s, r);
+      da = Math.abs(da - Math.round(da / (2 * Math.PI)) * 2 * Math.PI);
+      const k = 1 - da * r / (w * 0.5 * LAVA_HALO);
+      if (k > best) best = k;
+    }
+    return best;
+  }
+
   /** Lava surface height in the crater, or null. */
   function lavaLevel(id) {
     const f = region(id).terrain.features.find(ff => ff.type === 'cone' && ff.crater);
@@ -382,6 +418,7 @@
       if (f.type !== 'cone' || !f.crater) continue;
       if (Math.hypot(x - f.x, z - f.z) < f.crater.r && surfaceAt(id, x, z) < lavaLevel(id)) return 'lava';
     }
+    if (lavaAt(id, x, z) > LAVA_IN) return 'lava';                 // a stream down the flank
     for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return 'water';
     const rv = riverAt(id, x, z);
     if (rv && (R.terrain.water === 'mask' || surfaceAt(id, x, z) < rv.level)) return 'water';   // riverAt is null on a deck
@@ -470,5 +507,5 @@
     return null;
   }
 
-  M.define('terrain', { GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
+  M.define('terrain', { GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), lavaFlows, flowAngle, flowWidth, lavaAt, LAVA_IN, surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
 })(typeof self !== 'undefined' ? self : this);

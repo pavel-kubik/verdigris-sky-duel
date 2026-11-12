@@ -59,6 +59,7 @@
 
     const group = new THREE.Group(); group.name = 'ruins:' + id;
     const mat = new THREE.MeshStandardMaterial({ vertexColors: false, flatShading: true, roughness: 1 });
+    if (root.VTex) root.VTex.detail(mat, { map: 'cobble', scale: 5, strength: 0.7, bump: 1.5 });
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
     const col = new THREE.Color(), colB = new THREE.Color();
     function inst(geo, items, cols, place) {

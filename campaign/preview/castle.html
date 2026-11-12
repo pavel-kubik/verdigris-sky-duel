@@ -30,7 +30,7 @@
 <script>
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
-    ['../../i18n.js', '../core/umd.js', '../core/data.js', '../core/castle.js', '../render/castle-kit.js', 'castle.js']
+    ['../../i18n.js', '../../shared/textures.js', '../core/umd.js', '../core/data.js', '../core/castle.js', '../render/castle-kit.js', 'castle.js']
       .forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>

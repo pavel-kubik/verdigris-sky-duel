@@ -37,20 +37,24 @@
   };
 
   /** Merges [geometry, colour] parts into one non-indexed geometry with a colour attribute. */
+  /* texture of a part by its colour (VTex.detail kinds): 0 masonry / plaster, 1 slates, 2 timber, 3 thatch, 4 plain */
+  const TEXK = {};
+  [[1, ['slate']], [2, ['wood', 'darkWood', 'barn', 'log', 'logTop']], [3, ['thatch', 'grain']], [4, ['order', 'gold', 'bronze', 'iron']]].forEach(([k, names]) => names.forEach(n => { TEXK[COL[n]] = k; }));
   function merge(parts) {
-    const pos = [], nor = [], col = [], c = new THREE.Color();
+    const pos = [], nor = [], col = [], tk = [], c = new THREE.Color();
     for (const [g0, hex] of parts) {
       const g = g0.index ? g0.toNonIndexed() : g0;
       g.computeVertexNormals();
       const p = g.attributes.position.array, n = g.attributes.normal.array;
       c.setHex(hex);
-      for (let i = 0; i < p.length; i += 3) { pos.push(p[i], p[i + 1], p[i + 2]); nor.push(n[i], n[i + 1], n[i + 2]); col.push(c.r, c.g, c.b); }
+      for (let i = 0; i < p.length; i += 3) { pos.push(p[i], p[i + 1], p[i + 2]); nor.push(n[i], n[i + 1], n[i + 2]); col.push(c.r, c.g, c.b); tk.push(TEXK[hex] || 0); }
       g.dispose(); if (g !== g0) g0.dispose();
     }
     const out = new THREE.BufferGeometry();
     out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    out.setAttribute('vtk', new THREE.Float32BufferAttribute(tk, 1));
     out.computeBoundingSphere();
     return out;
   }
@@ -148,6 +152,7 @@
   function build(town) {
     const group = new THREE.Group(); group.name = 'settlements';
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.92, metalness: 0 });
+    if (root.VTex) root.VTex.detail(mat, { map: 'stone', kinds: ['roof', 'wood', 'thatch'], scale: 5, strength: 0.75, bump: 1.6, local: true });
     const meshes = {}, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     let drawn = 0, current = null, pens = null, ruinMesh = null, ruinsDrawn = 0;
     const slot = new Map();                                   // building id -> [mesh, instance index] (whole buildings)

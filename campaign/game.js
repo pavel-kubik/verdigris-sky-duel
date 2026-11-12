@@ -16,7 +16,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't220.2 2026-11-08 README phase 3 section, Phase 3 marked done, intro news line';
+  const BUILD = 'gfx.1 2026-11-12 textured dragon, castles, animals; volcano with lava; living forest (fell / burn) in every mode';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -29,6 +29,7 @@
   const qPick = QL.pick({ param: params.get('q'), stored: store(D.quality.storeKey), isTouch });
   let qTier = qPick.tier, qSource = qPick.source, qSet = QL.settings(qTier, window.devicePixelRatio, FOG);
   let qSampler = qPick.auto ? QL.sampler() : null;
+  if (window.VTex) VTex.quality(qTier === 'low' ? 0 : 1);       // the low tier keeps the textures but skips their per-pixel relief
   renderer.setPixelRatio(qSet.pixelRatio);
   scene.fog = new THREE.Fog(0x7d6a58, qSet.fogNear, qSet.fogFar);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);
@@ -68,7 +69,7 @@
     if (townView) townView.dispose();
     if (castleView) { castleView.dispose(); castleView = null; }
     regionId = id;
-    region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar });
+    region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar, particles: qSet.particles, detail: qTier !== 'low' });
     scene.add(region.group);
     if (cs.region !== id || !cs.field) ST.enterRegion(cs, id);
     preyView = VRender.prey.build();
@@ -1654,6 +1655,7 @@
         if (fastTime && cs.clock) cs.clock.t = (cs.clock.t + dt * 39 / D.clock.dayLength) % 1;   // T21 debug /: x40 (the step adds the 1x)
         onEvents(ST.step(cs, readInput(), dt));
         survive(dt);
+        forestTick(dt);
       }
       poseHero(dt);
       poseMother(dt);
@@ -1675,7 +1677,7 @@
     syncScene();
     caveView.update(cs, time);
     sky.position.copy(camera.position);
-    region.update(camera.position, time);
+    region.update(camera.position, time, { dt, camera, viewH: renderer.domElement.height });
     if (dt > 0) updateParticles(dt);
     if (state === 'intro' || !pilot) mom.root.visible = false;
     motherHud();
@@ -1713,6 +1715,32 @@
     renderer.render(scene, camera);
     sampleQuality(rawDt);
     if (debug) debugHud(dt);
+  }
+
+  /* ---------- the living forest (shared/forest.js): the same rules as in the co-op and the deathmatch ----------
+     Flying (or running) into a tree knocks it down: the dragon is jolted (slowed, a little damage, never fatal here);
+     fire breath sets trees alight, the fire spreads a little and leaves charred snags; trees grow back in time. */
+  let treeCool = 0, treeTip = false;
+  function forestTick(dt) {
+    const Fo = region && region.forest;
+    if (!Fo || !window.VForest || dt <= 0) return;
+    VForest.step(Fo, dt);
+    if (!pilot || cs.inLair || cs.inAerie) return;
+    treeCool = Math.max(0, treeCool - dt);
+    const mode = pilot.mode || 'air', J = Fo.rules.jolt;
+    if (mode !== 'ground' || Math.abs(pilot.speed || 0) > 5) {
+      const f = MT.fwd(pilot.yaw, mode === 'ground' ? 0 : pilot.pitch), sp = Math.max(1, Math.abs(pilot.speed || 0));
+      const hits = VForest.hit(Fo, pilot.pos, 2.3 * heroScale, [f[0] * sp, f[1] * sp, f[2] * sp]);
+      if (hits.length) {
+        shake = Math.max(shake, mode === 'ground' ? 0.2 : 0.5);
+        if (mode === 'air' && treeCool <= 0) {
+          treeCool = J.cool; pilot.speed *= J.slow;
+          dragon.hp = Math.max(1, dragon.hp - J.dmg); hero.flash = Math.max(hero.flash || 0, 0.4); hurt = Math.max(hurt, 0.3);
+        }
+        if (!treeTip) { treeTip = true; flashPrompt(t('c.prompt.tree'), 3); }
+      }
+    }
+    if (cs.breath) VForest.heat(Fo, cs.breath.origin, cs.breath.dir, cs.breath.range, Math.cos(cs.breath.cone), dt);
   }
 
   /* ---------- ?debug panel: performance, dragon parameters, hotkeys ---------- */
@@ -1903,5 +1931,5 @@
   requestAnimationFrame(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

@@ -1,11 +1,25 @@
 # Verdigris Sky Duel
 
-A procedural low-poly green dragon built from primitives in Three.js, with an orbit preview and an aerial fight mode against waves of crimson wyverns.
+A procedural green dragon modelled and textured in code with Three.js (no asset files), with an orbit preview and an aerial fight mode against waves of crimson wyverns.
 
 **Mobile first.** The game is designed and built for touch phones first (portrait and landscape); desktop keyboard and mouse stay supported with lower priority. Every action has a touch control, on-screen texts on touch name the buttons rather than keys, layouts are checked at phone width (390 x 844) first, and performance budgets target a mid-range phone.
 
 - **Play solo:** https://pavel-kubik.github.io/verdigris-sky-duel/
 - **Play co-op (beta):** https://pavel-kubik.github.io/verdigris-sky-duel/mp/
+
+## Models, textures and the living forest
+
+Everything is generated in the browser - there are no image or model files.
+
+- **Textures** (`shared/textures.js`, `VTex`): dragon scales, belly scutes, wing membrane, horn, ashlar, slates, shingles, planks, thatch, rock, turf, ash, bark, foliage, fur, fleece, hide and feathers are painted once into canvases from tileable noise. Models with UVs (the dragon) use them as colour and normal maps; everything else (terrain, castles, villages, bridges, rocks, trees, animals) gets them as triplanar detail with per-pixel relief through `VTex.detail(material, …)`, so vertex and instance colours keep their palette. The low quality tier skips the relief.
+- **Dragon** (`shared/dragon.js`): one model for every mode - a smooth body lofted from cross-sections, a sculpted head with brow ridges, slit-pupilled eyes, curved horns, teeth and a tongue, belly scutes, dorsal spines, muscled legs with toes and claws and wings with fingers and scalloped, billowing membranes. Geometry is built once and shared by every dragon (about 90 draw calls, 11k triangles).
+- **Castle, villages, animals**: Vyshgard and the settlements carry masonry, slate, timber and thatch textures; goats, deer, boars, sheep, cows and hens are rounded models with fur, fleece, hide and feathers.
+- **Volcano** (`campaign/render/volcano-view.js`): a lake of flowing lava in the crater, four lava streams down the flanks (they are lava for the rules too: no landing, no walking - `terrain.lavaFlows`), a fountain of glowing lava with a bigger burst every few seconds and a column of ash and smoke. Toward the rim of the Ash Wastes the ash gives way to grass and a living forest.
+- **Living forest** (`shared/forest.js` rules, `shared/forest-view.js` models): conifers, pines, broadleaves, birches, poplars and dead wood sway in the wind. **The same rules in the solo duel, the co-op, the campaign and the deathmatch:**
+  - fly into a tree and it **breaks** and topples along your flight; the dragon is jolted (it keeps 55 % of its speed and takes 4 damage - never fatal in the campaign, harmless in the tutorial) but does not fall;
+  - **fire breath** sets a tree alight after a moment, a bursting **fireball** at once; it burns for 9-15 s with flames, embers and smoke, the fire jumps to neighbours at most two trees on, and a charred snag is left;
+  - felled and burnt trees **grow back** after 150 s (in the deathmatch also on a new round);
+  - in the co-op and the deathmatch every browser decides what its own dragon fells and ignites and tells the host, who tells everyone and hands the state to players who join later.
 
 ## Learn to fly (tutorial)
 
@@ -48,6 +62,7 @@ Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 A single-player dragon campaign in its own page, built mobile first: everything plays on a touch phone, and every keyboard action has a touch button. **Phase 1 (Survival MVP)**, **Phase 2 (Kingdom + hoard)** and **Phase 3 (Castle, map + missions)** are done. A hatchling hatches next to its mother, learns to fly and hunt from her, grows into a **Drake** in the **Ash Wastes** and **Wildwood**, raids the Order's settlements in the **River Farmlands** for gold, carries it home into its cave and spends it on upgrades - then flies on to the **Veltava Bend** and takes missions against **Vyshgard Castle**. Later phases (Highlands, Lowlands, endgame) are planned in [`ai_sdlc/001_campaign/000_spec.md`](ai_sdlc/001_campaign/000_spec.md).
 
 - **Mother:** she flies with the hatchling, leads it to a herd and teaches each skill once (a caption at the top); after the lessons she flies off and comes back to visit now and then.
+- **Trees and lava:** the dragon breaks the trees it flies (or runs) into and its fire breath burns them; the lava streams on the volcano cannot be landed on or walked through - see [Models, textures and the living forest](#models-textures-and-the-living-forest).
 - **Hunting:** fly low over a herd and hold Grab to swoop and grab prey, then hold Eat to eat it in flight. A hatchling can lift goats and deer; a boar is too heavy and fights back - roast it with fire breath and eat the roast chunks (half the food).
 - **Hunger:** drains over time and faster when boosting or breathing fire. Fed regenerates vitality, Hungry slows fire regen, Starving makes the dragon slow, without fire and slowly losing vitality.
 - **Landing and walking:** press F / tap Land over flat ground (not too high, too fast or too steep, not on water, lava or roofs). On foot the dragon walks (Shift / Boost runs), picks up prey or loot in front of it with Grab and eats with Eat - but it is vulnerable, and guards hear it land. F / Fly takes off.
@@ -113,7 +128,8 @@ Dragon against dragon over the campaign's Wildwood (Phase 3 terrain, trees and t
 - **Respawn:** 5 s after dying, at the spawn point farthest from the other dragons, with 3 s of spawn protection.
 - **Food:** chickens, goats and sheep wander the arena and flee dragons. Fly low over one or sit down next to it to eat it (+15 / +25 / +30 vitality); it comes back after 18 s. Vitality otherwise regenerates only slowly.
 - **Sitting down:** F / Sit within 8 m of any surface - the ground, a roof or the flat top of a rock pillar (not water). A sitting dragon turns, breathes fire and shoots fireballs, and its fire refills faster. F, W, Shift or Fly takes off.
-- **Falling:** flying into another dragon, a rock pillar, a building wall or a tree crown, or diving steeply into the ground, sends the dragon tumbling out of control until it hits the ground or a roof: damage on impact, then a short stun. Both dragons fall in a dragon-on-dragon collision; a fall death counts as a kill for whoever hit or bumped the dragon in the last 8 s.
+- **Trees:** flying into a tree breaks it (a jolt: slower, 4 damage) and fire sets it alight - see [the living forest](#models-textures-and-the-living-forest).
+- **Falling:** flying into another dragon, a rock pillar or a building wall, or diving steeply into the ground, sends the dragon tumbling out of control until it hits the ground or a roof: damage on impact, then a short stun. Both dragons fall in a dragon-on-dragon collision; a fall death counts as a kill for whoever hit or bumped the dragon in the last 8 s.
 
 | Action | Keyboard / mouse | Touch |
 |---|---|---|
@@ -163,6 +179,7 @@ Up to 6 dragons fight the wyvern waves together, connected peer-to-peer over Web
 | `mp/sim.js` | Shared simulation with no rendering: flight physics, wyvern AI, fireballs, breath-cone damage, waves, respawns. Runs in the browser and in Node. |
 | `mp/game.js` | Rendering, input, lobby and networking. |
 | `mp/sim.test.js` | Simulation tests: `node mp/sim.test.js` |
+| `shared/` | The dragon model, textures, the living forest and the QR code, used by every mode |
 
 **How the netcode works.** Each browser flies its own dragon locally and sends its pose 20 times a second. The host's browser owns the world (wyverns, fireballs, damage and score) and broadcasts snapshots and events 20 times a second. Remote dragons are smoothed and extrapolated between snapshots.
 

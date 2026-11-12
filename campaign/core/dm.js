@@ -23,6 +23,7 @@
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const D = M.need('data'), T = M.need('terrain'), F = M.need('flight'), S = M.need('settlement');
+  const VF = typeof module === 'object' && module.exports ? require('../../shared/forest.js') : root.VForest;   // the living forest (shared rules)
   const { clamp, wrap, fwd, norm, mulberry, range } = M.need('math');
   const X = D.dm;
   const MODES = ['air', 'perching', 'perch', 'fall', 'down'];
@@ -83,10 +84,11 @@
     return { cell: c, cells, n: (list || []).length };
   }
 
-  /** Everything a pilot collides with. trees: render/flora list or null. */
-  function env(trees) {
+  /** Everything a pilot collides with. forest: the arena's VForest (trees break when hit, the same rule as in the
+      campaign and the co-op); without one, trees = a plain [[x, z, r]] list of solid crowns (the old rule, tests). */
+  function env(trees, forest) {
     const A = arena();
-    return { regionId: A.region, town: A.town, pillars: A.pillars, trees: treeGrid(trees) };
+    return { regionId: A.region, town: A.town, pillars: A.pillars, trees: treeGrid(forest ? null : trees), forest: forest || null };
   }
 
   function pillarAt(E, x, z, pad) {
@@ -144,7 +146,7 @@
    * ===================================================================== */
   function newPilot(pos, yaw) {
     const p = F.newPilot(pos, yaw || 0, X.stats.cruise);
-    return Object.assign(p, { mode: 'air', tr: null, stun: 0, spin: 0, ballCd: 0, crashBy: 0 });
+    return Object.assign(p, { mode: 'air', tr: null, stun: 0, spin: 0, ballCd: 0, crashBy: 0, treeCool: 0 });
   }
 
   function flightCtx(E) {
@@ -219,6 +221,12 @@
       const ob = obstacle(E, p);
       if (ob) crash(p, ob, ev);
       else {
+        if (E.forest && VF) {                                     // through a tree: it breaks, the dragon is jolted (VForest.RULES.jolt)
+          p.treeCool = Math.max(0, (p.treeCool || 0) - dt);
+          const hits = VF.hit(E.forest, p.pos, X.trees.body, p.vel), J = E.forest.rules.jolt;
+          for (const h of hits) ev.push({ e: 'tree', k: 'f', i: h.i, dx: h.dx, dz: h.dz });
+          if (hits.length && p.treeCool <= 0) { p.treeCool = J.cool; p.speed *= J.slow; ev.push({ e: 'crash', kind: 'tree', dmg: J.dmg, soft: true }); }
+        }
         const s = surface(E, p.pos[0], p.pos[2]);
         if (p.pos[1] - s.y <= X.minAlt + 0.3 && p.pitch < FL.groundPitch && p.speed > FL.groundSpeed && s.kind !== 'water') crash(p, { kind: 'ground', nx: 0, nz: 0, out: 0 }, ev);
       }
@@ -305,6 +313,7 @@
       t: 0, timeLimit: opts.timeLimit || X.timeLimit, timeLeft: opts.timeLimit || X.timeLimit, fragLimit: opts.fragLimit || X.fragLimit,
       phase, over: phase === 'over', overT: 0, winner: 0, code: opts.code || '', hostId: opts.hostId || 1,
       players: {}, balls: [], food: [], nid: 1, ev: [], rng: opts.rng || Math.random, round: 1,
+      trees: {},                                                  // felled / burning trees by tree number (for players who join later)
       ledger: {}, seqN: 1,                                        // ledger: seat key -> stats of players who left
     };
     const A = arena(), FD = X.food;
@@ -415,6 +424,30 @@
     if (!p) return false;
     return damage(w, p, clamp(+dmg || 0, 0, X.fall.maxDmg + X.fall.crashDmg), 0, kind === 'impact' ? 'impact' : 'crash');
   }
+  /** Tree events from a player's browser: [{ k: 'f' (felled) | 'i' (set alight), i (tree number), dx, dz }]. Recorded and sent on to everyone. */
+  function treeEvents(w, id, list) {
+    if (!w.players[id] || !Array.isArray(list)) return 0;
+    let n = 0;
+    for (const t of list.slice(0, 40)) {
+      if (!t || !Number.isInteger(t.i) || t.i < 0 || t.i > 99999 || (t.k !== 'f' && t.k !== 'i')) continue;
+      const dx = clamp(+t.dx || 0, -1, 1), dz = clamp(+t.dz || 0, -1, 1), rec = w.trees[t.i] || (w.trees[t.i] = [0, 0, 0, 0, 0]);
+      if (t.k === 'f') { if (rec[0]) continue; rec[0] = 1; rec[2] = dx; rec[3] = dz; } else { if (rec[1]) continue; rec[1] = 1; }
+      rec[4] = w.t;
+      w.ev.push(t.k === 'f' ? { e: 'tree', k: 'f', i: t.i, dx: r2(dx), dz: r2(dz) } : { e: 'tree', k: 'i', i: t.i });
+      n++;
+    }
+    return n;
+  }
+  /** Trees that are down or burnt, for a player who joins: [[i, st, fire, dx, dz]] (grown-back ones are dropped). */
+  function forestState(w) {
+    const keep = VF ? VF.RULES.regrow : 150, out = [];
+    for (const i of Object.keys(w.trees)) {
+      const r = w.trees[i];
+      if (keep > 0 && w.t - r[4] > keep) { delete w.trees[i]; continue; }
+      out.push([+i, r[0], r[1] ? 2 : 0, r[2], r[3]]);
+    }
+    return out;
+  }
   function respawn(w, p) {
     const s = spawnFor(w, p.id);
     p.down = false; p.hp = X.hp; p.sinv = X.spawnInv; p.pos = s.pos.slice(); p.yaw = s.yaw; p.vel = [0, 0, 0]; p.mode = 0;
@@ -442,6 +475,7 @@
   /** After a match: back to the lobby for the next round (scores reset, everyone respawns). */
   function restart(w) {
     w.over = false; w.phase = 'lobby'; w.overT = 0; w.winner = 0; w.timeLeft = w.timeLimit; w.balls.length = 0; w.round++;
+    w.trees = {};                                                // the forest stands again (clients reset on 'restart')
     resetScores(w);
     playerList(w).forEach(p => respawn(w, p));
     w.ev.push({ e: 'restart', round: w.round });
@@ -677,7 +711,7 @@
   }
 
   M.define('dm', {
-    MODES, PHASES, FOOD_TYPES, keyOf, startMatch, setSettings, exportRoom, importRoom, mergeRoom, successorOf, arena, env, treeGrid, surface, solidTop, obstacle, pillarAt,
+    MODES, PHASES, FOOD_TYPES, keyOf, treeEvents, forestState, startMatch, setSettings, exportRoom, importRoom, mergeRoom, successorOf, arena, env, treeGrid, surface, solidTop, obstacle, pillarAt,
     newPilot, step, startFall, tryPerch, perchBlock, tryTakeoff, tryBall, tryRoll, poseOf,
     newWorld, addPlayer, removePlayer, setPose, shoot, damage, reportCrash, respawn, board, endMatch, restart,
     stepWorld, snapshot, playerList, modeOf, spawnFor,

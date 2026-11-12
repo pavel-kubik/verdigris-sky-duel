@@ -2,8 +2,11 @@
  * Verdigris campaign - region terrain renderer.
  * Meshes core terrain.heightAt on the core GRID in CHUNK-sized pieces, with exactly the triangle
  * split terrain.surfaceAt assumes (diagonal 10-01 per cell), so the simulation collides with what
- * is drawn. Adds water, the volcano's lava and the lair cave mouth, and culls far chunks.
- *   VRender.terrain.build(regionId, { isTouch, flora, far }) -> { group, fog, update(cameraPos), dispose(), info }
+ * is drawn. Adds water, the volcano (render/volcano-view.js) and the lair cave mouth, and culls far chunks.
+ * The ground is smooth shaded (normals from the height field, so chunks join without a seam) and carries triplanar
+ * detail textures from shared/textures.js: turf or ash on flat ground, rock on the slopes.
+ *   VRender.terrain.build(regionId, { isTouch, flora, far, detail, particles }) -> { group, fog, forest, update(cameraPos, time, fx), dispose(), info }
+ *     update fx: { dt, camera, viewH } animates the forest (falling and burning trees) and the volcano
  */
 (function (root) {
   'use strict';
@@ -16,6 +19,7 @@
     ash: {
       fog: 0x6e5c4c, sky: { top: 0x15202a, mid: 0x4a4a48, bot: 0xc07a4a },
       low: 0x524840, mid: 0x3e3631, high: 0x2a2421, steep: 0x332c28, scorch: 0x5e2c1c, water: null,
+      grass: 0x4f6338, grass2: 0x3a4d2e, glow: 0xb84a1a,       // the living rim of the Wastes; cooling lava beside the flows
     },
     forest: {
       fog: 0x7f8a70, sky: { top: 0x10283a, mid: 0x4f6f72, bot: 0xd09a64 },
@@ -54,6 +58,13 @@
         const flow = Math.sin(x * 0.006 + Math.sin(z * 0.011) * 2.2) * Math.sin(z * 0.004 + 1.1);
         if (dCone > cone.r * 0.6 && flow > 0.82) c.lerp(b.set(pal.scorch), Math.min(1, (flow - 0.82) * 7));
         if (slope > 0.7) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.7) * 2));
+        const far = R.flora.far;
+        if (far) {                                               // toward the rim the ash gives way to grass and woods
+          const d = Math.hypot(x, z), k = Math.min(1, Math.max(0, (d - far.from + 90) / (far.full - far.from + 90)));
+          if (k > 0) c.lerp(b.set(Math.sin(x * 0.019 + Math.cos(z * 0.015) * 1.8) > 0 ? pal.grass : pal.grass2), k * k * (3 - 2 * k) * (0.55 + 0.35 * Math.min(1, Math.max(0, 1 - slope * 2))));
+        }
+        const lv = dCone < 520 ? T.lavaAt(id, x, z) : 0;          // scorched, glowing ground beside the lava streams
+        if (lv > 0) c.lerp(b.set(pal.high), Math.min(1, lv * 1.6)).lerp(b.set(pal.glow), Math.max(0, lv - 0.45) * 1.2);
       } else if (R.palette === 'farm') {
         a.set(pal.low); b.set(pal.mid);
         c.copy(a).lerp(b, 0.15 + 0.6 * (Math.sin(x * 0.013 + Math.cos(z * 0.009) * 1.7) * Math.cos(z * 0.011 - x * 0.004) + 1) / 2);   // meadow patches, no stripes
@@ -111,10 +122,14 @@
   function buildChunk(id, cx, cz, mat, colour, rng) {
     const n = Math.round(T.CHUNK / T.GRID), g = T.GRID, x0 = cx * T.CHUNK, z0 = cz * T.CHUNK;
     const pos = new Float32Array((n + 1) * (n + 1) * 3), col = new Float32Array(pos.length);
-    const hs = new Float32Array((n + 1) * (n + 1));
+    const hs = new Float32Array((n + 1) * (n + 1)), nor = new Float32Array(pos.length);
+    const w = n + 3, pad = new Float32Array(w * w);               // heights with one ring of neighbours, for seamless normals
+    for (let j = -1; j <= n + 1; j++) for (let i = -1; i <= n + 1; i++) pad[(j + 1) * w + i + 1] = T.heightAt(id, x0 + i * g, z0 + j * g);
     for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
-      const k = j * (n + 1) + i, x = x0 + i * g, z = z0 + j * g, h = T.heightAt(id, x, z);
+      const k = j * (n + 1) + i, x = x0 + i * g, z = z0 + j * g, o = (j + 1) * w + i + 1, h = pad[o];
       hs[k] = h; pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
+      const nx = pad[o - 1] - pad[o + 1], nz = pad[o - w] - pad[o + w], l = 1 / Math.hypot(nx, 2 * g, nz);
+      nor[k * 3] = nx * l; nor[k * 3 + 1] = 2 * g * l; nor[k * 3 + 2] = nz * l;
     }
     for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
       const k = j * (n + 1) + i, x = x0 + i * g, z = z0 + j * g;
@@ -134,7 +149,7 @@
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    geo.computeVertexNormals();
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, mat);
     mesh.matrixAutoUpdate = false; mesh.updateMatrix();
@@ -149,14 +164,15 @@
     g.rotation.y = L.facing;
     // the slope rises behind the mouth (toward the volcano), so tilt the opening back a little
     const tilt = Math.atan(T.slopeAt(id, L.x, L.z)) * 0.5;
-    const rock = new THREE.MeshStandardMaterial({ color: 0x2c2522, flatShading: true, roughness: 1 });
+    const rock = new THREE.MeshStandardMaterial({ color: 0x3a302b, flatShading: true, roughness: 1 });
+    if (root.VTex) root.VTex.detail(rock, { map: 'rock', scale: 9, strength: 0.8, bump: 1.4 });
     const dark = new THREE.MeshBasicMaterial({ color: 0x0a0605 });
     const hole = new THREE.Mesh(new THREE.CircleGeometry(11, 18), dark);
     hole.scale.set(1, 0.8, 1); hole.position.set(0, 0, -2.5); hole.rotation.x = -tilt; g.add(hole);
     const arch = new THREE.Mesh(new THREE.TorusGeometry(11.5, 3.4, 5, 12, Math.PI), rock);
     arch.scale.set(1, 0.85, 1); arch.position.set(0, -1.5, -2); arch.rotation.x = -tilt; g.add(arch);
     [-1, 1].forEach(s => {
-      const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(4.2, 0), rock);
+      const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(4.2, 1), rock);
       boulder.position.set(s * 12.5, -5, 0); boulder.rotation.set(s, s * 2, 0); g.add(boulder);
     });
     const glow = new THREE.PointLight(0xff7a30, 1.4, 70, 2); glow.position.set(0, 0, -8); g.add(glow);
@@ -167,6 +183,7 @@
   function crater(id, group) {
     const f = T.region(id).terrain.features.find(ff => ff.type === 'cone' && ff.crater);
     if (!f) return null;
+    if (VR.volcano) { const v = VR.volcano.build(id, group.userData.fxOpts); group.add(v.group); return v; }   // the full volcano
     const y = T.lavaLevel(id);
     const lava = new THREE.Mesh(new THREE.CircleGeometry(f.crater.r * 0.8, 28), new THREE.MeshBasicMaterial({ color: 0xff6a1e }));
     lava.rotation.x = -Math.PI / 2; lava.position.set(f.x, y, f.z); group.add(lava);
@@ -242,7 +259,10 @@
     const R = T.region(id), pal = PALETTES[R.palette];
     const group = new THREE.Group(); group.name = 'region:' + id;
     const rng = C.need('math').mulberry(R.seed * 977 + 1);
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, metalness: 0 });
+    const TX = root.VTex && opts.detail !== false ? root.VTex : null;
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
+    if (TX) TX.detail(mat, { map: 'rock', top: R.palette === 'ash' ? 'ash' : 'ground', scale: 22, topScale: 11, strength: 0.62, bump: 1.5 });
+    group.userData.fxOpts = { particles: opts.particles, detail: opts.detail };
     const colour = colourFn(id, pal);
     const chunks = [];
     const nC = Math.ceil(EXTENT / T.CHUNK);
@@ -264,22 +284,27 @@
     if (ruins) group.add(ruins.group);
     const lavaFx = crater(id, group);
     const mouth = R.lair ? lairMouth(id, group) : null;
-    const flora = VR.flora ? VR.flora.build(id, { isTouch: !!opts.isTouch, flora: opts.flora }) : null;
+    const flora = VR.flora ? VR.flora.build(id, { isTouch: !!opts.isTouch, flora: opts.flora, particles: opts.particles, detail: opts.detail, rules: opts.forestRules }) : null;
     if (flora) group.add(flora.group);
 
     let visible = chunks.length;
     const far = (opts.far || 950) + T.CHUNK * 0.75;
-    function update(camPos, time) {
+    function update(camPos, time, fx) {
       visible = 0;
+      if (TX && time != null) TX.tick(time);
+      if (fx && flora) flora.update(fx.dt, time, fx.camera, fx.viewH);
       for (const m of chunks) {
         const c = m.userData.centre;
         m.visible = Math.hypot(c.x - camPos.x, c.z - camPos.z) < far;
         if (m.visible) visible++;
       }
       if (lavaFx && time != null) {
-        const k = 0.85 + Math.sin(time * 1.7) * 0.1 + Math.sin(time * 4.3) * 0.05;
-        lavaFx.light.intensity = 2.2 * k;
-        lavaFx.crust.rotation.z = time * 0.03;
+        if (lavaFx.update) lavaFx.update(fx ? fx.dt : 0, time, fx && fx.camera, fx && fx.viewH);
+        else {
+          const k = 0.85 + Math.sin(time * 1.7) * 0.1 + Math.sin(time * 4.3) * 0.05;
+          lavaFx.light.intensity = 2.2 * k;
+          lavaFx.crust.rotation.z = time * 0.03;
+        }
       }
     }
     function dispose() {
@@ -288,11 +313,14 @@
         if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
       });
       if (flora) flora.dispose();
+      if (lavaFx && lavaFx.dispose) lavaFx.dispose();
       if (group.parent) group.parent.remove(group);
     }
     return {
       group, palette: pal, fog: pal.fog, sky: pal.sky, mouth, lava: lavaFx, update, dispose,
-      trees: flora ? flora.trees : [],                                 // [[x, z, r]] (deathmatch tree collisions, core/dm.js)
+      trees: flora ? flora.trees : [],                                 // [[x, z, r]]
+      forest: flora ? flora.forest : null,                             // VForest: trees the dragon fells and burns
+      flora,
       get info() { return { chunks: chunks.length, visible, trees: flora ? flora.count.trees : 0, rocks: flora ? flora.count.rocks : 0 }; },
     };
   }

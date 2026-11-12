@@ -272,7 +272,7 @@ select{background:#1b2420;color:var(--bone);border:1px solid var(--line);border-
   /* Game scripts carry the page's ?v= so a test link with a new v also fetches fresh scripts (no stale cache). */
   (function () {
     var v = (location.search.match(/[?&]v=([^&]+)/) || [])[1], q = v ? '?v=' + v : '';
-    ['../../i18n.js', '../../pwa.js', '../../shared/dragon.js', '../../shared/qr.js',
+    ['../../i18n.js', '../../pwa.js', '../../shared/textures.js', '../../shared/dragon.js', '../../shared/forest.js', '../../shared/forest-view.js', '../../shared/qr.js',
      '../core/umd.js', '../core/math.js', '../core/data.js', '../core/terrain.js', '../core/castle.js', '../core/settlement.js', '../core/flight.js', '../core/walk.js', '../core/dm.js', '../core/dmnet.js',
      '../render/flora.js', '../render/terrain.js', '../render/prey-view.js', '../render/settlement-view.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });

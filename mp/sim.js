@@ -121,8 +121,42 @@
    * World: everything the host owns.
    * Events are appended to w.ev; the host drains and broadcasts them.
    * ===================================================================== */
+  /* ---------- the living forest (shared/forest.js): the same trees in every browser ----------
+     Seeded places on dry, gentle ground; the client gives each tree its model size (shared/forest-view.js) and runs
+     the shared rules: a dragon's own browser decides what it fells and sets alight and tells the host. */
+  const VF = typeof module === 'object' && module.exports ? require('../shared/forest.js') : root.VForest;
+  const FOREST = VF ? VF.DUEL : { n: 0, kinds: [] };
+  let treeCache = null;
+  function trees() { return treeCache || (treeCache = VF ? VF.scatter(FOREST, H) : []); }
+  /** Tree events from a player's browser: [{ k: 'f' (felled) | 'i' (set alight), i, dx, dz }]; jolt = it flew into one. */
+  function treeEvents(w, id, list, jolt) {
+    const p = w.players[id];
+    if (!p || !Array.isArray(list)) return 0;
+    let n = 0;
+    for (const t of list.slice(0, 40)) {
+      if (!t || !Number.isInteger(t.i) || t.i < 0 || t.i >= FOREST.n || (t.k !== 'f' && t.k !== 'i')) continue;
+      const dx = clamp(+t.dx || 0, -1, 1), dz = clamp(+t.dz || 0, -1, 1), rec = w.trees[t.i] || (w.trees[t.i] = [0, 0, 0, 0, 0]);
+      if (t.k === 'f') { if (rec[0]) continue; rec[0] = 1; rec[2] = dx; rec[3] = dz; } else { if (rec[1]) continue; rec[1] = 1; }
+      rec[4] = w.t;
+      w.ev.push(t.k === 'f' ? { e: 'tree', k: 'f', i: t.i, dx: r2(dx), dz: r2(dz) } : { e: 'tree', k: 'i', i: t.i });
+      n++;
+    }
+    if (jolt && n) hurtPlayer(w, p, clamp(+jolt || 0, 0, 6));
+    return n;
+  }
+  /** Trees that are down or burnt, for a player who joins: [[i, st, fire, dx, dz]]. */
+  function forestState(w, keep) {
+    const out = [];
+    for (const i of Object.keys(w.trees)) {
+      const r = w.trees[i];
+      if (keep > 0 && w.t - r[4] > keep) { delete w.trees[i]; continue; }
+      out.push([+i, r[0], r[1] ? 2 : 0, r[2], r[3]]);
+    }
+    return out;
+  }
+
   function newWorld(rng) {
-    return { t: 0, wave: 0, score: 0, waveTimer: 0, countdown: 8, foes: [], balls: [], players: {}, nid: 1, ev: [], over: false, rng: rng || Math.random };
+    return { trees: {}, t: 0, wave: 0, score: 0, waveTimer: 0, countdown: 8, foes: [], balls: [], players: {}, nid: 1, ev: [], over: false, rng: rng || Math.random };
   }
   function playerList(w) { return Object.keys(w.players).map(k => w.players[k]); }
   function freeColor(w) {
@@ -225,7 +259,7 @@
   }
   function restart(w) {
     w.foes.length = 0; w.balls.length = 0;
-    w.wave = 0; w.score = 0; w.waveTimer = 0; w.countdown = 5; w.over = false;
+    w.wave = 0; w.score = 0; w.waveTimer = 0; w.countdown = 5; w.over = false; w.trees = {};
     w.ev.push({ e: 'restart' });
     playerList(w).forEach(p => { p.kills = 0; respawn(w, p); });
   }
@@ -364,6 +398,7 @@
   const api = {
     WORLD_R, MAX_PLAYERS, BALL_SPEED, H, fwd, norm, wrap, clamp, dist,
     newPilot, stepPilot, tryRoll, tryBall, poseOf,
+    FOREST, trees, treeEvents, forestState,
     newWorld, addPlayer, removePlayer, setPose, shoot, stepWorld, snapshot, restart, playerList,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
