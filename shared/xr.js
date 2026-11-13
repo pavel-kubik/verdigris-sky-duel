@@ -2,7 +2,7 @@
  * Verdigris - immersive VR (WebXR) support, written for Meta Quest and Three.js r128. Shared by every mode: the solo duel and
  * the tutorial, the co-op, the deathmatch and the campaign. Runs in the browser (window.VXR); the pure parts (mapPads, menuNav,
  * wrapText) also run in Node for tests.
- *   VXR.SLOW                         time scale of the single-player modes in VR (the headset needs more time to read and aim)
+ *   VXR.SLOW                         time scale of the single-player modes in VR (the 'speed' comfort setting: 0.5, 0.75 or 1)
  *   VXR.mapPads(left, right, prev) -> { sx, sy, breath, boost, ball, pause, roll, x, y, grip, gripL, nav, ok, ls, rs, prev }
  *     pure; left / right are Gamepads or null; pass the returned prev back in on the next frame
  *   VXR.comfort                      the VR comfort settings (pure): OPTIONS, PRESETS, defaults(), sanitize(), preset(), set(),
@@ -43,12 +43,15 @@
  *   Comfort menu: click the RIGHT stick in VR (B closes it). Presets Comfortable / Recommended / Advanced and every
  *     setting on its own; a mode that can pause is paused while it is open. The first time a player enters VR a short
  *     note recommends Comfortable and a break at the first symptom ('vsd-comfort-seen').
- *   Debug overlay (head-locked, small): click the LEFT stick in VR. Frame time, fps, CPU time per frame, draw calls,
- *     triangles, speed and turn rate of the view.
+ *   Debug strip (under the status panel): click the LEFT stick in VR, or the first row of the comfort menu. fps, frame
+ *     time, CPU time per frame, draw calls, triangles, speed / turn rate / acceleration of the view, quality.
+ *   'enabled' off: VR exactly as it was before the comfort work (comfort.ORIGINAL), to compare; every feature also has
+ *     its own row in the menu.
  */
 (function (root) {
   'use strict';
-  const DEAD = 0.15, FLICK_ON = 0.7, FLICK_OFF = 0.3, YAW_RATE = 6, SLOW = 0.5;
+  const DEAD = 0.15, FLICK_ON = 0.7, FLICK_OFF = 0.3, YAW_RATE = 6;
+  let slowNow = 0.5;                                            // VXR.SLOW: the 'speed' setting in effect
   // xr-standard layout (WebXR Gamepads Module)
   const TRIGGER = 0, GRIP = 1, STICK = 3, FACE_LOW = 4, FACE_HIGH = 5, STICK_X = 2, STICK_Y = 3;
   const FONT = '"Barlow Semi Condensed",sans-serif';
@@ -102,7 +105,9 @@
   const CF_KEY = 'vsd-comfort';
   /** Every setting and the values it can take. */
   const OPTIONS = {
+    enabled: [true, false],           // the master switch: off = VR exactly as it was before the comfort work
     preset: ['comfortable', 'recommended', 'advanced', 'custom'],
+    speed: [0.5, 0.75, 1],            // time scale of the single-player modes in VR (it was always 0.5)
     scale: [0.7, 0.8, 0.9, 1, 1.1, 1.2],   // render scale (the eye buffer; 1 = what the headset recommends)
     foveation: [0, 0.33, 0.66, 1],    // fixed foveation: the edge of the view is drawn coarser
     turn: ['snap', 'smooth'],         // how the view follows the dragon's turns
@@ -119,13 +124,16 @@
     debug: [false, true],             // the head-locked debug overlay
   };
   /** Device settings: not part of a preset. */
-  const DEVICE = { scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
+  const DEVICE = { enabled: true, scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
   /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
   const PRESETS = {
-    comfortable: { turn: 'snap', snapAngle: 30, smoothSpeed: 30, ease: true, boost: false, assist: 'gentle', vignette: 'high', rest: 'strong', effects: false },
-    recommended: { turn: 'snap', snapAngle: 30, smoothSpeed: 45, ease: true, boost: true, assist: 'normal', vignette: 'medium', rest: 'subtle', effects: false },
-    advanced: { turn: 'smooth', snapAngle: 30, smoothSpeed: 0, ease: false, boost: true, assist: 'free', vignette: 'off', rest: 'off', effects: true },
+    comfortable: { speed: 0.5, turn: 'snap', snapAngle: 30, smoothSpeed: 30, ease: true, boost: false, assist: 'gentle', vignette: 'low', rest: 'strong', effects: false },
+    recommended: { speed: 0.75, turn: 'snap', snapAngle: 30, smoothSpeed: 45, ease: true, boost: true, assist: 'normal', vignette: 'off', rest: 'subtle', effects: false },
+    advanced: { speed: 1, turn: 'smooth', snapAngle: 30, smoothSpeed: 0, ease: false, boost: true, assist: 'free', vignette: 'off', rest: 'off', effects: true },
   };
+  /** VR as it was before the comfort work: what is in effect while 'enabled' is off. */
+  const ORIGINAL = { speed: 0.5, turn: 'smooth', smoothSpeed: 0, ease: false, boost: true, assist: 'free', vignette: 'off', rest: 'off', effects: false, scale: 1, foveation: 1, adaptive: false, compact: false };
+  function effective(out, s) { return Object.assign(out, s, s.enabled ? null : ORIGINAL); }
   function defaults() { return Object.assign({ preset: 'recommended' }, DEVICE, PRESETS.recommended); }
 
   /* ---------- adaptive quality (pure): frames over the budget for a second lower the quality one level ---------- */
@@ -225,7 +233,7 @@
    * open: half angle (deg) of the view when the ring is out of sight; low / medium / high: the half angle it closes to.
    * turn (deg/s) and accel (m/s2) each close it fully on their own; up / down: how fast it closes and opens (1/s).
    */
-  const VIG = { open: 58, low: 44, medium: 36, high: 28, turn: 60, accel: 14, up: 8, down: 1.6, feather: 0.3, alpha: 0.94 };
+  const VIG = { open: 60, low: 50, medium: 44, high: 36, turn: 90, accel: 25, up: 4, down: 1.6, feather: 0.6, alpha: 0.7 };
   /** 0 (open) .. 1 (closed as far as the strength goes) from the turn rate and the linear acceleration of the view. */
   function vignetteTarget(turnDeg, accel) { return Math.max(0, Math.min(1, turnDeg / VIG.turn + accel / VIG.accel)); }
   function vignetteStep(cur, target, dt) { return cur + (target - cur) * (1 - Math.exp(-dt * (target > cur ? VIG.up : VIG.down))); }
@@ -275,7 +283,7 @@
     return { position: P, color: C, index: I };
   }
 
-  const comfort = { KEY: CF_KEY, VIG, vignetteTarget, vignetteStep, vignetteAngle, restFrame, snapStep, smoothStep, easeStep, shapeStick, EASE, ASSIST, FADE, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
+  const comfort = { KEY: CF_KEY, ORIGINAL, effective, VIG, vignetteTarget, vignetteStep, vignetteAngle, restFrame, snapStep, smoothStep, easeStep, shapeStick, EASE, ASSIST, FADE, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
 
   /* ---------- the VR menu: a mirror of the DOM panel that is open on the flat page ---------- */
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -389,6 +397,8 @@
     let storage = null;
     try { storage = root.localStorage; } catch (_) { }
     const cf = loadComfort(storage, root.location ? root.location.search : '');
+    const ef = effective({}, cf);                                 // what is in effect: cf, or the original VR while 'enabled' is off
+    slowNow = ef.speed;
     /* the motion of the view and the cost of a frame, on the real clock (the modes pass a slowed game dt to follow) */
     const st = { now: 0, dt: 0, t0: 0, speed: 0, turn: 0, accel: 0, vx: 0, vy: 0, vz: 0, haveV: false, acc: 0, accMax: 0, accCpu: 0, n: 0, calls: 0, tris: 0, at: -Infinity, have: false, yaw: 0 };
     const lastPos = new THREE.Vector3();
@@ -411,7 +421,7 @@
     function applyQuality() {
       const session = renderer.xr.getSession();
       if (!session) return;
-      const q = adaptQuality(cf.adaptive ? adapt.level : 0, cf), layer = session.renderState.baseLayer;
+      const q = adaptQuality(ef.adaptive ? adapt.level : 0, ef), layer = session.renderState.baseLayer;
       if (layer && 'fixedFoveation' in layer) layer.fixedFoveation = q.foveation;   // r128 has no setFoveation
       vpWant = Math.min(1, q.scale / fbScale);
       if (vpWant !== vpScale && !vpBusy) { vpBusy = true; session.requestAnimationFrame(viewportFrame); }
@@ -453,9 +463,9 @@
     })();
     let vig = 0;
     function updateVignette(dt) {
-      vig = cf.vignette === 'off' ? 0 : vignetteStep(vig, vignetteTarget(st.turn, st.accel), dt);
+      vig = ef.vignette === 'off' ? 0 : vignetteStep(vig, vignetteTarget(st.turn, st.accel), dt);
       vigMesh.visible = vig > 0.02;
-      if (vigMesh.visible) vigMesh.material.uniforms.uIn.value = Math.tan(vignetteAngle(cf.vignette, vig) * DEG);
+      if (vigMesh.visible) vigMesh.material.uniforms.uIn.value = Math.tan(vignetteAngle(ef.vignette, vig) * DEG);
     }
     const want = new THREE.Vector3(), lastWant = new THREE.Vector3(), easeS = { s: 0, lag: 0 }, stick = { x: 0, y: 0 };
     let easeOn = 0;                                               // 0: no last position yet, 1: no speed yet, 2: running
@@ -467,8 +477,8 @@
     function applyComfort() {
       if (!renderer.xr.isPresenting) return;
       dbg.mesh.visible = cf.debug;
-      showRest(cf.rest === 'off' ? null : cf.rest);
-      if (root.VDragon && root.VDragon.compact) root.VDragon.compact(cf.compact);
+      showRest(ef.rest === 'off' ? null : ef.rest);
+      if (root.VDragon && root.VDragon.compact) root.VDragon.compact(ef.compact);
       applyQuality();
     }
 
@@ -483,25 +493,23 @@
     }
     const hud = panel(640, 320, 1.2, 0.6, 0, -1.15, -2, -0.52, 999);   // about 30 deg below the eye line (the dragon is at 18), tilted to the player
     const menuP = panel(1024, 768, 2, 1.5, 0, 0.12, -2.4, 0, 1001);
-    const dbg = panel(448, 224, 0.26, 0.13, -0.4, 0.3, -1, 0, 1003, camera);   // head-locked: a child of the camera, up and left of the centre
+    const dbg = panel(960, 96, 1.2, 0.12, 0, -1.15 - 0.37 * Math.cos(0.52), -2 + 0.37 * Math.sin(0.52), -0.52, 1000);   // a strip under the status panel, in its plane
     let hudAt = -Infinity;
 
     /* debug overlay: 4 times a second; the numbers are averages over that quarter second */
     function drawDebug(now) {
       const n = Math.max(1, st.n), ms = st.acc / n, g = dbg.g, session = renderer.xr.getSession(), layer = session && session.renderState.baseLayer;
-      g.clearRect(0, 0, 448, 224); g.fillStyle = 'rgba(0,0,0,.72)'; g.fillRect(0, 0, 448, 224);
+      g.clearRect(0, 0, 960, 96); g.fillStyle = 'rgba(0,0,0,.72)'; g.fillRect(0, 0, 960, 96);
       g.font = '600 30px monospace'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-      g.fillStyle = ms > 1000 / ((session && session.frameRate) || 90) * 1.08 ? '#ff7a6b' : '#8dffb0';
-      g.fillText(ms.toFixed(1) + ' ms  max ' + st.accMax.toFixed(0) + '  ' + (ms > 0 ? 1000 / ms : 0).toFixed(0) + ' fps', 12, 38);
+      const hz = (session && session.frameRate) || 0;
+      g.fillStyle = ms > 1000 / (hz || 90) * 1.08 ? '#ff7a6b' : '#8dffb0';
+      g.fillText((ms > 0 ? 1000 / ms : 0).toFixed(0) + ' fps  ' + ms.toFixed(1) + ' ms  max ' + st.accMax.toFixed(0) + '  cpu ' + (st.accCpu / n).toFixed(1) + (hz ? '  ' + hz + ' Hz' : ''), 12, 38);
       g.fillStyle = '#ebe3cd';
-      g.fillText('cpu ' + (st.accCpu / n).toFixed(1) + ' ms   ' + ((session && session.frameRate) || '?') + ' Hz', 12, 80);
-      g.fillText('calls ' + st.calls + '  tris ' + (st.tris / 1000).toFixed(0) + 'k', 12, 122);
-      g.fillText('v ' + st.speed.toFixed(0) + ' m/s w ' + st.turn.toFixed(0) + ' d/s a ' + st.accel.toFixed(0), 12, 164);
-      g.fillText(debugLine(layer), 12, 206);
+      g.fillText('calls ' + st.calls + ' tris ' + (st.tris / 1000).toFixed(0) + 'k  v' + st.speed.toFixed(0) + ' w' + st.turn.toFixed(0) + ' a' + st.accel.toFixed(0) + '  ' + debugLine(layer), 12, 80);
       dbg.tex.needsUpdate = true;
       st.acc = st.accMax = st.accCpu = st.n = 0; st.at = now;
     }
-    const debugLine = layer => 'fov ' + (layer && layer.fixedFoveation != null ? (+layer.fixedFoveation).toFixed(2) : '-') + ' x' + (fbScale * vpScale).toFixed(2) + (vpOk ? '' : '!') + ' L' + (cf.adaptive ? adapt.level : '-');
+    const debugLine = layer => 'f' + (layer && layer.fixedFoveation != null ? (+layer.fixedFoveation).toFixed(2) : '-') + ' x' + (fbScale * vpScale).toFixed(2) + (vpOk ? '' : '!') + ' L' + (ef.adaptive ? adapt.level : '-') + (ef.enabled ? '' : ' OFF');
     /* the speed and the turn rate of the view (the rig), smoothed over about 0.1 s */
     function measure() {
       if (st.dt && st.have) {
@@ -519,9 +527,9 @@
        same mirror as every other menu. A click of the RIGHT stick opens and closes it; B closes it. ---------- */
     const T = k => (root.I18N ? root.I18N.t(k) : k);
     const SEEN_KEY = 'vsd-comfort-seen';
-    const MENU_ROWS = [['preset', 'sel'], ['turn', 'sel'], ['snapAngle', 'sel'], ['smoothSpeed', 'sel'], ['vignette', 'sel'], ['rest', 'sel'], ['effects', 'box'],
-                       ['scale', 'sel'], ['assist', 'sel'], ['ease', 'box'], ['boost', 'box'], ['debug', 'box']];
-    const optText = (k, v) => (k === 'snapAngle' ? v + '°' : k === 'smoothSpeed' ? (v ? v + ' °/s' : T('cf.o.nolimit')) : k === 'scale' ? v.toFixed(1) : T('cf.o.' + v));
+    const MENU_ROWS = [['debug', 'box'], ['enabled', 'box'], ['preset', 'sel'], ['speed', 'sel'], ['turn', 'sel'], ['snapAngle', 'sel'], ['smoothSpeed', 'sel'], ['vignette', 'sel'], ['rest', 'sel'], ['effects', 'box'],
+                       ['scale', 'sel'], ['assist', 'sel'], ['ease', 'box'], ['boost', 'box'], ['foveation', 'sel'], ['adaptive', 'box'], ['compact', 'box']];
+    const optText = (k, v) => (k === 'snapAngle' ? v + '°' : k === 'smoothSpeed' ? (v ? v + ' °/s' : T('cf.o.nolimit')) : k === 'scale' ? v.toFixed(1) : k === 'foveation' ? v.toFixed(2) : k === 'speed' ? v * 100 + ' %' : T('cf.o.' + v));
     let cmEl = null, cmOpen = false, cmFirst = false;
     function syncComfortMenu() {
       if (!cmEl) return;
@@ -560,6 +568,7 @@
     }
     function setComfort(key, value) {
       setOption(cf, key, value); saveComfort(storage, cf);
+      effective(ef, cf); slowNow = ef.speed;
       applyComfort();
     }
     let menu = null, menuSel = 0, menuScanAt = -Infinity, menuDrawn = '', menuSince = 0;
@@ -623,7 +632,7 @@
     async function enter() {
       if (busy || renderer.xr.isPresenting) return;
       busy = true;
-      fbScale = cf.scale; renderer.xr.setFramebufferScaleFactor(fbScale);
+      fbScale = ef.scale; renderer.xr.setFramebufferScaleFactor(fbScale);
       try { await renderer.xr.setSession(await navigator.xr.requestSession('immersive-vr')); }
       catch (e) { console.warn('VR not started', e); if (o.onError) o.onError(e); }
       busy = false;
@@ -635,16 +644,16 @@
 
     const viewProxy = { position: rig.position, quaternion: new THREE.Quaternion(), fov: 90, viewH: 1000 };
     const api = {
-      rig, eye: rig.position, bars, cf, setComfort,
+      rig, eye: rig.position, bars, cf: ef, setComfort,
       follow(pos, yaw, dt, at, shake) {
-        havePivot = !!at;
+        havePivot = !!at && ef.enabled;                          // off: the chase position as the mode gives it, as before
         if (at) { if (at.isVector3) pivot.copy(at); else pivot.set(at[0], at[1], at[2]); }
         if (snap || dt == null || rig.position.distanceToSquared(pos) > 3600) { snap = false; place(pos, yaw); return; }   // 60 m in a frame is a jump, not flight
         const rd = st.dt;                                         // the real clock: what the player feels
         let turned = false;
-        if (cf.turn === 'snap') {
-          if (!fadePhase) { pendingYaw = snapStep(wrap(yaw - rig.rotation.y), cf.snapAngle * DEG); if (pendingYaw) { fadePhase = 1; fadeT = 0; fadeMesh.visible = true; } }
-        } else if (!fadePhase) rig.rotation.y += smoothStep(wrap(yaw - rig.rotation.y), rd, cf.smoothSpeed * DEG);
+        if (ef.turn === 'snap') {
+          if (!fadePhase) { pendingYaw = snapStep(wrap(yaw - rig.rotation.y), ef.snapAngle * DEG); if (pendingYaw) { fadePhase = 1; fadeT = 0; fadeMesh.visible = true; } }
+        } else if (!fadePhase) rig.rotation.y += smoothStep(wrap(yaw - rig.rotation.y), ef.enabled ? rd : dt, ef.smoothSpeed * DEG);   // off: on the game clock, as before
         if (fadePhase) {
           fadeT += rd || FADE;
           if (fadePhase === 1 && fadeT >= FADE) { rig.rotation.y = wrap(rig.rotation.y + pendingYaw); fadePhase = 2; fadeT = 0; turned = true; }
@@ -658,7 +667,7 @@
           const a = wrap(ry - yaw), c = Math.cos(a), s = Math.sin(a), ox = pos.x - pivot.x, oz = pos.z - pivot.z;
           want.x = pivot.x + ox * c + oz * s; want.z = pivot.z - ox * s + oz * c;
         }
-        if (cf.ease && havePivot) {
+        if (ef.ease && havePivot) {
           const fx = -Math.sin(ry), fz = -Math.cos(ry);
           if (dt > 0 && rd > 0 && !turned) {                      // not while paused, not across a snap
             if (easeOn) {
@@ -674,7 +683,7 @@
         if (turned) st.have = false;                              // a snap is not a turn rate
         measure();
         updateVignette(rd);
-        if (shake > 0 && cf.effects) { rig.position.x += (Math.random() - 0.5) * shake * 2; rig.position.y += (Math.random() - 0.5) * shake * 2; }
+        if (shake > 0 && ef.effects) { rig.position.x += (Math.random() - 0.5) * shake * 2; rig.position.y += (Math.random() - 0.5) * shake * 2; }
       },
       view() {
         camera.getWorldQuaternion(viewProxy.quaternion);
@@ -701,10 +710,10 @@
         st.now = now; st.dt = d > 0 && d < 250 ? d / 1000 : 0;
         if (d > 0) { st.acc += d; st.n++; if (d > st.accMax) st.accMax = d; }
         if (p.ls) setComfort('debug', !cf.debug);
-        shapeStick(stick, p.sx, p.sy, st.dt, cf.assist, !!(opts && opts.ground));
+        shapeStick(stick, p.sx, p.sy, st.dt, ef.assist, !!(opts && opts.ground));
         p.sx = stick.x; p.sy = stick.y;
-        if (!cf.boost && !(opts && opts.keepBoost)) p.boost = false;
-        if (cf.adaptive && adaptStep(adapt, d, 1000 / (renderer.xr.getSession().frameRate || 90), adaptLevels(cf))) applyQuality();
+        if (!ef.boost && !(opts && opts.keepBoost)) p.boost = false;
+        if (ef.adaptive && adaptStep(adapt, d, 1000 / (renderer.xr.getSession().frameRate || 90), adaptLevels(ef))) applyQuality();
         let roots = [].concat(menuRoot || []).filter(Boolean);
         if (cmOpen && (p.pause || (p.rs && !cmFirst))) { closeComfortMenu(); p.pause = false; }   // B (or the stick again) closes it and does nothing else
         else if (p.rs && !cmOpen) { openComfortMenu(false); p.pause = !roots.length; }            // a mode that is flying gets a pause press
@@ -740,7 +749,7 @@
         g.clearRect(0, 0, 640, 320); g.fillStyle = 'rgba(12,19,16,.55)'; g.fillRect(0, 0, 640, 320);
         g.textAlign = 'left'; g.textBaseline = 'alphabetic';
         fn(g, 640, 320);
-        if (cf.rest === 'strong' && havePivot) {                  // a steady readout: speed of the view and the dragon's height
+        if (ef.rest === 'strong' && havePivot) {                  // a steady readout: speed of the view and the dragon's height
           g.font = '600 20px ' + FONT; g.textAlign = 'right'; g.fillStyle = 'rgba(235,227,205,.7)';
           g.fillText(Math.round(st.speed) + ' m/s   ' + Math.round(pivot.y) + ' m', 628, 308);
           g.textAlign = 'left';
@@ -774,7 +783,7 @@
   /** Text of an element with its child nodes joined by ' - ' (a banner: title and small print). */
   const textOf = el => (el ? [].map.call(el.childNodes, n => clean(n.textContent)).filter(Boolean).join(' - ') : '');
 
-  const api = { SLOW, FONT, mapPads, menuNav, wrapText, comfort, attach, hudBar, hudText, textOf };
+  const api = { get SLOW() { return slowNow; }, FONT, mapPads, menuNav, wrapText, comfort, attach, hudBar, hudText, textOf };
   root.VXR = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof self !== 'undefined' ? self : this);
