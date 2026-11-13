@@ -240,6 +240,37 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   ok(C.adaptQuality(3, Object.assign({}, d, { scale: 0.7, foveation: 1 })).scale === 0.6 && C.adaptLevels(Object.assign({}, d, { scale: 0.7, foveation: 1 })) === 1, 'a low setting has fewer levels left');
 }
 
+/* ---------- presets and the comfort menu ---------- */
+{
+  const C = comfort, P = C.PRESETS, src = read('shared/xr.js'), i18n = read('i18n.js');
+  const keys = Object.keys(P.recommended).sort().join();
+  for (const n in P) { ok(Object.keys(P[n]).sort().join() === keys, 'preset ' + n + ' sets the same settings as the others'); for (const k in P[n]) ok(C.OPTIONS[k].includes(P[n][k]), 'preset ' + n + ': ' + k + ' is a valid option'); }
+  ok(P.comfortable.turn === 'snap' && P.comfortable.vignette === 'high' && P.comfortable.rest === 'strong' && !P.comfortable.effects && !P.comfortable.boost, 'Comfortable: snap turn, strong vignette, strong rest frame, no camera effects, capped speed');
+  const s = C.defaults();
+  C.set(s, 'preset', 'comfortable');
+  ok(s.preset === 'comfortable' && s.vignette === 'high' && s.scale === 1, 'choosing a preset applies it and leaves the device settings alone');
+  C.set(s, 'vignette', 'low');
+  ok(s.preset === 'custom', 'changing a preset setting makes it Custom');
+  C.set(s, 'vignette', 'high');
+  ok(s.preset === 'comfortable', 'and setting it back names the preset again');
+  C.set(s, 'scale', 0.8); C.set(s, 'debug', true);
+  ok(s.preset === 'comfortable' && s.scale === 0.8, 'render scale and the debug overlay are not part of a preset');
+  C.set(s, 'turn', 'sideways'); C.set(s, 'nonsense', 1);
+  ok(s.turn === 'snap' && s.nonsense === undefined, 'invalid values are ignored');
+  const st = { v: null, getItem() { return this.v; }, setItem(k, x) { this.v = x; } };
+  C.save(st, s);
+  ok(JSON.stringify(C.load(st, '')) === JSON.stringify(s), 'the choice survives a reload');
+  ok(C.load(st, '?comfort=preset:advanced,vignette:low').turn === 'smooth' && C.load(st, '?comfort=preset:advanced,vignette:low').vignette === 'low', 'a test link can pick a preset and change one setting on top');
+  const rows = /const MENU_ROWS = \[([^;]*)\];/.exec(src)[1];
+  for (const k of ['preset', 'turn', 'snapAngle', 'smoothSpeed', 'vignette', 'rest', 'effects', 'scale']) ok(rows.includes("'" + k + "'"), 'the comfort menu has ' + k);
+  const two = k => ok((i18n.match(new RegExp("'" + k.replace(/\./g, '\\.') + "':", 'g')) || []).length === 2, k + ' exists in EN and CS');
+  for (const m of rows.matchAll(/\['([a-zA-Z]+)'/g)) two('cf.' + m[1]);
+  for (const k of ['cf.title', 'cf.close', 'cf.note', 'cf.first', 'cf.first.yes', 'cf.first.no', 'cf.o.nolimit']) two(k);
+  for (const k of ['preset', 'turn', 'vignette', 'rest', 'assist']) for (const v of C.OPTIONS[k]) two('cf.o.' + v);
+  ok(/Comfort vignette \(reduces peripheral motion\)/.test(i18n), 'the vignette is labelled as asked');
+  ok(/try \{ storage\.setItem\(SEEN_KEY/.test(src) && /try \{ seen = storage\.getItem\(SEEN_KEY\)/.test(src), 'the first-time note is remembered through localStorage inside try / catch');
+}
+
 /* ---------- page wiring ---------- */
 {
   const html = read('index.html');

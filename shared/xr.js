@@ -40,6 +40,9 @@
  *   Rest frame (setting 'rest'): a saddle bow and two horns fixed to the rig, in the lower view. They never move against
  *     the player's seat, whatever the dragon and the world do, which gives the eyes something that agrees with the body.
  *     Strong adds taller horns, side rails and a speed / height line on the status panel.
+ *   Comfort menu: click the RIGHT stick in VR (B closes it). Presets Comfortable / Recommended / Advanced and every
+ *     setting on its own; a mode that can pause is paused while it is open. The first time a player enters VR a short
+ *     note recommends Comfortable and a break at the first symptom ('vsd-comfort-seen').
  *   Debug overlay (head-locked, small): click the LEFT stick in VR. Frame time, fps, CPU time per frame, draw calls,
  *     triangles, speed and turn rate of the view.
  */
@@ -512,6 +515,49 @@
       else if (!st.have) st.haveV = false;
       lastPos.copy(rig.position); st.yaw = rig.rotation.y; st.have = true;
     }
+    /* ---------- the comfort menu: a DOM panel that exists only during a session, kept off screen and shown through the
+       same mirror as every other menu. A click of the RIGHT stick opens and closes it; B closes it. ---------- */
+    const T = k => (root.I18N ? root.I18N.t(k) : k);
+    const SEEN_KEY = 'vsd-comfort-seen';
+    const MENU_ROWS = [['preset', 'sel'], ['turn', 'sel'], ['snapAngle', 'sel'], ['smoothSpeed', 'sel'], ['vignette', 'sel'], ['rest', 'sel'], ['effects', 'box'],
+                       ['scale', 'sel'], ['assist', 'sel'], ['ease', 'box'], ['boost', 'box'], ['debug', 'box']];
+    const optText = (k, v) => (k === 'snapAngle' ? v + '°' : k === 'smoothSpeed' ? (v ? v + ' °/s' : T('cf.o.nolimit')) : k === 'scale' ? v.toFixed(1) : T('cf.o.' + v));
+    let cmEl = null, cmOpen = false, cmFirst = false;
+    function syncComfortMenu() {
+      if (!cmEl) return;
+      for (const c of cmEl.querySelectorAll('[data-k]')) { if (c.type === 'checkbox') c.checked = !!cf[c.dataset.k]; else c.value = String(cf[c.dataset.k]); }
+    }
+    function closeComfortMenu() {
+      cmOpen = false;
+      if (cmFirst) { cmFirst = false; try { storage.setItem(SEEN_KEY, '1'); } catch (_) { } }
+      if (cmEl) { cmEl.remove(); cmEl = null; }
+    }
+    function openComfortMenu(first) {
+      if (cmEl) cmEl.remove();
+      cmFirst = !!first; cmOpen = true;
+      const el = cmEl = document.createElement('section'), add = (tag, text, parent) => { const n = document.createElement(tag); if (text) n.textContent = text; (parent || el).appendChild(n); return n; };
+      el.id = 'vxrComfort'; el.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px';
+      add('h2', T('cf.title'));
+      add('p', T(first ? 'cf.first' : 'cf.note'));
+      if (first) {
+        const yes = add('button', T('cf.first.yes')); yes.className = 'cta';
+        yes.onclick = () => { setComfort('preset', 'comfortable'); closeComfortMenu(); };
+        add('button', T('cf.first.no')).onclick = () => { closeComfortMenu(); };
+      } else {
+        for (const [k, kind] of MENU_ROWS) {
+          const label = add('label', T('cf.' + k) + ' ');
+          if (kind === 'box') { const c = add('input', '', label); c.type = 'checkbox'; c.dataset.k = k; c.onchange = () => { setComfort(k, c.checked); syncComfortMenu(); }; }
+          else {
+            const c = add('select', '', label); c.dataset.k = k;
+            for (const v of OPTIONS[k]) { const o = add('option', optText(k, v), c); o.value = String(v); }
+            c.onchange = () => { setComfort(k, c.value); syncComfortMenu(); };
+          }
+        }
+        add('button', T('cf.close')).onclick = closeComfortMenu;   // not the main button: the menu opens on Preset
+      }
+      document.body.appendChild(el);
+      syncComfortMenu();
+    }
     function setComfort(key, value) {
       setOption(cf, key, value); saveComfort(storage, cf);
       applyComfort();
@@ -559,11 +605,15 @@
       } catch (_) { }
       Object.assign(adapt, adaptState()); vpScale = 1; vpBusy = false;
       applyComfort();
+      let seen = '1';
+      try { seen = storage.getItem(SEEN_KEY); } catch (_) { }
+      if (!seen) openComfortMenu(true);
       if (o.onStart) o.onStart();
     });
     renderer.xr.addEventListener('sessionend', () => {
       rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
       hud.mesh.visible = menuP.mesh.visible = dbg.mesh.visible = false; menu = null;
+      closeComfortMenu();
       showRest(null); fadePhase = 0; fadeMesh.visible = false; vig = 0; vigMesh.visible = false;
       if (root.VDragon && root.VDragon.compact) root.VDragon.compact(false);   // the flat screen draws the dragons as it always did
       bars([]);
@@ -655,7 +705,10 @@
         p.sx = stick.x; p.sy = stick.y;
         if (!cf.boost && !(opts && opts.keepBoost)) p.boost = false;
         if (cf.adaptive && adaptStep(adapt, d, 1000 / (renderer.xr.getSession().frameRate || 90), adaptLevels(cf))) applyQuality();
-        const roots = [].concat(menuRoot || []).filter(Boolean);
+        let roots = [].concat(menuRoot || []).filter(Boolean);
+        if (cmOpen && (p.pause || (p.rs && !cmFirst))) { closeComfortMenu(); p.pause = false; }   // B (or the stick again) closes it and does nothing else
+        else if (p.rs && !cmOpen) { openComfortMenu(false); p.pause = !roots.length; }            // a mode that is flying gets a pause press
+        if (cmOpen) roots = [cmEl];
         if (!roots.length) {
           if (menu) { menu = null; menuP.mesh.visible = false; menuDrawn = ''; }
           p.menu = false;

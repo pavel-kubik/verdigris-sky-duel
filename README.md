@@ -59,7 +59,25 @@ Single static `index.html`, no build step. Three.js r128 is loaded from cdnjs.
 
 Every mode plays in immersive VR through WebXR (`shared/xr.js`), with nothing to install: the solo duel, the tutorial, the co-op, the deathmatch and the campaign. On the headset, open the game in Quest Browser and choose **Enter VR** on the start screen of the mode (or the **VR** button at the top once you are flying); the buttons only appear on devices that support VR. Play seated. To leave VR, press the Meta button; single-player modes pause and the flat page comes back.
 
-- **View:** the camera follows the dragon with a level horizon - no pitch, roll, shake or zoom.
+- **View:** the camera follows the dragon with a level horizon - no pitch, roll or zoom; game logic only ever turns the view about the vertical axis. The dragon banks and pitches as a model in front of you.
+- **Comfort menu:** click the **right stick** (B closes it). Three presets and every setting on its own; the choice is kept in `localStorage` (`vsd-comfort`). The first time you enter VR a note recommends **Comfortable**. Take a break at the first sign of discomfort.
+
+  | Setting | Values (Recommended in bold) | What it does |
+  |---|---|---|
+  | Preset | Comfortable, **Recommended**, Advanced | Comfortable: snap turn, strong vignette, strong rest frame, gentle steering, no boost. Advanced: smooth uncapped turn, nothing else on. |
+  | Turning | **Snap**, Smooth | Snap: the view turns in steps behind a 100 ms fade once the dragon's heading is a step away. Smooth: it follows, up to the speed cap. |
+  | Snap angle / Smooth turn speed | 15, **30**, 45 deg / 30, **45**, 60, 90 deg/s, no limit | |
+  | Comfort vignette (reduces peripheral motion) | Off, Low, **Medium**, High | A soft black ring narrows the view while it turns or accelerates and opens in steady flight. |
+  | Rest frame | Off, **Subtle**, Strong | A saddle bow and horns fixed to your seat in the lower view; Strong adds taller horns, side rails and a speed / height readout. |
+  | Camera effects (shake) | **Off**, On | The hit shake. Off: the view is never shaken. |
+  | Render scale | 0.7 - 1.2 (**1.0**) | Eye buffer resolution; a raised value applies the next time you enter VR. |
+  | Steering | Gentle, **Normal**, Free | Limits the turn and dive rate and how fast the stick can reverse. |
+  | Gentle speed changes | **On**, Off | Boosts and jolts reach the view over half a second; the dragon pulls ahead meanwhile. |
+  | Boost | **On**, Off | Off removes the boost in VR (the boost lesson keeps it). |
+
+- **Performance:** 90 Hz is requested, fixed foveation starts at medium (0.66), dragons are drawn as skinned meshes (7 draw calls instead of 88), and when a second of frames runs over the budget the quality drops a level (full foveation, then the render scale in 10 % steps down to 0.6) and comes back when frames are good again. Not in the menu: `foveation`, `adaptive`, `compact`.
+- **Debug overlay:** click the **left stick**: frame time and fps, CPU time per frame, draw calls and triangles (both eyes), speed, turn rate and acceleration of the view, foveation, render scale and adaptive level.
+- **Test links:** `?comfort=key:value,key:value` overrides the stored settings for one page load, e.g. `?comfort=preset:comfortable,debug:true` or `?comfort=turn:smooth,vignette:off`. Keys: `preset turn snapAngle smoothSpeed vignette rest effects scale assist ease boost foveation adaptive compact debug`.
 - **Status panel** (below your eye line): vitality and fire, the radar, and what the mode shows on the flat screen - wave and score, the lesson goal, the match clock, or in the campaign hunger, region, gold, mission clock, compass and the current prompt.
 - **Floating bars:** vitality over every foe and teammate, vitality and fire over your own dragon, the roast over a tutorial chicken.
 - **Menus:** whatever panel is open on the flat page (home screen, lesson briefing, pause, lobby, room settings, leaderboard, cave stations, mission board, aerie, map, journal, story cards) is mirrored on a panel in front of you. Flick a stick up or down to choose, press **A** or the right trigger to press the button, **B** to go back. Text fields cannot be typed in VR: enter your name or a room code on the flat page first (an invite link fills the code in).
