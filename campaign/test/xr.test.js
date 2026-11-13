@@ -176,6 +176,23 @@ ok(!mapPads(pad({ 0: true }), null).breath && !mapPads(null, pad({ 0: true })).b
   ok(/xrOpts\.ground = /.test(camp) && /cs\.inLair \|\| cs\.inAerie \? null : pilot\.pos/.test(camp), 'the campaign tells VR when the dragon walks, and keeps the cave camera where the cave puts it');
 }
 
+/* ---------- comfort vignette: closes with turn rate and acceleration, opens in steady flight ---------- */
+{
+  const C = comfort, V = C.VIG, src = read('shared/xr.js');
+  ok(C.defaults().vignette === 'medium' && C.PRESETS.comfortable.vignette === 'high' && C.PRESETS.advanced.vignette === 'off', 'vignette: Medium by default, High in Comfortable, off in Advanced');
+  ok(C.vignetteTarget(0, 0) === 0, 'steady flight (no turn, no acceleration): open');
+  ok(C.vignetteTarget(V.turn / 2, 0) === 0.5 && C.vignetteTarget(0, V.accel / 2) === 0.5, 'it closes in proportion to the turn rate and to the linear acceleration');
+  ok(C.vignetteTarget(500, 500) === 1, 'and never past the strength');
+  ok(V.low > V.medium && V.medium > V.high && V.open > V.low, 'Low, Medium, High: each narrows the view further');
+  ok(C.vignetteAngle('medium', 0) === V.open && C.vignetteAngle('medium', 1) === V.medium && C.vignetteAngle('off', 1) === V.open, 'the clear half angle runs from open to the strength; off stays open');
+  let m = 0, t = 0;
+  for (; t < 0.3; t += 1 / 90) m = C.vignetteStep(m, 1, 1 / 90);
+  ok(m > 0.85, 'it closes within about a third of a second: ' + m.toFixed(2));
+  for (t = 0; t < 1; t += 1 / 90) m = C.vignetteStep(m, 0, 1 / 90);
+  ok(m > 0.1 && m < 0.3, 'and opens more slowly, so it does not flicker: ' + m.toFixed(2) + ' after a second');
+  ok(!/EffectComposer|WebGLRenderTarget|ShaderPass/.test(src), 'no post-processing pass: the vignette is a mesh');
+}
+
 /* ---------- rest frame: low-poly, in the lower view, fixed to the seat ---------- */
 {
   const C = comfort;

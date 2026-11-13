@@ -35,6 +35,8 @@
  *     xr.bars(list): floating bars in the world, [{ id, x, y, z, w, rows: [[value 0..1, colour], ...] }]; [] removes them
  *     xr.pointScale(): the eye-buffer equivalent of height / (2 tan(fov / 2)) for point sprites, or 0 before the first VR frame
  *     xr.cf: the comfort settings in use; xr.setComfort(key, value) changes one (and stores it)
+ *   Comfort vignette (setting 'vignette'): a soft black ring that narrows the view while the view turns or changes its
+ *     velocity, and opens again in steady flight. One ring mesh in view space (no post-processing pass), hidden while open.
  *   Rest frame (setting 'rest'): a saddle bow and two horns fixed to the rig, in the lower view. They never move against
  *     the player's seat, whatever the dragon and the world do, which gives the eyes something that agrees with the body.
  *     Strong adds taller horns, side rails and a speed / height line on the status panel.
@@ -106,6 +108,7 @@
     ease: [true, false],              // speed changes reach the view over half a second
     boost: [true, false],             // the boost works in VR
     assist: ['gentle', 'normal', 'free'],   // stick shaping: turn and dive limits, no instant reversals
+    vignette: ['off', 'low', 'medium', 'high'],   // comfort vignette: narrows the view while it turns or accelerates
     rest: ['off', 'subtle', 'strong'],   // rest frame: saddle bow and horns fixed to the seat
     effects: [false, true],           // camera effects in VR (the hit shake); off: the view is never shaken
     adaptive: [true, false],          // lower the quality a step while frames run over the budget
@@ -116,9 +119,9 @@
   const DEVICE = { scale: 1, foveation: 0.66, adaptive: true, compact: true, debug: false };
   /** The settings a preset owns; the rest (render scale, debug ...) are about the device, not about comfort. */
   const PRESETS = {
-    comfortable: { turn: 'snap', snapAngle: 30, smoothSpeed: 30, ease: true, boost: false, assist: 'gentle', rest: 'strong', effects: false },
-    recommended: { turn: 'snap', snapAngle: 30, smoothSpeed: 45, ease: true, boost: true, assist: 'normal', rest: 'subtle', effects: false },
-    advanced: { turn: 'smooth', snapAngle: 30, smoothSpeed: 0, ease: false, boost: true, assist: 'free', rest: 'off', effects: true },
+    comfortable: { turn: 'snap', snapAngle: 30, smoothSpeed: 30, ease: true, boost: false, assist: 'gentle', vignette: 'high', rest: 'strong', effects: false },
+    recommended: { turn: 'snap', snapAngle: 30, smoothSpeed: 45, ease: true, boost: true, assist: 'normal', vignette: 'medium', rest: 'subtle', effects: false },
+    advanced: { turn: 'smooth', snapAngle: 30, smoothSpeed: 0, ease: false, boost: true, assist: 'free', vignette: 'off', rest: 'off', effects: true },
   };
   function defaults() { return Object.assign({ preset: 'recommended' }, DEVICE, PRESETS.recommended); }
 
@@ -214,6 +217,18 @@
     return k;
   }
 
+  /* ---------- comfort vignette (pure) ---------- */
+  /**
+   * open: half angle (deg) of the view when the ring is out of sight; low / medium / high: the half angle it closes to.
+   * turn (deg/s) and accel (m/s2) each close it fully on their own; up / down: how fast it closes and opens (1/s).
+   */
+  const VIG = { open: 58, low: 44, medium: 36, high: 28, turn: 60, accel: 14, up: 8, down: 1.6, feather: 0.3, alpha: 0.94 };
+  /** 0 (open) .. 1 (closed as far as the strength goes) from the turn rate and the linear acceleration of the view. */
+  function vignetteTarget(turnDeg, accel) { return Math.max(0, Math.min(1, turnDeg / VIG.turn + accel / VIG.accel)); }
+  function vignetteStep(cur, target, dt) { return cur + (target - cur) * (1 - Math.exp(-dt * (target > cur ? VIG.up : VIG.down))); }
+  /** Half angle (deg) of the clear view for a strength and an amount 0..1. */
+  function vignetteAngle(level, m) { const lo = VIG[level]; return lo ? VIG.open + (lo - VIG.open) * Math.max(0, Math.min(1, m)) : VIG.open; }
+
   /* ---------- rest frame (pure): tubes along polylines, as plain arrays ---------- */
   /**
    * The rest frame in rig space (origin = the seated head, -z ahead, metres): a saddle bow low in front, about 40 deg
@@ -257,7 +272,7 @@
     return { position: P, color: C, index: I };
   }
 
-  const comfort = { KEY: CF_KEY, restFrame, snapStep, smoothStep, easeStep, shapeStick, EASE, ASSIST, FADE, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
+  const comfort = { KEY: CF_KEY, VIG, vignetteTarget, vignetteStep, vignetteAngle, restFrame, snapStep, smoothStep, easeStep, shapeStick, EASE, ASSIST, FADE, OPTIONS, PRESETS, ADAPT, adaptState, adaptLevels, adaptQuality, adaptStep, defaults, sanitize, preset, set: setOption, load: loadComfort, save: saveComfort };
 
   /* ---------- the VR menu: a mirror of the DOM panel that is open on the flat page ---------- */
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -372,7 +387,7 @@
     try { storage = root.localStorage; } catch (_) { }
     const cf = loadComfort(storage, root.location ? root.location.search : '');
     /* the motion of the view and the cost of a frame, on the real clock (the modes pass a slowed game dt to follow) */
-    const st = { now: 0, dt: 0, t0: 0, speed: 0, turn: 0, acc: 0, accMax: 0, accCpu: 0, n: 0, calls: 0, tris: 0, at: -Infinity, have: false, yaw: 0 };
+    const st = { now: 0, dt: 0, t0: 0, speed: 0, turn: 0, accel: 0, vx: 0, vy: 0, vz: 0, haveV: false, acc: 0, accMax: 0, accCpu: 0, n: 0, calls: 0, tris: 0, at: -Infinity, have: false, yaw: 0 };
     const lastPos = new THREE.Vector3();
     const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -413,16 +428,38 @@
     }
     const pivot = new THREE.Vector3(); let havePivot = false;      // the dragon the view follows
     /* the snap turn fade: a quad over each eye, drawn only during the 100 ms of a turn */
-    const fadeMat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false, uniforms: { uA: { value: 0 } },
+    const fadeMat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide, uniforms: { uA: { value: 0 } },
       vertexShader: 'void main(){gl_Position=vec4(position.xy,0.,1.);}', fragmentShader: 'uniform float uA;void main(){gl_FragColor=vec4(0.,0.,0.,uA);}' });
     const fadeMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fadeMat);
     fadeMesh.frustumCulled = false; fadeMesh.renderOrder = 1004; fadeMesh.visible = false; rig.add(fadeMesh);
     let fadePhase = 0, fadeT = 0, pendingYaw = 0;                  // 1: going dark, 2: coming back
+    /* the comfort vignette: a ring in view space (the same in each eye, so it has no depth), clear inside uIn, black
+       outside uIn * (1 + feather). x, y of a vertex: its direction; z: 0 inner edge, 1 end of the feather, 2 far out. */
+    const vigMesh = (function () {
+      const N = 48, pos = [], idx = [];
+      for (let r = 0; r < 3; r++) for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2; pos.push(Math.cos(a), Math.sin(a), r); }
+      for (let r = 0; r < 2; r++) for (let i = 0; i < N; i++) { const a = r * N + i, b = r * N + (i + 1) % N; idx.push(a, a + N, b, b, a + N, b + N); }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+      const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide,
+        uniforms: { uIn: { value: 1.6 }, uFeather: { value: VIG.feather }, uAlpha: { value: VIG.alpha } },
+        vertexShader: 'uniform float uIn,uFeather;varying float vA;void main(){float r=position.z<.5?uIn:position.z<1.5?uIn*(1.+uFeather):12.;vA=position.z<.5?0.:1.;gl_Position=projectionMatrix*vec4(position.xy*r,-1.,1.);}',
+        fragmentShader: 'uniform float uAlpha;varying float vA;void main(){gl_FragColor=vec4(0.,0.,0.,vA*vA*(3.-2.*vA)*uAlpha);}' }));
+      m.frustumCulled = false; m.renderOrder = 996; m.visible = false; rig.add(m);
+      return m;
+    })();
+    let vig = 0;
+    function updateVignette(dt) {
+      vig = cf.vignette === 'off' ? 0 : vignetteStep(vig, vignetteTarget(st.turn, st.accel), dt);
+      vigMesh.visible = vig > 0.02;
+      if (vigMesh.visible) vigMesh.material.uniforms.uIn.value = Math.tan(vignetteAngle(cf.vignette, vig) * DEG);
+    }
     const want = new THREE.Vector3(), lastWant = new THREE.Vector3(), easeS = { s: 0, lag: 0 }, stick = { x: 0, y: 0 };
     let easeOn = 0;                                               // 0: no last position yet, 1: no speed yet, 2: running
     function place(pos, yaw) {                                    // at once: a seat, a respawn, the first frame
       rig.position.copy(pos); rig.rotation.y = yaw;
       fadePhase = 0; fadeMesh.visible = false; easeOn = 0; easeS.lag = 0; st.have = false; measure();
+      st.accel = st.turn = 0; vig = 0; vigMesh.visible = false;
     }
     function applyComfort() {
       if (!renderer.xr.isPresenting) return;
@@ -456,7 +493,7 @@
       g.fillStyle = '#ebe3cd';
       g.fillText('cpu ' + (st.accCpu / n).toFixed(1) + ' ms   ' + ((session && session.frameRate) || '?') + ' Hz', 12, 80);
       g.fillText('calls ' + st.calls + '  tris ' + (st.tris / 1000).toFixed(0) + 'k', 12, 122);
-      g.fillText('speed ' + st.speed.toFixed(0) + ' m/s  turn ' + st.turn.toFixed(0) + ' d/s', 12, 164);
+      g.fillText('v ' + st.speed.toFixed(0) + ' m/s w ' + st.turn.toFixed(0) + ' d/s a ' + st.accel.toFixed(0), 12, 164);
       g.fillText(debugLine(layer), 12, 206);
       dbg.tex.needsUpdate = true;
       st.acc = st.accMax = st.accCpu = st.n = 0; st.at = now;
@@ -466,9 +503,13 @@
     function measure() {
       if (st.dt && st.have) {
         const k = 1 - Math.exp(-st.dt * 8);
+        const vx = (rig.position.x - lastPos.x) / st.dt, vy = (rig.position.y - lastPos.y) / st.dt, vz = (rig.position.z - lastPos.z) / st.dt;
+        if (st.haveV) st.accel += (Math.hypot(vx - st.vx, vy - st.vy, vz - st.vz) / st.dt - st.accel) * (1 - Math.exp(-st.dt * 6));   // linear acceleration, turns of the path included
+        st.vx = vx; st.vy = vy; st.vz = vz; st.haveV = true;
         st.speed += (rig.position.distanceTo(lastPos) / st.dt - st.speed) * k;
         st.turn += (Math.abs(wrap(rig.rotation.y - st.yaw)) / st.dt * 180 / Math.PI - st.turn) * k;
       }
+      else if (!st.have) st.haveV = false;
       lastPos.copy(rig.position); st.yaw = rig.rotation.y; st.have = true;
     }
     function setComfort(key, value) {
@@ -523,7 +564,7 @@
     renderer.xr.addEventListener('sessionend', () => {
       rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
       hud.mesh.visible = menuP.mesh.visible = dbg.mesh.visible = false; menu = null;
-      showRest(null); fadePhase = 0; fadeMesh.visible = false;
+      showRest(null); fadePhase = 0; fadeMesh.visible = false; vig = 0; vigMesh.visible = false;
       if (root.VDragon && root.VDragon.compact) root.VDragon.compact(false);   // the flat screen draws the dragons as it always did
       bars([]);
       if (o.onEnd) o.onEnd();
@@ -582,6 +623,7 @@
         rig.position.copy(want);
         if (turned) st.have = false;                              // a snap is not a turn rate
         measure();
+        updateVignette(rd);
         if (shake > 0 && cf.effects) { rig.position.x += (Math.random() - 0.5) * shake * 2; rig.position.y += (Math.random() - 0.5) * shake * 2; }
       },
       view() {
