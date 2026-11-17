@@ -375,42 +375,59 @@
     },
 
     regions: {
+      /* Mount Rip (Hora Říp): the real lone volcanic hill of the Bohemian lowland, 35 km north of Prahold (Prague),
+         baked from the same terrain model as the Bend (tools/terrain/regions/rip.json -> core/dem-rip.js, 3.6 m per
+         unit, heights x exag). In the game the old volcano woke up: a crater (cone h 0 = only the crater, dug into the
+         summit), lava streams down the flanks, the cave on the south flank facing the way to the Wildwood and Prahold. */
       ash: {
-        nameKey: 'c.region.ash', radius: 1100, seed: 11, ceiling: 320,
-        terrain: { amp: 0.9, base: 20, features: [
-          { type: 'cone', x: 0, z: 0, r: 260, h: 150, crater: { r: 38, depth: 30 } },
-          // lava streams out of the crater (terrain.lavaFlows): a = direction (0 = +Z, the cave side stays clear),
-          // len, w = [width at the rim, at the foot], ph = how it wanders. Lava: no landing, no walking.
-          { type: 'lava', a: 1.3, len: 250, w: [3.5, 8], ph: 4.1 }, { type: 'lava', a: 2.25, len: 330, w: [4, 11], ph: 0.3 },
-          { type: 'lava', a: 3.4, len: 400, w: [5, 13], ph: 1.7 }, { type: 'lava', a: 4.7, len: 310, w: [4, 10], ph: 2.9 },
-          { type: 'flatten', x: 0, z: 0, r: 1100, toward: 14, from: 700 },
+        nameKey: 'c.region.ash', radius: 1100, seed: 11, ceiling: 340,
+        terrain: { dem: 'demRip', exag: 2.2, offset: -12, base: 20, features: [
+          { type: 'cone', x: -35, z: 0, r: 200, h: 0, crater: { r: 34, depth: 22 } },
+          // lava streams out of the crater (terrain.lavaFlows): a = direction (0 = +Z, north; the cave side, PI, stays
+          // clear), len, w = [width at the rim, at the foot], ph = how it wanders. Lava: no landing, no walking.
+          { type: 'lava', a: 0.15, len: 300, w: [3.5, 9], ph: 4.1 }, { type: 'lava', a: 1.35, len: 330, w: [4, 11], ph: 0.3 },
+          { type: 'lava', a: 4.75, len: 380, w: [5, 12], ph: 1.7 }, { type: 'lava', a: 5.6, len: 260, w: [3.5, 8], ph: 2.9 },
         ] },
         palette: 'ash',
-        // cave mouth on the volcano's +Z flank, opening toward the Wildwood exit;
+        // cave mouth on the volcano's south (-Z) flank, opening toward the Wildwood exit (south, toward Prahold);
         // the mouth centre sits `above` units over the slope (terrain.lairPos computes it)
-        lair: { x: 0, z: 150, above: 7, r: 18, facing: 0 },
-        spawn: { x: 0, z: 260, y: 110, yaw: 0 },          // respawn point in front of the cave, facing away (+Z)
-        // far: a living forest toward the rim (from .. full = thin to dense), so the Wastes are alive beyond the ash
+        lair: { x: 0, z: -130, above: 7, r: 18, facing: PI },
+        spawn: { x: 0, z: -260, y: 110, yaw: PI },          // respawn point in front of the cave, facing away (south)
+        // far: a living forest toward the rim (from .. full = thin to dense), so the land round Rip is alive beyond the ash
         flora: { trees: 60, rocks: 140, far: { trees: 640, from: 500, full: 800, kinds: 'ashfar' } },
         herds: [{ type: 'goat', count: 4, ring: [350, 900] }],
-        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }],     // radians, 0 = +Z; region edge arc on the +Z side
-        entries: { wild: { angle: 0 } },
+        // the villages round Rip on the plain (scenery: no guards), at about their real bearings from the hill
+        city: { villages: [
+          { id: 'krabcice', nameKey: 'c.placeName.krabcice', x: -240, z: 360, r: 55, church: true },
+          { id: 'ctineves', nameKey: 'c.placeName.ctineves', x: -380, z: -380, r: 50 },
+          { id: 'mnetes', nameKey: 'c.placeName.mnetes', x: 160, z: -680, r: 48, plan: 'street', yaw: 1.2 },
+          { id: 'vrazkov', nameKey: 'c.placeName.vrazkov', x: 520, z: -440, r: 48 },
+          { id: 'klenec', nameKey: 'c.placeName.klenec', x: 560, z: 420, r: 46 },
+        ] },
+        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],     // radians, 0 = +Z; region edge arc on the south side
+        entries: { wild: { angle: PI } },
       },
       wild: {
         nameKey: 'c.region.wild', radius: 1100, seed: 23, ceiling: 280,
         waterLevel: 0.6,                                    // lakes in the hollows (T11: not landable, not walkable)
         terrain: { amp: 1.0, base: 12, features: [
-          { type: 'plateau', x: 420, z: -300, r: 40 },      // settlement ground (T11): the hamlet and the small outpost (T12)
-          { type: 'plateau', x: -380, z: 520, r: 30 },
+          { type: 'plateau', x: 420, z: 300, r: 40 },       // settlement ground (T11): the hamlet and the small outpost (T12)
+          { type: 'plateau', x: -380, z: -520, r: 30 },
         ] },
         palette: 'forest',
         flora: { trees: 1400, rocks: 120 },
         herds: [{ type: 'deer', count: 5, ring: [200, 1000] }, { type: 'boar', count: 3, ring: [300, 1000] },
                 { type: 'goat', count: 2, ring: [600, 1000] }],
-        settlements: [{ type: 'hamlet', x: 420, z: -300, yaw: 0.4 }, { type: 'outpostS', x: -380, z: 520, yaw: 2.1 }],
+        // (mirrored north - south when Mount Rip moved north of Prahold: the hamlet stays on the Rip side, the outpost on the Farmlands side)
+        settlements: [{ type: 'hamlet', x: 420, z: 300, yaw: PI - 0.4 }, { type: 'outpostS', x: -380, z: -520, yaw: PI - 2.1 }],
         // minStage: a smaller dragon is told it is too small (prompt, no travel); the Farmlands are for a Drake
-        exits: [{ to: 'ash', angleFrom: PI - 0.6, angleTo: PI + 0.6 }, { to: 'farm', angleFrom: -0.6, angleTo: 0.6, minStage: 1 }],
-        entries: { ash: { angle: PI }, farm: { angle: 0 } },
+        // north to Mount Rip, south to the Farmlands (the Vltava valley on the way to Prahold)
+        city: { villages: [
+          { id: 'lhota', nameKey: 'c.placeName.lhota', x: -650, z: -80, r: 46 },
+          { id: 'zelizy', nameKey: 'c.placeName.zelizy', x: 300, z: -760, r: 44, plan: 'street', yaw: 0.6 },
+        ] },
+        exits: [{ to: 'ash', angleFrom: -0.6, angleTo: 0.6 }, { to: 'farm', angleFrom: PI - 0.6, angleTo: PI + 0.6, minStage: 1 }],
+        entries: { ash: { angle: 0 }, farm: { angle: PI } },
       },
       /* River Farmlands (Phase 2 T11): open farmland, a river across the middle, a road from the Wildwood side up to
          the village, flat plateaus for the three settlements (T12). river: points, width, depth (+ level, valley);
@@ -419,18 +436,26 @@
         nameKey: 'c.region.farm', radius: 1100, seed: 37, ceiling: 300,
         waterLevel: 0,                                      // ponds in the lowest hollows
         terrain: { amp: 0.6, base: 12, features: [
-          { type: 'road', points: [[0, -1100], [0, -300], [380, 260], [700, 640]], width: 8 },
-          { type: 'river', points: [[-1100, -200], [-300, 0], [200, 150], [1100, 80]], width: 26, depth: 6 },
-          { type: 'plateau', x: 380, z: 260, r: 70 }, { type: 'plateau', x: -420, z: -460, r: 50 },
-          { type: 'plateau', x: 640, z: -520, r: 90 },
+          { type: 'road', points: [[0, 1100], [0, 300], [380, -260], [700, -640]], width: 8 },
+          { type: 'river', points: [[-1100, 200], [-300, 0], [200, -150], [1100, -80]], width: 26, depth: 6 },
+          { type: 'plateau', x: 380, z: -260, r: 70 }, { type: 'plateau', x: -420, z: 460, r: 50 },
+          { type: 'plateau', x: 640, z: 520, r: 90 },
         ] },
         palette: 'farm',
         flora: { trees: 500, rocks: 60, fields: 24 },
         herds: [{ type: 'deer', count: 2, ring: [700, 1000] }],
-        settlements: [{ type: 'village', x: 380, z: 260, yaw: 0 }, { type: 'hamlet', x: -420, z: -460, yaw: 1.2 },
-                      { type: 'outpost', x: 640, z: -520, yaw: -0.8 }],
-        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }, { to: 'bend', angleFrom: -0.5, angleTo: 0.5, minStage: 1 }],
-        entries: { wild: { angle: PI }, bend: { angle: 0 } },
+        // (mirrored north - south with Mount Rip north of Prahold: the road still comes from the Wildwood side)
+        settlements: [{ type: 'village', x: 380, z: -260, yaw: PI }, { type: 'hamlet', x: -420, z: 460, yaw: PI - 1.2 },
+                      { type: 'outpost', x: 640, z: 520, yaw: PI + 0.8 }],
+        // north to the Wildwood, south down the valley to the Veltava Bend (Prahold)
+        city: { villages: [
+          { id: 'roztoky', nameKey: 'c.placeName.roztoky', x: -620, z: -380, r: 60, church: true },
+          { id: 'uholicky', nameKey: 'c.placeName.uholicky', x: 160, z: 640, r: 50 },
+          { id: 'libcice', nameKey: 'c.placeName.libcice', x: -720, z: 600, r: 52, plan: 'street', yaw: 0.4 },
+          { id: 'suchdol', nameKey: 'c.placeName.suchdol', x: 820, z: 80, r: 50 },
+        ] },
+        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }, { to: 'bend', angleFrom: PI - 0.5, angleTo: PI + 0.5, minStage: 1 }],
+        entries: { wild: { angle: 0 }, bend: { angle: PI } },
       },
       /* Veltava Bend (Phase 3 T02, 003_task_missions.md 4.2): real Prague terrain baked into core/dem-bend.js
          (tools/terrain). terrain.dem: base heights from that grid (metres above its base / metresPerUnit x exag +
@@ -447,8 +472,6 @@
             { type: 'cliff', x: 220, z: -815, r: 84, face: PI / 2, drop: 12, width: 60 },               // rock face west (+X), to the river
             { type: 'plateau', x: 190, z: 250, r: 34 }, { type: 'plateau', x: -250, z: 450, r: 60 },
             { type: 'plateau', x: 230, z: 930, r: 34 }, { type: 'plateau', x: 745, z: -230, r: 24 },
-            { type: 'ruins', x: 230, z: -200, r: 150 },                                                 // Staromark
-            { type: 'ruins', x: 645, z: 0, r: 50, kind: 'castle' },                                     // Hradchan
             { type: 'road', width: 8, points: [[255, -1190], [245, -1000], [230, -870]] },            // south entry on the east bank -> gate
             { type: 'road', width: 7, points: [[640, 40], [460, -125], [360, -125], [280, -300], [250, -600], [230, -870]] },
             { type: 'road', width: 7, points: [[280, -300], [100, 20], [-150, 212], [-250, 450]] },       // to Holeshwick
@@ -467,8 +490,75 @@
           { type: 'hamlet',   x: 230, z: 930, yaw: -2.2, name: 'troyvale' },
           { type: 'outpostS', x: 745, z: -230, yaw: -1.4, name: 'petrovel' },
         ],
-        exits: [{ to: 'farm', angleFrom: PI - 0.5, angleTo: PI + 0.5 }],
-        entries: { farm: { angle: PI - 0.27 } },                                                         // over the river, south
+        // north, downstream past Troyvale (Troja) toward the Farmlands, the Wildwood and Mount Rip
+        /* Prahold - the city of the Bend (core/city.js lays out streets and houses, render/city-view.js draws them with
+           render/house-kit.js). Districts after real Prague, at their real places (projected like the terrain): the
+           castle of Hradchan with its cathedral, the Lesser Town under it, Staromark round its square with the town hall
+           and the twin-spired Tyn church, Josefov, Novomark planned on a grid with the long Horse Market and the Cattle
+           Market, Hradchany by Strahov, and the suburbs of Smichov and the Royal Vineyards. Earlier districts win where
+           circles overlap. plan: organic (warped, crooked lanes) | grid | suburb (sparse, gardens); block: street spacing
+           [along, across]; styles: weights of the house styles; landmarks at fixed places (yaw: the front faces
+           (sin yaw, cos yaw), +X = west). villages: a round green with a chapel (plan 'round') or a street village. */
+        city: {
+          districts: [
+            { id: 'hradchan', nameKey: 'c.placeName.hradchan', x: 625, z: 10, r: 72, plan: 'organic', block: [34, 42], depth: [8, 11], street: 6, floors: [2, 3],
+              styles: { renaissance: 2, baroque: 2, gothic: 1.5 }, landmarks: [
+                { kind: 'cathedral', x: 632, z: 14, yaw: PI / 2, w: 28, d: 84, name: 'vitus' },
+                { kind: 'palace', x: 622, z: -20, yaw: PI, w: 70, d: 14, style: 'classic', name: 'oldpalace' },
+                { kind: 'palace', x: 714, z: 0, yaw: PI / 2, w: 44, d: 14, style: 'classic', name: 'westwing' },
+                { kind: 'church', x: 588, z: 16, yaw: PI / 2, w: 12, d: 26, style: 'gothic', name: 'george' },
+                { kind: 'tower', x: 556, z: 46, style: 'gothic' }, { kind: 'tower', x: 708, z: 26, style: 'gothic' },
+              ] },
+            { id: 'malastrana', nameKey: 'c.placeName.malastrana', x: 560, z: -95, r: 80, plan: 'organic', orient: 0.2, block: [42, 50], depth: [8, 12], warp: 6, street: 6,
+              floors: [3, 4], styles: { baroque: 5, renaissance: 2, classic: 1.5, gothic: 0.6 },
+              squares: [{ x: 577, z: -77, r: 34, name: 'malsq' }], landmarks: [
+                { kind: 'domechurch', x: 577, z: -77, yaw: -PI / 2, name: 'nicholas' },
+                { kind: 'palace', x: 516, z: -28, yaw: 0, w: 52, d: 18, style: 'baroque', name: 'wallenstein' },
+              ] },
+            { id: 'staromark', nameKey: 'c.placeName.staromark', x: 215, z: -105, r: 128, plan: 'organic', orient: 0.5, block: [44, 56], depth: [8, 12], warp: 6, street: 6,
+              floors: [3, 5], styles: { gothic: 3, baroque: 3.5, renaissance: 2.5, classic: 1 },
+              squares: [{ x: 222, z: -93, r: 31, arcade: true, name: 'oldsq' }], landmarks: [
+                { kind: 'townhall', x: 249, z: -114, yaw: -0.94, name: 'townhall' },
+                { kind: 'cathedral', x: 186, z: -78, yaw: 1.96, w: 22, d: 40, name: 'tyn' },
+                { kind: 'domechurch', x: 268, z: -74, yaw: -1.26, w: 20, d: 26, name: 'nicholasOld' },
+                { kind: 'gatetower', x: 95, z: -99, yaw: -PI / 2, name: 'powder' },
+                { kind: 'palace', x: 322, z: -128, yaw: PI / 2, w: 44, d: 24, style: 'baroque', name: 'clementinum' },
+                { kind: 'chapel', x: 288, z: -160, yaw: 0, w: 14, d: 18, style: 'gothic', name: 'bethlehem' },
+                { kind: 'palace', x: 172, z: -146, yaw: PI, w: 26, d: 20, style: 'classic', name: 'theatre' },
+              ] },
+            { id: 'josefov', nameKey: 'c.placeName.josefov', x: 272, z: -12, r: 52, plan: 'organic', orient: 0.9, block: [36, 42], depth: [8, 11], street: 5,
+              floors: [3, 4], styles: { classic: 2, baroque: 2, gothic: 1.5, renaissance: 1 }, landmarks: [
+                { kind: 'chapel', x: 270, z: -6, yaw: 0, w: 11, d: 16, style: 'gothic', name: 'oldnew' },
+              ] },
+            { id: 'novomark', nameKey: 'c.placeName.novomark', x: 160, z: -420, r: 210, plan: 'grid', orient: -2.48, block: [58, 70], depth: [9, 13], street: 7,
+              floors: [3, 5], styles: { baroque: 3, classic: 3, renaissance: 2, gothic: 1, timber: 0.8 },
+              squares: [{ x: 108, z: -262, len: 204, wid: 24, yaw: -2.48, name: 'horse' }, { x: 264, z: -457, r: 40, green: true, name: 'cattle' }],
+              landmarks: [
+                { kind: 'palace', x: 36, z: -356, yaw: 0.65, w: 50, d: 22, style: 'classic', name: 'museum' },
+                { kind: 'townhall', x: 286, z: -414, yaw: -2.68, name: 'newhall' },
+                { kind: 'church', x: 280, z: -530, yaw: PI / 2, style: 'gothic', name: 'emmaus' },
+                { kind: 'domechurch', x: 133, z: -668, yaw: 0, w: 22, d: 26, name: 'karlov' },
+                { kind: 'church', x: 160, z: -214, yaw: PI / 2, w: 16, d: 36, style: 'gothic', name: 'snows' },
+              ] },
+            { id: 'hradcany', nameKey: 'c.placeName.hradcany', x: 770, z: -50, r: 66, plan: 'organic', orient: 0.4, block: [40, 48], depth: [8, 11], street: 6,
+              floors: [2, 3], styles: { baroque: 3, renaissance: 2, classic: 1 }, landmarks: [
+                { kind: 'church', x: 809, z: -37, yaw: -PI / 2, style: 'baroque', name: 'loreta' },
+                { kind: 'church', x: 857, z: -128, yaw: -PI / 2, w: 16, d: 34, style: 'baroque', name: 'strahov' },
+              ] },
+            { id: 'smichov', nameKey: 'c.placeName.smichov', x: 560, z: -520, r: 120, plan: 'suburb', orient: 0.1, block: [40, 50], street: 6,
+              floors: [1, 2], density: 0.75, gap: 3, yards: 0.4, styles: { timber: 2, cottage: 2, classic: 1, baroque: 1, farm: 1 } },
+            { id: 'vinohrady', nameKey: 'c.placeName.vinohrady', x: -110, z: -330, r: 135, plan: 'suburb', orient: -0.3, block: [44, 54], street: 6,
+              floors: [1, 2], density: 0.6, gap: 4, yards: 0.5, styles: { farm: 2, cottage: 2, timber: 1, baroque: 1 } },
+          ],
+          villages: [
+            { id: 'podol', nameKey: 'c.placeName.podol', x: 195, z: -1010, r: 50, plan: 'street', yaw: 0.05 },
+            { id: 'nusle', nameKey: 'c.placeName.nusle', x: -90, z: -800, r: 55 },
+            { id: 'liben', nameKey: 'c.placeName.liben', x: -820, z: 400, r: 60, church: true },
+            { id: 'dejvice', nameKey: 'c.placeName.dejvice', x: 840, z: 290, r: 55 },
+          ],
+        },
+        exits: [{ to: 'farm', angleFrom: -0.1, angleTo: 0.9 }],
+        entries: { farm: { angle: 0.45 } },                                                             // north-west, where the river leaves the city (Podbaba)
       },
     },
     startRegion: 'ash',
@@ -511,7 +601,7 @@
        region view's zoom range. tapPx: the smallest tap target of a map icon (css px). */
     map: {
       cell: 50, reveal: 160, revealAlt: 1.5, highAlt: 0.6, every: 0.25, image: 256,
-      world: { ash: [0, 0], wild: [0, 1], farm: [0, 2], bend: [0, 3], pass: [-1, 2.6], low: [1, 3.6], capital: [0, 4.4] },
+      world: { bend: [0, 0], farm: [0.2, 1], wild: [-0.3, 2], ash: [-0.2, 3], pass: [-1.3, 0.6], low: [1.3, 0.5], capital: [0, -1.3] },
       later: { pass: { stage: 1 }, low: { stage: 2 }, capital: { stage: 3 } },   // 000_spec.md 9: Drake (late), Wyrm, Elder
       links: [['pass', 'farm'], ['low', 'bend'], ['capital', 'bend']],
       zoom: [1, 4], tapPx: 36,
@@ -523,8 +613,8 @@
        Flying into the mouth (inside `mouthR` x scale) or the Move slot within `enterRange` enters: carried loot is
        banked, Rest heals (no stage-up: that stays at the nest), Leave puts the dragon back in the air in front of it. */
     aeries: {
-      wild: { x: -620, z: -480, facing: 1.9 },
-      farm: { x: 720, z: 560, facing: -2.4 },
+      wild: { x: -620, z: 480, facing: PI - 1.9 },
+      farm: { x: 720, z: -560, facing: PI + 2.4 },
       bend: { x: 120, z: 1010, facing: Math.PI },      // a cleft in the Troyvale rocks, facing the river
       discover: 200, enterRange: 40, nearRange: 110, mouthR: 9, above: 6, out: 26, outY: 22, room: { r: 22, h: 14 },
     },
@@ -543,10 +633,10 @@
       briefs: { a2_chalice: 3, a2_workshop: 2, a2_caravan: 2 } },
     missions: [
       { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
-        relic: 'ember_chalice', time: 540, reward: { gold: 250 } },
+        relic: 'ember_chalice', time: 660, reward: { gold: 250 } },
       { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-        time: 600, reward: { gold: 200 } },
-      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 600,
+        time: 720, reward: { gold: 200 } },
+      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 720,
         reward: { gold: 300 } },
     ],
     mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1,
@@ -577,7 +667,97 @@
        its time (never under min). queueMax waiting at most (the oldest plain 'info' goes first); the log keeps logMax. */
     messages: { perChar: 12, min: 4, max: 9, waitCut: 0.7, queueMax: 4, logMax: 40 },
 
-    controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
+    controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF', guise: 'KeyH' },
+
+    /* People on foot (core/hero.js): the heroes of the tales and the dragon in human form. Speeds in units / s (a
+       person is about 1.8 units tall), turn in rad / s, runSt stamina per s while running, jump take-off speed,
+       stepUp: highest kerb or step, maxSlope: rise per run, fallAt: a drop that turns into a fall. gift: what the action
+       button does (bolt: a spark at a target up to giftRange away, strike: a sword cut, charm: a word that turns a
+       guard away, ember: warm sparks); floatFall: holding jump slows the fall (the wizard). */
+    hero: {
+      turn: 2.6, back: 1.8, accel: 8, runSt: 9, stRegen: 14, jump: 7.5, gravity: 22, stepUp: 0.7, maxSlope: 1.1, fallAt: 0.8,
+      kinds: {
+        wizard:    { walk: 3.4, run: 6.8, gift: 'bolt',   giftRange: 34, giftCone: 0.55, giftTime: 0.6, giftCool: 0.7, jumpMult: 1.15, floatFall: true },
+        princess:  { walk: 3.8, run: 7.6, gift: 'charm',  giftRange: 10, giftCone: 0.8, giftTime: 0.8, giftCool: 1.2 },
+        prince:    { walk: 3.8, run: 7.4, gift: 'strike', giftRange: 3.2, giftCone: 0.9, giftTime: 0.45, giftCool: 0.5 },
+        dragonkin: { walk: 4.2, run: 8.4, gift: 'ember',  giftRange: 8, giftCone: 0.6, giftTime: 0.7, giftCool: 1.0 },
+      },
+    },
+    /* The Guise (core/guise.js): a Drake (minStage) can take human form on the ground; time: the shimmer (s); st:
+       stamina it costs each way; clear: room needed round the person to turn back (x the dragon's scale); pad: the
+       person's body against walls; hunger: share of the usual hunger drain while human. */
+    guise: { minStage: 1, time: 1.2, st: 25, clear: 5, pad: 0.45, hunger: 0.5, cam: 0.32 },
+    /* Tales (core/tale.js): reach / talk / pick distances, how close a follower keeps (follow) and when it catches up
+       (lost), guards' sight (range, half-angle cone, x walkSight when not running, close: seen whatever the angle) and how
+       long a charmed guard looks away (s). */
+    tale: { reach: 8, talk: 4, pick: 2.6, follow: 2.6, lost: 40, sight: 18, cone: 0.7, walkSight: 0.7, close: 3, charm: 12 },
+    /* The three tellings played on foot in Prahold (campaign/hero/). Texts: c.tale.<id>.<chapter>.title / l1.. / end,
+       c.tale.<id>.<chapter>.<step> = the objective, c.tale.<id>.end.*. Places: [x, z] in the Bend or a landmark lot's
+       name (core/city.js data: vitus, townhall, clementinum, oldnew, ...). */
+    tales: {
+      wizard: { hero: 'wizard', region: 'bend', start: { x: 690, z: 30, yaw: -PI / 2 }, chapters: [
+        { lines: 3, steps: [
+          { type: 'reach', at: [560, 40], r: 10 },
+          { type: 'gift', targets: [{ at: [560, 40], y: 18, kind: 'lantern' }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'reach', at: 'clementinum', r: 10 },
+          { type: 'collect', item: 'page', at: [[250, -150], [200, -40], [300, -60]] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'gift', targets: [{ at: [372, -125], y: 12, kind: 'lantern' }, { at: [464, -125], y: 12, kind: 'lantern' }, { at: 'townhall', y: 22, kind: 'lantern' }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'reach', at: [690, -300], r: 10, npcs: [{ id: 'dragon', kind: 'dragon', at: [706, -318] }] },
+          { type: 'gift', npcs: [], targets: [{ at: [706, -318], y: 4, r: 3, kind: 'dragon' }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'escort', npc: { id: 'stranger', kind: 'dragonkin', at: [700, -310] }, to: [222, -93], r: 12 },
+        ] },
+      ] },
+      prince: { hero: 'prince', region: 'bend', start: { x: 660, z: -2, yaw: PI / 2 }, chapters: [
+        { lines: 3, steps: [
+          { type: 'gift', targets: [{ at: [684, -4], y: 1, hp: 2, kind: 'dummy' }, { at: [692, 6], y: 1, hp: 2, kind: 'dummy' }, { at: [684, 14], y: 1, hp: 2, kind: 'dummy' }] },
+          { type: 'talk', npcs: [{ id: 'grandmaster', kind: 'guard', at: [700, -8], yaw: -PI / 2 }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'collect', item: 'scorch', at: [[540, -120], [600, -130], [520, -80]] },
+          { type: 'reach', at: [470, -125], r: 8 },
+        ] },
+        { lines: 2, steps: [
+          { type: 'talk', npcs: [{ id: 'stranger', kind: 'dragonkin', at: [418, -125], yaw: PI / 2 }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'sneak', to: [232, -372], r: 7, guards: [{ at: [196, -330], yaw: 0.6, range: 16 }, { at: [262, -348], yaw: -2.2, range: 16 }] },
+          { type: 'collect', item: 'ledger', at: [[238, -380]] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'reach', at: [222, -93], r: 14, npcs: [{ id: 'stranger', kind: 'dragonkin', at: [214, -88] }] },
+          { type: 'gift', npcs: [{ id: 'stranger', kind: 'dragonkin', at: [214, -88] }], targets: [{ at: [226, -98], y: 1, hp: 2, kind: 'thug' }, { at: [206, -100], y: 1, hp: 2, kind: 'thug' }, { at: [218, -78], y: 1, hp: 2, kind: 'thug' }] },
+          { type: 'talk', npcs: [{ id: 'stranger', kind: 'dragonkin', at: [214, -88] }] },
+        ] },
+      ] },
+      princess: { hero: 'princess', region: 'bend', start: { x: 628, z: -36, yaw: -PI / 2 }, chapters: [
+        { lines: 2, steps: [
+          { type: 'sneak', to: [548, -58], r: 8, guards: [{ at: [606, -44], yaw: -PI / 2, range: 14, sway: 0.9 }, { at: [580, -40], yaw: PI / 2, range: 14, sway: 0.9 }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'talk', npcs: [{ id: 'baker', at: [560, -112], line: 'c.tale.princess.baker' }, { id: 'glazier', at: [602, -62], line: 'c.tale.princess.glazier' },
+                                 { id: 'widow', at: [530, -64], line: 'c.tale.princess.widow' }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'reach', at: [418, -125], r: 10 },
+          { type: 'talk', npcs: [{ id: 'stranger', kind: 'dragonkin', at: 'oldnew' }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'collect', item: 'lantern', at: [[240, -150], [180, -120], [290, -40]] },
+          { type: 'sneak', to: 'powder', r: 9, guards: [{ at: [140, -92], yaw: 1.6, range: 16 }, { at: [118, -124], yaw: 0.4, range: 16 }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'escort', npc: { id: 'stranger', kind: 'dragonkin', at: [100, -96] }, to: [44, -330], r: 12 },
+        ] },
+      ] },
+    },
 
     /* Deathmatch (campaign/dm/, core/dm.js): dragons of human players only (no AI dragons) in the Wildwood around the
        hamlet and the outpost. Peer-to-peer like the co-op: every browser flies its own dragon, the host owns hp,

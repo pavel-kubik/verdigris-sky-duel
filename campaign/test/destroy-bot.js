@@ -18,6 +18,7 @@ const HIGH = 140;           // height over the target while approaching and circ
 const PASS = 8;             // the dive aims this far above the target's roof
 const RUNIN = 45;           // height over the target's roof on the run-in (the dive is a glide of about 0.4)
 const RUN_BEARING = 0.75;   // run-in bearing from the workshop (over the courtyard, between bastion2 and the keep)
+const BOOST_ST = 55;        // no boost in the dive below this stamina: the fire needs it (a long run-in from the north)
 const RUN = 300;            // the dive starts this far out (a long glide: the flight model limits the pitch)
 // careful: botches `miss` of the passes (breathes too late), thinks every `think` s, turns away from a ballista's aim line
 // `dodgeLate` s after it shows (for `dodge` s); circles `circleR` out while the target burns (out of ballista range)
@@ -106,7 +107,7 @@ function decide(bot, dt) {
       bot.commit = () => bot.phase === 'dive' && d < 100;   // the last of the dive: no dodging
       const past = dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw) < 0;
       if (d < 12 || past && d < 60 || bot.lit && bot.fireT > 0.8 || bot.phaseT > 30) { setPhase(bot, 'climb'); return { sx: 0, sy: 1 }; }
-      return { sx: s.sx, sy: s.sy, breath: near && !bot.botch, boost: !near && d < RUN * 0.8 };   // a botched pass: the breath comes too late
+      return { sx: s.sx, sy: s.sy, breath: near && !bot.botch, boost: !near && d < RUN * 0.8 && p.st > BOOST_ST };   // a botched pass: the breath comes too late; keeps breath for the fire
     }
   }
   if (bot.phase === 'home') {

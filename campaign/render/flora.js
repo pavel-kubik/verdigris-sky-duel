@@ -51,7 +51,7 @@
       if (T.plateauAt(id, x, z, 10) || T.fieldAt(id, x, z, 3) || T.lineDist(id, 'road', x, z) < 9) return false;   // settlements, crops, roads (T11)
       if (cone && Math.hypot(x - cone.x, z - cone.z) < cone.r * 0.9) return false;
       if (R.lair && Math.hypot(x - R.lair.x, z - R.lair.z) < 45) return false;
-      if (T.ruinsAt(id, x, z) || T.deckAt(id, x, z, 8) || (R.vines && Math.hypot(x - R.vines.x, z - R.vines.z) < R.vines.r)) return false;   // T02
+      if (T.ruinsAt(id, x, z) || (T.cityAt && T.cityAt(id, x, z, 6)) || T.deckAt(id, x, z, 8) || (R.vines && Math.hypot(x - R.vines.x, z - R.vines.z) < R.vines.r)) return false;   // T02
       return T.slopeAt(id, x, z, 3) < 0.5;
     };
     const spots = place(id, rng, R.flora.trees, far ? (x, z) => treeOk(x, z) && Math.hypot(x, z) < far.from + 40 : treeOk).map(p => [p[0], p[1], pal]);

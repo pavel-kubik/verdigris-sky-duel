@@ -18,7 +18,7 @@ const HIGH = 150;                                    // height over the ground f
 const LAND_R = 30;                                   // sets down within this distance of the landing spot
 // meals on the way out (in the Wildwood, no alert there): hunt while hungrier than `below`
 // until `full`, for at most `giveUp` s per region
-const HUNT = { regions: ['wild'], below: 85, full: 95, sight: 450, giveUp: 120 };
+const HUNT = { regions: ['wild'], below: 85, full: 99, sight: 450, giveUp: 120 };
 /**
  * Pilots. "careful" stands for a player on a phone (the T24 raid-time target): botches `miss` of the swoops (pulls up
  * and comes round for `recover` s) and circles the settlement once at HIGH (`scout` laps, radius `scoutR`) to find the

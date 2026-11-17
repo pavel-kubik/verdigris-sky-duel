@@ -76,7 +76,7 @@ const viewer = (o) => Object.assign({ pos: [0, 0, 0], yaw: 0, sight: 130, fov: 1
   ok(PC.seen(v, { pos: b, alt: 2 }, { regionId: id, town, scale: 1 }) === 0, 'behind the tower = not seen');
   ok(PC.seen(v, { pos: [b[0], y0 + tw.h * 3, b[2]], alt: 40 }, { regionId: id, town }) > 0, 'over the tower = seen');
   const eye = [x, y0 + tw.h + 2, z];
-  ok(PC.los(id, eye, b, town, tw.id), 'the post on the tower looks over its own roof');
+  ok(PC.los(id, eye, a, town, tw.id), 'the post on the tower looks over its own roof');
 }
 
 // 7. hearing: landing near a guard is heard, far away not; a Drake is louder

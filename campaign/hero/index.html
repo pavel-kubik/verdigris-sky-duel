@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title data-i18n="c.hero.title">Tales of Prahold</title>
+<meta name="description" content="The story of the last dragon, told by the wizard, the prince and the princess - played on foot in the streets of Prahold." data-i18n-attr="content:c.hero.desc">
+<meta name="theme-color" content="#0d1411">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ink:#0d1411;--panel:rgba(12,19,16,.82);--line:rgba(233,225,204,.16);--bone:#ebe3cd;--mute:#a9ae9b;
+  --verd:#62c48a;--ember:#ff9447;--gold:#d8b25a;--blood:#e5484f;
+  --f-display:"Grenze Gotisch",Georgia,serif;--f-ui:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--ink);color:var(--bone);font:15px/1.4 var(--f-ui);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer}
+.panel{position:fixed;inset:0;display:grid;place-items:center;padding:16px;background:linear-gradient(rgba(8,12,10,.55),rgba(8,12,10,.86));overflow:auto;z-index:20}
+.card{width:min(560px,100%);display:grid;gap:14px}
+.eyebrow{font:700 12px/1 var(--f-ui);letter-spacing:.2em;text-transform:uppercase;color:var(--ember)}
+h1{margin:0;font:700 clamp(34px,9vw,52px)/1.02 var(--f-display);color:#f3ead2;text-wrap:balance}
+.lead{margin:0;color:var(--mute);font-size:16px;text-wrap:pretty}
+.heroes{display:grid;gap:10px}
+.hero{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;text-align:left;padding:12px 14px;min-height:72px;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
+.hero:hover,.hero:focus-visible{border-color:var(--verd);outline:none}
+.hero b{display:block;font:600 22px/1.1 var(--f-display);color:#f3ead2}
+.hero small{display:block;color:var(--mute);font-size:14px;line-height:1.3;margin-top:3px}
+.hero i{font-style:normal;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--verd)}
+.hero svg{width:44px;height:44px}
+.hero .choose{grid-column:1 / -1;justify-content:flex-end}
+.hero .choose .btn{min-height:44px;padding:8px 14px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn{min-height:46px;padding:10px 18px;border-radius:6px;border:1px solid var(--line);background:var(--panel);font-weight:700;letter-spacing:.04em}
+.btn.go{background:var(--verd);color:#08130d;border:0}
+a.btn{color:var(--bone)}
+.langs{display:flex;gap:6px}
+.langs button{min-width:44px;min-height:40px;border-radius:6px;border:1px solid var(--line);background:transparent;font-weight:700}
+.langs button.on{border-color:var(--verd);color:var(--verd)}
+#loading{position:fixed;inset:auto 0 30% 0;text-align:center;color:var(--mute);font-size:16px;z-index:30}
+/* in game */
+#top{position:fixed;left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));display:flex;gap:8px;align-items:flex-start;pointer-events:none;z-index:5}
+#obj{flex:1;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:grid;gap:2px}
+#obj .k{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ember);font-weight:700}
+#obj .t{font-size:16px;line-height:1.25;color:var(--bone);text-wrap:pretty}
+#obj .p{font-size:13px;color:var(--verd);font-weight:600}
+#pauseBtn{pointer-events:auto;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-weight:700}
+#arrow{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top,0px));width:56px;height:56px;margin-left:-28px;pointer-events:none;display:grid;place-items:center;z-index:4}
+#arrow svg{width:40px;height:40px;filter:drop-shadow(0 1px 3px #000)}
+#arrow span{position:absolute;top:50px;font-size:12px;font-weight:700;color:var(--gold);text-shadow:0 1px 3px #000;white-space:nowrap}
+#say{position:fixed;left:50%;bottom:calc(178px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(520px,calc(100% - 24px));text-align:center;pointer-events:none;z-index:6}
+#say p{margin:0 auto;display:inline-block;background:rgba(12,19,16,.86);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font:400 17px/1.35 var(--f-display);color:#efe6cf;opacity:0;transition:opacity .4s}
+#say p.on{opacity:1}
+#stBar{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:120px;height:5px;margin-left:-60px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;z-index:5}
+#stBar i{display:block;height:100%;background:var(--ember);width:100%}
+#legend{position:fixed;left:12px;bottom:12px;color:var(--mute);font-size:13px;background:rgba(12,19,16,.6);padding:6px 10px;border-radius:6px;z-index:5}
+#stick{position:fixed;left:calc(22px + env(safe-area-inset-left,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));width:128px;height:128px;border-radius:50%;border:1px solid var(--line);background:rgba(12,19,16,.35);touch-action:none;z-index:5}
+#nub{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(98,196,138,.35);border:1px solid var(--verd)}
+#btns{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:repeat(2,68px);gap:12px;z-index:5}
+#btns button{width:68px;height:68px;border-radius:50%;border:1px solid var(--line);background:rgba(12,19,16,.55);font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;touch-action:none}
+#btns button.on{background:rgba(255,148,71,.35);border-color:var(--ember)}
+#btns #bGift{grid-column:2;grid-row:1 / span 2;height:100%;border-radius:34px;border-color:var(--verd);color:var(--verd);box-shadow:0 0 12px rgba(98,196,138,.35)}
+#pause .card{width:min(360px,100%)}
+#pause h2{margin:0;font:700 34px/1 var(--f-display)}
+#vig{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(229,72,79,0);transition:box-shadow .3s;z-index:3}
+#vig.on{box-shadow:inset 0 0 120px rgba(229,72,79,.65)}
+@media (prefers-reduced-motion: reduce){#say p{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vig"></div>
+<p id="loading" hidden data-i18n="c.hero.loading">Building Prahold...</p>
+
+<section id="intro" class="panel" aria-labelledby="introTitle">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="eyebrow" data-i18n="c.hero.pick">Whose telling?</div>
+      <div class="langs" id="langs"></div>
+    </div>
+    <h1 id="introTitle" data-i18n="c.hero.title">Tales of Prahold</h1>
+    <p class="lead" data-i18n="c.hero.desc">The story of the last dragon, told by the wizard, the prince and the princess - played on foot in the streets of Prahold.</p>
+    <div class="heroes" id="heroes"></div>
+    <div class="row"><a class="btn" href="../" data-i18n="c.hero.campaign" style="text-decoration:none;display:inline-grid;place-items:center">Dragon campaign</a><a class="btn" href="../../" style="text-decoration:none;display:inline-grid;place-items:center">Verdigris</a></div>
+  </div>
+</section>
+
+<div id="top" hidden>
+  <div id="obj" aria-live="polite"><span class="k"></span><span class="t"></span><span class="p"></span></div>
+  <button id="pauseBtn" aria-label="Pause">II</button>
+</div>
+<div id="arrow" hidden><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 L33 31 L20 25 L7 31 Z" fill="#d8b25a" stroke="#2a2010" stroke-width="2"/></svg><span></span></div>
+<div id="say"><p></p></div>
+<div id="stBar" hidden><i></i></div>
+<div id="legend" hidden></div>
+<div id="touch" hidden>
+  <div id="stick"><div id="nub"></div></div>
+  <div id="btns">
+    <button id="bJump" data-i18n="c.hero.jump">Jump</button>
+    <button id="bGift">Spell</button>
+    <button id="bRun" data-i18n="c.hero.run">Run</button>
+  </div>
+</div>
+
+<section id="pause" class="panel" hidden aria-labelledby="pauseTitle">
+  <div class="card">
+    <h2 id="pauseTitle" data-i18n="c.hero.paused">Paused</h2>
+    <button class="btn go" id="resumeBtn" data-i18n="c.hero.resume">Resume</button>
+    <button class="btn" id="restartBtn" data-i18n="c.hero.restart">Start the telling again</button>
+    <button class="btn" id="menuBtn" data-i18n="c.hero.menu">Tales</button>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  (function () {
+    var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
+    ['../../i18n.js', '../../shared/textures.js', '../../shared/dragon.js', '../../shared/human.js', '../../shared/forest.js', '../../shared/forest-view.js',
+     '../core/umd.js', '../core/math.js', '../core/events.js', '../core/data.js', '../core/dem-bend.js', '../core/dem-rip.js', '../core/terrain.js', '../core/clock.js',
+     '../core/settlement.js', '../core/castle.js', '../core/city.js', '../core/hero.js', '../core/tale.js', '../core/quality.js',
+     '../render/flora.js', '../render/bridge-view.js', '../render/ruins-view.js', '../render/volcano-view.js', '../render/terrain.js', '../render/settlement-view.js',
+     '../render/castle-kit.js', '../render/castle-view.js', '../render/house-kit.js', '../render/city-view.js', '../render/sky.js', '../render/story-card.js', 'game.js'
+    ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
+  })();
+</script>
+</body>
+</html>

@@ -87,11 +87,12 @@ const grid = (n, gap) => { const t = []; for (let i = 0; i < n * n; i++) t.push(
   const flows = T.lavaFlows('ash');
   ok(flows.length >= 3, 'lava streams: ' + flows.length);
   for (const s of flows) {
-    const r = (s.r0 + s.r1) / 2, a = T.flowAngle(s, r), x = Math.sin(a) * r, z = Math.cos(a) * r;
+    const r = (s.r0 + s.r1) / 2, a = T.flowAngle(s, r), x = s.cone.x + Math.sin(a) * r, z = s.cone.z + Math.cos(a) * r;
     ok(T.lavaAt('ash', x, z) > 0.95 && T.liquidAt('ash', x, z) === 'lava', 'the middle of a stream is lava');
     const w = T.flowWidth(s, r), px = Math.cos(a), pz = -Math.sin(a);
     ok(T.liquidAt('ash', x + px * w * 1.5, z + pz * w * 1.5) !== 'lava', 'beside it is ground');
-    ok(Math.abs(Math.atan2(Math.sin(s.f.a), Math.cos(s.f.a))) > 0.9, 'no stream runs down the cave side');
+    const L = D.regions.ash.lair, cave = Math.atan2(L.x - s.cone.x, L.z - s.cone.z), off = s.f.a - cave;
+    ok(Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) > 0.9, 'no stream runs down the cave side');
   }
   const L = D.regions.ash.lair;
   ok(T.liquidAt('ash', L.x, L.z) == null && T.lavaAt('ash', D.regions.ash.spawn.x, D.regions.ash.spawn.z) === 0, 'the cave mouth and the spawn are clear of lava');

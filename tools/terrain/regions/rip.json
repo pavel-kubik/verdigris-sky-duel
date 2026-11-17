@@ -1,0 +1,23 @@
+{
+  "id": "rip",
+  "module": "demRip",
+  "out": "campaign/core/dem-rip.js",
+  "title": "Mount Rip",
+  "tile": "N50E014",
+  "crop": { "lon": [14.215, 14.36], "lat": [50.34, 50.435] },
+  "projection": { "lon0": 14.2877, "lat0": 50.3866, "metresPerUnit": 3.6 },
+  "grid": { "radius": 1100, "cell": 10, "base": 170 },
+  "preview": {
+    "exag": 2.2,
+    "out": "ai_sdlc/001_campaign/img/rip-terrain.png",
+    "entry": { "text": "to the Wildwood and Prahold (south)", "at": [0, -1050] },
+    "places": [
+      ["Mount Rip (volcano)", 0, 0], ["Cave (lair)", 0, -150], ["Rotunda of St George", 25, 10],
+      ["Krabchice", 560, -380], ["Rovne", -650, 300], ["Ctineves", 380, 520], ["Mnetes", 760, -760]
+    ]
+  },
+  "names": [
+    ["Mount Rip", "Hora Říp", "Říp (459 m), the lone volcanic hill of the Bohemian lowland, 35 km north of Prague"],
+    ["Krabchice", "Krabčice", "Krabčice"], ["Rovne", "Roudné", "Rovné"], ["Ctineves", "Ctiněves", "Ctiněves"], ["Mnetes", "Mnetěš", "Mnetěš"]
+  ]
+}

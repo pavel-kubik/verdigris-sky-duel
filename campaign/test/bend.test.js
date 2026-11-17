@@ -120,7 +120,7 @@ ok(T.plateauAt(id, 220, -815), 'Vyshgard top keeps its plateau for the castle (T
 }
 
 // 6. ruins, roads, names
-ok(T.ruinsAt(id, 230, -200) && T.ruinsAt(id, 645, 0) && !T.ruinsAt(id, -600, 600), 'Staromark and Hradchan are ruins areas');
+ok(T.cityAt(id, 230, -100) && T.cityAt(id, 640, 0) && !T.cityAt(id, -600, 900) && !T.ruinsAt(id, 230, -200), 'Staromark and Hradchan are living parts of Prahold, no ruins');
 for (const f of R.terrain.features.filter(ff => ff.type === 'road')) {
   let wet = 0;
   for (const p of f.points) if (T.liquidAt(id, p[0], p[1])) wet++;
@@ -132,14 +132,14 @@ ok(R.nameKey === 'c.region.bend' && R.palette === 'bend', 'region name key and p
 {
   const e = D.regions.farm.exits.find(x => x.to === 'bend');
   ok(e && e.minStage === 1, 'the Farmlands exit to the Bend needs a Drake');
-  const r = D.regions.farm.radius - 30, pos = [0, T.surfaceAt('farm', 0, r) + 40, r];
-  const ex = RG.exitAt('farm', pos, 0);
-  ok(ex && ex.to === 'bend', 'flying out north of the Farmlands offers the Bend');
+  const r = D.regions.farm.radius - 30, pos = [0, T.surfaceAt('farm', 0, -r) + 40, -r];
+  const ex = RG.exitAt('farm', pos, Math.PI);
+  ok(ex && ex.to === 'bend', 'flying out south of the Farmlands (down the Vltava valley) offers the Bend');
   const at = RG.entryPoint('bend', 'farm');
-  ok(at.pos[2] < -900 && Math.hypot(at.pos[0], at.pos[2]) < R.radius - D.travel.edgeBand, 'the dragon arrives in the south of the Bend');
+  ok(at.pos[2] > 800 && Math.hypot(at.pos[0], at.pos[2]) < R.radius - D.travel.edgeBand, 'the dragon arrives in the north of the Bend (Troyvale side)');
   ok(RG.exitAt('bend', at.pos, at.yaw) === null, 'no exit offered at the entry');
-  const back = RG.exitAt('bend', [Math.sin(Math.PI) * (R.radius - 30), 60, Math.cos(Math.PI) * (R.radius - 30)], Math.PI);
-  ok(back && back.to === 'farm', 'south edge of the Bend leads back to the Farmlands');
+  const back = RG.exitAt('bend', [Math.sin(0.4) * (R.radius - 30), 60, Math.cos(0.4) * (R.radius - 30)], 0.4);
+  ok(back && back.to === 'farm', 'north edge of the Bend leads back to the Farmlands');
   const fb = RG.entryPoint('farm', 'bend');
-  ok(fb.pos[2] > 800, 'coming back, the dragon appears in the north of the Farmlands');
+  ok(fb.pos[2] < -800, 'coming back, the dragon appears in the south of the Farmlands');
 }
