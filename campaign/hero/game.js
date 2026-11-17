@@ -242,7 +242,7 @@
   $('#pauseBtn').onclick = () => { if (state === 'play') setState('paused'); };
   $('#resumeBtn').onclick = () => setState('play');
   $('#restartBtn').onclick = () => { progress[heroKind] = { ch: 0, done: false }; saveProgress(); begin(heroKind, true); };
-  $('#menuBtn').onclick = () => setState('intro');
+  $('#menuBtn').onclick = () => setState('intro');   // the chapter reached stays: the menu offers Continue or Start again
   document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') setState('paused'); });
   const c1 = v => Math.max(-1, Math.min(1, v));
   function readInput() {
@@ -266,14 +266,29 @@
   function renderIntro() {
     const box = $('#heroes'); box.innerHTML = '';
     for (const kind of ['wizard', 'prince', 'princess', 'dragon']) {
-      const b = document.createElement(kind === 'dragon' ? 'a' : 'button');
+      const pr = progress[kind] || {}, of = kind === 'dragon' ? 0 : D.tales[kind].chapters.length;
+      const started = kind !== 'dragon' && (pr.ch > 0 || pr.done);
+      // a telling begun or finished: Continue (from the chapter reached) and Start again; else the card starts it
+      const b = document.createElement(kind === 'dragon' ? 'a' : started ? 'div' : 'button');
       b.className = 'hero';
       if (kind === 'dragon') { b.href = '../'; b.style.textDecoration = 'none'; b.style.color = 'inherit'; }
-      const pr = progress[kind] || {};
-      const state2 = kind === 'dragon' ? '' : pr.done ? '&#10003;' : pr.ch ? t('c.hero.chapter', { n: pr.ch + 1, of: D.tales[kind].chapters.length }) : '';
-      b.innerHTML = ICON[kind] + '<span><b></b><small></small></span><i>' + state2 + '</i>';
+      const note = started ? (pr.done ? t('c.hero.finished') : t('c.hero.chapter', { n: pr.ch + 1, of })) : '';
+      b.innerHTML = ICON[kind] + '<span><b></b><small></small></span><i></i>';
       b.querySelector('b').textContent = t('c.hero.' + kind); b.querySelector('small').textContent = t('c.hero.' + kind + '.sub');
-      if (kind !== 'dragon') b.onclick = () => begin(kind, false);
+      b.querySelector('i').textContent = note;
+      if (kind !== 'dragon' && !started) b.onclick = () => begin(kind, false);
+      if (started) {
+        const row = document.createElement('div'); row.className = 'row choose';
+        if (!pr.done) {
+          const go = document.createElement('button'); go.className = 'btn go';
+          go.textContent = t('c.hero.continueCh', { n: pr.ch + 1 }); go.onclick = () => begin(kind, false); row.appendChild(go);
+        }
+        const again = document.createElement('button'); again.className = 'btn' + (pr.done ? ' go' : '');
+        again.textContent = t('c.hero.again');
+        again.onclick = () => { progress[kind] = { ch: 0, done: false }; saveProgress(); begin(kind, true); };
+        row.appendChild(again);
+        b.appendChild(row);
+      }
       box.appendChild(b);
     }
     const langs = $('#langs'); langs.innerHTML = '';
