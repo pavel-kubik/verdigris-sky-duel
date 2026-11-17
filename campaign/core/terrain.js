@@ -100,6 +100,12 @@
       const ix = clamp(Math.round((x + B.radius) / B.cell), 0, n - 1), iz = clamp(Math.round((z + B.radius) / B.cell), 0, n - 1);
       return iz * n + ix;
     };
+    if (!B.river || !B.river.length) {                              // a dry region (Mount Rip): no river level to trace
+      for (let iz = 0; iz < n; iz++) for (let ix = 0; ix < n; ix++) lvl[iz * n + ix] = -1e4;
+      g = { n, cell: B.cell, radius: B.radius, h, wet, lvl, near, line: [], lineLevel: [], src: B };
+      demCache.set(id, g);
+      return g;
+    }
     // river level along the centre line: samples every STEP units, lowest wet ground within SEARCH, falling, smoothed
     const STEP = 20, SEARCH = 60, line = [];
     for (let i = 0; i + 1 < B.river.length; i++) {
@@ -169,7 +175,11 @@
   /** Noise, volcano cones and the flatten ring: the ground before roads, rivers and plateaus. */
   function baseHeight(id, x, z) {
     const R = region(id), T = R.terrain;
-    if (T.dem) return demBase(id, R, x, z);
+    if (T.dem) {                                 // real terrain; a cone with a crater (Mount Rip) digs its crater into it
+      let h = demBase(id, R, x, z);
+      for (const f of T.features) if (f.type === 'cone') h += cone(f, Math.hypot(x - f.x, z - f.z))[0];
+      return h;
+    }
     let n = noise(x, z, R.seed) * T.amp;
     let add = 0;
     for (const f of T.features) {
@@ -281,6 +291,16 @@
   /** The ruins overlay (burned city scenery) under (x, z), or null. */
   function ruinsAt(id, x, z, pad) {
     for (const f of region(id).terrain.features) if (f.type === 'ruins' && Math.hypot(x - f.x, z - f.z) < f.r + (pad || 0)) return f;
+    return null;
+  }
+
+  /** The town district or village circle (region.city, core/city.js lays out its streets and houses) under (x, z), or null. */
+  function cityAt(id, x, z, pad) {
+    const C = region(id).city;
+    if (!C) return null;
+    pad = pad || 0;
+    for (const d of C.districts || []) if (Math.hypot(x - d.x, z - d.z) < d.r + pad) return d;
+    for (const v of C.villages || []) if (Math.hypot(x - v.x, z - v.z) < v.r * 1.3 + pad) return v;
     return null;
   }
 
@@ -474,7 +494,7 @@
       if (Math.hypot(c.x, c.z) > R.radius - FIELD.edgePad) return false;
       for (const o of out) if (Math.hypot(o.x - c.x, o.z - c.z) < rr + Math.hypot(o.w, o.l) / 2 * 0.8 + FIELD.gap) return false;
       for (const [x, z] of corners(c)) {
-        if (!dryAt(id, x, z) || plateauAt(id, x, z, FIELD.plateauPad)) return false;
+        if (!dryAt(id, x, z) || plateauAt(id, x, z, FIELD.plateauPad) || cityAt(id, x, z, 10)) return false;
         if (lineDist(id, 'road', x, z) < FIELD.roadPad + 4) return false;
         for (const f of R.terrain.features) if (f.type === 'river' && nearestOn(f.points, x, z).d < f.width / 2 * CHANNEL + FIELD.riverPad) return false;
         if (slopeAt(id, x, z, 4) > FIELD.slope) return false;
@@ -507,5 +527,5 @@
     return null;
   }
 
-  M.define('terrain', { GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), lavaFlows, flowAngle, flowWidth, lavaAt, LAVA_IN, surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
+  M.define('terrain', { GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, cityAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), lavaFlows, flowAngle, flowWidth, lavaAt, LAVA_IN, surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
 })(typeof self !== 'undefined' ? self : this);

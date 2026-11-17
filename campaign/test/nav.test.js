@@ -116,7 +116,7 @@ const scents = cs => NV.markers(cs).filter(m => m.kind === 'scent' || m.kind ===
   const wild = makeCs('wild', [0, 80, 0], 0);
   const wm = NV.markers(wild), wl = wm.find(m => m.kind === 'lair');
   ok(wl && wl.via === 'ash' && wl.label.key === 'c.nav.lairVia', 'wild: lair via the Ash Wastes');
-  near(Math.abs(wl.bearing), Math.PI, 1e-9, 'wild: lair marker points at the south exit');
+  near(Math.abs(wl.bearing), 0, 1e-9, 'wild: lair marker points at the north exit (Mount Rip)');
   near(wl.dist, T.region('wild').radius, 1e-6, 'wild: distance to the exit');
   ok(!wm.some(m => m.kind === 'exit' && m.key === 'exit:ash'), 'wild: no duplicate exit marker on the way home');
 

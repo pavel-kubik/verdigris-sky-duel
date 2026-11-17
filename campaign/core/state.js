@@ -155,8 +155,17 @@
   /** Building solids for a dragon of this scale: { solidAt, solidHit } with the body pad (settlement.pad x scale). */
   function solids(cs, scale) {
     const town = ensureTown(cs), pad = D.settlement.pad * (scale || 1);
-    return { solidAt: (x, z) => SE.solidAt(town, x, z, pad), solidHit: (x, z) => SE.hit(town, x, z, pad),
-             walkTop: (x, z) => SE.surfaceAt(town, x, z) };          // T03: wall walks and bastion tops are landable
+    const CI = M.need('city');                                  // the houses of Prahold and the villages (core/city.js)
+    if (!D.regions[cs.region] || !D.regions[cs.region].city) {
+      return { solidAt: (x, z) => SE.solidAt(town, x, z, pad), solidHit: (x, z) => SE.hit(town, x, z, pad),
+               walkTop: (x, z) => SE.surfaceAt(town, x, z) };        // T03: wall walks and bastion tops are landable
+    }
+    const rid = cs.region;
+    return {
+      solidAt: (x, z) => { const a = SE.solidAt(town, x, z, pad), b = CI.solidAt(rid, x, z, pad); return a == null ? b : b == null ? a : Math.max(a, b); },
+      solidHit: (x, z) => { const a = SE.hit(town, x, z, pad), b = CI.hit(rid, x, z, pad); return !a ? b : !b ? a : (b.depth > a.depth ? b : a); },
+      walkTop: (x, z) => SE.surfaceAt(town, x, z),
+    };
   }
 
   const scaleOf = cs => cs.debugScale || G.scaleOf(cs.dragon.foodXp, cs.dragon.stage);   // debugScale: ?debug B (Elder size test, T10)

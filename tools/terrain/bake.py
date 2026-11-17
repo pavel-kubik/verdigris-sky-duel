@@ -60,8 +60,10 @@ def rdp(pts, eps):
 
 def bake(rid):
     cfg = T.region(rid); H, m = T.load_crop(rid)
-    g, rc, p = cfg['grid'], cfg['river'], cfg['projection']
+    g, rc, p = cfg['grid'], cfg.get('river'), cfg['projection']
     xs, X, Z, G = T.grid(cfg, H, m)
+    if rc is None:                                     # a dry region (Mount Rip): no river, no water mask
+        return cfg, m, G, np.zeros(G.shape, bool), []
     path = river_path(G, X, Z, rc, g['radius'])
     W = water(G, path, rc, g['cell'])
     P = np.array([[xs[c], xs[r]] for r, c in path], float)

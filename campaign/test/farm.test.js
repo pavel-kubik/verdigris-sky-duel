@@ -131,7 +131,7 @@ ok((D.regions.wild.settlements || []).length === 2, 'Wildwood has the hamlet and
 function flyOut(stage) {
   const cs = S.create({ regionId: 'wild', rng: mulberry(9) });
   cs.dragon.stage = stage;
-  cs.dragon.pilot = F.newPilot(at('wild', 0.05, 200, 60), 0.05, 30);
+  cs.dragon.pilot = F.newPilot(at('wild', Math.PI + 0.05, 200, 60), Math.PI + 0.05, 30);
   const ev = [];
   let t = 0;
   while (!cs.exit && !cs.exitSmall && t < 20) { ev.push(...S.step(cs, {}, dt)); t += dt; }
@@ -153,13 +153,13 @@ function flyOut(stage) {
   const out = S.step(cs, { confirm: true }, dt);
   ok(cs.region === 'farm' && out.some(e => e.e === 'region:enter' && e.region === 'farm'), 'Drake travels to the Farmlands');
   const p = cs.dragon.pilot;
-  ok(p.pos[2] < -500 && Math.abs(p.pos[0]) < 1, 'arrives on the Farmlands south edge (the Wildwood side)');
+  ok(p.pos[2] > 500 && Math.abs(p.pos[0]) < 1, 'arrives on the Farmlands north edge (the Wildwood side)');
   ok(T.dryAt('farm', p.pos[0], p.pos[2]) || p.pos[1] > T.surfaceAt('farm', p.pos[0], p.pos[2]) + 20, 'arrives above the ground');
   // 5 round trips: one prey field at a time, no growth of state
   let sizes = [];
   for (let k = 0; k < 5; k++) {
     RG.enter(cs, 'wild', 'farm');
-    ok(cs.region === 'wild' && Math.hypot(cs.dragon.pilot.pos[0], cs.dragon.pilot.pos[2] - 880) < 5, 'back in Wildwood at its north edge');
+    ok(cs.region === 'wild' && Math.hypot(cs.dragon.pilot.pos[0], cs.dragon.pilot.pos[2] + 880) < 5, 'back in Wildwood at its south edge (the Farmlands side)');
     RG.enter(cs, 'farm', 'wild');
     sizes.push(cs.field.list.length);
   }

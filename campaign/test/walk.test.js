@@ -40,7 +40,7 @@ function grounded(region, xz, scale) {
   ok(W.canLand(lowPilot('wild', flat, 6, D.stages[0].cruise), 'wild').ok && D.stages[1].cruise <= D.land.maxSpeed, 'cruise speed of every stage lands');
   ok(D.stages.every(s => s.boost > D.land.maxSpeed), 'boost speed never lands');
   ok(W.canLand(lowPilot('wild', steep, 6, 30), 'wild').why === 'steep', 'steep slope: steep');
-  ok(W.canLand(lowPilot('ash', [0, 0], 6, 30), 'ash').why === 'lava', 'over the crater lava: lava');
+  { const cf = D.regions.ash.terrain.features.find(f => f.crater); ok(W.canLand(lowPilot('ash', [cf.x, cf.z], 6, 30), 'ash').why === 'lava', 'over the crater lava: lava'); }
   ok(W.canLand(lowPilot('wild', flat, 6, 30), 'wild', () => 20).why === 'roof', 'over a building solid: roof');
   D.regions.wild.water = [{ x: flat[0], z: flat[1], r: 30 }];
   ok(W.canLand(lowPilot('wild', flat, 6, 30), 'wild').why === 'water', 'over water: water');

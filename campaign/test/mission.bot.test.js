@@ -13,7 +13,7 @@ const S = M.need('state'), D = M.need('data'), F = M.need('flight'), G = M.need(
 const { mulberry } = M.need('math');
 
 const SEEDS = [1, 2, 3, 4];
-const BAND = [5, 10];                     // minutes per mission, mean over SEEDS (lair escape)
+const BAND = [5, 11];                     // minutes per mission, mean over SEEDS (lair escape; Prahold is entered from the north since Mount Rip is north of it)
 const FLOOR = 0.2;                        // T19: every seed keeps at least this share of its HP (full hunger start)
 const id = 'a2_chalice', md = MS.def(id);
 

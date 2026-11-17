@@ -36,6 +36,7 @@
     if (T.slopeAt(regionId, x, z, 3) > 0.6) return false;
     for (const f of R.terrain.features) if (f.type === 'cone' && Math.hypot(x - f.x, z - f.z) < f.r * 0.95) return false;
     if (R.lair && Math.hypot(x - R.lair.x, z - R.lair.z) < 80) return false;
+    if (T.cityAt(regionId, x, z)) return false;                     // wild animals keep out of towns and villages
     return true;
   }
 

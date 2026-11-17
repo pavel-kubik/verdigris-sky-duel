@@ -18,15 +18,16 @@ near(Math.abs(RG.arcMid({ angleFrom: Math.PI - 0.6, angleTo: Math.PI + 0.6 })), 
 
 // 2. exitAt: only near the edge, inside an exit arc, heading outward
 {
-  const near0 = at('ash', 0, 30), far0 = at('ash', 0, 300), side = at('ash', Math.PI / 2, 30);
-  const e = RG.exitAt('ash', near0, 0);
-  ok(e && e.to === 'wild', 'ash north edge heading out offers Wildwood');
-  ok(RG.exitAt('ash', near0, Math.PI) === null, 'heading inward: no exit');
-  ok(RG.exitAt('ash', far0, 0) === null, 'far from the edge: no exit');
+  // Mount Rip lies north of Prahold: its exit to the Wildwood is on the south edge, the Wildwood's way back on its north edge
+  const near0 = at('ash', Math.PI, 30), far0 = at('ash', Math.PI, 300), side = at('ash', Math.PI / 2, 30);
+  const e = RG.exitAt('ash', near0, Math.PI);
+  ok(e && e.to === 'wild', 'ash south edge heading out offers Wildwood');
+  ok(RG.exitAt('ash', near0, 0) === null, 'heading inward: no exit');
+  ok(RG.exitAt('ash', far0, Math.PI) === null, 'far from the edge: no exit');
   ok(RG.exitAt('ash', side, Math.PI / 2) === null, 'edge outside the exit arc: no exit');
-  const w = RG.exitAt('wild', at('wild', Math.PI, 30), Math.PI);
-  ok(w && w.to === 'ash', 'wild south edge heading out offers Ash Wastes');
-  ok(RG.exitAt('wild', at('wild', Math.PI + 0.5, 20), Math.PI + 0.5) && RG.exitAt('wild', at('wild', -Math.PI + 0.5, 20), -Math.PI + 0.5), 'wild exit arc spans the seam');
+  const w = RG.exitAt('wild', at('wild', 0, 30), 0);
+  ok(w && w.to === 'ash', 'wild north edge heading out offers Mount Rip');
+  ok(RG.exitAt('ash', at('ash', Math.PI + 0.5, 20), Math.PI + 0.5) && RG.exitAt('ash', at('ash', -Math.PI + 0.5, 20), -Math.PI + 0.5), 'ash exit arc spans the seam');
 }
 
 // 3. entry placement: inside the radius, away from the soft edge and exit band, above ground, facing the centre
@@ -42,19 +43,19 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
 {
   // arriving from Ash lands on Wildwood's Ash-facing (south) edge, and back
   const w = RG.entryPoint('wild', 'ash'), a = RG.entryPoint('ash', 'wild');
-  ok(w.pos[2] < -500 && Math.abs(w.pos[0]) < 1, 'Wildwood entry is on its south edge');
-  ok(a.pos[2] > 500 && Math.abs(a.pos[0]) < 1, 'Ash entry is on its north edge (beside the exit)');
+  ok(w.pos[2] > 500 && Math.abs(w.pos[0]) < 1, 'Wildwood entry is on its north edge (Mount Rip side)');
+  ok(a.pos[2] < -500 && Math.abs(a.pos[0]) < 1, 'Mount Rip entry is on its south edge (beside the exit)');
 }
 
 // 4. flying straight at the exit raises the offer; it lingers after turning back, then expires
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
-  cs.dragon.pilot = F.newPilot(at('ash', 0, 300, 60), 0, 30);
+  cs.dragon.pilot = F.newPilot(at('ash', Math.PI, 300, 60), Math.PI, 30);
   const d = cs.dragon;
-  d.pilot = F.newPilot(at('ash', 0.1, 260, 60), 0.1, 30);
+  d.pilot = F.newPilot(at('ash', Math.PI + 0.1, 260, 60), Math.PI + 0.1, 30);
   let ev = [], t = 0;
   while (!cs.exit && t < 20) { ev.push(...S.step(cs, {}, dt)); t += dt; }
-  ok(cs.exit && cs.exit.to === 'wild', 'cruising north reaches the Wildwood exit (' + t.toFixed(1) + ' s)');
+  ok(cs.exit && cs.exit.to === 'wild', 'cruising south reaches the Wildwood exit (' + t.toFixed(1) + ' s)');
   ok(ev.filter(e => e.e === 'region:exit').length === 1, 'region:exit raised once');
   ok(cs.region === 'ash', 'no travel without confirm');
   // the soft boundary turns the dragon back; the offer stays for promptHold, then goes
@@ -70,7 +71,7 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
   const d = cs.dragon;
   const goat = cs.field.list.find(p => p.type === 'goat');
   goat.state = 'carried'; d.carried = goat.id;
-  d.pilot = F.newPilot(at('ash', 0, 30, 50), 0, 30);
+  d.pilot = F.newPilot(at('ash', Math.PI, 30, 50), Math.PI, 30);
   d.pilot.st = 42;
   const oldField = cs.field;
   const ev = S.step(cs, { confirm: true }, dt);
@@ -97,10 +98,10 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(21) });
   const d = cs.dragon;
-  d.pilot = F.newPilot(at('ash', 0, 200, 60), 0, 30);
+  d.pilot = F.newPilot(at('ash', Math.PI, 200, 60), Math.PI, 30);
   let trips = 0, tm = 0;
   while (trips < 10 && tm < 600) {
-    const R = T.region(cs.region), out = cs.region === 'ash' ? 0 : Math.PI;
+    const R = T.region(cs.region), out = cs.region === 'ash' ? Math.PI : 0;
     // steer toward the exit side, confirm when offered
     const turn = wrap(out - d.pilot.yaw);
     const ev = S.step(cs, { sx: Math.max(-1, Math.min(1, -turn * 2)), confirm: !!cs.exit }, dt);
@@ -125,7 +126,7 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
 // 8. debug region jump: enter works between regions without a shared exit (Ash Wastes -> Farmlands and back)
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
-  cs.dragon.pilot = F.newPilot(at('ash', 0, 300, 60), 0, 30);
+  cs.dragon.pilot = F.newPilot(at('ash', Math.PI, 300, 60), Math.PI, 30);
   for (const [to, from] of [['farm', 'ash'], ['ash', 'farm'], ['wild', 'ash'], ['farm', 'wild']]) {
     const ev = RG.enter(cs, to, from), p = cs.dragon.pilot, R = T.region(to);
     ok(ev[0].e === 'region:enter' && cs.region === to && cs.field, 'jump ' + from + ' -> ' + to);
