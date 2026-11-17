@@ -9,7 +9,7 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog'), SY = C.need('story');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog'), SY = C.need('story'), GU = C.need('guise'), CI = C.need('city');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -63,8 +63,10 @@
   const bootRegion = saved && D.regions[saved.world && saved.world.region] ? saved.world.region : startId;
   const cs = ST.create({ regionId: bootRegion, rng });         // the whole run: dragon, prey field, flags, stats
   const dragon = cs.dragon;
-  let castleView = null;
+  let castleView = null, cityView = null;                     // cityView: Prahold and the villages (render/city-view.js)
+  let placeShown = null, placeT = 0;                            // the part of Prahold (or the village) the dragon is in
   function loadRegion(id) {
+    if (cityView) { cityView.dispose(); cityView = null; }
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     if (townView) townView.dispose();
@@ -80,6 +82,9 @@
     scene.add(townView.group);
     castleView = VRender.castleView ? VRender.castleView.build(cs.town, { tier: qTier }) : null;   // T04: castles of the region (LOD, night, smoke)
     if (castleView) scene.add(castleView.group);
+    cityView = VRender.cityView ? VRender.cityView.build(id, { tier: qTier }) : null;
+    if (cityView) scene.add(cityView.group);
+    placeShown = null;
     scene.fog.color.set(region.fog); caveOn = null;
     skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
@@ -131,6 +136,10 @@
   const mom = VDragon.makeDragon({ body: 0x2c6450, dark: 0x173a30, belly: 0xb09c66, wing: 0x346e5a, horn: 0xd8c9a8, eye: 0xffb43a });
   mom.root.scale.setScalar(D.mother.scale); mom.root.visible = false; scene.add(mom.root);
   let momPhase = 0, momAcc = 0;
+  /* the Guise (core/guise.js): the dragon as a stranger in a green cloak, and the sparkle of the change */
+  const humanFig = window.VHuman ? VHuman.make('dragonkin', { seed: 7 }) : null;
+  if (humanFig) { humanFig.root.visible = false; scene.add(humanFig.root); }
+  const shimmer = window.VHuman ? VHuman.shimmer(scene) : null;
   /* the cave hall (T10, render/cave-view.js): shown instead of the region while cs.inLair; the region stays loaded */
   const caveView = VRender.cave.build();
   scene.add(caveView.group);
@@ -380,7 +389,7 @@
   let mouseBreath = false, invert = store('vsd-invert') === '1';
   $('#invertBox').checked = invert;
   $('#invertBox').onchange = e => { invert = e.target.checked; store('vsd-invert', invert ? '1' : '0'); };
-  let confirmQ = false, enterQ = false, landQ = false;          // one-shots: Enter / Move slot (travel), Move slot (enter cave), F / Move slot (land, fly)
+  let confirmQ = false, enterQ = false, landQ = false, guiseQ = false;          // one-shots: Enter / Move slot (travel), Move slot (enter cave), F / Move slot (land, fly)
   addEventListener('keydown', e => {
     if (mapView.isOpen) {                                        // T07: the map takes the keys while open
       if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && travelOn && document.activeElement && travelEl.contains(document.activeElement)) return;   // T09: the focused Fly there button
@@ -398,6 +407,7 @@
     if (e.code === 'KeyL' && !e.shiftKey && !e.repeat && state === 'play') { e.preventDefault(); openLog(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat && state === 'play') confirmQ = true;
     if (e.code === D.controls.land && !e.repeat && state === 'play' && !cs.inLair) landQ = true;
+    if (e.code === D.controls.guise && !e.repeat && state === 'play' && !cs.inLair && !e.shiftKey) guiseQ = true;
     if (e.code === 'Escape' && state === 'hatch') { skipHatch(); return; }
     if (e.code === 'Escape' && state === 'play' && stationOpen) { closeStation(); return; }
     if ((e.code === 'Enter' || e.code === 'NumpadEnter') && stationOpen && document.activeElement && document.activeElement.tagName === 'BUTTON' && lairEl.contains(document.activeElement)) return;   // T20: Enter presses the focused panel button (Buy, Eat)
@@ -411,7 +421,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CHJKOTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+H chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CYJKOTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+Y chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -461,6 +471,8 @@
   const takeConfirm = () => { const c = confirmQ; confirmQ = false; return c; };
   const takeEnter = () => { const c = enterQ; enterQ = false; return c; };
   const takeLand = () => { const c = landQ; landQ = false; return c; };
+  const takeGuise = () => { const c = guiseQ; guiseQ = false; return c; };
+  $('#bGuise').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') guiseQ = true; });
   const clamp1 = v => Math.max(-1, Math.min(1, v));
   function readInput() {
     if (state !== 'play') return { sx: 0, sy: 0, breath: false, boost: false };
@@ -475,6 +487,7 @@
       confirm: takeConfirm(),
       enter: takeEnter(),
       land: takeLand(),
+      guise: takeGuise(),
     };
   }
 
@@ -637,7 +650,7 @@
     if (cs.inAerie) { const k = Math.pow(heroScale, 0.75), bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);   // T08: in front of the ledge, looking back at the dragon and the cleft
       const kk = Math.max(k, 1.6); return out.set(pilot.pos[0] + bx * 17 * kk + bz * 6 * kk, pilot.pos[1] + 3 * kk, pilot.pos[2] + bz * 17 * kk - bx * 6 * kk); }
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
-    const k = Math.pow(heroScale, 0.75), gc = D.groundCam, gb = heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back
+    const k = Math.pow(cs.form === 'human' ? D.guise.cam : heroScale, 0.75), gc = D.groundCam, gb = cs.form === 'human' ? 1 : heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back; the Guise: a person's height
     const back = lerp(22, gc.back, gb) * k, up = lerp(7 - pilot.pitch * 6, gc.height, gb) * k;   // T07: lower and closer on the ground
     out.set(p[0] - bx * back, p[1] + up, p[2] - bz * back);
     out.y = Math.max(out.y, TR.surfaceAt(regionId, out.x, out.z) + 3);
@@ -697,6 +710,17 @@
 
   function poseHero(dt) {
     const p = pilot;
+    const human = cs.form === 'human' && cs.hero && !cs.inLair;
+    if (humanFig) {
+      humanFig.root.visible = human;
+      if (human) {
+        const h = cs.hero;
+        humanFig.root.position.set(h.pos[0], h.pos[1], h.pos[2]); humanFig.root.rotation.y = h.yaw;
+        humanFig.anim(dt, { speed: Math.abs(h.speed), run: h.running, air: h.ground ? 0 : 1, attack: h.act || 0 });
+      }
+    }
+    hero.root.visible = !human;
+    if (shimmer) shimmer.update(dt);
     hero.root.position.set(p.pos[0], p.pos[1], p.pos[2]);
     hero.root.rotation.set(-p.pitch, p.yaw, p.roll + p.rollX, 'YXZ');
     const glide = p.pitch < -0.25 && !p.boosting, mode = p.mode || 'air';
@@ -777,7 +801,30 @@
   let goldPulse = 0;                                             // T19: HUD gold pulse after banking
   /* Phase 3 T17: story cards (render/story-card.js). An act card shows once, when nothing else is open; the world waits. */
   const storyCard = VRender.storyCard.build(document.body, { t });
+  /** The wizard's gift (the Guise): told once, when the dragon becomes a Drake (or on a Drake save that never saw it). */
+  function guiseCard() {
+    if (cs.flags.guiseCard || storyCard.open) return;
+    cs.flags.guiseCard = true;
+    storyCard.show({ kind: 'brief', kick: t('c.hero.wizard'), title: 'c.guise.card.title', lines: ['c.guise.card.1', 'c.guise.card.2', 'c.guise.card.3'] }, () => saveNow('story'));
+  }
+  /** Entering a part of Prahold or a village: its name for a moment (core/city.js placeAt). */
+  function placeHud(dt) {
+    placeT -= dt;
+    if (!pilot || cs.inLair || placeT > 0) return;
+    placeT = 0.5;
+    const pl = CI.placeAt(regionId, pilot.pos[0], pilot.pos[2]), id = pl ? pl.id : null;
+    if (id === placeShown) return;
+    placeShown = id;
+    if (pl && pl.nameKey) toast(regionId === 'bend' && TR.region(regionId).city.districts.includes(pl) ? t('c.city.enter', { place: t(pl.nameKey) }) : t(pl.nameKey), '', 2.5);
+  }
+  function guiseButton() {
+    const b = $('#bGuise'), on = state === 'play' && !!pilot && !cs.inLair && !cs.inAerie && GU.learned(cs) && (cs.form === 'human' || pilot.mode === 'ground');
+    b.hidden = !on;
+    const k = cs.form === 'human' ? 'c.guise.btnBack' : 'c.guise.btn';
+    if (on && b.dataset.k !== k) { b.dataset.k = k; b.textContent = t(k); }
+  }
   function storyTick() {
+    if (!cs.flags.guiseCard && GU.learned(cs) && dragon.pilot && !cs.inLair && !storyCard.open && !stationOpen) guiseCard();
     if (stationOpen || logOpen || mapView.isOpen || !$('#lairDeath').hidden || !dragon.pilot) return;
     const c = SY.pendingCard(cs);
     if (c) storyCard.show(Object.assign({ kind: 'act' }, c), x => { SY.mark(cs, x.id); saveNow('story'); });
@@ -794,6 +841,12 @@
         if (k) queueMicrotask(() => toast(t(k), '', 5, 'mission'));
       }
       if (e.e === 'boar:hit') { hero.flash = 0.6; hurt = 0.7; shake = Math.max(shake, 0.5); }
+      if (e.e === 'guise:human' || e.e === 'guise:dragon') {        // the Guise: sparkle, a word, and the wizard's card the first time
+        if (shimmer) shimmer.play(new THREE.Vector3(e.pos[0], e.pos[1] + 1, e.pos[2]), 0x8cf0b0);
+        if (e.e === 'guise:human') toast(t('c.guise.toHuman'), t(padUi ? 'c.guise.toHumanSub' : 'c.guise.toHumanSub'), 4); else toast(t('c.guise.toDragon'), '', 2.5);
+      }
+      if (e.e === 'guise:blocked') flashPrompt(t('c.guise.blocked.' + e.why), 3);
+      if (e.e === 'stage:up' && e.to >= D.guise.minStage && !cs.flags.guiseCard) queueMicrotask(guiseCard);
       else if (e.e === 'arrow:hit') { hero.flash = Math.max(hero.flash || 0, 0.35); hurt = Math.max(hurt, 0.4); shake = Math.max(shake, 0.15); if (!arrowTip) { arrowTip = true; flashPrompt(t(padUi ? 'c.prompt.arrowsTouch' : 'c.prompt.arrows'), 3); } }
       else if (e.e === 'clock:phase') {                          // T21: night falls / day breaks (outside only; the nest panel shows the time)
         if (!cs.inLair && state === 'play' && (e.phase === 'night' || e.phase === 'day')) toast(t('c.clock.' + e.phase), t('c.clock.' + e.phase + 'Sub'), 3);
@@ -1284,7 +1337,7 @@
   const DBG_REGION_KEYS = [['4', 'Digit4'], ['5', 'Digit5'], ['6', 'Digit6'], ['Shift+4', 'ShiftDigit4']];
   const DEBUG_KEYS = [
     ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
-    ['H', 'hunger -25', 'KeyH', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],
+    ['Home', 'hunger -25', 'Home', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],
     ['Z', 'die now (wake in the lair)', 'KeyZ', 'die'],
     ['Shift+Z', 'fly into the lair (Ash Wastes)', 'ShiftKeyZ', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near a region exit (again: the next exit)', 'KeyT', 'to exit'],
@@ -1325,7 +1378,7 @@
     ['Shift+J', 'mission: objective met now (then fly into the lair or an aerie for the reward), T10', 'ShiftKeyJ', 'mission done'],
     ['Shift+K', 'mission: fail now (heat +1, retry after a rest), T10', 'ShiftKeyK', 'mission fail'],
     ['Shift+C', 'tithe wagon: accepts its mission if needed, goes to the Veltava Bend and flies 90 behind the wagon, 30 up, facing it (breathe fire on it until it stops, land, Grab the chest), T15', 'ShiftKeyC', 'wagon'],
-    ['Shift+H', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyH', 'chalice'],
+    ['Shift+Y', 'Ember Chalice: accepts its mission if needed; in the Veltava Bend stand at the chapel door (Grab takes it), elsewhere it goes straight into the claws (carry test: slower, no fire), T12', 'ShiftKeyY', 'chalice'],
     ['Shift+O', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyO', 'workshop'],
     ['Shift+V', 'free the village: its Order buildings fall to ruins, its archers fall, the Order flag drops (Farmlands village), Phase 3 T16', 'ShiftKeyV', 'free village'],
     ['Shift+T', 'tribute now: the next food tribute of a freed village arrives in the larder (Phase 3 T16)', 'ShiftKeyT', 'tribute now'],
@@ -1362,7 +1415,7 @@
       refreshStage(); flashPrompt(t('c.dbg.drake'), 1.5);
     }
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
-    if (code === 'KeyH') dragon.hunger = Math.max(0, dragon.hunger - 25);
+    if (code === 'Home') dragon.hunger = Math.max(0, dragon.hunger - 25);
     if (code === 'KeyK' && !cs.inLair) { dragon.hp = Math.max(0, dragon.hp - 20); hero.flash = 0.6; }
     if (code === 'KeyZ' && !cs.inLair) dragon.hp = 0;               // core/state sees HP 0 on the next step: death
     if (code === 'ShiftKeyZ' && !cs.inLair) {                   // was L (L opens the message log now)
@@ -1434,7 +1487,7 @@
       if (!C.need('freed').freedAll(cs).length) flashPrompt(t('c.dbg.tributeNone'), 1.8);
       else cs.tributeT = D.tribute.every;                        // arrives on the next frame (or waits for room in the larder)
     }
-    if (code === 'ShiftKeyH' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
+    if (code === 'ShiftKeyY' && !cs.inLair && cs.town) {          // Phase 3 T12: the chalice - at the chapel door in the Bend, else into the claws
       const m = RL.missionOf('ember_chalice'), a = MS.active(cs);
       if (RL.has(cs, 'ember_chalice')) flashPrompt(t('c.dbg.relicOwned'), 1.5);
       else if (a && a.id !== m.id) flashPrompt(t('c.mission.refused.busy'), 1.5);
@@ -1734,7 +1787,7 @@
       camDesired(tmpV);
       if (dt > 0) camPos.lerp(tmpV, 1 - Math.exp(-dt * 4.5));
       fwdV.set(Math.sin(pilot.yaw) * Math.cos(pilot.pitch), Math.sin(pilot.pitch), Math.cos(pilot.yaw) * Math.cos(pilot.pitch));
-      const gb = heroPose.ground || 0, kc = Math.pow(heroScale, 0.75);   // T07: on the ground look a little ahead of the head
+      const human = cs.form === 'human', gb = human ? 1 : heroPose.ground || 0, kc = Math.pow(human ? D.guise.cam : heroScale, 0.75);   // T07: on the ground look a little ahead of the head
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
       else if (cs.inAerie) camLook.set(pilot.pos[0], pilot.pos[1] - (isTouch ? 4 : 1) * Math.max(kc, 1.6), pilot.pos[2]);   // touch: the dragon above the panel
@@ -1748,6 +1801,7 @@
         if (Math.abs(camera.fov - fovT) > 0.1) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
       }
       hud(dt);
+      guiseButton();
     }
     syncScene();
     caveView.update(cs, time);
@@ -1769,6 +1823,8 @@
       townView = VRender.settlements.build(cs.town); townView.town = cs.town; scene.add(townView.group);
     }
     if (castleView) castleView.update(dt, { town: cs.town, cam: eye, time, night: 1 - (skyView.state ? skyView.state.light : 1) });
+    if (cityView) { cityView.group.visible = !cs.inLair; if (!cs.inLair) cityView.update(eye, dt, 1 - (skyView.state ? skyView.state.light : 1)); }
+    placeHud(dt);
     townView.update(cs.town, dt, { cam: eye, particles: qSet.particles, pxScale: viewH * 0.5, lights: fireLights, time });
     if (!cornView || cornView.crops !== ST.ensureCrops(cs)) {   // corn fields (rebuilt with the region or a load)
       if (cornView) { scene.remove(cornView.group); cornView.dispose(); }
@@ -1864,10 +1920,10 @@
                  ['places', ['Digit1', 'Digit9', 'Equal', 'Comma', 'Period', 'Digit0']],
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
-      ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'KeyH', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
+      ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'Home', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
-      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyH', 'ShiftKeyO', 'ShiftKeyC']]]],
+      ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyY', 'ShiftKeyO', 'ShiftKeyC']]]],
       ['save', [['', ['KeyV', 'DbgSaveReload', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];

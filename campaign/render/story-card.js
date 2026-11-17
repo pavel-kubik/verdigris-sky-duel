@@ -121,7 +121,7 @@
       card = c; done = onDone || null;
       el.className = c.kind === 'act' ? 'act' : 'brief';
       canvas.hidden = c.kind !== 'act';
-      kick.textContent = c.kind === 'act' ? t('c.story.act', { n: c.act }) : t('c.story.brief');
+      kick.textContent = c.kick != null ? c.kick : c.kind === 'act' ? t('c.story.act', { n: c.act }) : t('c.story.brief');
       h2.textContent = t(c.title);
       box.innerHTML = '';
       for (const k of c.lines) { const p = document.createElement('p'); p.textContent = t(k); box.appendChild(p); }

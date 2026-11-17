@@ -442,7 +442,7 @@
     cs.watch = sq;                                      // T14's debug view and 'to post' read cs.watch.list
     sq.t += dt;
     for (const k in sq.rung) sq.rung[k] = Math.max(0, sq.rung[k] - dt);
-    const scale = (o && o.scale) || 1, inside = cs.inLair || !p;
+    const scale = (o && o.scale) || 1, inside = cs.inLair || !p || cs.form === 'human';   // the Guise (core/guise.js): a person in the street, not a dragon
     if (!inside) for (const e of burn(sq, cs.breath, dt)) out.push(e);
     const noises = inside ? [] : PC.noisesOf(p, ev, scale);
     const ctx = { regionId: cs.region, spot: (o && o.spot) || 1, light: cs.light == null ? 'day' : cs.light, scale, town };

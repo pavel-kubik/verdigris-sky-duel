@@ -57,7 +57,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story'), GU = M.need('guise');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -227,6 +227,13 @@
     if (!carried) d.carried = null;
     const eating = !!carried && !!inp.eat;
     cs.stats.played += dt;
+
+    // the Guise (core/guise.js): G turns the landed dragon into a person and back; a person walks, nothing else
+    if (inp.guise) for (const e of GU.toggle(cs, sol)) emit(cs, ev, e);
+    if (cs.form === 'human') {
+      for (const e of GU.step(cs, inp, dt, solids(cs, D.guise.pad))) emit(cs, ev, e);
+      return ev;
+    }
 
     // locomotion mode (T06): Land / Fly one-shot, then the mode decides what moves the dragon
     if (!p.mode) p.mode = 'air';
@@ -506,6 +513,7 @@
   function die(cs, ev, cause) {
     for (const e of LR.respawn(cs, cause)) emit(cs, ev, e);
     cs.swoop = null; cs.target = null; cs.breath = null; cs.fire = null; cs.fireMem = null; cs.hint = null;
+    cs.form = 'dragon'; cs.hero = null;                          // the Guise ends with death
     return ev;
   }
 

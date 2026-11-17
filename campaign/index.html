@@ -313,6 +313,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   </div>
   <div class="row" id="startRow"><button class="cta" id="startBtn" data-i18n="c.start">Hatch</button><button class="ghost" id="newBtn" hidden data-i18n="c.save.new">New hatchling</button></div>
   <button class="ghost" id="vrBtn" hidden data-i18n="intro.vr">Enter VR</button>
+  <a class="ghost" href="hero/" data-i18n="c.hero.title">Tales of Prahold</a>
   <a class="ghost" href="../" data-i18n="c.back">Back to the duel</a>
   <div class="foot"><span data-i18n="c.wipNote">Early build - the world is still forming.</span><div class="langSwitch"></div></div>
   <button class="ghost installBtn" hidden data-i18n="install.btn">Install app</button>
@@ -348,7 +349,7 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
   <div id="btns">
     <button id="bMove" class="off" aria-live="polite"></button>
     <button id="bRoll" data-i18n="btn.roll">Roll</button><button id="bAction" class="off hot"></button>
-    <button id="bBoost" data-i18n="btn.boost">Boost</button><button id="bBreath" data-i18n="btn.breath">Breath</button>
+    <button id="bGuise" hidden data-i18n="c.guise.btn">Guise</button><button id="bBoost" data-i18n="btn.boost">Boost</button><button id="bBreath" data-i18n="btn.breath">Breath</button>
   </div>
 </div>
 
@@ -425,10 +426,10 @@ body.mHud #mother{top:calc(198px + env(safe-area-inset-top,0px))}
      Load order = dependency order (core: pure logic, then render: THREE-side builders, then game.js). */
   (function () {
     var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
-    ['../i18n.js', '../pwa.js', '../shared/textures.js', '../shared/dragon.js', '../shared/forest.js', '../shared/forest-view.js', '../shared/xr.js',
+    ['../i18n.js', '../pwa.js', '../shared/textures.js', '../shared/dragon.js', '../shared/forest.js', '../shared/forest-view.js', '../shared/xr.js', '../shared/human.js',
      'core/umd.js', 'core/math.js', 'core/events.js', 'core/data.js', 'core/dem-bend.js', 'core/dem-rip.js', 'core/terrain.js', 'core/clock.js', 'core/growth.js', 'core/hunger.js', 'core/upgrades.js', 'core/settlement.js', 'core/castle.js', 'core/city.js', 'core/loot.js', 'core/relics.js', 'core/freed.js',
-     'core/flight.js', 'core/walk.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/caravan.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/story.js', 'core/tips.js', 'core/msglog.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js', 'core/dm.js', 'core/dmnet.js',
-     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/volcano-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/caravan-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'render/story-card.js', 'game.js'
+     'core/flight.js', 'core/walk.js', 'core/hero.js', 'core/guise.js', 'core/tale.js', 'core/prey.js', 'core/region.js', 'core/cave.js', 'core/lair.js', 'core/mother.js', 'core/nav.js', 'core/aerie.js', 'core/perception.js', 'core/defenders.js', 'core/caravan.js', 'core/alert.js', 'core/map.js', 'core/missions.js', 'core/story.js', 'core/tips.js', 'core/msglog.js', 'core/crops.js', 'core/state.js', 'core/save.js', 'core/controls.js', 'core/quality.js', 'core/dm.js', 'core/dmnet.js',
+     'render/flora.js', 'render/bridge-view.js', 'render/ruins-view.js', 'render/volcano-view.js', 'render/terrain.js', 'render/prey-view.js', 'render/settlement-view.js', 'render/castle-kit.js', 'render/castle-view.js', 'render/house-kit.js', 'render/city-view.js', 'render/loot-view.js', 'render/target-view.js', 'render/caravan-view.js', 'render/watch-view.js', 'render/defender-view.js', 'render/corn-view.js', 'render/cave-view.js', 'render/compass.js', 'render/map-view.js', 'render/aerie-view.js', 'render/sky.js', 'render/hatch-scene.js', 'render/story-card.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>

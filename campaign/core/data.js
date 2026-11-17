@@ -402,7 +402,7 @@
           { id: 'ctineves', nameKey: 'c.placeName.ctineves', x: -380, z: -380, r: 50 },
           { id: 'mnetes', nameKey: 'c.placeName.mnetes', x: 160, z: -680, r: 48, plan: 'street', yaw: 1.2 },
           { id: 'vrazkov', nameKey: 'c.placeName.vrazkov', x: 520, z: -440, r: 48 },
-          { id: 'rovne', nameKey: 'c.placeName.rovne', x: 560, z: 420, r: 46 },
+          { id: 'klenec', nameKey: 'c.placeName.klenec', x: 560, z: 420, r: 46 },
         ] },
         exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],     // radians, 0 = +Z; region edge arc on the south side
         entries: { wild: { angle: PI } },
@@ -504,8 +504,8 @@
             { id: 'hradchan', nameKey: 'c.placeName.hradchan', x: 625, z: 10, r: 72, plan: 'organic', block: [34, 42], depth: [8, 11], street: 6, floors: [2, 3],
               styles: { renaissance: 2, baroque: 2, gothic: 1.5 }, landmarks: [
                 { kind: 'cathedral', x: 632, z: 14, yaw: PI / 2, w: 28, d: 84, name: 'vitus' },
-                { kind: 'palace', x: 628, z: -18, yaw: PI, w: 92, d: 15, style: 'classic' },
-                { kind: 'palace', x: 690, z: 0, yaw: PI / 2, w: 44, d: 14, style: 'classic' },
+                { kind: 'palace', x: 622, z: -20, yaw: PI, w: 70, d: 14, style: 'classic', name: 'oldpalace' },
+                { kind: 'palace', x: 714, z: 0, yaw: PI / 2, w: 44, d: 14, style: 'classic', name: 'westwing' },
                 { kind: 'church', x: 588, z: 16, yaw: PI / 2, w: 12, d: 26, style: 'gothic', name: 'george' },
                 { kind: 'tower', x: 556, z: 46, style: 'gothic' }, { kind: 'tower', x: 708, z: 26, style: 'gothic' },
               ] },
@@ -551,9 +551,9 @@
               floors: [1, 2], density: 0.6, gap: 4, yards: 0.5, styles: { farm: 2, cottage: 2, timber: 1, baroque: 1 } },
           ],
           villages: [
-            { id: 'podol', nameKey: 'c.placeName.podol', x: 300, z: -1000, r: 50, plan: 'street', yaw: 0.05 },
+            { id: 'podol', nameKey: 'c.placeName.podol', x: 195, z: -1010, r: 50, plan: 'street', yaw: 0.05 },
             { id: 'nusle', nameKey: 'c.placeName.nusle', x: -90, z: -800, r: 55 },
-            { id: 'liben', nameKey: 'c.placeName.liben', x: -700, z: 480, r: 60, church: true },
+            { id: 'liben', nameKey: 'c.placeName.liben', x: -820, z: 400, r: 60, church: true },
             { id: 'dejvice', nameKey: 'c.placeName.dejvice', x: 840, z: 290, r: 55 },
           ],
         },
@@ -667,7 +667,97 @@
        its time (never under min). queueMax waiting at most (the oldest plain 'info' goes first); the log keeps logMax. */
     messages: { perChar: 12, min: 4, max: 9, waitCut: 0.7, queueMax: 4, logMax: 40 },
 
-    controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF' },
+    controls: { grab: 'KeyG', eat: 'KeyX', confirm: 'Enter', land: 'KeyF', guise: 'KeyH' },
+
+    /* People on foot (core/hero.js): the heroes of the tales and the dragon in human form. Speeds in units / s (a
+       person is about 1.8 units tall), turn in rad / s, runSt stamina per s while running, jump take-off speed,
+       stepUp: highest kerb or step, maxSlope: rise per run, fallAt: a drop that turns into a fall. gift: what the action
+       button does (bolt: a spark at a target up to giftRange away, strike: a sword cut, charm: a word that turns a
+       guard away, ember: warm sparks); floatFall: holding jump slows the fall (the wizard). */
+    hero: {
+      turn: 2.6, back: 1.8, accel: 8, runSt: 9, stRegen: 14, jump: 7.5, gravity: 22, stepUp: 0.7, maxSlope: 1.1, fallAt: 0.8,
+      kinds: {
+        wizard:    { walk: 3.4, run: 6.8, gift: 'bolt',   giftRange: 34, giftCone: 0.55, giftTime: 0.6, giftCool: 0.7, jumpMult: 1.15, floatFall: true },
+        princess:  { walk: 3.8, run: 7.6, gift: 'charm',  giftRange: 10, giftCone: 0.8, giftTime: 0.8, giftCool: 1.2 },
+        prince:    { walk: 3.8, run: 7.4, gift: 'strike', giftRange: 3.2, giftCone: 0.9, giftTime: 0.45, giftCool: 0.5 },
+        dragonkin: { walk: 4.2, run: 8.4, gift: 'ember',  giftRange: 8, giftCone: 0.6, giftTime: 0.7, giftCool: 1.0 },
+      },
+    },
+    /* The Guise (core/guise.js): a Drake (minStage) can take human form on the ground; time: the shimmer (s); st:
+       stamina it costs each way; clear: room needed round the person to turn back (x the dragon's scale); pad: the
+       person's body against walls; hunger: share of the usual hunger drain while human. */
+    guise: { minStage: 1, time: 1.2, st: 25, clear: 5, pad: 0.45, hunger: 0.5, cam: 0.32 },
+    /* Tales (core/tale.js): reach / talk / pick distances, how close a follower keeps (follow) and when it catches up
+       (lost), guards' sight (range, half-angle cone, x walkSight when not running, close: seen whatever the angle) and how
+       long a charmed guard looks away (s). */
+    tale: { reach: 8, talk: 4, pick: 2.6, follow: 2.6, lost: 40, sight: 18, cone: 0.7, walkSight: 0.7, close: 3, charm: 12 },
+    /* The three tellings played on foot in Prahold (campaign/hero/). Texts: c.tale.<id>.<chapter>.title / l1.. / end,
+       c.tale.<id>.<chapter>.<step> = the objective, c.tale.<id>.end.*. Places: [x, z] in the Bend or a landmark lot's
+       name (core/city.js data: vitus, townhall, clementinum, oldnew, ...). */
+    tales: {
+      wizard: { hero: 'wizard', region: 'bend', start: { x: 690, z: 30, yaw: -PI / 2 }, chapters: [
+        { lines: 3, steps: [
+          { type: 'reach', at: [560, 40], r: 10 },
+          { type: 'gift', targets: [{ at: [560, 40], y: 18, kind: 'lantern' }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'reach', at: 'clementinum', r: 10 },
+          { type: 'collect', item: 'page', at: [[250, -150], [200, -40], [300, -60]] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'gift', targets: [{ at: [372, -125], y: 12, kind: 'lantern' }, { at: [464, -125], y: 12, kind: 'lantern' }, { at: 'townhall', y: 22, kind: 'lantern' }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'reach', at: [690, -300], r: 10, npcs: [{ id: 'dragon', kind: 'dragon', at: [706, -318] }] },
+          { type: 'gift', npcs: [], targets: [{ at: [706, -318], y: 4, r: 3, kind: 'dragon' }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'escort', npc: { id: 'stranger', kind: 'dragonkin', at: [700, -310] }, to: [222, -93], r: 12 },
+        ] },
+      ] },
+      prince: { hero: 'prince', region: 'bend', start: { x: 660, z: -2, yaw: PI / 2 }, chapters: [
+        { lines: 3, steps: [
+          { type: 'gift', targets: [{ at: [684, -4], y: 1, hp: 2, kind: 'dummy' }, { at: [692, 6], y: 1, hp: 2, kind: 'dummy' }, { at: [684, 14], y: 1, hp: 2, kind: 'dummy' }] },
+          { type: 'talk', npcs: [{ id: 'grandmaster', kind: 'guard', at: [700, -8], yaw: -PI / 2 }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'collect', item: 'scorch', at: [[540, -120], [600, -130], [520, -80]] },
+          { type: 'reach', at: [470, -125], r: 8 },
+        ] },
+        { lines: 2, steps: [
+          { type: 'talk', npcs: [{ id: 'stranger', kind: 'dragonkin', at: [418, -125], yaw: PI / 2 }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'sneak', to: [232, -372], r: 7, guards: [{ at: [196, -330], yaw: 0.6, range: 16 }, { at: [262, -348], yaw: -2.2, range: 16 }] },
+          { type: 'collect', item: 'ledger', at: [[238, -380]] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'reach', at: [222, -93], r: 14, npcs: [{ id: 'stranger', kind: 'dragonkin', at: [214, -88] }] },
+          { type: 'gift', npcs: [{ id: 'stranger', kind: 'dragonkin', at: [214, -88] }], targets: [{ at: [226, -98], y: 1, hp: 2, kind: 'thug' }, { at: [206, -100], y: 1, hp: 2, kind: 'thug' }, { at: [218, -78], y: 1, hp: 2, kind: 'thug' }] },
+          { type: 'talk', npcs: [{ id: 'stranger', kind: 'dragonkin', at: [214, -88] }] },
+        ] },
+      ] },
+      princess: { hero: 'princess', region: 'bend', start: { x: 628, z: -36, yaw: -PI / 2 }, chapters: [
+        { lines: 2, steps: [
+          { type: 'sneak', to: [548, -58], r: 8, guards: [{ at: [606, -44], yaw: -PI / 2, range: 14, sway: 0.9 }, { at: [580, -40], yaw: PI / 2, range: 14, sway: 0.9 }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'talk', npcs: [{ id: 'baker', at: [560, -112], line: 'c.tale.princess.baker' }, { id: 'glazier', at: [602, -62], line: 'c.tale.princess.glazier' },
+                                 { id: 'widow', at: [530, -64], line: 'c.tale.princess.widow' }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'reach', at: [418, -125], r: 10 },
+          { type: 'talk', npcs: [{ id: 'stranger', kind: 'dragonkin', at: 'oldnew' }] },
+        ] },
+        { lines: 2, steps: [
+          { type: 'collect', item: 'lantern', at: [[240, -150], [180, -120], [290, -40]] },
+          { type: 'sneak', to: 'powder', r: 9, guards: [{ at: [140, -92], yaw: 1.6, range: 16 }, { at: [118, -124], yaw: 0.4, range: 16 }] },
+        ] },
+        { lines: 3, steps: [
+          { type: 'escort', npc: { id: 'stranger', kind: 'dragonkin', at: [100, -96] }, to: [44, -330], r: 12 },
+        ] },
+      ] },
+    },
 
     /* Deathmatch (campaign/dm/, core/dm.js): dragons of human players only (no AI dragons) in the Wildwood around the
        hamlet and the outpost. Peer-to-peer like the co-op: every browser flies its own dragon, the host owns hp,

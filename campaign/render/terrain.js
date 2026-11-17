@@ -74,6 +74,12 @@
           const cc = pal.crops[fd.f.crop], row = Math.sin(fd.u * fd.f.w * 1.1) > 0 ? 0 : 1;
           c.set(cc[row]);
         }
+        const town = T.cityAt ? T.cityAt(id, x, z) : null;            // Prahold's districts: paved yards; village greens: trodden earth
+        if (town) {
+          const inner = 1 - Math.hypot(x - town.x, z - town.z) / town.r;
+          if (R.city.districts && R.city.districts.includes(town)) c.lerp(b.set(Math.sin(x * 0.37) * Math.sin(z * 0.41) > 0.5 ? 0x7d7466 : 0x8c8374), Math.min(0.82, 0.25 + inner * 3));
+          else if (inner > -0.3) c.lerp(b.set(0x857552), Math.min(0.35, 0.1 + (inner + 0.3) * 0.6));
+        }
         if (T.plateauAt(id, x, z)) c.lerp(b.set(pal.plateau), 0.3);
         const rv = T.riverAt(id, x, z);
         if ((rv && h < rv.level + 1.6) || (R.waterLevel != null && h < R.waterLevel + 1.6)) c.set(pal.bank);   // muddy banks, pond shores
