@@ -31,7 +31,7 @@ Object.entries(D.prey).forEach(([id, p]) => {
 ok(D.prey.boar.size > D.stages[0].carry, 'a hatchling cannot lift a boar (must burn it)');
 ok(D.roast.chunkSize <= D.stages[0].carry, 'roast chunks are liftable by a hatchling');
 
-// Regions: exits and entries point at real regions, arcs are consistent both ways
+// Regions: exits point at real regions, both ways, across a shared edge
 const ids = Object.keys(D.regions);
 ok(ids.includes(D.startRegion), 'start region exists');
 ids.forEach(id => {
@@ -41,14 +41,15 @@ ids.forEach(id => {
   r.exits.forEach(ex => {
     const to = D.regions[ex.to];
     ok(!!to, 'exit target exists: ' + id + ' -> ' + ex.to);
-    ok(to.entries && to.entries[id], 'target has a matching entry: ' + ex.to + ' from ' + id);
-    // leaving through the middle of the arc should enter on the opposite side of the next region
-    const mid = (ex.angleFrom + ex.angleTo) / 2;
-    // (or, Phase 3 T02, anywhere on the target's own arc back: the Bend's entry follows the real river, off centre)
+    // one world: the exit is a whole side, and the region on the other side has the way back on its opposite side
     const back = (to.exits || []).find(b => b.to === id);
-    ok(Math.abs(Math.abs(wrap(to.entries[id].angle - mid)) - Math.PI) < 1e-9 || (back && RG.inArc(to.entries[id].angle, back.angleFrom, back.angleTo)),
-      'entry is opposite the exit: ' + id + ' -> ' + ex.to);
+    ok(back && ({ n: 's', s: 'n' })[ex.side] === back.side, 'the way back is on the opposite side: ' + id + ' -> ' + ex.to);
+    const dz = to.origin[1] - r.origin[1];
+    ok(Math.abs(Math.abs(dz) - (r.radius + to.radius)) < 1e-9 && (ex.side === 'n') === (dz > 0) && to.origin[0] === r.origin[0], 'neighbours share the edge: ' + id + ' -> ' + ex.to);
   });
 });
+// the one world: Prahold in the south at 0, 0, Mount Rip due north; the origins sit on the terrain chunk grid (seamless meshes)
+ok(D.regions.bend.origin[0] === 0 && D.regions.bend.origin[1] === 0 && D.regions.ash.origin[1] > D.regions.wild.origin[1] && D.regions.wild.origin[1] > D.regions.farm.origin[1], 'Rip, Wildwood, Farmlands, Bend from north to south');
+ids.forEach(id => ok(D.regions[id].origin.every(v => v % 300 === 0) && D.regions[id].radius % 300 === 0, 'origin and size on the chunk grid: ' + id));
 const ash = D.regions.ash;
 ok(ash.lair && Math.hypot(ash.lair.x, ash.lair.z) < ash.terrain.features[0].r, 'lair sits on the volcano');

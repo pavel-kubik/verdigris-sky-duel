@@ -57,7 +57,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story'), GU = M.need('guise');
+  const D = M.need('data'), T = M.need('terrain'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story'), GU = M.need('guise');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -260,7 +260,7 @@
       fly = Object.assign({}, inp, { sx: clamp(-turn * Sw.steer, -1, 1), sy: clamp(pitchWant / 0.75, -1, 1), boost: false });
     }
 
-    if (air) F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating, softEdge: RG.softEdgeAt(cs.region, p.pos, F.SOFT_EDGE), solidAt: sol.solidAt, solidHit: sol.solidHit });
+    if (air) F.step(p, fly, dt, { regionId: cs.region, stats, effects: eff, eating, bound: RG.bound(cs.region, p.pos, d.stage), solidAt: sol.solidAt, solidHit: sol.solidHit });
     else {
       const wctx = { regionId: cs.region, stats, effects: eff, eating, scale, solidAt: sol.solidAt, solidHit: sol.solidHit };
       if (p.mode === 'ground') WK.step(p, inp, dt, wctx);
@@ -374,20 +374,23 @@
     }
     cs.aerieNear = air && AE.canEnter(cs);
 
-    // region edge: offer the exit while near it heading outward (and a moment after); confirm travels
+    // region edge (one world): over a shared edge the dragon is in the next region at once; a region it is too small
+    // for is a wall (a prompt while it heads for it), the world's outer edge too
     let ex = air ? RG.exitAt(cs.region, p.pos, p.yaw) : null;
-    if (ex && ex.minStage != null && d.stage < ex.minStage) {     // T11: too small for that region - a prompt, no travel
+    if (ex && ex.minStage != null && d.stage < ex.minStage) {     // T11: too small for that region - a prompt, no way in
       if (!cs.exitSmall || cs.exitSmall.to !== ex.to) emit(cs, ev, { e: 'region:tooSmall', from: cs.region, to: ex.to, minStage: ex.minStage });
-      cs.exitSmall = ex; cs.exitSmallT = D.travel.promptHold; ex = null;
+      cs.exitSmall = ex; cs.exitSmallT = D.travel.promptHold;
     } else if (cs.exitSmall && (cs.exitSmallT -= dt) <= 0) { cs.exitSmall = null; cs.exitSmallT = 0; }
-    if (ex) {
-      if (!cs.exit || cs.exit.to !== ex.to) emit(cs, ev, { e: 'region:exit', from: cs.region, to: ex.to });
-      cs.exit = ex; cs.exitT = D.travel.promptHold;
-    } else if (cs.exit && (cs.exitT -= dt) <= 0) { cs.exit = null; cs.exitT = 0; }
-    if (cs.exit && inp.confirm) {
-      const from = cs.region;
-      for (const e of RG.enter(cs, cs.exit.to, from)) emit(cs, ev, e);
-      carried = carriedPrey(cs);
+    const into = RG.crossAt(cs.region, p.pos);
+    if (into) {
+      const gate = (T.region(cs.region).exits || []).find(e => e.to === into);
+      if (gate && (gate.minStage == null || d.stage >= gate.minStage)) {
+        for (const e of RG.cross(cs, into)) emit(cs, ev, e);
+        carried = carriedPrey(cs);
+      } else {                                                   // a wall: back inside the region's own square
+        const lim = T.region(cs.region).radius - 0.5;
+        p.pos[0] = Math.max(-lim, Math.min(lim, p.pos[0])); p.pos[2] = Math.max(-lim, Math.min(lim, p.pos[2]));
+      }
     }
 
     cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt, sol.walkTop).ok;                // the Move slot offers Land (controls.slots)

@@ -37,7 +37,8 @@
    * One flight step.
    * input: { sx, sy, breath, boost } with sx / sy in -1..1
    * ctx:   { regionId, stats: { turn, cruise, boost }, effects?, eating?, minAlt?, softEdge?, solidAt?, solidHit? }
-   *        softEdge: width of the steer-back band inside the radius (narrower in front of a region exit)
+   *        softEdge: width of the steer-back band inside the radius; bound: { d, nx, nz } (region.bound) - in the one
+   *        world the band is measured from the nearest wall the dragon may not pass, steering along (nx, nz)
    *        solidAt(x, z) -> roof | null, solidHit(x, z) -> { roof, nx, nz, depth } | null: buildings (T12). A roof counts
    *        as ground for the floor pull-up; flying into a wall just under the roof hops onto it (HOP), lower down
    *        the dragon is pushed out and slides along the wall, losing some speed.
@@ -61,10 +62,19 @@
     if (p.pos[1] > R.ceiling - 10) tp = Math.min(tp, -0.1);
     p.pitch += (tp - p.pitch) * Math.min(1, dt * 3);
 
-    const r = Math.hypot(p.pos[0], p.pos[2]), soft = ctx.softEdge == null ? SOFT_EDGE : ctx.softEdge;
-    if (r > R.radius - soft) {                                // soft boundary: steer back toward the centre
-      const d = wrap(Math.atan2(-p.pos[0], -p.pos[2]) - p.yaw);
-      p.yaw = wrap(p.yaw + d * Math.min(1, dt * 1.2 * (r - (R.radius - soft)) / 30));
+    const soft = ctx.softEdge == null ? SOFT_EDGE : ctx.softEdge;
+    if (ctx.bound) {                                          // one world: steer back from the wall it may not pass
+      const b = ctx.bound;
+      if (b.d < soft) {
+        const d = wrap(Math.atan2(b.nx, b.nz) - p.yaw);
+        if (Math.cos(d) < 0.95) p.yaw = wrap(p.yaw + d * Math.min(1, dt * 1.2 * (soft - b.d) / 30));
+      }
+    } else {
+      const r = Math.hypot(p.pos[0], p.pos[2]);
+      if (r > R.radius - soft) {                              // soft boundary: steer back toward the centre
+        const d = wrap(Math.atan2(-p.pos[0], -p.pos[2]) - p.yaw);
+        p.yaw = wrap(p.yaw + d * Math.min(1, dt * 1.2 * (r - (R.radius - soft)) / 30));
+      }
     }
 
     let target = (p.boosting ? st.boost : st.cruise) * eff.speedMult - p.pitch * 8;

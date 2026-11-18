@@ -142,8 +142,7 @@ function travel(bot, to) {
   const cs = bot.cs, p = cs.dragon.pilot, R = T.region(cs.region);
   const ex = R.exits.find(e => e.to === to);
   if (cs.exit && cs.exit.to === to) return { confirm: true };
-  const a = RG.arcMid(ex), r = R.radius + 50;
-  const goal = [Math.sin(a) * r, 0, Math.cos(a) * r];
+  const q = RG.exitPoint(cs.region, ex, -50), goal = [q[0], 0, q[1]];   // over the edge at its pass
   const ground = T.surfaceAt(cs.region, p.pos[0], p.pos[2]);
   const s = steer(p, goal, ground + 60);
   return { sx: s.sx, sy: s.sy, boost: p.st > 40 };

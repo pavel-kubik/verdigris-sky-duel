@@ -90,7 +90,7 @@
   function passable(ctx, x0, z0, x1, z1, scale) {
     const R = T.region(ctx.regionId), run = Math.hypot(x1 - x0, z1 - z0);
     if (run < 1e-9) return true;
-    if (!ctx.surface && Math.hypot(x1, z1) > R.radius) return false;
+    if (!ctx.surface && T.edgeDist(ctx.regionId, x1, z1) < 0) return false;
     if (!ctx.surface && T.liquidAt(ctx.regionId, x1, z1) && !T.liquidAt(ctx.regionId, x0, z0)) return false;   // no wading into water or lava
     const s1 = surfaceFn(ctx)(x1, z1), roof = ctx.solidAt ? ctx.solidAt(x1, z1) : null;
     const g0 = groundAt(ctx, x0, z0), g1 = roof != null && roof > s1 ? roof : s1;
@@ -199,7 +199,7 @@
     const x1 = p.pos[0] + dx, z1 = p.pos[2] + dz;
     if (!ctx.surface) {
       const R = T.region(ctx.regionId);
-      if (Math.hypot(x1, z1) > R.radius) return;
+      if (T.edgeDist(ctx.regionId, x1, z1) < 0) return;
       if (p.mode === 'landing' && T.liquidAt(ctx.regionId, x1, z1)) { p.speed = 0; return; }
     }
     if (p.mode === 'landing' && ctx.solidHit && ctx.solidHit(x1, z1)) { p.speed = 0; return; }   // no sliding into a building (T12)

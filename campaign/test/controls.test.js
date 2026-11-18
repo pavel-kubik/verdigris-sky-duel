@@ -42,20 +42,17 @@ const mouth = LR.mouthPos('ash');
   ok(a.grab && !a.eat && b.eat && !b.grab && !c.eat && !c.grab, 'Action input follows the kind latched at press');
 }
 
-// 4. Move: Fly to <region> at an exit (confirm travels), as in phase 1 with Enter
+// 4. One world: no Fly to <region> button at an edge - flying over it is the way into the next region
 {
   const cs = fresh('ash');
-  const arc = D.regions.ash.exits[0], R = T.region('ash').radius;
-  const ang = (arc.angleFrom + arc.angleTo) / 2, r = R - D.travel.edgeBand / 2;
-  const x = Math.sin(ang) * r, z = Math.cos(ang) * r;
-  cs.dragon.pilot = F.newPilot([x, T.surfaceAt('ash', x, z) + 60, z], ang, 30);
+  const R = T.region('ash').radius, z = -(R - D.travel.edgeBand / 2);
+  cs.dragon.pilot = F.newPilot([0, T.surfaceAt('ash', 0, z) + 60, z], Math.PI, 30);
   S.step(cs, {}, dt);
   const sl = CT.slots(cs);
-  ok(sl.move && sl.move.kind === 'travel' && sl.move.to === 'wild', 'at the Wildwood exit: Move = Fly to Wildwood');
-  const mi = CT.moveInput(sl.move);
-  ok(mi.confirm && !mi.enter, 'Move tap at an exit = confirm');
-  const ev = S.step(cs, mi, dt);
-  ok(cs.region === 'wild' && ev.some(e => e.e === 'region:enter'), 'Move tap travels to Wildwood');
+  ok(!sl.move || sl.move.kind !== 'travel', 'at the Wildwood edge: no travel button');
+  let ev = [];
+  for (let i = 0; i < 60 * 4 && cs.region === 'ash'; i++) ev = ev.concat(S.step(cs, {}, dt));
+  ok(cs.region === 'wild' && ev.some(e => e.e === 'region:enter' && e.seamless), 'flying on over the edge is in Wildwood');
 }
 
 // 5. Move: Enter cave only within enterRange of the mouth while heading toward it

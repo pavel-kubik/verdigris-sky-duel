@@ -1,74 +1,83 @@
 /*
  * Verdigris campaign - map screen (Phase 3 T07, 003_task_missions.md 6 "Map screen"). A 2D canvas over the game, no THREE
  * scene (the terrain colours come from render/terrain.js colourFn).
- *   VRender.mapView.build(el, { t, stageName }) -> { open(cs, view?), close(), isOpen, redraw(), setView('region' | 'world'),
- *                                                    zoomBy(f), imageMs(regionId), info, setPad(px) }
+ *   VRender.mapView.build(el, { t, stageName }) -> { open(cs, view?), close(), isOpen, redraw(), setView('region' | 'world', id?),
+ *                                                    zoomBy(f), imageMs(), info, setPad(px) }
  *   setPad(px): keep px free at the bottom (T09: the travel strip of the map stone); 0 = the whole screen
  *   el: the #map section with canvas#mapCanvas, #mapTitle, #mapTag, buttons #mapWorldBtn, #mapRegionBtn, #mapZoomIn,
  *       #mapZoomOut, #mapClose (game.js wires Close).
- * Region view: the terrain image (data.map.image px, from heights + the region palette, toned to parchment, hill shaded,
- *   water from the terrain), drawn once per region and cached; fog = dark parchment over unexplored cells (core/map.js
- *   bits); icons for the lair and discovered places (the compass icons); the region exits on the rim; the dragon arrow.
- *   Drag to pan, pinch (or the wheel, or + / -) to zoom within data.map.zoom; tap an icon for its name.
- * World view: the regions around the volcano at data.map.world; unknown regions are a fogged "?", locked ones show
- *   the stage they need, the alert level colours the rim, the dragon's region has a marker; tap a known region to
- *   open its region view.
+ * One map of the one world (core/terrain.js zones): Mount Rip in the north, the Wildwood, the River Farmlands and the
+ * Veltava Bend with Prahold in the south, drawn from the real terrain (worldImage: heights + each region's palette,
+ * toned to parchment, hill shaded, water from the terrain, cached), with the Vltava, the roads (core/roads.js and the
+ * Bend's own) and the crop fields drawn on top as lines and shapes, so they stay sharp when zoomed in. Fog = dark
+ * parchment over the cells the dragon has not explored (core/map.js bits, one grid per region); villages, Prahold and
+ * the discovered places (the compass icons: lair, settlements, castle, aeries) are named once explored, the regions
+ * carry their names and, while the dragon is too small for them, the stage they need. The mission target rings gold,
+ * the dragon is an arrow. Drag to pan, pinch (or the wheel, or + / -) to zoom within data.map.zoom; tap an icon for its
+ * name. "World" fits the whole map, "Region" centres on the dragon's region.
  * Map axes: north (+Z) up, east (-X) right: screen x = -world x.
  */
 (function (root) {
   'use strict';
   const C = root.VCamp, VR = root.VRender = root.VRender || {};
   if (!C) return;
-  const D = C.need('data'), T = C.need('terrain'), MP = C.need('map'), RG = C.need('region');
+  const D = C.need('data'), T = C.need('terrain'), MP = C.need('map');
   const TAU = Math.PI * 2;
-  const PARCH = [0.80, 0.72, 0.55], INK = '#2b2116', FOG = 'rgba(38,30,20,0.94)';
+  const PARCH = [0.80, 0.72, 0.55], INK = '#2b2116';
   const ALERT = ['#62c48a', '#e0b040', '#e07a3a', '#e5484f'];
+  const CROP = ['#c2a64e', '#86a845', '#7a6040', '#ad9d55', '#6f7a3a'];
+  const STEP = 20;                                          // world units per image pixel
 
-  const images = {}, imageMs = {};
+  let image = null, imageTime = 0;
 
-  /** terrain.liquidAt with the height already known (no surfaceAt: 3 fewer height samples per pixel). */
+  /** terrain.liquidAt with the height already known (no surfaceAt: fewer height samples per pixel). */
   function wetAt(id, R, x, z, h) {
     for (const f of R.terrain.features) if (f.type === 'cone' && f.crater && Math.hypot(x - f.x, z - f.z) < f.crater.r && h < T.lavaLevel(id)) return 'lava';
-    for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return 'water';
     const rv = T.riverAt(id, x, z);
-    if (rv && (R.terrain.water === 'mask' || h < rv.level)) return 'water';
-    if (R.waterLevel != null && h < R.waterLevel) return 'water';
+    if (rv && (!rv.world || h < rv.level + 0.5)) return 'water';
     return null;
   }
 
-  /** The region image: heights on an N x N grid, palette colour, toned toward parchment, hill shaded, water blue. */
-  function regionImage(id) {
-    if (images[id]) return images[id];
+  /** The world image: heights every STEP units over the world rectangle, the palette of the region each pixel lies in,
+      toned toward parchment, hill shaded, water blue. One canvas pixel per STEP units, drawn scaled. */
+  function worldImage() {
+    if (image) return image;
     const t0 = (root.performance || Date).now();
-    const N = D.map.image, R = T.region(id), r = R.radius, step = (2 * r) / N;
-    const VT = VR.terrain, pal = VT && VT.PALETTES[R.palette];
-    const colour = VT && pal ? VT.colourFn(id, pal) : null;
-    const hs = new Float32Array((N + 2) * (N + 2));
-    const X = i => r - (i - 0.5) * step, Z = j => r - (j - 0.5) * step;    // index 1..N = pixel centres, 0 and N+1 = border
-    for (let j = 0; j < N + 2; j++) for (let i = 0; i < N + 2; i++) hs[j * (N + 2) + i] = T.heightAt(id, X(i), Z(j));
-    const cv = document.createElement('canvas'); cv.width = cv.height = N;
-    const g = cv.getContext('2d'), img = g.createImageData(N, N), px = img.data;
-    const water = pal && pal.water != null ? [((pal.water >> 16) & 255) / 255, ((pal.water >> 8) & 255) / 255, (pal.water & 255) / 255] : [0.25, 0.42, 0.5];
-    for (let j = 1; j <= N; j++) for (let i = 1; i <= N; i++) {
-      const k = j * (N + 2) + i, x = X(i), z = Z(j), h = hs[k];
-      const dx = (hs[k - 1] - hs[k + 1]) / (2 * step), dz = (hs[k - (N + 2)] - hs[k + (N + 2)]) / (2 * step);   // dx: west - east
-      const slope = Math.hypot(dx, dz);
-      let c = colour ? colour(x, z, h, slope, 1) : [0.5, 0.5, 0.4];
+    const r = T.worldRect(), nx = Math.round((r.x1 - r.x0) / STEP), nz = Math.round((r.z1 - r.z0) / STEP);
+    const VT = VR.terrain, cols = {}, wat = {};
+    for (const id of T.zones()) {
+      const pal = VT && VT.PALETTES[T.region(id).palette];
+      cols[id] = VT && pal ? VT.colourFn(id, pal) : null;
+      wat[id] = pal && pal.water != null ? [((pal.water >> 16) & 255) / 255, ((pal.water >> 8) & 255) / 255, (pal.water & 255) / 255] : [0.25, 0.42, 0.5];
+    }
+    // pixel (i, j): i grows east (-X), j grows south (-Z); a one pixel border for the shading
+    const X = i => r.x1 - (i + 0.5) * STEP, Z = j => r.z1 - (j + 0.5) * STEP, W2 = nx + 2;
+    const hs = new Float32Array(W2 * (nz + 2)), zid = new Array(W2 * (nz + 2));
+    for (let j = -1; j <= nz; j++) for (let i = -1; i <= nx; i++) {
+      const x = X(i), z = Z(j), id = T.zoneAt(x, z) || T.zoneAt(Math.max(r.x0, Math.min(r.x1 - 1, x)), Math.max(r.z0, Math.min(r.z1 - 1, z)));
+      const k = (j + 1) * W2 + i + 1, [lx, lz] = T.toLocal(id, x, z);
+      hs[k] = T.heightAt(id, lx, lz); zid[k] = id;
+    }
+    const cv = document.createElement('canvas'); cv.width = nx; cv.height = nz;
+    const g = cv.getContext('2d'), img = g.createImageData(nx, nz), px = img.data;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const k = (j + 1) * W2 + i + 1, id = zid[k], R = T.region(id), [x, z] = T.toLocal(id, X(i), Z(j)), h = hs[k];
+      const dx = (hs[k - 1] - hs[k + 1]) / (2 * STEP), dz = (hs[k - W2] - hs[k + W2]) / (2 * STEP);   // dx: west - east, dz: north - south
+      let c = cols[id] ? cols[id](x, z, h, Math.hypot(dx, dz), 1) : [0.5, 0.5, 0.4];
       const wet = wetAt(id, R, x, z, h);
-      if (wet === 'water') c = water;
+      if (wet === 'water') c = wat[id];
       else if (wet === 'lava') c = [0.85, 0.32, 0.1];
-      // light from the north-west (top left): dx = west - east, dz = north - south; ground falling toward the light is brighter
-      const shade = wet ? 1 : Math.max(0.55, Math.min(1.35, 1 - (dx + dz) * 1.4));
-      const o = ((j - 1) * N + (i - 1)) * 4;
+      const shade = wet ? 1 : Math.max(0.55, Math.min(1.35, 1 - (dx + dz) * 1.4));   // light from the north-west (top left)
+      const o = (j * nx + i) * 4;
       for (let q = 0; q < 3; q++) px[o + q] = Math.max(0, Math.min(255, (c[q] * 0.6 + PARCH[q] * 0.4) * shade * 255));
-      px[o + 3] = Math.hypot(x, z) <= r ? 255 : 0;
+      px[o + 3] = 255;
     }
     g.putImageData(img, 0, 0);
-    imageMs[id] = (root.performance || Date).now() - t0;
-    return (images[id] = cv);
+    imageTime = (root.performance || Date).now() - t0;
+    return (image = cv);
   }
 
-  /** Fog: one pixel per map cell, opaque where unexplored (drawn scaled up with smoothing: soft edges). */
+  /** Fog of one region: one pixel per map cell, opaque where unexplored (drawn scaled up with smoothing: soft edges). */
   function fogImage(cs, id, cache) {
     const gr = MP.grid(id), b = MP.bits(cs, id);
     let cv = cache.cv;
@@ -88,7 +97,7 @@
     const cv = el.querySelector('#mapCanvas'), g = cv.getContext('2d');
     const titleEl = el.querySelector('#mapTitle'), tagEl = el.querySelector('#mapTag');
     const icon = VR.compass && VR.compass.icon, COL = (VR.compass && VR.compass.COL) || {};
-    let cs = null, view = 'region', regionId = null, model = null, open = false, W = 0, H = 0, dpr = 1;
+    let cs = null, view = 'region', regionId = null, models = {}, open = false, W = 0, H = 0, dpr = 1;
     const cam = { zoom: 1, cx: 0, cz: 0 }, fogCache = {};
     let hits = [], tagT = 0, padB = 0;                                  // padB: px kept free at the bottom (T09 travel strip)
 
@@ -97,64 +106,127 @@
       W = cv.clientWidth || root.innerWidth; H = cv.clientHeight || root.innerHeight;
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     }
-    const base = () => (Math.min(W, H - 120 - padB) * 0.94) / (2 * T.region(regionId).radius);
-    const toScreen = (x, z) => { const s = base() * cam.zoom; return [W / 2 - (x - cam.cx) * s, (H + 40 - padB) / 2 - (z - cam.cz) * s]; };
+    const rect = () => T.worldRect();
+    /** px per world unit at zoom 1: the whole world fits the screen */
+    const base = () => { const r = rect(); return Math.min((W - 16) / (r.x1 - r.x0), (H - 120 - padB) / (r.z1 - r.z0)); };
+    const cy = () => (H + 40 - padB) / 2;
+    const toScreen = (X, Z) => { const s = base() * cam.zoom; return [W / 2 - (X - cam.cx) * s, cy() - (Z - cam.cz) * s]; };
     function clampCam() {
-      const [z0, z1] = D.map.zoom, r = T.region(regionId).radius;
+      const [z0, z1] = D.map.zoom, r = rect(), s = base() * cam.zoom;
       cam.zoom = Math.max(z0, Math.min(z1, cam.zoom));
-      const lim = r * (1 - 1 / cam.zoom);
-      const l = Math.hypot(cam.cx, cam.cz);
-      if (l > lim) { cam.cx *= lim / Math.max(1e-6, l); cam.cz *= lim / Math.max(1e-6, l); }
+      const hx = Math.max(0, (r.x1 - r.x0) / 2 - W / 2 / s), hz = Math.max(0, (r.z1 - r.z0) / 2 - (H - 120 - padB) / 2 / s);
+      const mx = (r.x0 + r.x1) / 2, mz = (r.z0 + r.z1) / 2;
+      cam.cx = Math.max(mx - hx, Math.min(mx + hx, cam.cx)); cam.cz = Math.max(mz - hz, Math.min(mz + hz, cam.cz));
+    }
+    const wpt = (id, x, z) => T.toWorld(id, x, z);
+
+    function line(pts, width, colour) {
+      if (pts.length < 2) return;
+      g.strokeStyle = colour; g.lineWidth = width; g.lineJoin = g.lineCap = 'round';
+      g.beginPath();
+      pts.forEach((p, i) => { const [sx, sy] = toScreen(p[0], p[1]); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); });
+      g.stroke();
     }
 
-    function drawRegion() {
-      const R = T.region(regionId), r = R.radius, s = base() * cam.zoom;
-      const [ox, oy] = toScreen(0, 0);
-      g.save();
-      g.beginPath(); g.arc(ox, oy, r * s, 0, TAU); g.clip();
+    function drawMap() {
+      const r = rect(), s = base() * cam.zoom, [x0, y0] = toScreen(r.x1, r.z1);
       g.imageSmoothingEnabled = true;
-      g.drawImage(regionImage(regionId), ox - r * s, oy - r * s, 2 * r * s, 2 * r * s);
-      const gr = MP.grid(regionId), side = gr.n * gr.cell * s;
-      g.drawImage(fogImage(cs, regionId, fogCache[regionId] || (fogCache[regionId] = {})), ox - (gr.n * gr.cell / 2) * s, oy - (gr.n * gr.cell / 2) * s, side, side);
-      g.restore();
-      g.strokeStyle = 'rgba(233,225,204,.55)'; g.lineWidth = 2; g.beginPath(); g.arc(ox, oy, r * s, 0, TAU); g.stroke();
-      hits = [];
-      // exits on the rim: an arrow outward with the region name (greyed while locked)
-      const rm = {}; for (const q of model.regions) rm[q.id] = q;
-      for (const e of R.exits || []) {
-        const a = RG.arcMid(e), q = rm[e.to], [sx, sy] = toScreen(Math.sin(a) * r, Math.cos(a) * r);
-        const dx = sx - ox, dy = sy - oy, l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l;
-        const locked = q && q.locked;
-        g.save(); g.translate(sx, sy); g.rotate(Math.atan2(uy, ux));
-        g.fillStyle = locked ? '#7d8278' : '#62c48a'; g.beginPath(); g.moveTo(10, 0); g.lineTo(-6, -8); g.lineTo(-6, 8); g.closePath(); g.fill();
-        g.restore();
-        const name = t('c.region.' + e.to) + (locked ? ' - ' + (locked.later ? t('c.map.later') : t('c.map.needs', { stage: stageName(locked.stage) })) : '');
-        label(name, sx - ux * 22, sy - uy * 22, locked ? '#a9ae9b' : '#ebe3cd');
-        hits.push({ x: sx, y: sy, name });
+      g.save(); g.beginPath(); g.rect(x0, y0, (r.x1 - r.x0) * s, (r.z1 - r.z0) * s); g.clip();   // lines end at the world's edge
+      g.drawImage(worldImage(), x0, y0, (r.x1 - r.x0) * s, (r.z1 - r.z0) * s);
+      // the crop fields, the river and the roads, sharp at any zoom
+      if (s * 40 > 3) {
+        for (const id of T.zones()) for (const f of T.fields(id)) {
+          const sn = Math.sin(f.yaw), cn = Math.cos(f.yaw);
+          g.fillStyle = CROP[f.crop % CROP.length]; g.globalAlpha = 0.8; g.beginPath();
+          [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v], k) => {
+            const a = u * f.w / 2, b = v * f.l / 2, [X, Z] = wpt(id, f.x + a * cn + b * sn, f.z - a * sn + b * cn), [sx, sy] = toScreen(X, Z);
+            k ? g.lineTo(sx, sy) : g.moveTo(sx, sy);
+          });
+          g.closePath(); g.fill(); g.globalAlpha = 1;
+        }
       }
-      // places: lair + discovered settlements / castles / aeries (T08)
-      for (const p of model.places) {
-        const [sx, sy] = toScreen(p.x, p.z);
-        g.fillStyle = 'rgba(12,19,16,.7)'; g.beginPath(); g.arc(sx, sy, 15, 0, TAU); g.fill();
+      const rv = T.worldRiver();
+      if (rv) line(rv.pts, Math.max(2.5, rv.width * s), '#4b7d9c');
+      const bend = T.zones().find(id => T.region(id).terrain.water === 'mask');
+      if (bend) { const gr = T.demGrid(bend); if (gr.line.length) line(gr.line.map(p => wpt(bend, p[0], p[1])), Math.max(2.5, 36 * s), '#4b7d9c'); }
+      const roadW = Math.max(1.3, D.world.roads.width * s);
+      for (const rd of T.worldRoads().list) line(rd.pts, roadW + 1.5, 'rgba(60,45,25,.55)');
+      for (const id of T.zones()) for (const f of T.region(id).terrain.features) if (f.type === 'road') line(f.points.map(p => wpt(id, p[0], p[1])), roadW + 1.5, 'rgba(60,45,25,.55)');
+      for (const rd of T.worldRoads().list) line(rd.pts, roadW, '#c9ad7a');
+      for (const id of T.zones()) for (const f of T.region(id).terrain.features) if (f.type === 'road') line(f.points.map(p => wpt(id, p[0], p[1])), roadW, '#c9ad7a');
+      // villages and Prahold's districts: roofs-coloured spots
+      for (const id of T.zones()) {
+        const Cc = T.region(id).city;
+        if (!Cc) continue;
+        for (const v of (Cc.districts || []).concat(Cc.villages || [])) {
+          const [sx, sy] = toScreen(...wpt(id, v.x, v.z));
+          g.fillStyle = 'rgba(150,72,52,.55)'; g.beginPath(); g.arc(sx, sy, Math.max(3, v.r * s * 0.9), 0, TAU); g.fill();
+        }
+      }
+      // fog over the unexplored cells of each region
+      for (const id of T.zones()) {
+        const gr = MP.grid(id), side = gr.n * gr.cell * s, [cx0, cy0] = toScreen(...wpt(id, gr.n * gr.cell / 2, gr.n * gr.cell / 2));
+        g.drawImage(fogImage(cs, id, fogCache[id] || (fogCache[id] = {})), cx0, cy0, side, side);
+      }
+      g.restore();
+      // region names and seams; a region the dragon is too small for says what it needs
+      hits = [];
+      const rm = {};
+      for (const q of (models[regionId] || models[T.zones()[0]]).regions) rm[q.id] = q;
+      g.setLineDash([6, 6]); g.strokeStyle = 'rgba(233,225,204,.35)'; g.lineWidth = 1.5;
+      for (const id of T.zones()) {
+        const R = T.region(id), [ax, ay] = toScreen(R.origin[0] + R.radius, R.origin[1] + R.radius), [bx, by] = toScreen(R.origin[0] - R.radius, R.origin[1] - R.radius);
+        g.strokeRect(ax, ay, bx - ax, by - ay);
+      }
+      g.setLineDash([]);
+      for (const id of T.zones()) {
+        const R = T.region(id), q = rm[id] || {}, [sx, sy] = toScreen(R.origin[0], R.origin[1] + R.radius * 0.82);
+        if (sy < 64 || sy > H - 70) continue;                            // off screen: no label pinned to the edge
+        let name = t(R.nameKey);
+        if (q.locked) name += ' - ' + (q.locked.later ? t('c.map.later') : t('c.map.needs', { stage: stageName(q.locked.stage) }));
+        label(name, sx, sy, q.locked ? '#e0b040' : q.here ? '#ffd9b3' : '#ebe3cd', q.alert ? ALERT[Math.min(3, q.alert)] : null);
+        if (q.mission) { g.strokeStyle = '#ffd34d'; g.lineWidth = 2; g.setLineDash([5, 4]); const [ax, ay] = toScreen(R.origin[0] + R.radius - 20, R.origin[1] + R.radius - 20), [bx, by] = toScreen(R.origin[0] - R.radius + 20, R.origin[1] - R.radius + 20); g.strokeRect(ax, ay, bx - ax, by - ay); g.setLineDash([]); }
+      }
+      // explored villages and Prahold: their names once zoomed in
+      if (s * 400 > 60) for (const id of T.zones()) {
+        const Cc = T.region(id).city;
+        if (!Cc) continue;
+        const ds = Cc.districts || [], mid = k => ds.reduce((a, d) => a + d[k], 0) / ds.length;   // Prahold: named over the middle of its districts
+        const named = (ds.length ? [{ x: mid('x'), z: mid('z'), nameKey: 'c.placeName.prahold', big: true }] : []).concat(Cc.villages || []);
+        for (const v of named) {
+          if (!MP.explored(cs, id, v.x, v.z)) continue;
+          const [sx, sy] = toScreen(...wpt(id, v.x, v.z));
+          if (sx < -40 || sx > W + 40 || sy < 40 || sy > H) continue;
+          small(t(v.nameKey), sx, sy + (v.big ? 0 : Math.max(8, (v.r || 30) * s) + 8), v.big);
+          hits.push({ x: sx, y: sy, name: t(v.nameKey) });
+        }
+      }
+      // places: lair + discovered settlements / castles / aeries (T08) of every region
+      for (const id of T.zones()) for (const p of (models[id] ? models[id].places : [])) {
+        const [sx, sy] = toScreen(...wpt(id, p.x, p.z));
+        g.fillStyle = 'rgba(12,19,16,.7)'; g.beginPath(); g.arc(sx, sy, 13, 0, TAU); g.fill();
         g.strokeStyle = p.freed ? '#62c48a' : p.alert ? ALERT[Math.min(3, p.alert)] : 'rgba(233,225,204,.6)'; g.lineWidth = p.freed ? 3 : 1.5; g.stroke();   // Phase 3 T16: a freed village has a green rim
-        if (p.freed) label(t('c.map.freed'), sx, sy + 26, '#62c48a');
+        if (p.freed) small(t('c.map.freed'), sx, sy + 22, false, '#62c48a');
         const col = p.kind === 'lair' ? COL.lair : p.kind === 'castle' ? COL.castle : p.kind === 'aerie' ? COL.aerie : COL.settlement;
-        if (icon) icon(g, p.kind, sx, sy, 9, col || '#fff', 1);
+        if (icon) icon(g, p.kind, sx, sy, 8, col || '#fff', 1);
         hits.push({ x: sx, y: sy, name: t(p.key) });
       }
       // T11: the mission target - a pulsing gold ring
-      if (model.target) {
-        const [sx, sy] = toScreen(model.target.x, model.target.z), pr = 20 + 3 * Math.sin(Date.now() / 250);
+      for (const id of T.zones()) {
+        const tg = models[id] && models[id].target;
+        if (!tg) continue;
+        const [sx, sy] = toScreen(...wpt(id, tg.x, tg.z)), pr = 18 + 3 * Math.sin(Date.now() / 250);
         g.strokeStyle = '#ffd34d'; g.lineWidth = 3; g.beginPath(); g.arc(sx, sy, pr, 0, TAU); g.stroke();
         g.lineWidth = 1.5; g.beginPath(); g.arc(sx, sy, pr + 6, 0, TAU); g.stroke();
-        const name = t('c.map.target', { m: t('c.mission.' + model.target.id) });
+        const name = t('c.map.target', { m: t('c.mission.' + tg.id) });
         label(name, sx, sy + pr + 16, '#ffd34d');
         hits.push({ x: sx, y: sy, name });
       }
       // the dragon: an arrow along its heading (world direction (sin yaw, cos yaw) -> screen (-sin, -cos))
-      if (model.dragon) {
-        const [sx, sy] = toScreen(model.dragon.x, model.dragon.z), y = model.dragon.yaw;
-        g.save(); g.translate(sx, sy); g.rotate(-y);                        // the arrow points up (north) at yaw 0; +X (west) is left
+      const me = models[cs.region] && models[cs.region].dragon;
+      if (me) {
+        const [sx, sy] = toScreen(...wpt(cs.region, me.x, me.z));
+        g.save(); g.translate(sx, sy); g.rotate(-me.yaw);                  // the arrow points up (north) at yaw 0; +X (west) is left
         g.fillStyle = '#ff9447'; g.strokeStyle = INK; g.lineWidth = 2;
         g.beginPath(); g.moveTo(0, -14); g.lineTo(10, 11); g.lineTo(0, 5); g.lineTo(-10, 11); g.closePath(); g.stroke(); g.fill();
         g.restore();
@@ -165,76 +237,50 @@
       g.fillText(t('c.nav.n'), W - 28, 92); g.beginPath(); g.moveTo(W - 28, 96); g.lineTo(W - 33, 110); g.lineTo(W - 23, 110); g.closePath(); g.fill();
     }
 
-    function label(txt, x, y, col) {
+    function label(txt, x, y, col, rim) {
       g.font = '600 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       const w = g.measureText(txt).width + 10;
       const lx = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, x)), ly = Math.max(70, Math.min(H - 76, y));   // clear of the bar and the help line
       g.fillStyle = 'rgba(12,19,16,.72)'; g.fillRect(lx - w / 2, ly - 9, w, 18);
+      if (rim) { g.strokeStyle = rim; g.lineWidth = 2; g.strokeRect(lx - w / 2, ly - 9, w, 18); }
       g.fillStyle = col; g.fillText(txt, lx, ly);
     }
-
-    function drawWorld() {
-      const ids = model.regions, S = Math.min(W / 3.4, (H - 120 - padB) / 5.6), cy = (H + 40 - padB) / 2;
-      const pos = q => [W / 2 + q.col * S, cy - (q.row - 2.2) * S];
-      const by = {}; for (const q of ids) by[q.id] = q;
-      g.strokeStyle = 'rgba(233,225,204,.35)'; g.lineWidth = 3; g.setLineDash([6, 6]);
-      const pairs = [];
-      for (const id of Object.keys(D.regions)) for (const e of D.regions[id].exits || []) pairs.push([id, e.to]);
-      for (const p of D.map.links) pairs.push(p);
-      for (const [a, b] of pairs) {
-        if (!by[a] || !by[b] || !by[a].known || !by[b].known) continue;
-        const [x0, y0] = pos(by[a]), [x1, y1] = pos(by[b]);
-        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
-      }
-      g.setLineDash([]);
-      hits = [];
-      const VT = VR.terrain;
-      for (const q of ids) {
-        const [x, y] = pos(q), rr = S * 0.4;
-        if (!q.known) {                                                    // never show an undiscovered place: a fogged blob
-          g.fillStyle = FOG; g.beginPath(); g.arc(x, y, rr * 0.8, 0, TAU); g.fill();
-          g.fillStyle = '#7d7462'; g.font = '700 20px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', x, y);
-          continue;
-        }
-        const R = q.playable ? T.region(q.id) : null, pal = R && VT ? VT.PALETTES[R.palette] : null;
-        const c = pal ? pal.mid : 0x5a5a50;
-        g.fillStyle = q.playable ? '#' + c.toString(16).padStart(6, '0') : 'rgba(90,86,74,.85)';
-        g.beginPath(); for (let k = 0; k <= 12; k++) { const a = (k / 12) * TAU, w = rr * (0.88 + 0.12 * Math.sin(k * 2.7 + q.col * 3 + q.row)); k ? g.lineTo(x + Math.cos(a) * w, y + Math.sin(a) * w) : g.moveTo(x + Math.cos(a) * w, y + Math.sin(a) * w); } g.closePath(); g.fill();
-        g.strokeStyle = q.alert ? ALERT[Math.min(3, q.alert)] : 'rgba(233,225,204,.5)'; g.lineWidth = q.alert ? 3 : 1.5; g.stroke();
-        if (q.id === 'ash') { g.fillStyle = '#3a2a22'; g.beginPath(); g.moveTo(x - rr * 0.35, y + rr * 0.2); g.lineTo(x, y - rr * 0.35); g.lineTo(x + rr * 0.35, y + rr * 0.2); g.closePath(); g.fill(); g.fillStyle = '#e06a2a'; g.beginPath(); g.arc(x, y - rr * 0.3, rr * 0.08, 0, TAU); g.fill(); }
-        if (q.mission) { g.strokeStyle = '#ffd34d'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(x, y, rr * 1.05, 0, TAU); g.stroke(); g.setLineDash([]); }   // T11
-        if (q.here) { g.fillStyle = '#ff9447'; g.beginPath(); g.arc(x + rr * 0.55, y - rr * 0.55, 7, 0, TAU); g.fill(); g.strokeStyle = INK; g.lineWidth = 2; g.stroke(); }
-        let name = t(q.nameKey);
-        label(name, x, y + rr * 0.62, '#ebe3cd');
-        if (q.locked) {
-          const why = q.locked.later ? t('c.map.later') : t('c.map.needs', { stage: stageName(q.locked.stage) });
-          lock(x, y - 2); label(why, x, y + rr * 0.62 + 20, '#e0b040'); name += ' - ' + why;
-        }
-        hits.push({ x, y, r: Math.max(rr, D.map.tapPx / 2), name, region: q.playable && q.visited ? q.id : null });
-      }
-    }
-    function lock(x, y) {
-      g.strokeStyle = '#e0b040'; g.fillStyle = '#e0b040'; g.lineWidth = 2.5;
-      g.beginPath(); g.arc(x, y - 6, 6, Math.PI, 0); g.stroke(); g.fillRect(x - 8, y - 6, 16, 12);
+    function small(txt, x, y, big, col) {
+      g.font = (big ? '700 13px' : '600 10px') + ' sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = 3; g.strokeStyle = 'rgba(20,14,8,.85)'; g.strokeText(txt, x, y);
+      g.fillStyle = col || (big ? '#ffe9c8' : '#f3ead4'); g.fillText(txt, x, y);
     }
 
     function draw() {
       if (!open) return;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.fillStyle = '#1d1810'; g.fillRect(0, 0, W, H);
-      if (view === 'world') drawWorld(); else drawRegion();
-      const help = el.querySelector('#mapHelp'); if (help) help.textContent = view === 'world' ? t('c.map.helpWorld') : (opts.help || '');
+      drawMap();
+      const help = el.querySelector('#mapHelp'); if (help) help.textContent = opts.help || '';
       titleEl.textContent = view === 'world' ? t('c.map.world') : t('c.region.' + regionId);
       el.querySelector('#mapWorldBtn').classList.toggle('on', view === 'world');
       el.querySelector('#mapRegionBtn').classList.toggle('on', view === 'region');
-      el.querySelector('#mapZoomIn').hidden = el.querySelector('#mapZoomOut').hidden = view === 'world';
+      el.querySelector('#mapZoomIn').hidden = el.querySelector('#mapZoomOut').hidden = false;
     }
 
-    function refresh() { model = MP.model(cs, regionId); draw(); }
+    function refresh() {
+      models = {};
+      for (const id of T.zones()) models[id] = MP.model(cs, id);
+      draw();
+    }
 
+    /** 'world': the whole map; 'region': centred on the region (the dragon's by default, on the dragon itself when in it). */
     function setView(v, id) {
       view = v;
-      if (id && id !== regionId) { regionId = id; cam.zoom = 1; cam.cx = cam.cz = 0; }
+      if (v === 'world') { const r = rect(); cam.zoom = 1; cam.cx = (r.x0 + r.x1) / 2; cam.cz = (r.z0 + r.z1) / 2; }
+      else {
+        regionId = id || (cs && cs.region) || regionId;
+        const R = T.region(regionId), r = rect(), p = cs && cs.dragon.pilot;
+        cam.zoom = Math.max(D.map.zoom[0], Math.min(D.map.zoom[1], (r.z1 - r.z0) / (2 * R.radius) * 0.9));
+        const at = p && regionId === cs.region && !cs.inLair ? T.toWorld(regionId, p.pos[0], p.pos[2]) : R.origin;
+        cam.cx = at[0]; cam.cz = at[1];
+      }
+      clampCam();
       tagEl.hidden = true;
       refresh();
     }
@@ -252,11 +298,10 @@
         if (d <= rr && d < bd) { best = h; bd = d; }
       }
       if (!best) { tagEl.hidden = true; return; }
-      if (view === 'world' && best.region) { setView('region', best.region); return; }
       show(best.name, best.x, best.y);
     }
 
-    // pointers: one = pan (region view), two = pinch zoom; a short still press = tap
+    // pointers: one = pan, two = pinch zoom; a short still press = tap
     const ptrs = new Map();
     let pinch = null, downAt = null;
     cv.addEventListener('pointerdown', e => {
@@ -270,7 +315,6 @@
       const p = ptrs.get(e.pointerId); if (!p) return;
       const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
       if (downAt) downAt.moved += Math.hypot(dx, dy);
-      if (view !== 'region') return;
       if (ptrs.size >= 2 && pinch) {
         const [a, b] = [...ptrs.values()];
         cam.zoom = pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, pinch.d);
@@ -287,9 +331,9 @@
       if (ptrs.size === 0 && downAt) { if (downAt.moved < 10 && Date.now() - downAt.t < 600) tap(e.clientX, e.clientY); downAt = null; }
     };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-    cv.addEventListener('wheel', e => { if (view !== 'region') return; zoomBy(e.deltaY < 0 ? 1.25 : 0.8); e.preventDefault(); }, { passive: false });
+    cv.addEventListener('wheel', e => { zoomBy(e.deltaY < 0 ? 1.25 : 0.8); e.preventDefault(); }, { passive: false });
 
-    function zoomBy(f) { if (view !== 'region') return; cam.zoom *= f; clampCam(); draw(); }
+    function zoomBy(f) { cam.zoom *= f; clampCam(); draw(); }
     el.querySelector('#mapZoomIn').onclick = () => zoomBy(1.4);
     el.querySelector('#mapZoomOut').onclick = () => zoomBy(1 / 1.4);
     el.querySelector('#mapWorldBtn').onclick = () => setView('world');
@@ -298,20 +342,19 @@
     function openMap(state, v) {
       cs = state; open = true; el.hidden = false;
       size();
-      if (regionId !== cs.region) { regionId = cs.region; cam.zoom = 1; cam.cx = cam.cz = 0; }
-      if (cs.inLair && D.regions[cs.region].lair) cam.cx = cam.cz = 0;
-      setView(v || (D.regions[cs.region] ? 'region' : 'world'));
+      regionId = cs.region;
+      setView(v || 'region', cs.region);
     }
     function close() { open = false; el.hidden = true; tagEl.hidden = true; ptrs.clear(); pinch = null; }
     function tick(dt) { if (open && tagT > 0 && (tagT -= dt) <= 0) tagEl.hidden = true; }
-    root.addEventListener('resize', () => { if (open) { size(); draw(); } });
+    root.addEventListener('resize', () => { if (open) { size(); clampCam(); draw(); } });
 
     return {
-      open: openMap, close, tick, setPad: px => { padB = Math.max(0, px || 0); if (open) draw(); }, redraw: () => open && refresh(), setView, zoomBy, tap,
+      open: openMap, close, tick, setPad: px => { padB = Math.max(0, px || 0); if (open) { clampCam(); draw(); } }, redraw: () => open && refresh(), setView, zoomBy, tap,
       get isOpen() { return open; }, get view() { return view; }, get region() { return regionId; }, get cam() { return cam; },
-      get hits() { return hits.slice(); }, imageMs: id => imageMs[id], get info() { return { images: Object.keys(images), imageMs: Object.assign({}, imageMs) }; },
+      get hits() { return hits.slice(); }, imageMs: () => imageTime, get info() { return { image: !!image, imageMs: imageTime }; },
     };
   }
 
-  VR.mapView = { build, regionImage };
+  VR.mapView = { build, worldImage };
 })(typeof self !== 'undefined' ? self : this);

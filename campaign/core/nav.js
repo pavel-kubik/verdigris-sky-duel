@@ -126,8 +126,7 @@
 
   /** Point on the region edge in the middle of an exit arc. */
   function exitPoint(regionId, e) {
-    const a = RG.arcMid(e), r = T.region(regionId).radius;
-    return [Math.sin(a) * r, Math.cos(a) * r];
+    return RG.exitPoint(regionId, e);
   }
 
   const lairRegion = () => Object.keys(D.regions).find(id => D.regions[id].lair) || null;

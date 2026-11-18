@@ -41,7 +41,7 @@
   /** Can the feet move from (x0, z0) to (x1, z1)? Not into water or lava, not up a wall or too steep a slope. */
   function passable(h, ctx, x0, z0, x1, z1) {
     const R = T.region(ctx.regionId), H = K();
-    if (Math.hypot(x1, z1) > R.radius - 40) return false;
+    if (T.edgeDist(ctx.regionId, x1, z1) < 40) return false;
     if (T.liquidAt(ctx.regionId, x1, z1) && !T.liquidAt(ctx.regionId, x0, z0)) return false;
     const roof = ctx.solidAt ? ctx.solidAt(x1, z1) : null, g1 = groundY(ctx, x1, z1);
     if (roof != null && roof > g1 + H.stepUp && roof > h.pos[1] + H.stepUp) return false;         // a wall

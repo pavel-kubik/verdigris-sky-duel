@@ -6,13 +6,13 @@ const CR = core('crops'), D = core('data'), T = core('terrain'), S = core('state
 const { mulberry } = core('math');
 const C = D.corn;
 
-// 1. the Farmlands have corn fields, the other regions none; ids are stable
+// 1. the Farmlands have corn fields (the other regions of the one world too); ids are stable
 {
   const ids = CR.ids('farm');
   ok(ids.length >= 2, 'at least 2 corn fields in the Farmlands: ' + ids.length);
   ok(ids.every(c => c.f.crop === C.crop && /^farm\.corn\d+$/.test(c.id)), 'corn crop, ids farm.corn<n>');
   ok(CR.ids('farm').map(c => c.id).join() === ids.map(c => c.id).join(), 'same fields every time');
-  ok(CR.ids('ash').length === 0 && CR.ids('wild').length === 0, 'no corn outside the Farmlands');
+  for (const id of ['ash', 'wild', 'bend']) ok(CR.ids(id).every(c => c.id.startsWith(id + '.corn')), 'corn ids of ' + id + ' carry its name (fields now grow in every region of the one world)');
 }
 
 /** A breath cone from 20 above a spot of field f, pointing down at it. */

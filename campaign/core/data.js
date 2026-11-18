@@ -52,7 +52,7 @@
 
     hunger: {
       max: 100, start: 80,
-      drain: 0.33,            // per second at hungerMult 1 (100 to 0 in about 5 min)
+      drain: 0.3,             // per second at hungerMult 1 (100 to 0 in about 5.5 min; 0.33 before the one world's longer flights)
       boostDrain: 0.25,       // extra per second while boosting
       breathDrain: 0.15,      // extra per second while breathing fire
       states: { hungry: 30, starving: 10 },
@@ -109,11 +109,12 @@
     pose: { gaitLen: 3, turnGait: 1.4, legRate: 4, legsAt: 0.25, foldAt: 0.55, tuckAt: 0.6 },
     groundCam: { back: 18, height: 6, look: 10 },
     ground: { reach: 6, reachCone: 0.7, eatTime: 2.5, breathPitch: -0.15 },
-    // region travel: the exit prompt shows within edgeBand of the radius while heading outward (cos of the angle
-    // between heading and the outward direction >= outwardCos) and stays promptHold s after the dragon turns back;
-    // a traveller appears entryInset inside the new region's radius, about entryAlt above the ground;
-    // inside an exit arc the flight soft boundary narrows to softEdge (120 elsewhere) so the dragon can reach the exit
-    travel: { edgeBand: 90, outwardCos: 0.2, promptHold: 3, entryInset: 220, entryAlt: 45, softEdge: 45 },
+    // region edges (one world, core/region.js): over a shared edge the dragon is in the next region at once; a region it
+    // is too small for says so within edgeBand of that edge while it heads outward (cos of the angle between heading and
+    // the outward direction >= outwardCos) and for promptHold s after it turns back (the flight steers it back);
+    // a jump (debug, tests) puts the dragon entryInset inside the new region's edge, about entryAlt above the ground;
+    // softEdge: kept for old callers (the soft wall is flight.SOFT_EDGE wide everywhere now)
+    travel: { edgeBand: 160, outwardCos: 0.2, promptHold: 3, entryInset: 220, entryAlt: 45, softEdge: 45 },
 
     // lair: larder slots, 1 food lost per spoilEvery s, the "fly into the cave" prompt within nearRange of the mouth,
     // the Move slot "Enter cave" (touch) within enterRange of the mouth while heading toward it
@@ -218,7 +219,7 @@
     // T24 (test/raid.test.js): loot 1.0 -> 1.5 so back-to-back raids lift the alert one level each (1, 2, 3)
     alert: {
       maxLevel: 3, maxHeat: 3.99,
-      add: { sighted: 0.2, bell: 0.5, orderBurned: 0.5, civilBurned: 0.75, livestock: 1.0, defenderKilled: 0.25, loot: 1.5 },
+      add: { sighted: 0.2, bell: 0.5, orderBurned: 0.5, civilBurned: 0.75, livestock: 1.0, defenderKilled: 0.25, loot: 1.7 },   // one world: loot 1.5 -> 1.7 (longer trips home, more quiet time between raids)
       quiet: 60,
       decay: 0.0035,
       towerDownMult: 2,
@@ -380,7 +381,7 @@
          unit, heights x exag). In the game the old volcano woke up: a crater (cone h 0 = only the crater, dug into the
          summit), lava streams down the flanks, the cave on the south flank facing the way to the Wildwood and Prahold. */
       ash: {
-        nameKey: 'c.region.ash', radius: 1100, seed: 11, ceiling: 340,
+        nameKey: 'c.region.ash', radius: 1200, seed: 11, ceiling: 340, origin: [0, 7200],
         terrain: { dem: 'demRip', exag: 2.2, offset: -12, base: 20, features: [
           { type: 'cone', x: -35, z: 0, r: 200, h: 0, crater: { r: 34, depth: 22 } },
           // lava streams out of the crater (terrain.lavaFlows): a = direction (0 = +Z, north; the cave side, PI, stays
@@ -394,68 +395,73 @@
         lair: { x: 0, z: -130, above: 7, r: 18, facing: PI },
         spawn: { x: 0, z: -260, y: 110, yaw: PI },          // respawn point in front of the cave, facing away (south)
         // far: a living forest toward the rim (from .. full = thin to dense), so the land round Rip is alive beyond the ash
-        flora: { trees: 60, rocks: 140, far: { trees: 640, from: 500, full: 800, kinds: 'ashfar' } },
         herds: [{ type: 'goat', count: 4, ring: [350, 900] }],
         // the villages round Rip on the plain (scenery: no guards), at about their real bearings from the hill
         city: { villages: [
-          { id: 'krabcice', nameKey: 'c.placeName.krabcice', x: -240, z: 360, r: 55, church: true },
-          { id: 'ctineves', nameKey: 'c.placeName.ctineves', x: -380, z: -380, r: 50 },
-          { id: 'mnetes', nameKey: 'c.placeName.mnetes', x: 160, z: -680, r: 48, plan: 'street', yaw: 1.2 },
-          { id: 'vrazkov', nameKey: 'c.placeName.vrazkov', x: 520, z: -440, r: 48 },
-          { id: 'klenec', nameKey: 'c.placeName.klenec', x: 560, z: 420, r: 46 },
+          { id: 'krabcice', nameKey: 'c.placeName.krabcice', x: -240, z: 540, r: 55, church: true },
+          { id: 'ctineves', nameKey: 'c.placeName.ctineves', x: 940, z: -300, r: 50 },
+          { id: 'mnetes', nameKey: 'c.placeName.mnetes', x: 160, z: -700, r: 48, plan: 'street', yaw: 1.2 },
+          { id: 'vrazkov', nameKey: 'c.placeName.vrazkov', x: 560, z: -460, r: 48 },
+          { id: 'klenec', nameKey: 'c.placeName.klenec', x: 600, z: 400, r: 46 },
+          { id: 'roudnice', nameKey: 'c.placeName.roudnice', x: 520, z: 1020, r: 60, church: true, plan: 'street', yaw: 1.4 },
         ] },
-        exits: [{ to: 'wild', angleFrom: PI - 0.6, angleTo: PI + 0.6 }],     // radians, 0 = +Z; region edge arc on the south side
-        entries: { wild: { angle: PI } },
+        flora: { trees: 60, rocks: 140, fields: 40, far: { trees: 640, from: 500, full: 800, kinds: 'ashfar' } },
+        exits: [{ to: 'wild', side: 's' }],                 // the region edge on the south side, toward Prahold
       },
       wild: {
-        nameKey: 'c.region.wild', radius: 1100, seed: 23, ceiling: 280,
-        waterLevel: 0.6,                                    // lakes in the hollows (T11: not landable, not walkable)
-        terrain: { amp: 1.0, base: 12, features: [
-          { type: 'plateau', x: 420, z: 300, r: 40 },       // settlement ground (T11): the hamlet and the small outpost (T12)
-          { type: 'plateau', x: -380, z: -520, r: 30 },
+        nameKey: 'c.region.wild', radius: 1200, seed: 23, ceiling: 340, origin: [0, 4800],
+        terrain: { features: [
+          { type: 'plateau', x: -650, z: 0, r: 40 },        // settlement ground (T11): the hamlet and the small outpost (T12)
+          { type: 'plateau', x: 550, z: 650, r: 30 },
+          { type: 'bridge', snap: 'river', x: 400, z: -760, width: 7, kind: 'wood' },      // over the Vltava by Veltrusy
         ] },
         palette: 'forest',
-        flora: { trees: 1400, rocks: 120 },
-        herds: [{ type: 'deer', count: 5, ring: [200, 1000] }, { type: 'boar', count: 3, ring: [300, 1000] },
-                { type: 'goat', count: 2, ring: [600, 1000] }],
-        // (mirrored north - south when Mount Rip moved north of Prahold: the hamlet stays on the Rip side, the outpost on the Farmlands side)
-        settlements: [{ type: 'hamlet', x: 420, z: 300, yaw: PI - 0.4 }, { type: 'outpostS', x: -380, z: -520, yaw: PI - 2.1 }],
-        // minStage: a smaller dragon is told it is too small (prompt, no travel); the Farmlands are for a Drake
-        // north to Mount Rip, south to the Farmlands (the Vltava valley on the way to Prahold)
+        flora: { trees: 1800, rocks: 120, fields: 14 },
+        herds: [{ type: 'deer', count: 5, ring: [200, 1100] }, { type: 'boar', count: 3, ring: [300, 1100] },
+                { type: 'goat', count: 2, ring: [600, 1100] }],
+        settlements: [{ type: 'hamlet', x: -650, z: 0, yaw: PI - 0.4 }, { type: 'outpostS', x: 550, z: 650, yaw: PI - 2.1 }],
+        // the Vltava valley north of Kralupy: Nelahozeves and Veltrusy on the river, Lhota and Horinves in the woods
         city: { villages: [
-          { id: 'lhota', nameKey: 'c.placeName.lhota', x: -650, z: -80, r: 46 },
-          { id: 'zelizy', nameKey: 'c.placeName.zelizy', x: 300, z: -760, r: 44, plan: 'street', yaw: 0.6 },
+          { id: 'nelahozeves', nameKey: 'c.placeName.nelahozeves', x: 560, z: -820, r: 50, church: true },
+          { id: 'veltrusy', nameKey: 'c.placeName.veltrusy', x: 40, z: -560, r: 52, plan: 'street', yaw: 0.5 },
+          { id: 'lhota', nameKey: 'c.placeName.lhota', x: 880, z: -400, r: 46 },
+          { id: 'horinves', nameKey: 'c.placeName.horinves', x: 240, z: 600, r: 46 },
+          { id: 'vranany', nameKey: 'c.placeName.vranany', x: -760, z: 760, r: 48, plan: 'street', yaw: 0.9 },
+          { id: 'zelizy', nameKey: 'c.placeName.zelizy', x: -900, z: -120, r: 44 },
         ] },
-        exits: [{ to: 'ash', angleFrom: -0.6, angleTo: 0.6 }, { to: 'farm', angleFrom: PI - 0.6, angleTo: PI + 0.6, minStage: 1 }],
-        entries: { ash: { angle: 0 }, farm: { angle: PI } },
+        // north to Mount Rip, south to the Farmlands (the Vltava valley on the way to Prahold); minStage: the Farmlands are for a Drake;
+        // x: where the way over the edge naturally runs (the compass, the mother and the test pilots aim there): here east of
+        // the river, between the woods and the Order's outpost
+        exits: [{ to: 'ash', side: 'n' }, { to: 'farm', side: 's', minStage: 1, x: -150 }],
       },
-      /* River Farmlands (Phase 2 T11): open farmland, a river across the middle, a road from the Wildwood side up to
-         the village, flat plateaus for the three settlements (T12). river: points, width, depth (+ level, valley);
-         road: points, width; plateau: x, z, r (+ edge, y). flora.fields = crop fields placed near roads and the river. */
+      /* River Farmlands (Phase 2 T11): open farmland on both sides of the Vltava between Prahold and Kralupy (the real
+         valley, core/dem-world.js), Roztoky, Klecany, Rez and Libcice by the river, three Order settlements on plateaus
+         (T12), bridges at Roztoky and Kralupy. flora.fields = crop fields placed along the roads and the river. */
       farm: {
-        nameKey: 'c.region.farm', radius: 1100, seed: 37, ceiling: 300,
-        waterLevel: 0,                                      // ponds in the lowest hollows
-        terrain: { amp: 0.6, base: 12, features: [
-          { type: 'road', points: [[0, 1100], [0, 300], [380, -260], [700, -640]], width: 8 },
-          { type: 'river', points: [[-1100, 200], [-300, 0], [200, -150], [1100, -80]], width: 26, depth: 6 },
-          { type: 'plateau', x: 380, z: -260, r: 70 }, { type: 'plateau', x: -420, z: 460, r: 50 },
-          { type: 'plateau', x: 640, z: 520, r: 90 },
+        nameKey: 'c.region.farm', radius: 1200, seed: 37, ceiling: 340, origin: [0, 2400],
+        terrain: { features: [
+          { type: 'plateau', x: -600, z: -450, r: 70 }, { type: 'plateau', x: -280, z: 300, r: 50 },
+          { type: 'plateau', x: -300, z: 800, r: 90 },
+          { type: 'bridge', snap: 'river', x: 200, z: -200, width: 8, kind: 'wood' },      // Roztoky - Klecany
+          { type: 'bridge', snap: 'river', x: 250, z: 880, width: 8 },                     // Kralupy (stone)
         ] },
         palette: 'farm',
-        flora: { trees: 500, rocks: 60, fields: 24 },
-        herds: [{ type: 'deer', count: 2, ring: [700, 1000] }],
-        // (mirrored north - south with Mount Rip north of Prahold: the road still comes from the Wildwood side)
-        settlements: [{ type: 'village', x: 380, z: -260, yaw: PI }, { type: 'hamlet', x: -420, z: 460, yaw: PI - 1.2 },
-                      { type: 'outpost', x: 640, z: 520, yaw: PI + 0.8 }],
+        flora: { trees: 700, rocks: 60, fields: 60 },
+        herds: [{ type: 'deer', count: 2, ring: [700, 1100] }],
+        settlements: [{ type: 'village', x: -600, z: -450, yaw: PI }, { type: 'hamlet', x: -280, z: 300, yaw: PI - 1.2 },
+                      { type: 'outpost', x: -300, z: 800, yaw: PI + 0.8 }],
         // north to the Wildwood, south down the valley to the Veltava Bend (Prahold)
         city: { villages: [
-          { id: 'roztoky', nameKey: 'c.placeName.roztoky', x: -620, z: -380, r: 60, church: true },
-          { id: 'uholicky', nameKey: 'c.placeName.uholicky', x: 160, z: 640, r: 50 },
-          { id: 'libcice', nameKey: 'c.placeName.libcice', x: -720, z: 600, r: 52, plan: 'street', yaw: 0.4 },
-          { id: 'suchdol', nameKey: 'c.placeName.suchdol', x: 820, z: 80, r: 50 },
+          { id: 'roztoky', nameKey: 'c.placeName.roztoky', x: 420, z: -400, r: 60, church: true },
+          { id: 'klecany', nameKey: 'c.placeName.klecany', x: -150, z: 60, r: 50 },
+          { id: 'rez', nameKey: 'c.placeName.rez', x: 700, z: 240, r: 46, plan: 'street', yaw: 0.3 },
+          { id: 'libcice', nameKey: 'c.placeName.libcice', x: 440, z: 560, r: 52, plan: 'street', yaw: 0.4 },
+          { id: 'uholicky', nameKey: 'c.placeName.uholicky', x: 960, z: -280, r: 48 },
+          { id: 'suchdol', nameKey: 'c.placeName.suchdol', x: 900, z: -900, r: 50 },
+          { id: 'odolena', nameKey: 'c.placeName.odolena', x: -520, z: 960, r: 52, church: true },
+          { id: 'kralupy', nameKey: 'c.placeName.kralupy', x: 560, z: 980, r: 60, church: true },
         ] },
-        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }, { to: 'bend', angleFrom: PI - 0.5, angleTo: PI + 0.5, minStage: 1 }],
-        entries: { wild: { angle: 0 }, bend: { angle: PI } },
+        exits: [{ to: 'wild', side: 'n', x: -150 }, { to: 'bend', side: 's', minStage: 1 }],
       },
       /* Veltava Bend (Phase 3 T02, 003_task_missions.md 4.2): real Prague terrain baked into core/dem-bend.js
          (tools/terrain). terrain.dem: base heights from that grid (metres above its base / metresPerUnit x exag +
@@ -464,7 +470,7 @@
          burned royal city: scenery only), road, bridge (a dry deck at bank height: Karlsbridge in stone, a wooden one
          to Holeshwick). Vyshgard Castle itself joins the settlements in T03 / T04 (its plateau is already here). */
       bend: {
-        nameKey: 'c.region.bend', radius: 1200, seed: 53, ceiling: 340,
+        nameKey: 'c.region.bend', radius: 1200, seed: 53, ceiling: 340, origin: [0, 0],
         terrain: {
           dem: 'demBend', exag: 1.6, offset: 4, water: 'mask',
           features: [
@@ -557,11 +563,48 @@
             { id: 'dejvice', nameKey: 'c.placeName.dejvice', x: 840, z: 290, r: 55 },
           ],
         },
-        exits: [{ to: 'farm', angleFrom: -0.1, angleTo: 0.9 }],
-        entries: { farm: { angle: 0.45 } },                                                             // north-west, where the river leaves the city (Podbaba)
+        exits: [{ to: 'farm', side: 'n' }],                    // north, downstream where the river leaves the city (Podbaba)
       },
     },
     startRegion: 'ash',
+
+    /* Worlds of their own outside the campaign (terrain.region looks here after data.regions). */
+    arenas: {
+      /* The deathmatch arena (core/dm.js): the old Wildwood, a world of its own (no origin): noise hills, lakes, forest. */
+      arena: {
+        nameKey: 'c.region.wild', radius: 1100, seed: 23, ceiling: 280,
+        waterLevel: 0.6,                                    // lakes in the hollows (T11: not landable, not walkable)
+        terrain: { amp: 1.0, base: 12, features: [
+          { type: 'plateau', x: 420, z: 300, r: 40 },       // the deathmatch's perches: a hamlet and a small outpost
+          { type: 'plateau', x: -380, z: -520, r: 30 },
+        ] },
+        palette: 'forest',
+        flora: { trees: 1400, rocks: 120 },
+        herds: [{ type: 'deer', count: 5, ring: [200, 1000] }, { type: 'boar', count: 3, ring: [300, 1000] },
+                { type: 'goat', count: 2, ring: [600, 1000] }],
+        settlements: [{ type: 'hamlet', x: 420, z: 300, yaw: PI - 0.4 }, { type: 'outpostS', x: -380, z: -520, yaw: PI - 2.1 }],
+      },
+    },
+
+    /* One world (core/terrain.js zones, core/roads.js): the regions with an `origin` are squares of half size `radius`
+       side by side in one world (+X west, +Z north): the Bend (Prahold) at 0, 0, the Farmlands, the Wildwood and Mount
+       Rip northward, 2400 units apart, so Rip lies 7200 units due north of the city. The ground is the real terrain of
+       the whole valley (core/dem-world.js, tools/terrain/world.py) with the Bend's and Rip's finer models blended in
+       over `band` units at their edges; heights in units = (metres - base) / 3.6 x exag + offset, exag and offset
+       blending from the Bend's (Z <= blend[0]) to Rip's (Z >= blend[1]). river: the Vltava below the Bend (channel
+       width, depth, valley floor, water `up` over the traced level, `join` units over which it meets the Bend's level,
+       `lead` = how many samples of the Bend's own river line lead into it, so the two rivers join without a gap).
+       roads: the network between neighbouring villages (core/roads.js): width, A* grid cell, margin from the world edge,
+       climb = cost of slope^2, reuse = cost factor on ground an earlier road took, cityCost = extra cost inside Prahold,
+       gabriel = neighbour test radius factor, maxLen, detour = the longest road as a multiple of the straight line,
+       simplify = path simplification (units), snap = a road joins an earlier one closer than this, green = a road ends this share of a village's radius from its centre, gate =
+       units from a settlement's centre where it ends, nodes = extra road ends (world coordinates: Prahold's gates). */
+    world: {
+      band: 160, base: 170, blend: [1200, 6000], exag: [1.6, 2.2], offset: [4, -12],
+      river: { width: 30, depth: 5, valley: 70, up: 0.4, join: 300, lead: 8 },
+      roads: { width: 6, cell: 30, margin: 90, climb: 260, reuse: 0.55, cityCost: 6, gabriel: 1.0, maxLen: 1700, detour: 1.7, simplify: 9, green: 0.42, gate: 36, snap: 14,
+               nodes: [{ id: 'praholdN', x: 700, z: 420 }, { id: 'praholdE', x: -500, z: -120 }, { id: 'praholdS', x: 255, z: -1100 }] },
+    },
 
     /* The mother dragon (Phase 2 T05, core/mother.js). She flies ahead toward the lesson's goal, demonstrates
        (show) once the hatchling is within showRange of it, then circles over it (wait) until the hatchling copies her.
@@ -604,7 +647,7 @@
       world: { bend: [0, 0], farm: [0.2, 1], wild: [-0.3, 2], ash: [-0.2, 3], pass: [-1.3, 0.6], low: [1.3, 0.5], capital: [0, -1.3] },
       later: { pass: { stage: 1 }, low: { stage: 2 }, capital: { stage: 3 } },   // 000_spec.md 9: Drake (late), Wyrm, Elder
       links: [['pass', 'farm'], ['low', 'bend'], ['capital', 'bend']],
-      zoom: [1, 4], tapPx: 36,
+      zoom: [1, 18], tapPx: 36,
     },
 
     /* Aeries (Phase 3 T08, core/aerie.js, render/aerie-view.js; 003_task_missions.md 4.4). A small cliff cave per region
@@ -613,7 +656,7 @@
        Flying into the mouth (inside `mouthR` x scale) or the Move slot within `enterRange` enters: carried loot is
        banked, Rest heals (no stage-up: that stays at the nest), Leave puts the dragon back in the air in front of it. */
     aeries: {
-      wild: { x: -620, z: 480, facing: PI - 1.9 },
+      wild: { x: -250, z: 500, facing: PI },            // one world: on the valley side above the Vltava, facing down it
       farm: { x: 720, z: -560, facing: PI + 2.4 },
       bend: { x: 120, z: 1010, facing: Math.PI },      // a cleft in the Troyvale rocks, facing the river
       discover: 200, enterRange: 40, nearRange: 110, mouthR: 9, above: 6, out: 26, outY: 22, room: { r: 22, h: 14 },
@@ -633,10 +676,10 @@
       briefs: { a2_chalice: 3, a2_workshop: 2, a2_caravan: 2 } },
     missions: [
       { id: 'a2_chalice',  type: 'steal',     act: 2, minStage: 1, region: 'bend', target: 'bend.castle.chapel1',
-        relic: 'ember_chalice', time: 660, reward: { gold: 250 } },
+        relic: 'ember_chalice', time: 780, reward: { gold: 250 } },
       { id: 'a2_workshop', type: 'destroy',   act: 2, minStage: 1, region: 'bend', target: 'bend.castle.workshop1',
-        time: 720, reward: { gold: 200 } },
-      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 720,
+        time: 840, reward: { gold: 200 } },
+      { id: 'a2_caravan',  type: 'intercept', act: 2, minStage: 1, region: 'bend', caravan: 'tithe', time: 840,
         reward: { gold: 300 } },
     ],
     mission: { bonusPer: 5, bonus: 0.01, warn: 60, danger: 20, retryAfter: 'rest', alertOnFail: 1,
@@ -657,7 +700,7 @@
        wagon or the oxen (`oxen` units ahead) costs `burn` hp/s; at 0 it stops and drops its `chest` on the road
        `chestBack` units behind it. Road 1 of the Bend: the Hradchan side, Karlsbridge, the east bank, the castle gate. */
     caravan: {
-      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 7, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
+      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 6, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
       burn: 20, oxen: 5, catchUp: 2, chestBack: 4,
       slots: [[-4, 1], [4, 1], [0, -7]],
     },
@@ -777,7 +820,7 @@
        food: wandering animals; a dragon within eatR (horizontal) and eatAlt above it eats it (+hp), back after respawn s;
        they flee dragons within flee. */
     dm: {
-      region: 'wild', maxPlayers: 8, fragLimit: 10, timeLimit: 600, overTime: 12,
+      region: 'arena', maxPlayers: 8, fragLimit: 10, timeLimit: 600, overTime: 12,
       arena: { r: 640, soft: 110 },
       hp: 100, regen: 0.35, respawn: 5, spawnInv: 3, spawnAlt: 60, minAlt: 3, stand: 1.6,
       stats: { turn: 1.0, cruise: 30, boost: 54 },

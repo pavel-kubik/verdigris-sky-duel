@@ -48,7 +48,7 @@ for (const id of ids) {
   for (let i = 0; i < 2000; i++) {
     const p = [(rng() * 2 - 1) * 2000, (rng() * 2 - 1) * 600, (rng() * 2 - 1) * 2000];
     T.clampToRegion(id, p);
-    ok(Math.hypot(p[0], p[2]) <= R.radius + 1e-6, 'inside radius');
+    ok(T.edgeDist(id, p[0], p[2]) >= -1e-6, 'inside the world');
     ok(p[1] >= Math.min(R.ceiling, T.surfaceAt(id, p[0], p[2]) + D.flight.minAlt) - 1e-6 && p[1] <= R.ceiling + 1e-9, 'altitude bounds');
   }
 }
@@ -67,31 +67,37 @@ for (const id of ids) {
   near(lp[1] - T.surfaceAt('ash', L.x, L.z), L.above, 1e-9, 'lair mouth sits on the slope');
   ok(T.slopeAt('ash', L.x, L.z) > 0.2, 'lair is on the volcano flank, not the plain');
   let wet = 0, n = 0;
-  for (let x = -1000; x <= 1000; x += 25) for (let z = -1000; z <= 1000; z += 25) { if (Math.hypot(x, z) > 1000) continue; n++; if (T.heightAt('ash', x, z) < 0.6) wet++; }
-  ok(wet / n < 0.02, 'ash plain is dry: ' + (100 * wet / n).toFixed(1) + '% below water level');
+  for (let x = -1000; x <= 1000; x += 25) for (let z = -1000; z <= 1000; z += 25) { n++; if (T.liquidAt('ash', x, z) === 'water') wet++; }
+  ok(wet / n < 0.02, 'ash plain is dry: ' + (100 * wet / n).toFixed(1) + '% water');
   ok(T.lavaLevel('wild') === null && T.lairPos('wild') === null, 'Wildwood has no volcano and no lair');
 }
 
-// Wildwood: some lakes, mostly land
+// Wildwood: the real valley - mostly land, the Vltava crossing it
 {
   let wet = 0, n = 0;
-  for (let x = -1000; x <= 1000; x += 25) for (let z = -1000; z <= 1000; z += 25) { if (Math.hypot(x, z) > 1000) continue; n++; if (T.heightAt('wild', x, z) < 0.6) wet++; }
-  ok(wet / n > 0.03 && wet / n < 0.25, 'Wildwood has lakes but is mostly land: ' + (100 * wet / n).toFixed(1) + '%');
+  for (let x = -1000; x <= 1000; x += 25) for (let z = -1000; z <= 1000; z += 25) { n++; if (T.liquidAt('wild', x, z) === 'water') wet++; }
+  ok(wet / n > 0.002 && wet / n < 0.1, 'Wildwood is mostly land with the river: ' + (100 * wet / n).toFixed(1) + '%');
 }
 
-// A rugged ridge rises outside the region radius (natural boundary)
+// One world: the regions' edges join (same height on both sides), a rugged ridge rises outside the world only
 for (const id of ids) {
   const R = D.regions[id];
-  let inside = 0, outside = 0, low = Infinity, n = 0;
-  for (let a = 0; a < Math.PI * 2; a += 0.05, n++) {
-    inside += T.heightAt(id, Math.cos(a) * (R.radius - 60), Math.sin(a) * (R.radius - 60));
-    const o = T.heightAt(id, Math.cos(a) * (R.radius + 300), Math.sin(a) * (R.radius + 300));
-    outside += o; low = Math.min(low, o);
+  for (const e of R.exits) {
+    const zz = e.side === 'n' ? R.radius : -R.radius, Q = D.regions[e.to], zq = e.side === 'n' ? -Q.radius : Q.radius;
+    for (let x = -R.radius; x <= R.radius; x += 150) near(T.heightAt(id, x, zz), T.heightAt(e.to, x, zq), 1e-6, id + ' joins ' + e.to + ' at x ' + x);
+    near(T.surfaceAt(id, 3.75, zz - 3.75), T.surfaceAt(e.to, 3.75, zq - 3.75), 1e-6, 'the drawn surfaces join too: ' + id + ' / ' + e.to);
   }
-  ok(outside / n > inside / n + 100, 'ridge rises well above the region beyond the edge: ' + id);
-  ok(low > R.ceiling * 0.25, 'no low gap in the boundary ridge: ' + id + ' lowest ' + low.toFixed(0));
+  let inside = 0, outside = 0, low = Infinity, n = 0;
+  for (let z = -R.radius + 200; z <= R.radius - 200; z += 40, n++) {
+    for (const sx of [-1, 1]) {
+      inside += T.heightAt(id, sx * (R.radius - 60), z) / 2;
+      const o = T.heightAt(id, sx * (R.radius + 300), z);
+      outside += o / 2; low = Math.min(low, o);
+    }
+  }
+  ok(outside / n > inside / n + 100, 'ridge rises well above the land beyond the world edge: ' + id);
+  ok(low > 60, 'no low gap in the boundary ridge: ' + id + ' lowest ' + low.toFixed(0));
 }
-
 let threw = false;
 try { T.heightAt('nowhere', 0, 0); } catch (_) { threw = true; }
 ok(threw, 'unknown region throws');

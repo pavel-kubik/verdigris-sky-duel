@@ -17,7 +17,7 @@ const countBits = b => b.reduce((n, w) => { for (let k = 0; k < 32; k++) n += (w
 {
   const g = MP.grid('bend');
   ok(g.n === 48, 'bend grid 48 x 48: ' + g.n);
-  ok(MP.grid('wild').n === 44, 'wild grid 44 x 44');
+  ok(MP.grid('wild').n === 48, 'wild grid 48 x 48 (one world: every region is a 2400 square)');
   ok(MP.cellOf('bend', 0, 0) >= 0 && MP.cellOf('bend', 5000, 0) === -1, 'cellOf inside / outside');
   ok(MP.bits(makeCs('bend'), 'bend').length === Math.ceil(48 * 48 / 32), 'bitset words');
 }

@@ -1,113 +1,96 @@
-// Region edges and travel: exit arcs, outward heading, entry placement, prey respawn, carried prey, round trips.
+// Region edges in the one world: exits are whole sides, flying over a shared edge moves the dragon into the next region
+// where it is (no teleport, no prompt), walls where the dragon may not go (the world's edge, a region it is too small
+// for), entry placement for jumps, prey respawn, carried prey, round trips.
 'use strict';
 const { ok, near, core } = require('./harness.js');
 const RG = core('region'), S = core('state'), T = core('terrain'), D = core('data'), F = core('flight'), PR = core('prey');
 const { mulberry, wrap } = core('math');
 const dt = 1 / 60;
-const at = (id, a, inset, up) => {
-  const r = T.region(id).radius - inset, x = Math.sin(a) * r, z = Math.cos(a) * r;
-  return [x, T.surfaceAt(id, x, z) + (up || 40), z];
-};
+const at = (id, x, z, up) => [x, T.surfaceAt(id, x, z) + (up || 40), z];
 
-// 1. inArc handles arcs across the +-PI seam
+// 1. arcs: inArc still handles arcs across the +-PI seam; a side's bearing is 0 (north) or PI (south)
 ok(RG.inArc(Math.PI - 0.1, Math.PI - 0.6, Math.PI + 0.6) && RG.inArc(-Math.PI + 0.1, Math.PI - 0.6, Math.PI + 0.6), 'arc across the seam');
 ok(!RG.inArc(0, Math.PI - 0.6, Math.PI + 0.6) && RG.inArc(0.5, -0.6, 0.6) && !RG.inArc(0.7, -0.6, 0.6), 'arc bounds');
+near(RG.arcMid({ to: 'ash', side: 'n' }), 0, 1e-12, 'north side bearing');
+near(RG.arcMid({ to: 'wild', side: 's' }), Math.PI, 1e-12, 'south side bearing');
 
-near(RG.arcMid({ angleFrom: -0.6, angleTo: 0.6 }), 0, 1e-12, 'arc middle');
-near(Math.abs(RG.arcMid({ angleFrom: Math.PI - 0.6, angleTo: Math.PI + 0.6 })), Math.PI, 1e-9, 'arc middle across the seam');
-
-// 2. exitAt: only near the edge, inside an exit arc, heading outward
+// 2. exitAt: only near an exit side, heading outward
 {
-  // Mount Rip lies north of Prahold: its exit to the Wildwood is on the south edge, the Wildwood's way back on its north edge
-  const near0 = at('ash', Math.PI, 30), far0 = at('ash', Math.PI, 300), side = at('ash', Math.PI / 2, 30);
+  const R = T.region('ash').radius, near0 = at('ash', 0, -(R - 30)), far0 = at('ash', 0, -(R - 300)), side = at('ash', R - 30, 0);
   const e = RG.exitAt('ash', near0, Math.PI);
-  ok(e && e.to === 'wild', 'ash south edge heading out offers Wildwood');
+  ok(e && e.to === 'wild', 'ash south edge heading out: the Wildwood');
   ok(RG.exitAt('ash', near0, 0) === null, 'heading inward: no exit');
   ok(RG.exitAt('ash', far0, Math.PI) === null, 'far from the edge: no exit');
-  ok(RG.exitAt('ash', side, Math.PI / 2) === null, 'edge outside the exit arc: no exit');
-  const w = RG.exitAt('wild', at('wild', 0, 30), 0);
-  ok(w && w.to === 'ash', 'wild north edge heading out offers Mount Rip');
-  ok(RG.exitAt('ash', at('ash', Math.PI + 0.5, 20), Math.PI + 0.5) && RG.exitAt('ash', at('ash', -Math.PI + 0.5, 20), -Math.PI + 0.5), 'ash exit arc spans the seam');
+  ok(RG.exitAt('ash', side, Math.PI / 2) === null, 'the west edge is the world edge: no exit');
+  ok(RG.exitAt('ash', at('ash', 0, R - 30), 0) === null, 'north of Mount Rip: the world edge');
+  const w = RG.exitAt('wild', at('wild', 300, T.region('wild').radius - 30), 0.3);
+  ok(w && w.to === 'ash', 'wild north edge heading out: Mount Rip');
 }
 
-// 3. entry placement: inside the radius, away from the soft edge and exit band, above ground, facing the centre
-for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
+// 3. bound: the world's edges and a region too big for the dragon are walls, a shared edge is not
+{
+  const R = T.region('wild').radius;
+  const b0 = RG.bound('wild', [0, 50, -(R - 10)], 0), b1 = RG.bound('wild', [0, 50, -(R - 10)], 1);
+  ok(b0.d < 20 && b0.nz > 0.99, 'a hatchling meets a wall at the Farmlands edge (turned north)');
+  ok(b1.d > 200, 'a Drake does not: the Farmlands go on');
+  const bw = RG.bound('wild', [R - 15, 50, 0], 1);
+  ok(bw.d < 20 && bw.nx < -0.99, 'the west edge of the world is a wall (turned east)');
+  const bn = RG.bound('ash', [0, 50, R - 15], 1);
+  ok(bn.d < 20 && bn.nz < -0.99, 'north of Mount Rip is the world edge');
+}
+
+// 4. entry placement (jumps): inside the edge facing the other region, above ground, facing inward
+for (const [to, from] of [['wild', 'ash'], ['ash', 'wild'], ['farm', 'bend'], ['bend', 'farm']]) {
   const e = RG.entryPoint(to, from), R = T.region(to);
-  const r = Math.hypot(e.pos[0], e.pos[2]);
-  ok(r < R.radius - F.SOFT_EDGE - 50 && r < R.radius - D.travel.edgeBand, to + ': entry is inside the soft edge');
+  ok(T.inZone(to, e.pos[0], e.pos[2], D.travel.edgeBand), to + ': entry is inside the edge band');
   ok(e.pos[1] > T.surfaceAt(to, e.pos[0], e.pos[2]) + D.flight.minAlt && e.pos[1] < R.ceiling, to + ': entry altitude in range');
-  const inward = Math.atan2(-e.pos[0], -e.pos[2]);
-  ok(Math.abs(wrap(e.yaw - inward)) < 1e-9, to + ': entry faces the centre');
-  ok(RG.exitAt(to, e.pos, e.yaw) === null, to + ': no exit offered at the entry');
-}
-{
-  // arriving from Ash lands on Wildwood's Ash-facing (south) edge, and back
-  const w = RG.entryPoint('wild', 'ash'), a = RG.entryPoint('ash', 'wild');
-  ok(w.pos[2] > 500 && Math.abs(w.pos[0]) < 1, 'Wildwood entry is on its north edge (Mount Rip side)');
-  ok(a.pos[2] < -500 && Math.abs(a.pos[0]) < 1, 'Mount Rip entry is on its south edge (beside the exit)');
+  const north = D.regions[from].origin[1] > R.origin[1];
+  ok((e.pos[2] > 0) === north && Math.abs(e.pos[0]) < 1, to + ': entry on the side toward ' + from);
+  ok(RG.exitAt(to, e.pos, e.yaw) === null, to + ': no exit at the entry');
 }
 
-// 4. flying straight at the exit raises the offer; it lingers after turning back, then expires
-{
-  const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
-  cs.dragon.pilot = F.newPilot(at('ash', Math.PI, 300, 60), Math.PI, 30);
-  const d = cs.dragon;
-  d.pilot = F.newPilot(at('ash', Math.PI + 0.1, 260, 60), Math.PI + 0.1, 30);
-  let ev = [], t = 0;
-  while (!cs.exit && t < 20) { ev.push(...S.step(cs, {}, dt)); t += dt; }
-  ok(cs.exit && cs.exit.to === 'wild', 'cruising south reaches the Wildwood exit (' + t.toFixed(1) + ' s)');
-  ok(ev.filter(e => e.e === 'region:exit').length === 1, 'region:exit raised once');
-  ok(cs.region === 'ash', 'no travel without confirm');
-  // the soft boundary turns the dragon back; the offer stays for promptHold, then goes
-  let left = 0;
-  while (cs.exit && left < 30) { S.step(cs, {}, dt); left += dt; }
-  ok(!cs.exit && left > D.travel.promptHold * 0.9, 'offer expires after the dragon turns back (' + left.toFixed(1) + ' s)');
-  ok(Math.hypot(d.pilot.pos[0], d.pilot.pos[2]) < T.region('ash').radius, 'still inside Ash Wastes');
-}
-
-// 5. confirm travels: new region, entry placement, fresh prey field away from the dragon, carried prey kept
+// 5. flying over a shared edge: the same place in the next region's frame, a fresh prey field, the carried prey kept
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(9) });
-  const d = cs.dragon;
+  const d = cs.dragon, R = T.region('ash');
   const goat = cs.field.list.find(p => p.type === 'goat');
   goat.state = 'carried'; d.carried = goat.id;
-  d.pilot = F.newPilot(at('ash', Math.PI, 30, 50), Math.PI, 30);
+  d.pilot = F.newPilot(at('ash', 120, -(R.radius - 3), 60), Math.PI, 30);
   d.pilot.st = 42;
-  const oldField = cs.field;
-  const ev = S.step(cs, { confirm: true }, dt);
-  ok(ev.some(e => e.e === 'region:exit') && ev.some(e => e.e === 'region:enter' && e.region === 'wild' && e.from === 'ash'), 'exit + enter events');
+  const oldField = cs.field, [X0, Z0] = T.toWorld('ash', d.pilot.pos[0], d.pilot.pos[2]);
+  let ev = [];
+  for (let i = 0; i < 30 && cs.region === 'ash'; i++) ev = ev.concat(S.step(cs, {}, dt));
+  ok(ev.some(e => e.e === 'region:enter' && e.region === 'wild' && e.from === 'ash' && e.seamless), 'region:enter (seamless)');
   ok(cs.region === 'wild' && cs.field !== oldField && cs.field.regionId === 'wild', 'switched to the Wildwood field');
-  ok(cs.exit === null, 'offer cleared after travel');
-  const e = RG.entryPoint('wild', 'ash');
-  ok(Math.hypot(d.pilot.pos[0] - e.pos[0], d.pilot.pos[2] - e.pos[2]) < 2, 'dragon at the Wildwood entry');
-  near(d.pilot.st, 42, 1, 'fire carries over');
-  const types = new Set(cs.field.list.map(p => p.type));
-  ok(types.has('deer') && types.has('boar'), 'Wildwood prey spawned');
+  const [X1, Z1] = T.toWorld('wild', d.pilot.pos[0], d.pilot.pos[2]);
+  ok(Math.hypot(X1 - X0, Z1 - Z0) < 20 && d.pilot.pos[2] > R.radius - 30, 'the dragon is where it was, at the Wildwood north edge');
+  near(d.pilot.st, 42, 2, 'fire carries over');
   const live = cs.field.list.filter(p => p.state !== 'carried');
   ok(live.every(p => Math.hypot(p.pos[0] - d.pilot.pos[0], p.pos[2] - d.pilot.pos[2]) >= D.respawn.minDistFromDragon * 0.8), 'new herds spawn away from the dragon');
   const c = S.carriedPrey(cs);
   ok(c && c.type === 'goat' && c.state === 'carried', 'carried goat comes along');
   ok(cs.field.list.filter(p => p.id === c.id).length === 1, 'carried prey id unique in the new field');
-  // it still eats normally
   let eaten = false;
   for (let i = 0; i < Math.ceil(D.eat.time / dt) + 2 && !eaten; i++) eaten = S.step(cs, { eat: true }, dt).some(x => x.e === 'prey:eaten');
-  ok(eaten && d.carried === null, 'carried prey eaten after the trip');
+  ok(eaten && d.carried === null, 'carried prey eaten after the crossing');
+  // the height is the same on both sides of the edge (one ground)
+  for (let x = -1000; x <= 1000; x += 100) near(T.heightAt('ash', x, -R.radius), T.heightAt('wild', x, T.region('wild').radius), 1e-6, 'the edge at x ' + x + ' joins');
 }
 
-// 6. five round trips: state stays finite, prey count bounded, regions alternate
+// 6. ten crossings north and south: state stays finite, inside the world, prey count bounded
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(21) });
   const d = cs.dragon;
-  d.pilot = F.newPilot(at('ash', Math.PI, 200, 60), Math.PI, 30);
-  let trips = 0, tm = 0;
-  while (trips < 10 && tm < 600) {
-    const R = T.region(cs.region), out = cs.region === 'ash' ? Math.PI : 0;
-    // steer toward the exit side, confirm when offered
+  cs.dragon.stage = 1;
+  d.pilot = F.newPilot(at('ash', 0, -900, 60), Math.PI, 30);
+  let trips = 0, tm = 0, want = 'wild';
+  while (trips < 10 && tm < 900) {
+    const out = T.region(cs.region).origin[1] > T.region(want).origin[1] ? Math.PI : 0;
     const turn = wrap(out - d.pilot.yaw);
-    const ev = S.step(cs, { sx: Math.max(-1, Math.min(1, -turn * 2)), confirm: !!cs.exit }, dt);
-    if (ev.some(e => e.e === 'region:enter')) trips++;
+    const ev = S.step(cs, { sx: Math.max(-1, Math.min(1, -turn * 2)), boost: true }, dt);
+    if (ev.some(e => e.e === 'region:enter')) { trips++; want = cs.region === 'wild' ? 'ash' : 'wild'; }
     tm += dt;
-    ok(Number.isFinite(d.pilot.pos[0] + d.pilot.pos[1] + d.pilot.pos[2]) && Math.hypot(d.pilot.pos[0], d.pilot.pos[2]) <= R.radius + 1e-6, 'finite, in bounds');
+    ok(Number.isFinite(d.pilot.pos[0] + d.pilot.pos[1] + d.pilot.pos[2]) && T.edgeDist(cs.region, d.pilot.pos[0], d.pilot.pos[2]) >= -1e-6, 'finite, in the world');
     const stock = (cs.town.pens || []).reduce((n, pn) => n + pn.count, 0);       // T18: penned livestock come on top
     ok(cs.field.list.filter(p => !p.pen).length <= D.preyAi.maxActive && cs.field.list.length <= D.preyAi.maxActive + stock, 'prey count bounded');
   }
@@ -115,7 +98,7 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
   ok(cs.region === 'ash', 'back home in Ash Wastes');
 }
 
-// 7. unknown region throws, no exits in a region without exits
+// 7. unknown region throws
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(1) });
   let threw = false;
@@ -123,13 +106,13 @@ for (const [to, from] of [['wild', 'ash'], ['ash', 'wild']]) {
   ok(threw && cs.region === 'ash', 'unknown region rejected, state untouched');
 }
 
-// 8. debug region jump: enter works between regions without a shared exit (Ash Wastes -> Farmlands and back)
+// 8. debug region jump: enter works between any regions (Ash Wastes -> Farmlands and back)
 {
   const cs = S.create({ regionId: 'ash', rng: mulberry(3) });
-  cs.dragon.pilot = F.newPilot(at('ash', Math.PI, 300, 60), Math.PI, 30);
+  cs.dragon.pilot = F.newPilot(at('ash', 0, -900, 60), Math.PI, 30);
   for (const [to, from] of [['farm', 'ash'], ['ash', 'farm'], ['wild', 'ash'], ['farm', 'wild']]) {
     const ev = RG.enter(cs, to, from), p = cs.dragon.pilot, R = T.region(to);
     ok(ev[0].e === 'region:enter' && cs.region === to && cs.field, 'jump ' + from + ' -> ' + to);
-    ok(Number.isFinite(p.pos[1]) && p.pos[1] > T.surfaceAt(to, p.pos[0], p.pos[2]) && p.pos[1] < R.ceiling && Math.hypot(p.pos[0], p.pos[2]) < R.radius, 'placed in the air inside ' + to);
+    ok(Number.isFinite(p.pos[1]) && p.pos[1] > T.surfaceAt(to, p.pos[0], p.pos[2]) && p.pos[1] < R.ceiling && T.inZone(to, p.pos[0], p.pos[2]), 'placed in the air inside ' + to);
   }
 }

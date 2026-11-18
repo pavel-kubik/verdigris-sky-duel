@@ -101,7 +101,7 @@
   function groundOk(id, R, pts, maxRise, opt) {
     let lo = Infinity, hi = -Infinity;
     for (const [x, z] of pts) {
-      if (Math.hypot(x, z) > R.radius - 150) return no('rim');
+      if (R.origin ? !T.inZone(id, x, z, 15) || T.edgeDist(id, x, z) < 150 : Math.hypot(x, z) > R.radius - 150) return no('rim');
       if (T.liquidAt(id, x, z) || !T.dryAt(id, x, z) || T.deckAt(id, x, z, 4)) return no('wet');
       if (T.lineDist(id, 'road', x, z) < (opt.roadPad || 6.5)) return no('road');
       if (T.lineDist(id, 'river', x, z) < 22) return no('river');

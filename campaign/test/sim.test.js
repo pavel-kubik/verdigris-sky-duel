@@ -25,7 +25,7 @@ function watcher() {
     if (!(d.hunger >= 0 && d.hunger <= D.hunger.max)) fail('hunger out of range ' + d.hunger);
     if (!(d.hp >= 0 && d.hp <= st.hpMax)) fail('hp out of range ' + d.hp);
     if (!(d.foodXp >= 0 && d.foodXp <= D.growthCap.food)) fail('food XP out of range');
-    if (Math.hypot(p.pos[0], p.pos[2]) > T.region(cs.region).radius + 1) fail('outside the region');
+    if (T.edgeDist(cs.region, p.pos[0], p.pos[2]) < -1) fail('outside the world');
     if (cs.field.list.length > PREY_MAX) fail('too many prey ' + cs.field.list.length);
     w.maxPrey = Math.max(w.maxPrey, cs.field.list.length);
     if (HN.stateOf(d.hunger) === 'starving' && !ev.some(e => e.e === 'boar:hit')) w.minHpStarving = Math.min(w.minHpStarving, d.hp);

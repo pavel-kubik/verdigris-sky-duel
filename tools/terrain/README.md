@@ -53,10 +53,40 @@ node campaign/test/run.js                   # dem.test.js checks the module agai
 - Checked: Vyšehrad rock 236 m, Petřín 326 m, Letná 229 m, Vítkov 253 m, river 175-190 m.
 - The game exaggerates heights 1.6x (`regions.bend.terrain.exag` in `campaign/core/data.js`) so hills read on a phone.
 
+## The whole kingdom (`regions/world.json`, `world.py`)
+
+The campaign is one continuous world: Mount Rip, the Wildwood, the River Farmlands and the Veltava Bend are squares of
+2400 units side by side, north to south (`data.world`, `core/terrain.js` zones). Their common ground is one coarse model
+of the whole valley, `campaign/core/dem-world.js`, with the finer Bend and Rip modules blended in over their own squares.
+
+```
+python3 tools/terrain/world.py crop      # sources/world_dtm.png (+ .json): every 2nd sample of N50E014, 14.05-14.75 E, 49.98-50.50 N
+python3 tools/terrain/world.py bake      # campaign/core/dem-world.js: heights every 20 units + the Vltava's centre line
+python3 tools/terrain/world.py places    # game positions (world and region frame) of the real villages in world.json
+python3 tools/terrain/world.py preview   # ai_sdlc/001_campaign/img/world-terrain.png
+```
+
+- **Warp** (`warp`): game (X west, Z north) -> lon / lat. Prahold (Z <= 1200) and Mount Rip (Z >= 6000) keep 3.6 m per
+  unit around their own centres, exactly as `bend.json` and `rip.json`, so the three modules agree; between them the
+  scale rises and falls as a cosine bump (to about 6.5 m per unit in the middle) so that Rip lies 7200 units due north of
+  Prahold, and the centre line moves from Prague's longitude to Rip's. The game turns metres into units with the Bend's
+  exaggeration in the south and Rip's in the north (`data.world.exag`, `offset`), times sqrt(3.6 / scale) in the middle.
+- **Grid** (`grid`): X -1800..1800, Z -1800..9000 every 20 units (181 x 541), uint8 heights in 1.25 m steps above 150 m.
+- **River** (`river`): least-cost path on the valley floor from the Bend's north-west edge (Podbaba) to the world's east
+  edge (toward Mělník), smoothed and simplified, with the level (falling, in metres) at every point. The game joins it to
+  the Bend's own river and draws it as a channel (`data.world.river`) and a water ribbon.
+- **Places** (`places`): the real villages along the way; their game positions are the starting point of the villages in
+  `data.regions.*.city.villages` (moved a little where a village would sit in the river or across a region edge).
+- Roads and fields are not baked: `campaign/core/roads.js` lays the roads out when the game starts (A* over this
+  terrain), `core/terrain.js` places the fields along them.
+
+![Mount Rip to Prahold](../../ai_sdlc/001_campaign/img/world-terrain.png)
+
 ## Adding a region
 
 1. Add the tile to `sources.json` if it is new (any SRTM-format 1 arc second tile works), run `fetch_sources.py`.
 2. Copy `regions/bend.json`, set the crop, the centre, the scale and the river start / goal areas.
 3. `crop.py <id>`, `bake.py <id>`, `preview.py <id>`; look at the preview, tune `river` until the water is right.
 4. Commit the crop, the config, the module and the preview; load the module in `campaign/index.html` and `sw.js`
-   when the region goes into the game.
+   when the region goes into the game. In the one world a new region also needs an `origin` next to its neighbours
+   (multiples of 300), `exits` on the shared sides, and the world crop and grid must cover it.

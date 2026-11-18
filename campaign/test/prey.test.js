@@ -92,7 +92,7 @@ for (const regionId of Object.keys(D.regions)) {
     for (let i = 0; i < 12 / dt; i++) {
       dragon.pos[1] = b.pos[1] + 5;                                       // keep it right above the ground near the boar
       const ev = P.step(f, dragon, dt, { stats: statsOf(1), rng: mulberry(1) });
-      for (const e of ev) if (e.e === 'boar:hit') { hits++; if (firstHitAt < 0) firstHitAt = i * dt; ok(e.damage === charge.damage, 'boar damage from data'); }
+      for (const e of ev) if (e.e === 'boar:hit' && e.id === b.id) { hits++; if (firstHitAt < 0) firstHitAt = i * dt; ok(e.damage === charge.damage, 'boar damage from data'); }
     }
     ok(b.state === 'charge', 'boar charges a low dragon');
     ok(hits >= 2 && hits <= Math.ceil(12 / charge.cooldown) + 1, 'boar hits repeatedly but no faster than its cooldown: ' + hits);

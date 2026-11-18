@@ -280,7 +280,7 @@ The world is six regions radiating from the volcano, each a seamless map loaded 
 | Royal Lowlands | Castles, slayer headquarters | Wyrm | Yes |
 | Capital | Final act | Elder | No - boss arena |
 
-**Transitions:** flying to a region edge shows a short "fly to" prompt; confirming loads the neighbour region with the dragon entering from that edge. The mission timer pauses during loading. A fast-travel option from the lair to any discovered aerie keeps long trips short.
+**Transitions (revised 2026-11-18, one world):** the regions built so far - Mount Rip (Ash Wastes), Wildwood, River Farmlands, Veltava Bend - are one continuous land, north to south from Rip to Prahold, on the real terrain of the Vltava valley (`core/dem-world.js`, `tools/terrain/world.py`). Each region is a 2400-unit square beside its neighbours; the dragon flies (or walks) over an edge into the next region without a prompt or a load, and the next region is drawn before it gets there. A region it is too small for is a wall with a "too small" prompt. Roads join every village to its neighbours (`core/roads.js`) and crop fields line them in every region; the map is one map of the whole kingdom. A fast-travel option from the lair to any discovered aerie keeps long trips short. (Before: flying to a region edge showed a "fly to" prompt and confirming loaded the neighbour region.)
 
 **Region size target:** about 2-3 minutes of straight flight across for a hatchling, so a 5-10 minute mission covers approach, objective and escape.
 

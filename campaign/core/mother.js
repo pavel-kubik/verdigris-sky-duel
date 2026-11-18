@@ -45,7 +45,7 @@
     const R = T.region(regionId);
     for (const e of R.exits || []) {
       if (!test(e.to) || (e.minStage != null && (stage || 0) < e.minStage)) continue;     // never toward a region it is too small for
-      const a = RG.arcMid(e), r = R.radius - MO.exitInset, x = Math.sin(a) * r, z = Math.cos(a) * r;
+      const [x, z] = RG.exitPoint(regionId, e, MO.exitInset);
       return { pos: [x, T.surfaceAt(regionId, x, z) + MO.alt, z], route: e.to };
     }
     return null;
@@ -225,7 +225,7 @@
     for (const e of ev) {
       if (e.e === 'lair:enter' && st.at !== 'done') { st.at = 'lair'; cs.mom = null; }
       else if (e.e === 'lair:leave' && st.at !== 'done' && cs.dragon.pilot) { st.at = 'air'; placeBeside(cs, 'lead'); }
-      else if (e.e === 'region:enter' && !e.respawn && cs.mom && cs.dragon.pilot) {
+      else if (e.e === 'region:enter' && !e.respawn && !e.seamless && cs.mom && cs.dragon.pilot) {
         const ph = cs.mom.phase === 'away' ? null : cs.mom.phase === 'praise' ? 'praise' : 'lead', pr = cs.mom.praise, pt = cs.mom.praiseT;
         if (ph) { placeBeside(cs, ph); cs.mom.praise = pr; cs.mom.praiseT = pt; } else cs.mom = null;
       }

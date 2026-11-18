@@ -51,7 +51,7 @@
   let world = null;
   function buildWorld() {
     if (world) return world;
-    const region = VRender.terrain.build(REGION, { isTouch, flora: tier === 'low' ? 0.4 : tier === 'mid' ? 0.65 : 1, far: FOG.far, particles: tier === 'low' ? 0.4 : 1, detail: tier !== 'low' });
+    const region = VRender.terrain.build(REGION, { isTouch, flora: tier === 'low' ? 0.4 : tier === 'mid' ? 0.65 : 1, far: FOG.far, particles: tier === 'low' ? 0.4 : 1, detail: tier !== 'low', solo: true });
     scene.add(region.group);
     skyView.setRegion(region); scene.fog.color.set(region.fog);
     const town = SE.build(REGION);
@@ -158,7 +158,7 @@
     const play = s === 'play' || s === 'paused';
     $('#top').hidden = !play; $('#stBar').hidden = !play;
     $('#touch').hidden = !(play && isTouch); $('#legend').hidden = !(play && !isTouch);
-    $('#arrow').hidden = true;
+    $('#arrow').hidden = true; $('#radar').hidden = s !== 'play';
     if (s === 'intro') renderIntro();
     for (const k in keys) keys[k] = false;
     touch.x = touch.y = 0; touch.run = false;
@@ -315,6 +315,93 @@
   }
   function snapCam() { if (me && world) { camWant(camPos); camera.position.copy(camPos); } }
 
+  /* ---------- radar: what is around the hero, heading up ----------
+     A round screen (top right) turning with the camera: the hero in the middle, the objective in gold (pinned to the rim
+     with its direction when farther than the range), people to talk to in white, the stranger who follows in green, the
+     gift's targets in orange, things to pick up in yellow, guards in red with their sight (blue while charmed), the
+     streets and squares of Prahold drawn faintly and the river in blue, the north mark on the rim. */
+  const RADAR = { range: 90, cell: 6 };
+  const radarEl = $('#radar'), rg = radarEl.getContext('2d');
+  let radarDpr = 0, radarPx = 0, radarBg = null, radarBgAt = null;
+  /** The ground under the radar (streets, squares, water), north up, around (x, z); redrawn when the hero moved far. */
+  function radarGround(x, z) {
+    const n = Math.ceil(RADAR.range * 2.9 / RADAR.cell), cv = radarBg || (radarBg = document.createElement('canvas'));
+    cv.width = cv.height = n;
+    const g = cv.getContext('2d'), img = g.createImageData(n, n), px = img.data;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const wx = x + (n / 2 - i - 0.5) * RADAR.cell, wz = z + (n / 2 - j - 0.5) * RADAR.cell, o = (j * n + i) * 4;   // east right, north up
+      let c = null;
+      if (TR.liquidAt(REGION, wx, wz) === 'water') c = [70, 120, 160, 200];
+      else if (CI.solidAt(REGION, wx, wz, 0) != null || SE.solidAt(world.town, wx, wz, 0) != null) c = [120, 96, 80, 170];
+      else if (CI.pavedAt(REGION, wx, wz) || TR.lineDist(REGION, 'road', wx, wz) < 4) c = [190, 176, 150, 70];
+      if (c) { px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = c[3]; }
+    }
+    g.putImageData(img, 0, 0);
+    radarBgAt = [x, z];
+  }
+  function radar() {
+    const show = !!(ts && me && world) && state === 'play' && !storyCard.open;
+    radarEl.hidden = !show;
+    if (!show) return;
+    const css = radarEl.clientWidth || 128, dpr = Math.min(2, devicePixelRatio || 1);
+    if (css !== radarPx || dpr !== radarDpr) { radarPx = css; radarDpr = dpr; radarEl.width = radarEl.height = Math.round(css * dpr); }
+    const R = css / 2, k = (R - 6) / RADAR.range, g = rg;
+    const camYaw = Math.atan2(camLook.x - camera.position.x, camLook.z - camera.position.z);
+    // world (dx, dz) -> radar: heading up; +X (west) is left when facing north
+    const at = (wx, wz) => {
+      const dx = wx - me.pos[0], dz = wz - me.pos[2], c = Math.cos(camYaw), s = Math.sin(camYaw);
+      const f = dx * s + dz * c, r = dx * c - dz * s;                  // forward, right-hand (toward -X when facing +Z)
+      return [R - r * k, R - f * k, Math.hypot(dx, dz)];
+    };
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, css, css);
+    g.save(); g.beginPath(); g.arc(R, R, R - 1, 0, Math.PI * 2); g.clip();
+    g.fillStyle = 'rgba(12,19,16,.78)'; g.fillRect(0, 0, css, css);
+    if (!radarBgAt || Math.hypot(me.pos[0] - radarBgAt[0], me.pos[2] - radarBgAt[1]) > RADAR.range * 0.35) radarGround(me.pos[0], me.pos[2]);
+    const n = radarBg.width, [bx, by] = at(radarBgAt[0], radarBgAt[1]);
+    g.save(); g.translate(bx, by); g.rotate(camYaw); g.imageSmoothingEnabled = true;
+    g.drawImage(radarBg, -n / 2 * RADAR.cell * k, -n / 2 * RADAR.cell * k, n * RADAR.cell * k, n * RADAR.cell * k);
+    g.restore();
+    g.strokeStyle = 'rgba(233,225,204,.18)'; g.lineWidth = 1;
+    for (const f of [0.5, 1]) { g.beginPath(); g.arc(R, R, (R - 6) * f, 0, Math.PI * 2); g.stroke(); }
+    const dot = (wx, wz, col, size, ring) => {
+      let [sx, sy, d] = at(wx, wz);
+      const out = d > RADAR.range;
+      if (out) { if (!ring) return; const a = Math.atan2(sy - R, sx - R); sx = R + Math.cos(a) * (R - 7); sy = R + Math.sin(a) * (R - 7); }
+      g.fillStyle = col; g.beginPath(); g.arc(sx, sy, out ? size * 0.8 : size, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 1; g.stroke();
+    };
+    for (const q of ts.guards) {                                     // sight wedges under the dots
+      const [sx, sy, d] = at(q.pos[0], q.pos[2]);
+      if (d > RADAR.range + q.range) continue;
+      const rr = q.range * D.tale.walkSight * k, vx = Math.sin(q.yaw), vz = Math.cos(q.yaw), c = Math.cos(camYaw), s = Math.sin(camYaw);
+      const a = Math.atan2(-(vx * s + vz * c), -(vx * c - vz * s));     // the guard's facing on the radar
+      g.fillStyle = q.charmed > 0 ? 'rgba(106,160,255,.22)' : 'rgba(229,72,79,.26)';
+      g.beginPath(); g.moveTo(sx, sy); g.arc(sx, sy, rr, a - q.cone, a + q.cone); g.closePath(); g.fill();
+    }
+    for (const it of ts.items) if (!it.taken) dot(it.pos[0], it.pos[2], '#ffd34d', 3.2);
+    for (const q of ts.targets) if (q.hp > 0) dot(q.pos[0], q.pos[2], q.kind === 'thug' ? '#ff7a4a' : '#ff9447', 3.4);
+    for (const nn of ts.npcs) dot(nn.pos[0], nn.pos[2], nn === ts.follower ? '#62c48a' : nn.need && !nn.talked ? '#f3ead4' : 'rgba(200,192,170,.6)', nn.need && !nn.talked ? 3.4 : 2.4, nn === ts.follower);
+    for (const q of ts.guards) dot(q.pos[0], q.pos[2], q.charmed > 0 ? '#6aa0ff' : '#e5484f', 3.2);
+    const goal = TL.objective(ts) && TL.nearestGoal(ts, me.pos[0], me.pos[2]);
+    if (goal) {
+      let [sx, sy, d] = at(goal[0], goal[2]);
+      if (d > RADAR.range) { const a = Math.atan2(sy - R, sx - R); sx = R + Math.cos(a) * (R - 8); sy = R + Math.sin(a) * (R - 8); }
+      const s = 5 + Math.sin(performance.now() / 220);
+      g.fillStyle = '#ffd34d'; g.strokeStyle = '#2a2010'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(sx, sy - s); g.lineTo(sx + s, sy); g.lineTo(sx, sy + s); g.lineTo(sx - s, sy); g.closePath(); g.fill(); g.stroke();
+    }
+    g.restore();
+    // the hero: an arrow pointing up (the camera's heading); the hero's own facing as a tick
+    g.fillStyle = '#ebe3cd'; g.strokeStyle = '#1a140c'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(R, R - 7); g.lineTo(R + 5, R + 5); g.lineTo(R, R + 2); g.lineTo(R - 5, R + 5); g.closePath(); g.fill(); g.stroke();
+    // north on the rim
+    const na = -Math.PI / 2 + camYaw, nx = R + Math.cos(na) * (R - 9), ny = R + Math.sin(na) * (R - 9);
+    g.font = '700 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(t('c.nav.n'), nx, ny); g.fillStyle = '#ffd27a'; g.fillText(t('c.nav.n'), nx, ny);
+    g.strokeStyle = 'rgba(233,225,204,.45)'; g.lineWidth = 1.5; g.beginPath(); g.arc(R, R, R - 1.5, 0, Math.PI * 2); g.stroke();
+  }
+
   /* ---------- HUD ---------- */
   const objEl = $('#obj'), arrowEl = $('#arrow'), stFill = $('#stBar i');
   let objShown = '';
@@ -338,6 +425,8 @@
       glowLight.position.set(goal[0], goal[1] + 3, goal[2]); glowLight.intensity = d < 60 ? 1.2 : 0;
     } else glowLight.intensity = 0;
     stFill.style.width = me.st.toFixed(0) + '%';
+    document.documentElement.style.setProperty('--objH', objEl.offsetHeight + 'px');
+    radar();
     const gb = $('#bGift'), gk = 'c.hero.gift.' + me.gift;
     if (gb.dataset.k !== gk + (I18N && I18N.lang)) { gb.dataset.k = gk + (I18N && I18N.lang); gb.textContent = t(gk); $('#legend').textContent = t('c.hero.legend', { gift: t(gk) }); }
     sayT -= dt; if (sayT <= 0) $('#say p').classList.remove('on');

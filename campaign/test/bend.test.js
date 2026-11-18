@@ -128,7 +128,7 @@ for (const f of R.terrain.features.filter(ff => ff.type === 'road')) {
 }
 ok(R.nameKey === 'c.region.bend' && R.palette === 'bend', 'region name key and palette');
 
-// 7. travel: Farmlands <-> Bend, a hatchling is too small for it
+// 7. travel: Farmlands <-> Bend (the one world: side by side, the Bend's north edge is the Farmlands' south edge), a hatchling is too small for it
 {
   const e = D.regions.farm.exits.find(x => x.to === 'bend');
   ok(e && e.minStage === 1, 'the Farmlands exit to the Bend needs a Drake');
@@ -138,7 +138,7 @@ ok(R.nameKey === 'c.region.bend' && R.palette === 'bend', 'region name key and p
   const at = RG.entryPoint('bend', 'farm');
   ok(at.pos[2] > 800 && Math.hypot(at.pos[0], at.pos[2]) < R.radius - D.travel.edgeBand, 'the dragon arrives in the north of the Bend (Troyvale side)');
   ok(RG.exitAt('bend', at.pos, at.yaw) === null, 'no exit offered at the entry');
-  const back = RG.exitAt('bend', [Math.sin(0.4) * (R.radius - 30), 60, Math.cos(0.4) * (R.radius - 30)], 0.4);
+  const back = RG.exitAt('bend', [300, 60, R.radius - 30], 0.4);
   ok(back && back.to === 'farm', 'north edge of the Bend leads back to the Farmlands');
   const fb = RG.entryPoint('farm', 'bend');
   ok(fb.pos[2] < -800, 'coming back, the dragon appears in the south of the Farmlands');

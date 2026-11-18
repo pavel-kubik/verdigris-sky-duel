@@ -6,6 +6,16 @@
  * Height = base noise (the duel's H() formula, phase-shifted by the region seed, scaled by amp)
  *        + features (volcano cone with crater, flatten)
  *        + a rugged boundary ridge just beyond the region edge.
+ *
+ * One world (zones): a region with `origin` [x, z] is a zone of one continuous world (data.world): Mount Rip, the
+ * Wildwood, the River Farmlands and the Veltava Bend are squares of half size `radius` side by side, north to south.
+ * Every function still takes a region id and local x, z (the zone's frame, centred on its origin), but the ground is
+ * one world function: the real terrain of the whole kingdom (core/dem-world.js, Rip to Prague, tools/terrain/world.py)
+ * with the finer Bend and Rip models blended in over their zones, every zone's overlays (cone, plateaus, cliffs, roads,
+ * bridges) where they lie, the Vltava from the Bend down to the east edge (a channel with a falling level), the road
+ * network between the villages (core/roads.js) and a boundary ridge round the outside of the world only. So two zones
+ * agree exactly along their shared edge, and a zone's mesh, collisions and its neighbour's meet without a seam.
+ * A region without `origin` (the deathmatch arena) is a world of its own, as before.
  */
 (function (root) {
   'use strict';
@@ -18,12 +28,118 @@
   const GRID = 7.5, CHUNK = 300;
 
   function region(id) {
-    const r = D.regions[id];
+    const r = D.regions[id] || (D.arenas && D.arenas[id]);
     if (!r) throw new Error('VCamp terrain: unknown region "' + id + '"');
+    if (r.origin && wriver === null) worldRiver();               // a zone: its bridges sit on the world's river first
     return r;
   }
 
   const smooth = t => t * t * (3 - 2 * t);
+
+  /* ---------- one world: zones, frames, the world terrain model ---------- */
+  const W = () => D.world;
+  let zoneList = null;
+  /** Ids of the zones of the world (regions with an origin), south to north. */
+  function zones() {
+    if (!zoneList) zoneList = Object.keys(D.regions).filter(id => D.regions[id].origin).sort((a, b) => D.regions[a].origin[1] - D.regions[b].origin[1]);
+    return zoneList;
+  }
+  const isZone = id => !!region(id).origin;
+  function origin(id) { const o = region(id).origin; return o || [0, 0]; }
+  function toWorld(id, x, z) { const o = origin(id); return [x + o[0], z + o[1]]; }
+  function toLocal(id, X, Z) { const o = origin(id); return [X - o[0], Z - o[1]]; }
+  /** Max-norm inset of world point (X, Z) inside zone id (> 0 inside, < 0 outside). */
+  function inset(id, X, Z) { const R = region(id), o = R.origin; return R.radius - Math.max(Math.abs(X - o[0]), Math.abs(Z - o[1])); }
+  /** The zone whose square holds world point (X, Z) (the one it is deepest in), or null outside the world. */
+  function zoneAt(X, Z) {
+    let best = null, bi = -Infinity;
+    for (const id of zones()) { const k = inset(id, X, Z); if (k >= 0 && k > bi) { bi = k; best = id; } }
+    return best;
+  }
+  /** Is local (x, z) of region id inside its own square (zones) or circle (a lone region), `pad` from the edge? */
+  function inZone(id, x, z, pad) {
+    const R = region(id); pad = pad || 0;
+    return R.origin ? Math.max(Math.abs(x), Math.abs(z)) <= R.radius - pad : Math.hypot(x, z) <= R.radius - pad;
+  }
+  let rect = null;
+  /** The world's bounding rectangle (the zones form one column, so it is the world). */
+  function worldRect() {
+    if (rect) return rect;
+    rect = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+    for (const id of zones()) {
+      const R = region(id), [ox, oz] = R.origin;
+      rect.x0 = Math.min(rect.x0, ox - R.radius); rect.x1 = Math.max(rect.x1, ox + R.radius);
+      rect.z0 = Math.min(rect.z0, oz - R.radius); rect.z1 = Math.max(rect.z1, oz + R.radius);
+    }
+    return rect;
+  }
+  /** Distance from local (x, z) of region id to the world's edge (> 0 inside); a lone region: to its rim circle. */
+  function edgeDist(id, x, z) {
+    const R = region(id);
+    if (!R.origin) return R.radius - Math.hypot(x, z);
+    const [X, Z] = toWorld(id, x, z), r = worldRect();
+    return Math.min(X - r.x0, r.x1 - X, Z - r.z0, r.z1 - Z);
+  }
+  /** Zones whose square, grown by pad, holds world point (X, Z) (their overlays can reach it). */
+  function zonesNear(X, Z, pad) {
+    const out = [];
+    for (const id of zones()) if (inset(id, X, Z) > -pad) out.push(id);
+    return out;
+  }
+
+  /* The world model (core/dem-world.js): metres on a grid in world units, converted to game units as the zones do:
+     (metres - world.base) / 3.6 x exag + offset, exag and offset blending from the Bend's to Rip's values between
+     world.blend[0] and blend[1] (north), times sqrt(3.6 / the warp's metres per unit there), so the squeezed middle of
+     the valley does not turn into cliffs. */
+  let wg = null;
+  function worldGrid() {
+    if (wg) return wg;
+    const B = demModule('demWorld'), hb = b64(B.h), n = B.nx * B.nz, h = new Float32Array(n);
+    for (let i = 0; i < n; i++) h[i] = B.base + hb[i] * B.step;
+    wg = { B, h, nx: B.nx, nz: B.nz, cell: B.cell, x0: B.x0, z0: B.z0 };
+    return wg;
+  }
+  function worldMetres(X, Z) {
+    const g = worldGrid();
+    const fx = clamp((X - g.x0) / g.cell, 0, g.nx - 1.0001), fz = clamp((Z - g.z0) / g.cell, 0, g.nz - 1.0001);
+    const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz, i = iz * g.nx + ix, h = g.h;
+    return (h[i] * (1 - u) + h[i + 1] * u) * (1 - v) + (h[i + g.nx] * (1 - u) + h[i + g.nx + 1] * u) * v;
+  }
+  /** Metres per unit of the warp at world Z (1 = the zones' own 3.6). */
+  function warpScale(Z) {
+    const g = worldGrid(), sc = g.B.scale, k = clamp((Z - g.z0) / (g.cell * 5), 0, sc.length - 1.0001), i = Math.floor(k);
+    return sc[i] + (sc[i + 1] - sc[i]) * (k - i);
+  }
+  function toUnits(m, Z) {
+    const w = W(), k = smooth(clamp((Z - w.blend[0]) / (w.blend[1] - w.blend[0]), 0, 1));
+    const exag = w.exag[0] + (w.exag[1] - w.exag[0]) * k, off = w.offset[0] + (w.offset[1] - w.offset[0]) * k;
+    return (m - w.base) / worldGrid().B.metresPerUnit * exag * Math.sqrt(worldGrid().B.metresPerUnit / warpScale(Z)) + off;
+  }
+  /** Weight 0..1 of a zone's own terrain model at world (X, Z): 1 inside, fading to 0 over world.band at its edge. */
+  function demWeight(id, X, Z) { return smooth(clamp(inset(id, X, Z) / W().band, 0, 1)); }
+  const detailW = (X, Z) => DETAIL * (0.6 * Math.sin(X * 0.071 + Z * 0.053 + 7) + 0.4 * Math.sin(X * 0.17 - Z * 0.13 + 11.9));
+  /** The real ground of the world before any overlay: the world model, the zones' own models blended in, detail. */
+  function worldBase(X, Z) {
+    let h = toUnits(worldMetres(X, Z), Z);
+    for (const id of zones()) {
+      const R = D.regions[id];
+      if (!R.terrain.dem) continue;
+      const w = demWeight(id, X, Z);
+      if (w <= 0) continue;
+      const o = R.origin;
+      h += (demBase(id, R, X - o[0], Z - o[1], true) - h) * w;
+    }
+    return h + detailW(X, Z);
+  }
+  /** worldBase + the volcano cones of the zones (Mount Rip's crater). */
+  function worldGround(X, Z) {
+    let h = worldBase(X, Z);
+    for (const id of zonesNear(X, Z, 0)) {
+      const R = D.regions[id], o = R.origin;
+      for (const f of R.terrain.features) if (f.type === 'cone') h += cone(f, Math.hypot(X - o[0] - f.x, Z - o[1] - f.z))[0];
+    }
+    return h;
+  }
 
   function noise(x, z, seed) {
     const sx = seed * 1.37, sz = seed * 2.11;
@@ -148,9 +264,9 @@
   function waterY(id, x, z) { return sample(demGrid(id), demGrid(id).lvl, x, z) + WATER_UP; }
   const detail = (x, z, seed) => DETAIL * (0.6 * Math.sin(x * 0.071 + z * 0.053 + seed) + 0.4 * Math.sin(x * 0.17 - z * 0.13 + seed * 1.7));
   /** Real-terrain base: baked height + detail, carved under the river, kept above the water on the dry shore. */
-  function demBase(id, R, x, z) {
+  function demBase(id, R, x, z, noDetail) {
     const g = demGrid(id);
-    let h = sample(g, g.h, x, z) + detail(x, z, R.seed);
+    let h = sample(g, g.h, x, z) + (noDetail ? 0 : detail(x, z, R.seed));
     if (R.terrain.water !== 'mask' || sample(g, g.near, x, z) <= 0) return h;
     const m = sample(g, g.wet, x, z), top = sample(g, g.lvl, x, z) + WATER_UP;
     if (m >= 0.5) return Math.min(h, top - CARVE * smooth(clamp((m - 0.5) / 0.35, 0, 1)));
@@ -175,6 +291,7 @@
   /** Noise, volcano cones and the flatten ring: the ground before roads, rivers and plateaus. */
   function baseHeight(id, x, z) {
     const R = region(id), T = R.terrain;
+    if (R.origin) return worldGround(x + R.origin[0], z + R.origin[1]);   // a zone: the one world ground
     if (T.dem) {                                 // real terrain; a cone with a crater (Mount Rip) digs its crater into it
       let h = demBase(id, R, x, z);
       for (const f of T.features) if (f.type === 'cone') h += cone(f, Math.hypot(x - f.x, z - f.z))[0];
@@ -206,6 +323,10 @@
       let sum = baseHeight(id, f.x, f.z);
       for (let k = 0; k < 12; k++) sum += baseHeight(id, f.x + Math.sin(k * Math.PI / 6) * f.r, f.z + Math.cos(k * Math.PI / 6) * f.r);
       y = f.y != null ? f.y : Math.max(sum / 13, (R.waterLevel != null ? R.waterLevel : -Infinity) + 3);
+      if (R.origin && f.y == null) {             // never at the river either (the world's Vltava)
+        const [X, Z] = toWorld(id, f.x, f.z), q = worldRiverNear(X, Z, f.r + 60);
+        if (q) y = Math.max(y, q.level + 3);
+      }
       if (f.level === 'top') {                   // T02: a rock top (Vyshgard) - level with its highest ground, not its foot
         y = baseHeight(id, f.x, f.z);
         for (let k = 0; k < 12; k++) y = Math.max(y, baseHeight(id, f.x + Math.sin(k * Math.PI / 6) * f.r * 0.5, f.z + Math.cos(k * Math.PI / 6) * f.r * 0.5));
@@ -215,8 +336,171 @@
     return y;
   }
 
+  /* ---------- the world's river and roads (zones) ---------- */
+  /* The Vltava below the Bend (dem-world river: [x, z, metres]): a channel of world.river.width with a flat valley floor,
+     its level falling downstream; its first points join the Bend's own river level. Segments are bucketed on a grid
+     (LINE_CELL) so a height sample only looks at the few segments near it. */
+  const LINE_CELL = 100;
+  function lineIndex(polys, reach) {
+    const cells = new Map(), segs = [];
+    polys.forEach((pts, pi) => {
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i], b = pts[i + 1], si = segs.length;
+        segs.push({ p: pi, i, ax: a[0], az: a[1], dx: b[0] - a[0], dz: b[1] - a[1] });
+        const x0 = Math.floor((Math.min(a[0], b[0]) - reach) / LINE_CELL), x1 = Math.floor((Math.max(a[0], b[0]) + reach) / LINE_CELL);
+        const z0 = Math.floor((Math.min(a[1], b[1]) - reach) / LINE_CELL), z1 = Math.floor((Math.max(a[1], b[1]) + reach) / LINE_CELL);
+        for (let cz = z0; cz <= z1; cz++) for (let cx = x0; cx <= x1; cx++) {
+          const k = cx * 100003 + cz;
+          let l = cells.get(k); if (!l) cells.set(k, l = []);
+          l.push(si);
+        }
+      }
+    });
+    return { cells, segs, reach };
+  }
+  /** Nearest indexed segment to (X, Z) within the index reach: { d, x, z, p (polyline), i (segment), k (0..1) } or null. */
+  function lineNear(ix, X, Z) {
+    const l = ix.cells.get(Math.floor(X / LINE_CELL) * 100003 + Math.floor(Z / LINE_CELL));
+    if (!l) return null;
+    let best = null;
+    for (const si of l) {
+      const s = ix.segs[si], L2 = s.dx * s.dx + s.dz * s.dz;
+      const k = L2 > 0 ? clamp(((X - s.ax) * s.dx + (Z - s.az) * s.dz) / L2, 0, 1) : 0;
+      const px = s.ax + s.dx * k, pz = s.az + s.dz * k, d = Math.hypot(X - px, Z - pz);
+      if (!best || d < best.d) best = { d, x: px, z: pz, p: s.p, i: s.i, k };
+    }
+    return best;
+  }
+  let wriver = null;
+  /** The world river: { pts [[X, Z]], level [units], width, depth, valley, ix } (null without a world). */
+  function worldRiver() {
+    if (wriver !== null) return wriver;
+    if (!zones().length || !D.world || !D.world.river) return (wriver = false);
+    wriver = false;                                // while building (the Bend's level reads its region): no river yet
+    const B = worldGrid().B, RV = D.world.river, pts = B.river.map(p => [p[0], p[1]]);
+    const level = B.river.map(p => toUnits(p[2], p[1]) + RV.up);
+    const mz = zones().find(id => region(id).terrain.water === 'mask');
+    if (mz) {                                     // join the masked zone's river (the Bend): its last stretch leads in
+      const g = demGrid(mz), o = region(mz).origin, tail = g.line.slice(-RV.lead);
+      const lead = tail.map(p => [p[0] + o[0], p[1] + o[1]]), ll = tail.map(p => waterY(mz, p[0], p[1]));
+      const d0 = ll[ll.length - 1] - level[0];
+      let run = 0;
+      for (let i = 0; i < pts.length; i++) {
+        if (i) run += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        level[i] += d0 * (1 - smooth(clamp(run / RV.join, 0, 1)));
+      }
+      pts.unshift(...lead); level.unshift(...ll);
+      for (let i = 1; i < level.length; i++) level[i] = Math.min(level[i], level[i - 1]);   // never rises downstream
+    }
+    const out = RV.width / 2 * CHANNEL;
+    wriver = { pts, level, width: RV.width, depth: RV.depth, valley: RV.valley, out, ix: lineIndex([pts], out + RV.valley + 2) };
+    // bridges over it (zone features with snap: 'river'): moved onto the nearest point of the centre line, across it
+    for (const id of zones()) {
+      const R = D.regions[id], o = R.origin;
+      for (const f of R.terrain.features) {
+        if (f.type !== 'bridge' || f.snap !== 'river' || f.snapped) continue;
+        const q = nearestOn(pts, f.x + o[0], f.z + o[1]);
+        let i = 0, bd = Infinity;
+        for (let k = 0; k + 1 < pts.length; k++) { const d = nearestOn([pts[k], pts[k + 1]], q.x, q.z).d; if (d < bd) { bd = d; i = k; } }
+        const along = Math.atan2(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+        f.x = q.x - o[0]; f.z = q.z - o[1]; f.yaw = along + Math.PI / 2; f.len = (out + 8) * 2; f.snapped = true;
+      }
+    }
+    return wriver;
+  }
+  /** Nearest point of the world river within `reach` (the index reach at most): { d, x, z, level } or null. */
+  function worldRiverNear(X, Z, reach) {
+    const rv = worldRiver();
+    if (!rv) return null;
+    const q = lineNear(rv.ix, X, Z);
+    if (!q || q.d > (reach == null ? Infinity : reach)) return null;
+    q.level = rv.level[q.i] + (rv.level[q.i + 1] - rv.level[q.i]) * q.k;
+    return q;
+  }
+  /** Weight 0..1 of the world river at (X, Z): 0 where a masked zone (the Bend) draws its own river. */
+  function riverWeight(X, Z) {
+    for (const id of zones()) {
+      const R = D.regions[id];
+      if (R.terrain.water !== 'mask' || inset(id, X, Z) < -40) continue;
+      const x = X - R.origin[0], z = Z - R.origin[1];
+      if (maskAt(id, x, z) > 0.3) return 0;
+      if (inset(id, X, Z) > 0) for (const [ex, ez] of [[45, 0], [-45, 0], [0, 45], [0, -45]]) if (maskAt(id, x + ex, z + ez) > 0.3) return 0;   // its shore too
+    }
+    return 1;
+  }
+  let wroads = null;
+  /** The road network between the villages (core/roads.js), indexed: { list, ix } (empty without a world). */
+  function worldRoads() {
+    if (wroads) return wroads;
+    if (!zones().length || !D.world || !D.world.roads) return (wroads = { list: [], ix: lineIndex([], 0) });
+    wroads = { list: [], ix: lineIndex([], 0) };               // while the network is being built: no roads yet
+    const list = M.need('roads').network().roads;
+    wroads = { list, ix: lineIndex(list.map(r => r.pts), D.world.roads.width / 2 + ROAD_EDGE + 1) };
+    return wroads;
+  }
+
+  /** The world ground with the river shaped in: its channel and the flat valley floor beside it. */
+  function riverShaped(X, Z) {
+    let h = worldGround(X, Z);
+    const rv = worldRiver();
+    if (!rv) return h;
+    const q = worldRiverNear(X, Z, rv.out + rv.valley), w = q ? riverWeight(X, Z) : 0;
+    if (!q || w <= 0) return h;
+    const floor = q.level + BANK_UP;
+    const t = q.d >= rv.out ? h + (floor - h) * smooth(1 - (q.d - rv.out) / rv.valley)          // flat valley floor
+      : (q.level - rv.depth) + (rv.depth + BANK_UP) * smooth(q.d / rv.out);                     // the channel
+    return h + (t - h) * w;
+  }
+
+  /** The ground of world point (X, Z) with every overlay: the river, roads, plateaus, cliffs, the boundary ridge. */
+  function worldHeight(X, Z) {
+    let h = riverShaped(X, Z);
+    const near = zonesNear(X, Z, 260);
+    // roads: the zones' own (the Bend's) and the world's network, levelled across toward their centre line
+    for (const id of near) {
+      const R = D.regions[id], o = R.origin;
+      for (const f of R.terrain.features) {
+        if (f.type !== 'road') continue;
+        const half = f.width / 2, q = nearestOn(f.points, X - o[0], Z - o[1]);
+        if (q.d >= half + ROAD_EDGE) continue;
+        const e = smooth(1 - clamp((q.d - half) / ROAD_EDGE, 0, 1));
+        h += (riverShaped(q.x + o[0], q.z + o[1]) - h) * ROAD_K * e;
+      }
+    }
+    const rq = lineNear(worldRoads().ix, X, Z), half = D.world.roads.width / 2;
+    if (rq && rq.d < half + ROAD_EDGE) {
+      const e = smooth(1 - clamp((rq.d - half) / ROAD_EDGE, 0, 1));
+      h += (riverShaped(rq.x, rq.z) - h) * ROAD_K * e;
+    }
+    for (const id of near) {
+      const R = D.regions[id], F = R.terrain.features, o = R.origin, x = X - o[0], z = Z - o[1];
+      for (let i = 0; i < F.length; i++) {
+        const f = F[i];
+        if (f.type !== 'plateau') continue;
+        const edge = f.edge != null ? f.edge : PLATEAU_EDGE, d = Math.hypot(x - f.x, z - f.z);
+        if (d >= f.r + edge) continue;
+        const y = plateauHeight(id, R, f, i);
+        h = d <= f.r ? y : h + (y - h) * smooth(1 - (d - f.r) / edge);
+      }
+      for (let i = 0; i < F.length; i++) {
+        if (F[i].type !== 'cliff') continue;
+        const w = cliffDrop(F[i], x, z);
+        if (w <= 0) continue;
+        const target = R.terrain.water === 'mask' ? Math.max(waterY(id, x, z) + LEVEE, h - F[i].drop * 3) : h - F[i].drop;
+        if (target < h) h += (target - h) * w;
+      }
+    }
+    const r = worldRect(), d = Math.min(X - r.x0, r.x1 - X, Z - r.z0, r.z1 - Z);
+    if (d < RIM_START) {
+      const k = smooth(clamp((RIM_START - d) / RIM_WIDTH, 0, 1));
+      h += k * (RIM_HEIGHT + 40 * Math.sin(X * 0.013 + Z * 0.007 + 3) * Math.cos(Z * 0.011 - X * 0.005));
+    }
+    return h;
+  }
+
   function heightAt(id, x, z) {
     const R = region(id), F = R.terrain.features;
+    if (R.origin) return worldHeight(x + R.origin[0], z + R.origin[1]);
     let h = baseHeight(id, x, z);
     for (let i = 0; i < F.length; i++) {
       const f = F[i];
@@ -264,16 +548,42 @@
     return h;
   }
 
-  /** Distance from (x, z) to the nearest centre line of a feature type ('road' | 'river'), Infinity if none. */
+  /** Distance from (x, z) to the nearest centre line of a feature type ('road' | 'river'), Infinity if none (in a zone:
+      the world's roads and river count too, as far as their index reaches - farther is Infinity). */
   function lineDist(id, type, x, z) {
+    const R = region(id);
     let d = Infinity;
-    for (const f of region(id).terrain.features) if (f.type === type) d = Math.min(d, nearestOn(f.points, x, z).d);
+    for (const f of R.terrain.features) if (f.type === type) d = Math.min(d, nearestOn(f.points, x, z).d);
+    if (R.origin) {
+      const X = x + R.origin[0], Z = z + R.origin[1];
+      if (type === 'road') { const q = lineNear(worldRoads().ix, X, Z); if (q) d = Math.min(d, q.d); }
+      else if (type === 'river') { const q = worldRiverNear(X, Z); if (q && riverWeight(X, Z) > 0.5) d = Math.min(d, q.d); }
+    }
     return d;
   }
 
   /** The river whose channel holds (x, z): { f, level } or null. */
   function riverAt(id, x, z) {
     const R = region(id);
+    if (R.origin) {
+      const X = x + R.origin[0], Z = z + R.origin[1];
+      for (const mz of zones()) {                  // a masked zone's own river (the Bend's Vltava)
+        const M2 = D.regions[mz];
+        if (M2.terrain.water !== 'mask' || inset(mz, X, Z) < -40) continue;
+        const lx = X - M2.origin[0], lz = Z - M2.origin[1];
+        if (maskAt(mz, lx, lz) > 0.5 && !deckAt(id, x, z)) return { f: null, level: waterY(mz, lx, lz) };
+      }
+      const rv = worldRiver();
+      if (rv && riverWeight(X, Z) > 0.5) {
+        const q = worldRiverNear(X, Z, rv.out);
+        if (q && !deckAt(id, x, z)) return { f: rv, level: q.level, world: true };
+      }
+      for (const f of R.terrain.features) {
+        if (f.type !== 'river') continue;
+        if (nearestOn(f.points, x, z).d < f.width / 2 * CHANNEL) return { f, level: riverLevel(R, f) };
+      }
+      return null;
+    }
     if (R.terrain.water === 'mask') return maskAt(id, x, z) > 0.5 && !deckAt(id, x, z) ? { f: null, level: waterY(id, x, z) } : null;
     for (const f of R.terrain.features) {
       if (f.type !== 'river') continue;
@@ -367,11 +677,16 @@
     return Math.hypot(dx, dz) / (2 * e);
   }
 
-  /** Keeps pos inside the region radius and between ground + minAlt and the ceiling (mutates pos). */
+  /** Keeps pos inside the region radius (a zone: inside the world) and between ground + minAlt and the ceiling (mutates pos). */
   function clampToRegion(id, pos, minAlt) {
     const R = region(id);
-    const r = Math.hypot(pos[0], pos[2]);
-    if (r > R.radius) { pos[0] *= R.radius / r; pos[2] *= R.radius / r; }
+    if (R.origin) {
+      const r = worldRect(), o = R.origin;
+      pos[0] = clamp(pos[0], r.x0 - o[0], r.x1 - o[0]); pos[2] = clamp(pos[2], r.z0 - o[1], r.z1 - o[1]);
+    } else {
+      const r = Math.hypot(pos[0], pos[2]);
+      if (r > R.radius) { pos[0] *= R.radius / r; pos[2] *= R.radius / r; }
+    }
     const g = surfaceAt(id, pos[0], pos[2]) + (minAlt == null ? D.flight.minAlt : minAlt);
     pos[1] = Math.min(R.ceiling, Math.max(g, pos[1]));
     return pos;
@@ -434,6 +749,18 @@
    */
   function liquidAt(id, x, z) {
     const R = region(id);
+    if (R.origin) {
+      const X = x + R.origin[0], Z = z + R.origin[1], zid = zoneAt(X, Z) || id;
+      if (zid !== id) { const [lx, lz] = toLocal(zid, X, Z), l = liquidAt(zid, lx, lz); return l; }
+      for (const f of R.terrain.features) {
+        if (f.type === 'cone' && f.crater && Math.hypot(x - f.x, z - f.z) < f.crater.r && surfaceAt(id, x, z) < lavaLevel(id)) return 'lava';
+      }
+      if (lavaAt(id, x, z) > LAVA_IN) return 'lava';
+      for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return 'water';
+      const rv = riverAt(id, x, z);
+      if (rv && (!rv.world || surfaceAt(id, x, z) < rv.level)) return 'water';
+      return null;
+    }
     for (const f of R.terrain.features) {
       if (f.type !== 'cone' || !f.crater) continue;
       if (Math.hypot(x - f.x, z - f.z) < f.crater.r && surfaceAt(id, x, z) < lavaLevel(id)) return 'lava';
@@ -450,6 +777,20 @@
   const SHORE = 1.6;
   function dryAt(id, x, z) {
     const R = region(id), h = surfaceAt(id, x, z);
+    if (R.origin) {
+      if (hasBridges(id) && deckAt(id, x, z)) return true;
+      for (const w of R.water || []) if (Math.hypot(x - w.x, z - w.z) < w.r) return false;
+      const X = x + R.origin[0], Z = z + R.origin[1];
+      for (const mz of zones()) {
+        const M2 = D.regions[mz];
+        if (M2.terrain.water !== 'mask' || inset(mz, X, Z) < -40) continue;
+        const lx = X - M2.origin[0], lz = Z - M2.origin[1];
+        if (maskAt(mz, lx, lz) >= 0.3 || h < waterY(mz, lx, lz) + SHORE * 0.5) return false;
+      }
+      const rv = worldRiver(), q = rv && worldRiverNear(X, Z, rv.out + rv.valley);
+      if (q && riverWeight(X, Z) > 0.5 && (q.d < rv.out || h < q.level + SHORE)) return false;
+      return true;
+    }
     if (R.waterLevel != null && h < R.waterLevel + SHORE) return false;
     if (R.terrain.water === 'mask') {
       if (deckAt(id, x, z)) return true;
@@ -479,6 +820,14 @@
     if (fieldCache.has(id)) return fieldCache.get(id);
     const R = region(id), n = (R.flora && R.flora.fields) || 0, out = [];
     const lines = R.terrain.features.filter(f => f.type === 'road' || f.type === 'river');
+    if (R.origin && n) {                         // a zone: along the world's roads and the river where they cross it
+      const o = R.origin, polys = worldRoads().list.map(r => r.pts), rv = worldRiver();
+      if (rv) polys.push(rv.pts);
+      for (const pts of polys) {
+        const loc = pts.map(p => [p[0] - o[0], p[1] - o[1]]).filter(p => Math.max(Math.abs(p[0]), Math.abs(p[1])) < R.radius);
+        if (loc.length >= 2) lines.push({ type: 'road', points: loc });
+      }
+    }
     let seed = (R.seed * 2654435761) >>> 0;
     const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const corners = (c) => {
@@ -491,12 +840,14 @@
     };
     const ok = (c) => {
       const rr = Math.hypot(c.w, c.l) / 2;
-      if (Math.hypot(c.x, c.z) > R.radius - FIELD.edgePad) return false;
+      if (R.origin ? (!inZone(id, c.x, c.z, rr + 30) || edgeDist(id, c.x, c.z) < FIELD.edgePad) : Math.hypot(c.x, c.z) > R.radius - FIELD.edgePad) return false;
       for (const o of out) if (Math.hypot(o.x - c.x, o.z - c.z) < rr + Math.hypot(o.w, o.l) / 2 * 0.8 + FIELD.gap) return false;
       for (const [x, z] of corners(c)) {
         if (!dryAt(id, x, z) || plateauAt(id, x, z, FIELD.plateauPad) || cityAt(id, x, z, 10)) return false;
         if (lineDist(id, 'road', x, z) < FIELD.roadPad + 4) return false;
         for (const f of R.terrain.features) if (f.type === 'river' && nearestOn(f.points, x, z).d < f.width / 2 * CHANNEL + FIELD.riverPad) return false;
+        if (R.origin && worldRiver() && lineDist(id, 'river', x, z) < worldRiver().out + FIELD.riverPad) return false;
+        if (R.origin && cityNear(id, x, z, 10)) return false;
         if (slopeAt(id, x, z, 4) > FIELD.slope) return false;
       }
       return true;
@@ -527,5 +878,13 @@
     return null;
   }
 
-  M.define('terrain', { GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, cityAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), lavaFlows, flowAngle, flowWidth, lavaAt, LAVA_IN, surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
+  /** A town or village circle of any zone near world-frame point (x, z) of zone id (fields keep off the neighbours' too). */
+  function cityNear(id, x, z, pad) {
+    const [X, Z] = toWorld(id, x, z);
+    for (const zid of zonesNear(X, Z, 300)) { const [lx, lz] = toLocal(zid, X, Z); if (cityAt(zid, lx, lz, pad)) return true; }
+    return false;
+  }
+
+  M.define('terrain', { zones, origin, toWorld, toLocal, zoneAt, inZone, worldRect, edgeDist, zonesNear, worldMetres, worldGround, worldHeight, worldRiver, worldRiverNear, riverWeight, worldRoads, warpScale, toUnits, isZone, cityNear,
+    GRID, CHUNK, demHeight, demGrid, maskAt, waterY, ruinsAt, cityAt, deckAt, meshAt, heightAt, baseHeight, nearestOn, lineDist, riverAt, plateauAt, dryAt, fields, fieldAt, riverLevel: (id, f) => riverLevel(region(id), f), lavaFlows, flowAngle, flowWidth, lavaAt, LAVA_IN, surfaceAt, slopeAt, surfaceSlope, liquidAt, clampToRegion, lairPos, lavaLevel, region, noise });
 })(typeof self !== 'undefined' ? self : this);

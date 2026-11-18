@@ -5,8 +5,14 @@
  * is drawn. Adds water, the volcano (render/volcano-view.js) and the lair cave mouth, and culls far chunks.
  * The ground is smooth shaded (normals from the height field, so chunks join without a seam) and carries triplanar
  * detail textures from shared/textures.js: turf or ash on flat ground, rock on the slopes.
- *   VRender.terrain.build(regionId, { isTouch, flora, far, detail, particles }) -> { group, fog, forest, update(cameraPos, time, fx), dispose(), info }
+ *   VRender.terrain.build(regionId, { isTouch, flora, far, detail, particles, lazy }) -> { group, fog, forest, update(cameraPos, time, fx), dispose(), info }
  *     update fx: { dt, camera, viewH } animates the forest (falling and burning trees) and the volcano
+ * One world (core/terrain.js zones): a zone draws its own square only (plus the boundary ridge past the world's edge),
+ * so the zones' meshes meet along their shared edges; its colours blend into the neighbour's palette over SEAM units
+ * at the edge (both sides reach the same colour on the seam). Roads, fields, village greens and river banks are
+ * painted in every palette. The world's river (the Vltava below the Bend) is a ribbon at its falling level, the part
+ * of it over the zone. Chunks are built lazily, nearest first, up to `budget` per update (opts.lazy), so a neighbour
+ * zone appears without a long stall; update(cameraPos) takes the camera in the zone's own frame.
  */
 (function (root) {
   'use strict';
@@ -46,10 +52,29 @@
     const R = T.region(id);
     const cone = R.terrain.features.find(f => f.type === 'cone');
     const rimH = cone ? T.heightAt(id, cone.x + cone.crater.r, cone.z) : Infinity;
-    const road = R.terrain.features.find(f => f.type === 'road'), roadW = road ? road.width : 0;
+    const road = R.terrain.features.find(f => f.type === 'road'), roadW = road ? road.width : R.origin && D.world ? D.world.roads.width : 0;
+    function post(c, x, z, h, slope, jitter) {
+      if (R.origin && R.palette !== 'farm' && R.palette !== 'bend') {
+        const fd = T.fieldAt(id, x, z);
+        if (fd) c.set(CROPS[fd.f.crop][Math.sin(fd.u * fd.f.w * 1.1) > 0 ? 0 : 1]);
+        const town = T.cityAt(id, x, z);
+        if (town) { const inner = 1 - Math.hypot(x - town.x, z - town.z) / town.r; if (inner > -0.3) c.lerp(b.set(0x857552), Math.min(0.35, 0.1 + (inner + 0.3) * 0.6)); }
+        const rv = T.riverAt(id, x, z);
+        if (rv && h < rv.level + 1.6) c.set(pal.bank || 0x8b7d58);
+        const rd = T.lineDist(id, 'road', x, z);
+        if (rd < 3.2) c.set(pal.road || 0x9c8660);
+        else if (rd < 6) c.lerp(b.set(pal.roadEdge || 0x7f7a4a), 0.6);
+      }
+      return [c.r * jitter, c.g * jitter, c.b * jitter];
+    }
     return (x, z, h, slope, jitter) => {
       if (R.palette === 'ash') {
         const dCone = cone ? Math.hypot(x - cone.x, z - cone.z) : Infinity;
+        if (dCone > (R.flora.far ? R.flora.far.full + 250 : Infinity)) {   // the plain round Rip: meadows (a zone: fields come below)
+          c.set(pal.grass).lerp(b.set(pal.grass2), (Math.sin(x * 0.019 + Math.cos(z * 0.015) * 1.8) + 1) / 2 * 0.8);
+          if (slope > 0.6) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.6) * 2));
+          return post(c, x, z, h, slope, jitter);
+        }
         a.set(pal.low); b.set(pal.mid);
         c.copy(a).lerp(b, (Math.sin(x * 0.021) * Math.cos(z * 0.017) + 1) / 2);
         if (dCone < cone.r) c.lerp(b.set(pal.high), Math.min(1, (1 - dCone / cone.r) * 1.6));
@@ -68,7 +93,7 @@
       } else if (R.palette === 'farm') {
         a.set(pal.low); b.set(pal.mid);
         c.copy(a).lerp(b, 0.15 + 0.6 * (Math.sin(x * 0.013 + Math.cos(z * 0.009) * 1.7) * Math.cos(z * 0.011 - x * 0.004) + 1) / 2);   // meadow patches, no stripes
-        if (h > 30) c.lerp(b.set(pal.high), Math.min(1, (h - 30) / 16));
+        if (h > (R.origin ? 60 : 30)) c.lerp(b.set(pal.high), Math.min(1, (h - (R.origin ? 60 : 30)) / 16));
         const fd = T.fieldAt(id, x, z);
         if (fd) {                                                // crop rows along the field
           const cc = pal.crops[fd.f.crop], row = Math.sin(fd.u * fd.f.w * 1.1) > 0 ? 0 : 1;
@@ -112,6 +137,11 @@
         if (slope > 0.45) {                                      // limestone on steep slopes (the Vyshgard face), with strata
           c.lerp(b.set(Math.sin(h * 1.3) > 0.3 ? pal.strata : pal.steep), Math.min(1, (slope - 0.45) * 3));
         }
+      } else if (R.origin) {                                     // the Wildwood as a zone of the world: woods on real hills
+        a.set(pal.low); b.set(pal.mid);
+        c.copy(a).lerp(b, (Math.sin(x * 0.05) * Math.cos(z * 0.04) + 1) / 2);
+        if (h > 70) c.lerp(b.set(pal.high), Math.min(1, (h - 70) / 30));
+        if (slope > 0.55) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.55) * 2.5));
       } else {
         if (h < 2.2) c.set(pal.sand);
         else {
@@ -121,7 +151,24 @@
         }
         if (slope > 0.55) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.55) * 2.5));
       }
-      return [c.r * jitter, c.g * jitter, c.b * jitter];
+      return post(c, x, z, h, slope, jitter);
+    };
+  }
+  const CROPS = [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a], [0x6a5a3a, 0x4f6a2c]];
+
+  /** A zone's colour, blended over SEAM units at a shared edge into the neighbour's palette (half way on the seam). */
+  const SEAM = 140, zoneColour = new Map();
+  function seamColourFn(id) {
+    const R = T.region(id);
+    if (!R.origin) return colourFn(id, PALETTES[R.palette]);
+    const own = colourFn(id, PALETTES[R.palette]), nb = {};
+    for (const e of R.exits || []) { const Q = T.region(e.to); nb[e.side] = { id: e.to, f: colourFn(e.to, PALETTES[Q.palette]) }; }
+    return (x, z, h, slope, jitter) => {
+      const c = own(x, z, h, slope, jitter), side = z > 0 ? 'n' : 's', k = R.radius - Math.abs(z);
+      if (k >= SEAM || !nb[side]) return c;
+      const [X, Z] = T.toWorld(id, x, z), [lx, lz] = T.toLocal(nb[side].id, X, Z), o = nb[side].f(lx, lz, h, slope, jitter);
+      const w = 0.5 * (1 - k / SEAM);
+      return [c[0] + (o[0] - c[0]) * w, c[1] + (o[1] - c[1]) * w, c[2] + (o[2] - c[2]) * w];
     };
   }
 
@@ -227,6 +274,39 @@
     }
   }
 
+  /** The world's river over a zone: a ribbon along its centre line at its falling level, clipped to the zone's square
+      (plus a little overlap, hidden under the neighbour's identical ribbon), skipped where the Bend draws its own water. */
+  function worldRiverWater(id, group, pal) {
+    const rv = T.worldRiver && T.worldRiver(), R = T.region(id);
+    if (!rv || !R.origin) return null;
+    const [ox, oz] = R.origin, P = [], L = [];
+    for (let i = 0; i + 1 < rv.pts.length; i++) {
+      const a = rv.pts[i], b = rv.pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8));
+      for (let k = 0; k < n; k++) { P.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); L.push(rv.level[i] + (rv.level[i + 1] - rv.level[i]) * k / n); }
+    }
+    P.push(rv.pts[rv.pts.length - 1]); L.push(rv.level[rv.level.length - 1]);
+    const half = rv.out + 1, pos = [], idx = [];
+    let run = -1;
+    P.forEach((p, i) => {
+      const x = p[0] - ox, z = p[1] - oz, inside = Math.max(Math.abs(x), Math.abs(z)) < R.radius + 20 && T.riverWeight(p[0], p[1]) > 0;
+      if (!inside) { run = -1; return; }
+      const q0 = P[Math.max(0, i - 1)], q1 = P[Math.min(P.length - 1, i + 1)];
+      let dx = q1[0] - q0[0], dz = q1[1] - q0[1];
+      const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      const v = pos.length / 3;
+      pos.push(x - dz * half, L[i], z + dx * half, x + dz * half, L[i], z - dx * half);
+      if (run >= 0) idx.push(run, run + 2, run + 1, run + 1, run + 2, run + 3);   // counter-clockwise seen from above
+      run = v;
+    });
+    if (!idx.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: pal.water != null ? pal.water : 0x3d7480, roughness: 0.2, metalness: 0.25, transparent: true, opacity: 0.9 }));
+    mesh.name = 'river'; group.add(mesh);
+    return mesh;
+  }
+
   /** River water of a 'mask' region (T02): a grid mesh over the wet cells (dilated, so the banks hide its edge) at
       terrain.waterY, which steps down gently downstream. One draw call. */
   function maskWater(id, group, pal) {
@@ -269,19 +349,24 @@
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
     if (TX) TX.detail(mat, { map: 'rock', top: R.palette === 'ash' ? 'ash' : 'ground', scale: 22, topScale: 11, strength: 0.62, bump: 1.5 });
     group.userData.fxOpts = { particles: opts.particles, detail: opts.detail };
-    const colour = colourFn(id, pal);
-    const chunks = [];
+    const colour = seamColourFn(id);
+    const chunks = [], todo = [];
     const nC = Math.ceil(EXTENT / T.CHUNK);
-    for (let cz = -nC; cz < nC; cz++) for (let cx = -nC; cx < nC; cx++) {
-      const m = buildChunk(id, cx, cz, mat, colour, rng);
-      chunks.push(m); group.add(m);
-    }
+    if (R.origin) {                                              // a zone: its own square, past the world's edge on its outer sides
+      const n = Math.round(R.radius / T.CHUNK), out = Math.ceil((EXTENT - R.radius) / T.CHUNK) + 1, open = {};
+      if (!opts.solo) for (const e of R.exits || []) open[e.side] = true;   // solo: drawn alone (the Tales), the land goes on past every side
+      for (let cz = -n - (open.s ? 0 : out); cz < n + (open.n ? 0 : out); cz++) for (let cx = -n - out; cx < n + out; cx++) todo.push([cx, cz]);
+    } else for (let cz = -nC; cz < nC; cz++) for (let cx = -nC; cx < nC; cx++) todo.push([cx, cz]);
+    const crng = (cx, cz) => C.need('math').mulberry((R.seed * 977 + 1 + (cx + 50) * 131 + (cz + 50) * 7919) >>> 0);
+    const make = ([cx, cz]) => { const m = buildChunk(id, cx, cz, mat, colour, crng(cx, cz)); chunks.push(m); group.add(m); return m; };
+    if (!opts.lazy) { todo.forEach(make); todo.length = 0; }
     if (pal.water != null && R.waterLevel != null) {             // lakes and ponds: one plane at the region's water level
       const water = new THREE.Mesh(new THREE.CircleGeometry(EXTENT, 64), new THREE.MeshStandardMaterial({ color: pal.water, roughness: 0.25, metalness: 0.2, transparent: true, opacity: 0.88 }));
       water.rotation.x = -Math.PI / 2; water.position.y = R.waterLevel; group.add(water);
     }
     rivers(id, group, pal);
     if (R.terrain.water === 'mask') maskWater(id, group, pal);
+    worldRiverWater(id, group, pal);
     const bridges = VR.bridges ? VR.bridges.build(id) : null;           // T02: Karlsbridge and the wooden bridge
     if (bridges) group.add(bridges.group);
     const aerie = VR.aerie ? VR.aerie.build(id) : null;                 // Phase 3 T08: the region's aerie crag
@@ -294,8 +379,18 @@
     if (flora) group.add(flora.group);
 
     let visible = chunks.length;
-    const far = (opts.far || 950) + T.CHUNK * 0.75;
+    const far = (opts.far || 950) + T.CHUNK * 0.75, budget = opts.budget || 3;
+    /** Lazy chunks: the nearest unbuilt ones within reach (`all` = every one within reach now, e.g. right after a jump). */
+    function grow(camPos, all) {
+      if (!todo.length) return 0;
+      const d = ([cx, cz]) => Math.hypot((cx + 0.5) * T.CHUNK - camPos.x, (cz + 0.5) * T.CHUNK - camPos.z);
+      todo.sort((a, b) => d(a) - d(b));
+      let n = 0;
+      while (todo.length && d(todo[0]) < far + T.CHUNK && (all || n < budget)) { make(todo.shift()); n++; }
+      return n;
+    }
     function update(camPos, time, fx) {
+      grow(camPos, fx && fx.all);
       visible = 0;
       if (TX && time != null) TX.tick(time);
       if (fx && flora) flora.update(fx.dt, time, fx.camera, fx.viewH);
@@ -323,7 +418,8 @@
       if (group.parent) group.parent.remove(group);
     }
     return {
-      group, palette: pal, fog: pal.fog, sky: pal.sky, mouth, lava: lavaFx, update, dispose,
+      group, palette: pal, fog: pal.fog, sky: pal.sky, mouth, lava: lavaFx, update, dispose, grow, id,
+      get pending() { return todo.length; },
       trees: flora ? flora.trees : [],                                 // [[x, z, r]]
       forest: flora ? flora.forest : null,                             // VForest: trees the dragon fells and burns
       flora,
@@ -331,5 +427,5 @@
     };
   }
 
-  VR.terrain = { build, PALETTES, colourFn };   // colourFn: the map view (T07) paints its region image with it
+  VR.terrain = { build, PALETTES, colourFn, seamColourFn };   // colourFn: the map view (T07) paints its region image with it
 })(typeof self !== 'undefined' ? self : this);

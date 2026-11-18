@@ -66,14 +66,17 @@
   let castleView = null, cityView = null;                     // cityView: Prahold and the villages (render/city-view.js)
   let placeShown = null, placeT = 0;                            // the part of Prahold (or the village) the dragon is in
   function loadRegion(id) {
+    for (const k of Object.keys(nbViews)) nbDispose(k);
     if (cityView) { cityView.dispose(); cityView = null; }
     if (region) region.dispose();
     if (preyView) preyView.dispose();
     if (townView) townView.dispose();
     if (castleView) { castleView.dispose(); castleView = null; }
     regionId = id;
-    region = VRender.terrain.build(id, { isTouch, flora: qSet.flora, far: qSet.fogFar, particles: qSet.particles, detail: qTier !== 'low' });
+    region = VRender.terrain.build(id, terrainOpts());
     scene.add(region.group);
+    const at = cs.dragon.pilot && cs.region === id ? cs.dragon.pilot.pos : [0, 0, 0];
+    region.update(new V3(at[0], at[1], at[2]), 0, { all: true });   // the chunks in view now, the rest as the dragon flies
     if (cs.region !== id || !cs.field) ST.enterRegion(cs, id);
     preyView = VRender.prey.build();
     scene.add(preyView.group);
@@ -88,6 +91,87 @@
     scene.fog.color.set(region.fog); caveOn = null;
     skyView.setRegion(region); caveOn = null;                       // T21: the region's day palette, the clock lerps to night
     $('#regionText').textContent = t(TR.region(id).nameKey);
+  }
+  function terrainOpts() { return { isTouch, flora: qSet.flora, far: qSet.fogFar, particles: qSet.particles, detail: qTier !== 'low', lazy: true }; }
+
+  /* ---------- one world: the neighbour regions on screen (core/terrain.js zones) ----------
+     The simulation runs in the dragon's region; the regions next to it are drawn too, shifted by the difference of the
+     origins, so the land, the river, the roads, the villages and the towns go on past the edge. A neighbour's view is
+     built when the camera comes within the fog distance of its square (its terrain grows chunk by chunk) and freed when
+     it is far behind. Over the edge (region:enter, seamless) the views swap roles: the new region's become the live
+     ones, the old live ones stay as its neighbour, and the camera moves with the frame. */
+  const nbViews = {};
+  function zoneOff(id) { const a = TR.origin(id), b = TR.origin(regionId); return [a[0] - b[0], a[1] - b[1]]; }
+  function nbBuild(id) {
+    const v = { terrain: VRender.terrain.build(id, terrainOpts()), city: VRender.cityView ? VRender.cityView.build(id, { tier: qTier }) : null, town: null, townData: null, castle: null };
+    scene.add(v.terrain.group);
+    if (v.city) scene.add(v.city.group);
+    const R = TR.region(id);
+    if (R.settlements && R.settlements.length) {
+      v.townData = cs.regionStates && cs.regionStates[id] ? SE.build(id, cs.regionStates[id]) : SE.build(id);
+      v.town = VRender.settlements.build(v.townData); scene.add(v.town.group);
+      v.castle = VRender.castleView ? VRender.castleView.build(v.townData, { tier: qTier }) : null;
+      if (v.castle) scene.add(v.castle.group);
+    }
+    return (nbViews[id] = v);
+  }
+  function nbDispose(id) {
+    const v = nbViews[id];
+    if (!v) return;
+    for (const k of ['city', 'town', 'castle']) if (v[k]) { scene.remove(v[k].group); v[k].dispose(); }
+    v.terrain.dispose();
+    delete nbViews[id];
+  }
+  const nbEye = new V3(), nbCam = { position: nbEye, fov: 60 };
+  const SKY_SEAM = 400;                                         // the sky and fog blend into the neighbour's over this
+  function nbUpdate(eye, dt, viewH) {
+    if (!TR.region(regionId).origin) return;
+    {
+      const R = TR.region(regionId), side = eye.z > 0 ? 'n' : 's', ex = (R.exits || []).find(e => e.side === side), d = R.radius - Math.abs(eye.z);
+      const P = VRender.terrain.PALETTES, own = P[R.palette];
+      if (ex && d < SKY_SEAM) { const o = P[TR.region(ex.to).palette]; skyView.setRegion({ sky: own.sky, fog: own.fog }, { sky: o.sky, fog: o.fog }, 0.5 * (1 - Math.max(0, d) / SKY_SEAM)); }
+      else skyView.setRegion({ sky: own.sky, fog: own.fog });
+    }
+    const night = 1 - (skyView.state ? skyView.state.light : 1);
+    for (const id of TR.zones()) {
+      if (id === regionId) continue;
+      const [ox, oz] = zoneOff(id), R = TR.region(id);
+      const d = Math.hypot(Math.max(0, Math.abs(eye.x - ox) - R.radius), Math.max(0, Math.abs(eye.z - oz) - R.radius));
+      if (d > qSet.fogFar + 1500) { nbDispose(id); continue; }
+      let v = nbViews[id];
+      if (!v && d < qSet.fogFar + 350) v = nbBuild(id);
+      if (!v) continue;
+      const show = !cs.inLair && d < qSet.fogFar + 350;
+      for (const k of ['terrain', 'city', 'town', 'castle']) if (v[k]) { v[k].group.position.set(ox, 0, oz); v[k].group.visible = show; }
+      if (!show) continue;
+      nbEye.set(eye.x - ox, eye.y, eye.z - oz); nbCam.fov = camera.fov;
+      v.terrain.update(nbEye, time, { dt, camera: nbCam, viewH });
+      if (v.city) v.city.update(nbEye, dt, night);
+      if (v.town) v.town.update(v.townData, dt, { cam: nbEye, particles: qSet.particles, pxScale: viewH * 0.5, lights: [], time });
+      if (v.castle) v.castle.update(dt, { town: v.townData, cam: nbEye, time, night });
+    }
+  }
+  /** Over a shared edge (region:enter, seamless): the frame moves by e.shift, the views swap roles, no fade. */
+  function crossRegion(e) {
+    const [dx, dz] = e.shift || [0, 0], old = regionId;
+    camPos.x += dx; camPos.z += dz; camLook.x += dx; camLook.z += dz; camera.position.x += dx; camera.position.z += dz;
+    nbViews[old] = { terrain: region, city: cityView, town: townView, townData: townView ? townView.town : null, castle: castleView };
+    regionId = cs.region;
+    const v = nbViews[regionId] || nbBuild(regionId);
+    delete nbViews[regionId];
+    if (v.town) { scene.remove(v.town.group); v.town.dispose(); }
+    if (v.castle) { scene.remove(v.castle.group); v.castle.dispose(); }
+    region = v.terrain; cityView = v.city;
+    for (const g of [region.group, cityView && cityView.group]) if (g) { g.position.set(0, 0, 0); g.visible = true; }
+    preyView.dispose(); preyView = VRender.prey.build(); scene.add(preyView.group);
+    townView = VRender.settlements.build(ST.ensureTown(cs)); townView.town = cs.town; scene.add(townView.group);
+    castleView = VRender.castleView ? VRender.castleView.build(cs.town, { tier: qTier }) : null;
+    if (castleView) scene.add(castleView.group);
+    region.update(new V3(pilot.pos[0], pilot.pos[1], pilot.pos[2]), time, { all: true });
+    placeShown = null;
+    skyView.setRegion(region);
+    $('#regionText').textContent = t(TR.region(regionId).nameKey);
+    toast(t(TR.region(regionId).nameKey), t('c.toast.enterSub'), 2.5);
   }
   loadRegion(bootRegion);
   /** After core moved cs to another region (region:enter): rebuild the scene behind a short fade. */
@@ -891,7 +975,7 @@
       else if (e.e === 'prey:roasted') { embers(e.pos, 46); toast(t('c.toast.roasted'), t('c.toast.roastedSub', { n: e.chunks }), 2); }
       else if (e.e === 'prey:eaten') { hero.jaw.rotation.x = 0.9; toast(t('c.toast.eaten', { food: e.food }), t('c.prey.' + e.type), 1.6); }
       else if (e.e === 'dragon:died') { died = e; hurt = 0; shake = 0; hero.flash = 0; fadeEl.classList.add('now'); requestAnimationFrame(() => fadeEl.classList.remove('now')); }
-      else if (e.e === 'region:enter') swapRegion(e.respawn || e.travel);
+      else if (e.e === 'region:enter') { if (e.seamless) crossRegion(e); else swapRegion(e.respawn || e.travel); }
       else if (e.e === 'travel:done') { leaveCave(); toast(t('c.travel.done', { place: destName(MP.destinations(cs).find(d => d.id === e.to) || { kind: 'lair' }) }), t(e.to === 'lair' ? 'c.travel.doneLair' : 'c.travel.doneAerie'), 3); }   // T09
       else if (e.e === 'save') saveNow(e.why);
       else if (e.e === 'mission:accepted') toast(t('c.mission.accepted', { m: missionName(e.id) }), t('c.mission.acceptedSub', { time: mmss(e.time) }), 3.5, 'mission');   // T10 (the board and the HUD come with T11)
@@ -1808,6 +1892,7 @@
     const vw = inXR ? xr.view() : camera, eye = vw.position, viewH = inXR ? vw.viewH : renderer.domElement.height;   // VR: the rig, not the camera, is in the world
     sky.position.copy(eye);
     region.update(eye, time, { dt, camera: vw, viewH });
+    nbUpdate(eye, dt, viewH);
     if (dt > 0) updateParticles(dt);
     if (state === 'intro' || !pilot) mom.root.visible = false;
     motherHud();
@@ -2067,5 +2152,5 @@
   renderer.setAnimationLoop(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { storyCard, get nbViews() { return nbViews; }, leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();

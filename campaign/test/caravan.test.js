@@ -228,15 +228,14 @@ function distToRoad(r, x, z) {
 //    gets the chest to the Troyvale aerie inside the mission time with the trip from the lair (3 regions) counted
 {
   const r = CA.route('tithe'), c = D.caravan.tithe, m = D.missions.find(q => q.id === 'a2_caravan');
-  const cruise = G.statsOf(1).cruise, ent = D.regions.bend.entries.farm.angle, R = D.regions.bend.radius - D.travel.entryInset;
-  const e = [Math.sin(ent) * R, Math.cos(ent) * R];
+  const cruise = G.statsOf(1).cruise, e = [0, D.regions.bend.radius];               // over the Farmlands' edge (one world)
   // meet: the earliest t where the dragon (straight line at cruise from the entry) reaches the wagon
   let meet = null;
   for (let t = 0; t <= r.total / c.speed && meet == null; t += 0.5) { const a = DF.along(r, c.speed * t); if (Math.hypot(a.x - e[0], a.z - e[1]) <= cruise * t) meet = { t, a }; }
   ok(meet != null, 'the dragon can reach the wagon before the gate (' + (meet && meet.t) + ' s after entering)');
   const fire = c.wagonHp / D.caravan.burn, grab = 12;                    // land, take, take off
   const ae = D.aeries.bend, home = Math.hypot(meet.a.x - ae.x, meet.a.z - ae.z) / (cruise * D.loot[D.caravan.tithe.chest].carry.speedMult);
-  const lairTrip = 2 * 2 * 1000 / cruise;                                  // Ash -> Wild -> Farm (about 2 region diameters), timer starts after the Ash Wastes
+  const lairTrip = (D.regions.ash.origin[1] - D.regions.ash.radius - (D.regions.bend.origin[1] + D.regions.bend.radius)) / cruise;   // from the Ash Wastes' edge (the timer starts there) through Wild and Farm
   const total = lairTrip + meet.t + fire + grab + home;
   ok(total < m.time, 'fits the mission time: ' + total.toFixed(0) + ' of ' + m.time + ' s');
   ok(total > 120, 'not trivial: ' + total.toFixed(0) + ' s');

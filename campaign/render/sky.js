@@ -47,9 +47,14 @@
     const tmp = new THREE.Color();
     const lerp3 = (out, a, b, k) => out.copy(a).lerp(b, k);
 
-    function setRegion(region) {
+    /** The day palette of a region; with `other` and k (0..1), blended toward the neighbour's (one world: near an edge). */
+    const nb = { top: new THREE.Color(), mid: new THREE.Color(), bot: new THREE.Color(), fog: new THREE.Color() };
+    function setRegion(region, other, k) {
       if (!region) return;
       day.top.set(region.sky.top); day.mid.set(region.sky.mid); day.bot.set(region.sky.bot); day.fog.set(region.fog);
+      if (!other || !(k > 0)) return;
+      nb.top.set(other.sky.top); nb.mid.set(other.sky.mid); nb.bot.set(other.sky.bot); nb.fog.set(other.fog);
+      for (const key of ['top', 'mid', 'bot', 'fog']) day[key].lerp(nb[key], k);
     }
 
     /** The sun's direction at time t: rises in the east of the old fixed sun, highest at noon, sets at nightFrom. */

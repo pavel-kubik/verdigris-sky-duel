@@ -126,11 +126,11 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
   cs.dragon.pilot = F.newPilot([400, 160, -400], 2, 30);
   let saves = [];
   const run = (secs, inp) => { for (let i = 0; i < secs / 0.1; i++) saves.push(...S.step(cs, inp || {}, 0.1).filter(e => e.e === 'save')); };
-  run(59.5);
+  run(59.5, { sx: 0.6 });                                     // circling: the one world goes on past the region's edge
   ok(saves.length === 0, 'no save before 60 s');
-  run(1);
+  run(1, { sx: 0.6 });
   ok(saves.length === 1 && saves[0].why === 'timer', 'timer save at 60 s');
-  run(60);
+  run(60, { sx: 0.6 });
   ok(saves.length === 2, 'next timer save 60 s later');
 
   saves = [];
@@ -142,10 +142,9 @@ const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new
   S.lairLeave(cs);
 
   saves = [];
-  const ex = T.region('ash').exits[0], mid = (ex.angleFrom + ex.angleTo) / 2, r = T.region('ash').radius - 40;
-  const x = Math.sin(mid) * r, z = Math.cos(mid) * r;
-  cs.dragon.pilot = F.newPilot([x, T.surfaceAt('ash', x, z) + 50, z], mid, 30);
-  run(0.3, { confirm: true });
+  const x = 0, z = -(T.region('ash').radius - 4);                // at the Wildwood edge, flying south over it
+  cs.dragon.pilot = F.newPilot([x, T.surfaceAt('ash', x, z) + 50, z], Math.PI, 30);
+  run(0.3);
   ok(cs.region === 'wild' && saves.length === 1 && saves[0].why === 'region', 'save on region change');
   const s2 = mem();
   ok(SV.store(s2, cs) && SV.load(s2).data.world.region === 'wild', 'the region-change save holds the new region');

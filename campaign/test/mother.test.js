@@ -248,16 +248,18 @@ function visitCycle(stage) {
   const w = S.create({ regionId: 'wild', rng: mulberry(21) });
   w.story.mother = { lesson: ids.indexOf('roast'), at: 'air' };
   const g0 = (() => { w.dragon.pilot = F.newPilot([0, 80, 0], 0, 30); return MO.goal(w); })();
-  const boar = PR.byId(w.field, g0.prey), p = w.dragon.pilot;
+  let boar = PR.byId(w.field, g0.prey);
+  const p = w.dragon.pilot;
   p.pos = [boar.pos[0] + 60, boar.pos[1] + 12, boar.pos[2]]; p.yaw = -Math.PI / 2;
   MO.placeBeside(w, 'lead');
   for (let t = 0; t < 2; t += dt) MO.step(w, [], dt);
   ok(w.mom.phase === 'show' || w.mom.phase === 'wait', 'near the boar she shows / waits');
-  ok(boar.held > 0, 'she holds the boar');
+  boar = PR.byId(w.field, MO.goal(w).prey);                   // the nearest boar of the herd from here (herd mates stand close)
+  ok(boar && boar.held > 0, 'she holds the boar');
   const at = boar.pos.slice();
   p.pos = [boar.pos[0] + 8, boar.pos[1] + 5, boar.pos[2]];   // low and close: a free boar would charge
   let hits = 0;
-  for (let t = 0; t < 3; t += dt) { MO.step(w, [], dt); for (const e of PR.step(w.field, { pos: p.pos, inv: 0 }, dt, { stats: core('growth').statsOf(0), rng: w.rng })) if (e.e === 'boar:hit') hits++; }
+  for (let t = 0; t < 3; t += dt) { MO.step(w, [], dt); for (const e of PR.step(w.field, { pos: p.pos, inv: 0 }, dt, { stats: core('growth').statsOf(0), rng: w.rng })) if (e.e === 'boar:hit' && e.id === boar.id) hits++; }
   ok(dist(at, boar.pos) < 0.5 && hits === 0, 'a held boar neither runs nor charges');
   ok(D.roast.cool < D.roast.cookTime / 2, 'heat stays long enough for several passes (roast.cool ' + D.roast.cool + ' / s)');
 }

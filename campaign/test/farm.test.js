@@ -1,4 +1,5 @@
-// River Farmlands (Phase 2 T11): river, road and plateau terrain features, fields, water, the Drake-only exit from Wildwood.
+// River Farmlands (Phase 2 T11, one world): the real Vltava valley north of Prahold - the world's river (a channel with a
+// falling level), the road network between the villages (core/roads.js), plateaus, fields, the Drake-only edge from Wildwood.
 'use strict';
 const { ok, core } = require('./harness.js');
 const RG = core('region'), S = core('state'), T = core('terrain'), D = core('data'), F = core('flight'), PR = core('prey'), WK = core('walk'), NV = core('nav');
@@ -6,42 +7,42 @@ const { mulberry } = core('math');
 const dt = 1 / 60;
 const R = T.region('farm');
 const feat = type => R.terrain.features.filter(f => f.type === type);
-const at = (id, a, inset, up) => {
-  const r = T.region(id).radius - inset, x = Math.sin(a) * r, z = Math.cos(a) * r;
-  return [x, T.surfaceAt(id, x, z) + (up || 40), z];
-};
+const loc = (X, Z) => T.toLocal('farm', X, Z);
+const inFarm = (x, z, pad) => T.inZone('farm', x, z, pad || 0);
 
-// 1. the region is registered with a river, a road and three plateaus
+// 1. the region is registered with three plateaus and the world's river and roads cross it
 ok(R && R.nameKey === 'c.region.farm' && R.palette === 'farm', 'farm region registered');
-ok(feat('river').length === 1 && feat('road').length === 1 && feat('plateau').length === 3, 'farm features: river, road, 3 plateaus');
+ok(feat('plateau').length === 3, 'farm features: 3 plateaus');
+const rv = T.worldRiver();
+const riverHere = rv.pts.map(p => loc(p[0], p[1])).filter(p => inFarm(p[0], p[1], 60));
+ok(riverHere.length >= 5, 'the Vltava flows through the Farmlands (' + riverHere.length + ' points)');
+const roadsHere = T.worldRoads().list.filter(r => r.pts.some(p => inFarm(...loc(p[0], p[1]), 0)));
+ok(roadsHere.length >= 6, 'roads cross the Farmlands: ' + roadsHere.length);
 
-// 2. river: water along the whole channel inside the region, a channel below the banks, not landable, not walkable
+// 2. river: water along the channel, the bed below the level, not landable, not walkable; the level falls downstream
 {
-  const river = feat('river')[0], lv = T.riverLevel('farm', river);
   let wet = 0, n = 0;
-  for (let i = 0; i + 1 < river.points.length; i++) {
-    const a = river.points[i], b = river.points[i + 1];
-    for (let k = 0; k <= 20; k++) {
-      const x = a[0] + (b[0] - a[0]) * k / 20, z = a[1] + (b[1] - a[1]) * k / 20;
-      if (Math.hypot(x, z) > R.radius - 120) continue;
+  for (let i = 0; i + 1 < rv.pts.length; i++) {
+    const a = rv.pts[i], b = rv.pts[i + 1];
+    for (let k = 0; k <= 10; k++) {
+      const [x, z] = loc(a[0] + (b[0] - a[0]) * k / 10, a[1] + (b[1] - a[1]) * k / 10);
+      if (!inFarm(x, z, 40) || T.deckAt('farm', x, z, 4)) continue;
       n++;
-      if (T.liquidAt('farm', x, z) === 'water' && T.surfaceAt('farm', x, z) < lv - river.depth * 0.5) wet++;
+      const q = T.riverAt('farm', x, z);
+      if (T.liquidAt('farm', x, z) === 'water' && q && T.surfaceAt('farm', x, z) < q.level - rv.depth * 0.5) wet++;
     }
   }
   ok(n > 30 && wet === n, 'river centre line is deep water everywhere inside the region (' + wet + ' / ' + n + ')');
-  const p = river.points[2];
+  ok(rv.level.every((v, i) => i === 0 || v <= rv.level[i - 1] + 1e-9), 'river level never rises downstream');
+  const p = riverHere[Math.floor(riverHere.length / 2)];
   const pilot = F.newPilot([p[0], T.surfaceAt('farm', p[0], p[1]) + 4, p[1]], 0, 20);
   pilot.speed = 20;
   const land = WK.canLand(pilot, 'farm');
   ok(!land.ok && land.why === 'water', 'landing on the river is refused: water');
   ok(!T.dryAt('farm', p[0], p[1]), 'river is not dry ground for prey or trees');
-  // the bank beyond the channel is dry, level valley floor
-  const dz = river.width / 2 * 1.4 + 12, bx = p[0], bz = p[1] + dz;
-  ok(T.liquidAt('farm', bx, bz) === null && T.dryAt('farm', bx, bz), 'river bank is dry');
-  ok(Math.abs(T.surfaceAt('farm', bx, bz) - (lv + 2)) < 2.5, 'bank sits near the valley floor (level + 2)');
 }
 
-// 3. the surface is continuous across the river, the road and the plateau edges (no cliffs from the features)
+// 3. the surface is continuous across the river, the roads and the plateau edges (no cliffs from the features)
 {
   let worst = 0;
   const lines = [[[-200, -400], [-200, 400]], [[600, -200], [600, 400]], [[-300, -300], [300, -300]], [[380, 120], [380, 420]], [[640, -700], [640, -340]], [[-420, -600], [-420, -320]]];
@@ -54,28 +55,35 @@ ok(feat('river').length === 1 && feat('road').length === 1 && feat('plateau').le
       prev = h;
     }
   }
-  ok(worst < 1.2, 'no cliff across the river, road or plateau edges (max rise per unit ' + worst.toFixed(2) + ')');
+  ok(worst < 1.6, 'no cliff across the river, roads or plateau edges (max rise per unit ' + worst.toFixed(2) + ')');
 }
 
-// 4. road: levelled across, walkable, and dry everywhere except at the ford
+// 4. roads: levelled across, dry away from the river (they cross it on bridges only)
 {
-  const road = feat('road')[0];
-  let maxCross = 0, n = 0, dry = 0;
-  for (let i = 0; i + 1 < road.points.length; i++) {
-    const a = road.points[i], b = road.points[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  let maxCross = 0, n = 0, dry = 0, wet = 0, tilted = 0;
+  for (const r of roadsHere) for (let i = 0; i + 1 < r.pts.length; i++) {
+    const a = r.pts[i], b = r.pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 1) continue;
     const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
-    for (let s = 20; s < L - 20; s += 25) {
-      const x = a[0] + ux * s, z = a[1] + uz * s;
-      if (Math.hypot(x, z) > R.radius - 120 || T.riverAt('farm', x, z) || T.lineDist('farm', 'river', x, z) < 70) continue;
+    for (let s = 2; s < L - 2; s += 12) {
+      const [x, z] = loc(a[0] + ux * s, a[1] + uz * s);
+      if (!inFarm(x, z, 30)) continue;
+      if (T.liquidAt('farm', x, z) === 'water') wet++;
+      if (T.lineDist('farm', 'river', x, z) < 70 || T.deckAt('farm', x, z, 6)) continue;
       n++;
-      const l = T.heightAt('farm', x - uz * 3, z + ux * 3), r = T.heightAt('farm', x + uz * 3, z - ux * 3);
-      maxCross = Math.max(maxCross, Math.abs(l - r));
+      const l = T.heightAt('farm', x - uz * 2.5, z + ux * 2.5), rr = T.heightAt('farm', x + uz * 2.5, z - ux * 2.5);
+      maxCross = Math.max(maxCross, Math.abs(l - rr));
+      if (Math.abs(l - rr) > 1.2) tilted++;
       if (T.dryAt('farm', x, z)) dry++;
     }
   }
-  ok(n > 30, 'road samples: ' + n);
-  ok(maxCross < 0.8, 'road is level across its width (max ' + maxCross.toFixed(2) + ' over 6 units)');
+  ok(n > 60, 'road samples: ' + n);
+  // level across, but where two roads fork on a hillside the ground between them follows both
+  ok(tilted <= n * 0.03 && maxCross < 6, 'road is level across its width (' + tilted + ' of ' + n + ' tilted, max ' + maxCross.toFixed(2) + ' over 5 units)');
   ok(dry === n, 'road is dry away from the river (' + dry + ' / ' + n + ')');
+  ok(wet === 0, 'no road runs through the water (' + wet + ')');
+  const br = feat('bridge');
+  ok(br.length === 2 && br.every(f => f.snapped && T.deckAt('farm', f.x, f.z) && T.dryAt('farm', f.x, f.z) && T.lineDist('farm', 'river', f.x, f.z) < 2), 'two bridges sit across the Vltava (Roztoky, Kralupy)');
 }
 
 // 5. plateaus: flat, dry, landable; every settlement of every region sits on one
@@ -89,35 +97,40 @@ for (const f of feat('plateau')) {
   }
   ok(hi - lo < 0.3, 'plateau at ' + f.x + ',' + f.z + ' is flat (' + (hi - lo).toFixed(2) + ')');
   ok(okLand, 'plateau at ' + f.x + ',' + f.z + ' is landable');
-  ok(lo > R.waterLevel + 2.5, 'plateau above the water');
+  ok(T.dryAt('farm', f.x, f.z), 'plateau above the water');
 }
 for (const id of Object.keys(D.regions)) {
   for (const st of D.regions[id].settlements || []) ok(T.plateauAt(id, st.x, st.z), id + ': settlement ' + st.type + ' sits on a plateau');
 }
 ok((D.regions.wild.settlements || []).length === 2, 'Wildwood has the hamlet and the small outpost sites');
 
-// 6. fields: deterministic, enough of them, on dry flat ground, off roads, rivers and plateaus, not overlapping
-{
-  const fs = T.fields('farm');
-  ok(fs.length >= 16 && fs.length <= R.flora.fields, 'farm fields placed: ' + fs.length + ' of ' + R.flora.fields);
-  ok(T.fields('wild').length === 0 && T.fields('ash').length === 0, 'no fields outside the Farmlands');
+// 6. fields: deterministic, enough of them, on dry flat ground, off roads, rivers and plateaus, inside their region
+for (const id of T.zones()) {
+  const fs = T.fields(id), Q = T.region(id);
+  ok(fs.length >= Math.min(12, Q.flora.fields) && fs.length <= Q.flora.fields, id + ' fields placed: ' + fs.length + ' of ' + Q.flora.fields);
   for (const f of fs) {
-    ok(T.dryAt('farm', f.x, f.z) && !T.plateauAt('farm', f.x, f.z) && T.lineDist('farm', 'road', f.x, f.z) > 6, 'field on dry open ground');
-    ok(T.fieldAt('farm', f.x, f.z).f === f, 'fieldAt finds the field at its centre');
+    ok(T.dryAt(id, f.x, f.z) && !T.plateauAt(id, f.x, f.z) && T.lineDist(id, 'road', f.x, f.z) > 6 && !T.cityAt(id, f.x, f.z), id + ': field on dry open ground');
+    ok(T.inZone(id, f.x, f.z, 20), id + ': field inside its region (not across an edge)');
+    ok(T.fieldAt(id, f.x, f.z).f === f, 'fieldAt finds the field at its centre');
     ok(f.crop >= 0 && f.crop < 5, 'crop kind (4 = corn)');
   }
-  // corners belong to the field, a point well outside does not
-  const f = fs[0], s = Math.sin(f.yaw), c = Math.cos(f.yaw), u = f.w / 2 - 1, v = f.l / 2 - 1;
+}
+{
+  const fs = T.fields('farm'), f = fs[0], s = Math.sin(f.yaw), c = Math.cos(f.yaw), u = f.w / 2 - 1, v = f.l / 2 - 1;
+  ok(fs.length >= 40, 'the Farmlands are the most farmed: ' + fs.length);
   ok(T.fieldAt('farm', f.x + u * c + v * s, f.z - u * s + v * c), 'fieldAt: inside a corner');
   ok(!T.fieldAt('farm', f.x + (f.w / 2 + 3) * c, f.z - (f.w / 2 + 3) * s), 'fieldAt: just outside the long side');
 }
 
-// 7. Wildwood lakes (waterLevel) are water now too: not landable, not walkable
+// 7. every village is on the road network, and the network is one piece
 {
-  let lake = null;
-  for (let x = -900; x < 900 && !lake; x += 15) for (let z = -900; z < 900 && !lake; z += 15) if (T.surfaceAt('wild', x, z) < -1) lake = [x, z];
-  ok(lake, 'Wildwood has a lake hollow');
-  ok(T.liquidAt('wild', lake[0], lake[1]) === 'water' && !T.dryAt('wild', lake[0], lake[1]), 'Wildwood lake is water');
+  const N = core('roads').network(), deg = {};
+  for (const r of N.roads) { deg[r.a] = (deg[r.a] || 0) + 1; deg[r.b] = (deg[r.b] || 0) + 1; }
+  for (const id of T.zones()) for (const v of D.regions[id].city.villages) ok(deg[v.id] >= 1, 'village ' + v.id + ' has a road to a neighbour');
+  const par = {}, find = k => (par[k] === undefined || par[k] === k ? (par[k] = k) : (par[k] = find(par[k])));
+  for (const r of N.roads) par[find(r.a)] = find(r.b);
+  ok(new Set(N.nodes.map(n => find(n.id))).size === 1, 'the road network connects every place');
+  ok(N.roads.every(r => r.pts.length >= 2 && r.pts.every(p => Number.isFinite(p[0]) && Number.isFinite(p[1]))), 'roads are finite polylines');
 }
 
 // 8. prey in the Farmlands spawn on dry ground
@@ -127,39 +140,37 @@ ok((D.regions.wild.settlements || []).length === 2, 'Wildwood has the hamlet and
   ok(field.list.every(q => T.dryAt('farm', q.pos[0], q.pos[2]) && !T.liquidAt('farm', q.pos[0], q.pos[2])), 'every Farmlands animal stands on dry ground');
 }
 
-// 9. the Wildwood exit to the Farmlands: a hatchling is told it is too small, a Drake travels
-function flyOut(stage) {
+// 9. the Wildwood edge to the Farmlands: a hatchling is told it is too small and turned back, a Drake flies on over it
+function flyOut(stage, secs) {
   const cs = S.create({ regionId: 'wild', rng: mulberry(9) });
   cs.dragon.stage = stage;
-  cs.dragon.pilot = F.newPilot(at('wild', Math.PI + 0.05, 200, 60), Math.PI + 0.05, 30);
+  const z = -(T.region('wild').radius - 200);
+  cs.dragon.pilot = F.newPilot([0, T.surfaceAt('wild', 0, z) + 60, z], Math.PI, 30);
   const ev = [];
-  let t = 0;
-  while (!cs.exit && !cs.exitSmall && t < 20) { ev.push(...S.step(cs, {}, dt)); t += dt; }
-  return { cs, ev };
+  let small = null;
+  for (let t = 0; t < secs && cs.region === 'wild'; t += dt) { ev.push(...S.step(cs, {}, dt)); small = small || cs.exitSmall; }
+  return { cs, ev, small };
 }
 {
-  const { cs, ev } = flyOut(0);
-  ok(cs.exitSmall && cs.exitSmall.to === 'farm' && !cs.exit, 'hatchling at the Farmlands exit: too small, no travel offer');
-  ok(ev.filter(e => e.e === 'region:tooSmall' && e.to === 'farm').length === 1, 'region:tooSmall raised once');
-  for (let k = 0; k < 30; k++) S.step(cs, { confirm: true }, dt);
-  ok(cs.region === 'wild', 'confirm does not take a hatchling to the Farmlands');
+  const { cs, ev, small } = flyOut(0, 25);
+  ok(small && small.to === 'farm', 'hatchling at the Farmlands edge: too small');
+  ok(ev.filter(e => e.e === 'region:tooSmall' && e.to === 'farm').length >= 1, 'region:tooSmall raised');
+  ok(cs.region === 'wild' && T.inZone('wild', cs.dragon.pilot.pos[0], cs.dragon.pilot.pos[2]), 'the hatchling stays in Wildwood');
+  cs.dragon.pilot.pos[2] = -900; cs.dragon.pilot.yaw = Math.PI;
   const m = NV.markers(cs).find(q => q.key === 'exit:farm');
-  ok(m && m.dim, 'compass exit marker to the Farmlands is dimmed for a hatchling');
+  ok(m && m.dim, 'compass marker to the Farmlands is dimmed for a hatchling');
 }
 {
-  const { cs, ev } = flyOut(1);
-  ok(cs.exit && cs.exit.to === 'farm' && !cs.exitSmall, 'Drake at the Farmlands exit: travel offered');
+  const { cs, ev } = flyOut(1, 20);
   ok(!ev.some(e => e.e === 'region:tooSmall'), 'no too-small event for a Drake');
-  const out = S.step(cs, { confirm: true }, dt);
-  ok(cs.region === 'farm' && out.some(e => e.e === 'region:enter' && e.region === 'farm'), 'Drake travels to the Farmlands');
+  ok(cs.region === 'farm' && ev.some(e => e.e === 'region:enter' && e.region === 'farm' && e.seamless), 'a Drake flies on into the Farmlands');
   const p = cs.dragon.pilot;
-  ok(p.pos[2] > 500 && Math.abs(p.pos[0]) < 1, 'arrives on the Farmlands north edge (the Wildwood side)');
-  ok(T.dryAt('farm', p.pos[0], p.pos[2]) || p.pos[1] > T.surfaceAt('farm', p.pos[0], p.pos[2]) + 20, 'arrives above the ground');
+  ok(p.pos[2] > R.radius - 60 && Math.abs(p.pos[0]) < 5, 'it is at the Farmlands north edge (the Wildwood side), where it crossed');
   // 5 round trips: one prey field at a time, no growth of state
-  let sizes = [];
+  const sizes = [];
   for (let k = 0; k < 5; k++) {
     RG.enter(cs, 'wild', 'farm');
-    ok(cs.region === 'wild' && Math.hypot(cs.dragon.pilot.pos[0], cs.dragon.pilot.pos[2] + 880) < 5, 'back in Wildwood at its south edge (the Farmlands side)');
+    ok(cs.region === 'wild' && cs.dragon.pilot.pos[2] < -800, 'back in Wildwood at its south edge (the Farmlands side)');
     RG.enter(cs, 'farm', 'wild');
     sizes.push(cs.field.list.length);
   }

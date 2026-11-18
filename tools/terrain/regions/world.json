@@ -1,0 +1,29 @@
+{
+  "id": "world",
+  "module": "demWorld",
+  "out": "campaign/core/dem-world.js",
+  "title": "Kingdom of Prahold (Mount Rip to Prahold)",
+  "tile": "N50E014",
+  "crop": { "lon": [14.05, 14.75], "lat": [49.98, 50.50], "step": 2 },
+  "warp": {
+    "about": "Game world (X west, Z north, units) -> lon / lat. Prahold (the Bend, Z <= south.z) and Mount Rip (Z >= north.z) keep 3.6 m per unit around their own centres; the land between is drawn at a scale that rises smoothly (cosine bump) so Rip sits due north of Prahold, 7200 units away; the centre line moves from Prague's to Rip's longitude.",
+    "south": { "lon0": 14.4325, "lat0": 50.0905, "z0": 0, "z": 1200 },
+    "north": { "lon0": 14.2877, "lat0": 50.3866, "z0": 7200, "z": 6000 },
+    "metresPerUnit": 3.6
+  },
+  "grid": { "x": [-1800, 1800], "z": [-1800, 9000], "cell": 20, "base": 150, "step": 1.25 },
+  "river": {
+    "start": [700, 1120],
+    "goal": { "xBelow": -1650, "z": [3000, 7600] },
+    "costScale": 5.0, "smooth": 3, "simplify": 10
+  },
+  "places": [
+    ["roztoky", 14.3976, 50.1585], ["klecany", 14.4142, 50.1760], ["rez", 14.3568, 50.1797], ["libcice", 14.3622, 50.1969],
+    ["uholicky", 14.3440, 50.1610], ["suchdol", 14.3770, 50.1360], ["odolena", 14.4106, 50.2338], ["kralupy", 14.3116, 50.2410],
+    ["nelahozeves", 14.2990, 50.2620], ["veltrusy", 14.3289, 50.2705], ["chvateruby", 14.3420, 50.2310], ["zelizy", 14.4660, 50.4210],
+    ["lhota", 14.2600, 50.2800], ["vranany", 14.3530, 50.3220], ["horinves", 14.2800, 50.3280], ["zlonice", 14.0900, 50.2900],
+    ["krabcice", 14.3000, 50.4040], ["ctineves", 14.2390, 50.3770], ["mnetes", 14.2800, 50.3640], ["vrazkov", 14.2600, 50.3720],
+    ["klenec", 14.2570, 50.3950], ["roudnice", 14.2610, 50.4250], ["podol", 14.4180, 50.0500], ["dejvice", 14.3900, 50.1000],
+    ["liben", 14.4770, 50.1050], ["nusle", 14.4300, 50.0600]
+  ]
+}

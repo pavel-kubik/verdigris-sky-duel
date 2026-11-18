@@ -143,7 +143,7 @@ function make(region, seed) {
   // the free herd never respawns; the empty pen restocks after herdCooldown when the dragon is far
   for (const p of free) PR.remove(cs.field, p.id);
   rs.heat = 0;
-  for (let t = 0; t < D.respawn.herdCooldown + 5; t += 1) S.step(cs, {}, 1);
+  for (let t = 0; t < D.respawn.herdCooldown + 5; t += 1) S.step(cs, { sx: 0.7 }, 1);   // circling far off (the one world goes on past the edge)
   ok(penned(cs, pn).length === 4, 'the pen restocks after herdCooldown: ' + penned(cs, pn).length);
   ok(!cs.field.list.some(p => p.type === 'sheep' && !p.pen), 'released sheep do not come back on their own');
 }
