@@ -8,10 +8,11 @@ Built the way Phase 3 was built (Pavel, 2026-10-31): **visual form first** (the 
 
 The young dragon grows up and loses its mother. A Drake that has eaten enough rests at the nest and wakes as a **Wyrm**: bigger, with new horns and a spine crest, slower to turn and hungrier. The next time it flies out, the mother flies ahead to hunt and the Order brings her down with ballista bolts while the Wyrm watches: Act 2 ends and **Act 3 - Wyrmfire** begins. The Wyrm flies into the **Highland Pass**, a new region on the real terrain south-west of Prague (the Barrandov cliffs over the river, the Prokop gorge, the railway viaducts), where the Order's gold trains cross a viaduct to the cliff fortress **Maidenhold** under the escort of **mounted knights**. Outposts get **net launchers** that pin a dragon to the ground, and a Wyrm can finally **breach stone walls**. **Renown** starts counting: how the dragon treats villages decides whether they send tribute or ring the bell.
 
-The phase starts with the visual block (the Wyrm and its stage looks in a preview page, the Highland Pass terrain; checked by Pavel on a phone), then the new enemies (knights, nets), breaching, Renown, the mother's death scene, and last the Act 3 missions that use all of it.
+The phase opens with **debug tools for the world's basic blocks** (Pavel, 2026-11-18): a debug overlay with an object picker in the game, and a preview page for single blocks and their interactions, so problems with objects (stuck in a wall, an invisible solid, a house on a road, a bridge that leads nowhere) can be seen and reproduced before the new region, castle and enemies add more blocks. Then the visual block (the Wyrm and its stage looks in a preview page, the Highland Pass terrain; checked by Pavel on a phone), then the new enemies (knights, nets), breaching, Renown, the mother's death scene, and last the Act 3 missions that use all of it.
 
 **Exit criteria**
 
+- With `?debug`, every solid in the region can be shown as its collision shape, and tapping any object or spot names what it is, where its data comes from and how the dragon or the hero collides with it; any single block can be opened in the block preview with a hero or a dragon pushing against it.
 - On a phone, a Wyrm intercepts a gold train in the Highland Pass, stops it on or near the viaduct, takes the chest and survives the knight escort; it banks the chest in the pass aerie or the lair.
 - Renown changes how villages treat the dragon: at low Renown peasants ring the bell from farther and freed villages stop their tribute; at high Renown peasants do not ring the bell at a dragon that does not attack, and freed villages send more food.
 - The mother's death scene plays once, the first time a new Wyrm leaves the cave; it can be skipped, the Act 3 card follows, the place where she fell is marked on the map, and she never appears again.
@@ -26,6 +27,7 @@ The phase starts with the visual block (the Wyrm and its stage looks in a previe
 
 | Area | Phase 4 content |
 | --- | --- |
+| Debug tools | Debug overlay of the basic blocks (collision shapes, walkable tops, decks, streets and roads, water) with an object picker and a ground probe (`?debug`); block preview page for one block at a time with a hero or dragon test body and live collision readouts |
 | Growth | Wyrm stage (index 2): stats, stage-up at the nest, carry class 3 (cattle, knight), camera and flight scaled for the bigger body; growth cap moves to the Elder threshold (Elder itself is Phase 6) |
 | Stage visuals | Per-stage parts on the shared dragon model: horn count and length, a spine crest from Wyrm, wing span and membrane colour shift, darker scales with age; dragon preview page with a stage switch |
 | New region | Highland Pass: real terrain from the same LiDAR tile (section 4.2): the Barrand Cliffs over the Veltava, the Prokop Gorge cutting west, the Hlubowick viaducts across the gorge, the Maidenhold promontory, the Chuchel meadows in the south, Branick on the east bank; entered from the Farmlands (west edge) and the Veltava Bend (south edge); late Drake |
@@ -66,7 +68,7 @@ Elder stage, ground slam, frost mages, mangonels, named slayers, alert 4-5 and h
 | `data.map.world.pass` [-1, 2.6], `later.pass` { stage: 1 }, `links` [['pass', 'farm']] | The pass becomes a real region (removed from `later`); links pass-farm and pass-bend; the gate is a late Drake (`minGrowth: 0.45`) |
 | Touch layout: Breath, Boost, Roll fixed; Action and Move context slots | Roar goes into the Action slot when it applies (netted, or a knight within range and nothing to grab); the net struggle uses Boost taps; no new fixed buttons |
 | Save v3 (`core/save.js`, `migrate` chain) | v4 adds `renown`, `story.motherFell`, `regions.<id>.breaches`, `world.caravans`; v3 -> v4 step |
-| Headless browser renders at 2-8 fps in software | Visual tasks end with screenshots from fixed views plus a phone check by Pavel (feel checkpoints T02, T03 and T11) |
+| Headless browser renders at 2-8 fps in software | Visual tasks end with screenshots from fixed views plus a phone check by Pavel (feel checkpoints T04, T05 and T13) |
 
 ## 3. File structure
 
@@ -75,10 +77,15 @@ New files (existing ones extended where noted):
 ```
 campaign/
   preview/
+    blocks.html         block preview (T02): one basic block (house style / kind, settlement building, castle piece,
+                        bridge, tree, terrain feature) on flat or sloped ground, its collision shape and walkable top,
+                        a hero or dragon test body (driven, or a scripted push from 8 directions), live readouts
     dragon.html         stage preview: the four stages side by side or one at a time, orbit / touch drag + pinch,
                         wing flap, breath, palette, quality tier, triangle readout
     mother-fall.html    standalone preview of the mother's death scene (camera rail, bolts, fall), like the hatching preview
   core/
+    shapes.js           T01: the basic blocks of a region as one list of collision shapes ({ kind, id, src, shape, top })
+                        from terrain, settlement, castle and city, a ray pick and a ground probe (pure, tested)
     dem-pass.js         GENERATED by tools/terrain/bake.py pass (heights, river mask, river line)
     knights.js          mounted knights: spawn from stables, ride, chase, lance, grab / drop, return
     nets.js             net launcher shots, entangle state on the dragon, struggle, burn-off
@@ -88,6 +95,8 @@ campaign/
     (data.js, growth.js, terrain.js, castle.js, settlement.js, defenders.js, caravan.js, alert.js, freed.js, mother.js,
      story.js, missions.js, relics.js, upgrades.js, nav.js, map.js, region.js, state.js, save.js, tips.js extended)
   render/
+    debug-shapes.js     T01: the region's solids as wireframe shapes (boxes, cylinders, capsules, decks, walk tops), the
+                        street / road / water raster, the pick ray, the object card and the ground probe (?debug only)
     knight-view.js      horse + rider + lance, instanced, gallop cycle, dropped knight ragdoll-lite
     net-view.js         flying net (weighted corners), net on the dragon, burning net
     viaduct-view.js     tall stone arches and deck (instanced)
@@ -100,7 +109,7 @@ tools/terrain/
 ai_sdlc/001_campaign/img/
   pass-terrain.png      preview image
 campaign/test/
-  wyrm.test.js  stages.test.js  pass.test.js  maidenhold.test.js  knights.test.js  nets.test.js  breach.test.js
+  shapes.test.js  blocks.test.js  wyrm.test.js  stages.test.js  pass.test.js  maidenhold.test.js  knights.test.js  nets.test.js  breach.test.js
   renown.test.js  fall.test.js  save4.test.js  goldtrain-bot.js  breach-bot.js  (mission.bot.test.js extended)
 ```
 
@@ -108,7 +117,7 @@ Script order in `campaign/index.html`: Phase 3 order with `renown` after `alert`
 
 ## 4. Data schemas (`core/data.js`)
 
-All numbers are starting values for tuning (T17). `version` becomes 4.
+All numbers are starting values for tuning (T19). `version` becomes 4.
 
 ### 4.1 Wyrm and stage visuals
 
@@ -129,7 +138,7 @@ stageLook: {                                           // shared/dragon.js build
 camera: { scaleDist: 0.7 },                            // camera distance grows with scale ^ scaleDist
 ```
 
-`000_spec.md` gives the Wyrm `hungerMult 2.2`; Phase 2 had to cut the Drake from 1.5 to 1.1 so missions stay possible, so the Wyrm starts at 1.4 and T17 tunes it with the mission bots.
+`000_spec.md` gives the Wyrm `hungerMult 2.2`; Phase 2 had to cut the Drake from 1.5 to 1.1 so missions stay possible, so the Wyrm starts at 1.4 and T19 tunes it with the mission bots.
 
 ### 4.2 Highland Pass (real terrain, south-west of Prague)
 
@@ -147,7 +156,7 @@ The terrain is **real**: the left bank of the Vltava from Zlíchov south to Velk
 | Jinonice | Jinonice | Jinonice | hamlet at the west end of the gorge, where the gold road enters |
 | Branick | Braník | Braník | hamlet on the east bank, across the river |
 
-Region data (coordinates are placeholders until T03 bakes the terrain and picks the real spots; the PR updates them):
+Region data (coordinates are placeholders until T05 bakes the terrain and picks the real spots; the PR updates them):
 
 ```js
 regions.pass: {
@@ -377,38 +386,40 @@ v3 -> v4: `renown` from `renown.init`, `motherFell` null, no breaches, caravan c
 
 ## 7. Task breakdown
 
-Each task ends with both test runs passing and the browser check from the agent prompt. Visual tasks also save screenshots from the fixed views named in the row. Sizes: S < 2 h, M 2-5 h, L 5-10 h of AI-assisted work. Tasks with no dependency between them can run in parallel stacks (T01, T02, T03, T06 and T09 have none).
+Each task ends with both test runs passing and the browser check from the agent prompt. Visual tasks also save screenshots from the fixed views named in the row. Sizes: S < 2 h, M 2-5 h, L 5-10 h of AI-assisted work. Tasks with no dependency between them can run in parallel stacks (T01, T03, T04, T05, T08 and T11 have none). T01 and T02 come first: the later tasks use the overlay and the block preview to check their own blocks.
 
 | ID | Task | Depends on | Size | Acceptance |
 | --- | --- | --- | --- | --- |
-| T01 | Wyrm stage: `data.stages` wyrm row, `growthCap` to the Elder line, stage-up at the nest, carry class 3, camera distance by scale, landing pad and courtyard checks for the bigger body; debug "grow to Wyrm" button | - | M | Tests (`wyrm.test.js`): food XP 2400 qualifies for Wyrm, stage-up only at the nest, a Wyrm can land in the Vyshgard courtyard and on a wall walk, carry 3 lifts a cow, the Phase 1-3 bots still pass; on a phone the Wyrm flies and lands without the camera clipping the terrain |
-| T02 | Stage visuals + `campaign/preview/dragon.html`: `buildDragon({ stage })` horns, crest, span, tint, jaw spikes for the four stages (Elder in the preview only); the campaign dragon rebuilds on stage-up | - | M | **Feel checkpoint for Pavel on a phone** (the stages read apart at a glance). Preview at 390 x 844 with no page errors; without `stage` the model is unchanged (vertex count test), duel and co-op unaffected (`mp/sim.test.js`); under 6k triangles for the Wyrm; screenshots: four stages side by side, Wyrm close-up, Wyrm in flight |
-| T03 | Highland Pass region from real terrain: `tools/terrain/regions/pass.json`, crop, bake (`dem-pass.js`), preview image, region data of 4.2 with real coordinates, palette `pass`, `viaduct` bridge kind, exits from the Farmlands (west, late Drake) and the Bend, map world entry, aerie in the Barrand Cliffs | - | L | Tests (`pass.test.js`): heights at checked spots match the bake (river level, Barrandov top, gorge floor), the river runs along the east side, viaduct decks are walkable and high over the gorge floor, the cliff face is not walkable, settlement footprints are flat, a Drake below `minGrowth` cannot take the exit. Region under 300 draw calls, loads under 1.5 s on a mid laptop. **Feel checkpoint for Pavel on a phone**: reads as the Barrandov cliffs over the river; screenshots: high view, the cliffs from the river, the big viaduct from the gorge |
-| T04 | Maidenhold + pass settlements: `fortress` layout from the castle kit on the promontory, chain net over the yard (landing refused 'net'), toll fort, Chuchel village, Jinonice and Branick hamlets, Zlichov rock chapel; discovery, compass and map icons | T03 | M | Tests (`maidenhold.test.js`): layout on the flat top, yard landing refused with 'net', wall walks landable, every footprint flat; Maidenhold visible from the gorge mouth at 600+ units; screenshots: Maidenhold from the river, from the viaduct, at night |
-| T05 | `core/knights.js` + `render/knight-view.js`: stables send knights (alarm over `callAfter`, alert 2 where stables exist), ride roads and walkable ground, chase, lance on a landed or low dragon, arrows do not hurt them, fire does, grab and drop by a Wyrm; Vyshgard stables get knights | T01 | L | Tests (`knights.test.js`): call rule and timing, lance only under `maxAlt`, a burned stable sends none, grab needs carry 3, a drop from 12+ kills, they ride home after `returnAfter`, at most `max`; in game a Drake landing near the Vyshgard gate during a long alarm is charged by knights |
-| T06 | `core/nets.js` + `render/net-view.js` + `netter` defender: net launcher posts on the Farmlands and Lethna outposts (and the pass forts once T04 is in), aim line, net flight, pinned state (glide down, no takeoff), Fire burns it, Boost taps shorten it, immunity after | - | M | Tests (`nets.test.js`): pin time, burn time, struggle taps, immunity, no climb while netted; on a phone the prompt names the buttons, a netted dragon can always get free within `pin` s |
-| T07 | `core/breach.js` + `render/breach-view.js`: stone hp on wall segments, Wyrm breath wear, Boost ram, breach gap (non-solid middle, walk top cut, rubble), rebuild, mission hold | T01 | M | Tests (`breach.test.js`): a Drake never wears stone, a Wyrm does, a ram under `minSpeed` does nothing, the gap is walkable after the breach and solid again after the rebuild, bastions and towers never breach; in game a Wyrm breaches a Vyshgard wall segment |
-| T08 | Caravans generalised: kinds, free-roam schedule, gold train in the pass with knight escort over the big viaduct to Maidenhold, the Farmlands supply wagon (food), gold chest loot (size 3), compass and map markers | T04, T05 | M | Tests (`caravan.test.js` extended): the tithe mission still works, trains spawn on schedule only with the dragon in the region, follow the viaduct deck, stop at 0 hp and drop the chest, a train reaching Maidenhold just ends; the supply wagon drops food |
-| T09 | `core/renown.js`: value, start from the saved history, events, tiers, effects lookup; HUD badge, message on a tier change, message log line | - | S | Tests (`renown.test.js`): start from `stats`, event values, clamping, tier changes emit once; at 390 x 844 the badge does not cover the compass or bars |
-| T10 | Renown in the world: peasants and bells by tier, tribute by tier, more freeable places (Holeshwick, Chuchel), freed and Renown state on the map | T04, T09 | M | Tests (`freed.test.js` extended): hostile stops tribute, friendly gives x1.5, calm peasants do not ring at a dragon that has not attacked (and do after it burns something), Holeshwick and Chuchel can be freed; in game the difference is visible within one visit |
-| T11 | The mother's fall: `campaign/preview/mother-fall.html` first, then `core/fall.js` + `render/fall-scene.js` in the game (first Wyrm leaving the cave, the battery, the fall, Skip), the cairn and map place, mother retired, Act 3 card | T01 | L | **Feel checkpoint for Pavel on a phone** (the scene in the preview page). Tests (`fall.test.js`): plays once, never during a mission, Skip ends it with the same result, `mother.step` does nothing afterwards, act 3 after it; screenshots: three frames of the scene, the cairn |
-| T12 | Wyrm upgrades: Roar (Action slot when netted or a knight is near; breaks the net, stuns knights and peasants), Iron scales II, Siege horns; altar shows the Wyrm row locked below Wyrm | T05, T06, T07 | M | Tests (`upgrades.test.js` extended): Roar frees a net and stuns within range, its cooldown, iron scales II lowers arrow and lance damage, siege horns raises ram damage; on a phone Roar shows in the Action slot only when it applies |
-| T13 | Intercept mission a3_goldtrain: board entry (Act 3, Wyrm), the mission's own gold train with the knight escort, objective and fail at Maidenhold's gate, briefing; seeded bot `test/goldtrain-bot.js` | T08, T11 | M | Mission bot (seeded) completes it in its time band with 20%+ HP at full hunger on average; on a phone the train is easy to find by the gold marker and the viaduct ambush works |
-| T14 | Breach-and-steal mission a3_crown: the Scale-Crown in Maidenhold's keep, the yard net forces a breach, walk in, take it, escape; relic and trophy niche 2; seeded bot `test/breach-bot.js` | T04, T07, T11 | M | Mission bot completes it in its time band; the breach is held while the mission runs; on a phone the full flow from board to the crown on the trophy wall works |
-| T15 | Story for Act 3: briefings and outcome lines for both missions, the Order's view in one line each, tips on the trophy wall niche, no more mother lines after the fall; EN + CS | T11, T13, T14 | S | Every new string in EN and CS; the story test covers act 3 cards and that no mother line can play after the fall |
-| T16 | Save v4 + migration v3 -> v4: renown, mother's fate and cairn, breaches, caravan clocks, freed places, Wyrm upgrades | T07, T08, T10, T11, T12 | M | Reload restores all of it, also a Wyrm saved in the pass; a v3 save migrates with Renown from its history; corrupt v4 handled like v3; save under 32 KB |
-| T17 | Texts and tips (Wyrm, the pass, knights, nets, breach, Renown, Roar; touch wording) + mission bot for both missions in `mission.bot.test.js` + balancing (Wyrm hunger, knights, nets, ram, rewards, caravan times) | T15, T16 | M | Every visible string from `i18n.js` in EN and CS; touch texts name buttons; each mission succeeds within 5-10 min on average with 20%+ HP; Phase 3 missions still pass for a Drake; numbers changed in `data.js` only |
-| T18 | README campaign section (Wyrm, the Highland Pass, knights, nets, breaching, Renown, the two missions), controls table, mark Phase 4 done in `000_spec.md` | T17 | S | README lists the new content for phone and desktop |
+| T01 | Debug overlay and object picker (`?debug`, the campaign and, where it is on the phase branch, Tales of Prahold): `core/shapes.js` lists the region's basic blocks as collision shapes (city lots as boxes, settlement and castle pieces as cylinders and capsules with their walkable tops, the portcullis while closed, bridge decks, plateaus) with the data entry each comes from; `render/debug-shapes.js` draws them as coloured wireframes within a radius of the dragon, plus the street / road / square raster and water. Pick mode: tap or click a spot (a ray onto the terrain and the shapes) and a card names the object (kind, id, district or place, data source: region feature index, settlement or landmark name), size, position, ground height, roof or walk top, hp / fire / ruin state. A ground probe under the dragon or hero (surfaceAt, heightAt, deck, liquid, paved, road distance, plateau, field, zone). `city.why` reject counts in the debug panel. Debug panel buttons on touch, hotkeys on desktop | - | M | Tests (`shapes.test.js`): every lot, settlement piece and deck appears once, and at sampled points inside and outside each shape the shape agrees with `solidAt` / `hit` / `deckAt`; the pick returns the nearest object along a ray; the probe values equal the core queries; without `?debug` nothing is built (draw calls and frame time unchanged). At 390 x 844 the card and buttons do not cover the HUD, no page errors. Screenshots: the overlay over Vyshgard, over Prahold's streets by Karlsbridge, a picked house card |
+| T02 | Block preview `campaign/preview/blocks.html`: choose one basic block from a list (every house-kit style and kind, every settlement building type, the castle pieces, the bridge kinds, the tree kinds, the terrain features plateau / cliff / cone) and the ground (flat, slope, step); the block's model with its collision shape and walkable top (T01's drawing); a test body, the hero walker or a dragon (walking or hovering), driven by keys or the stick, or a scripted push from 8 directions; live readouts (ground under the body, push-out depth and normal, standing on a top or blocked, landing allowed and why not); pause, step, slow motion; URL parameters (`?block=...&ground=slope&body=hero&push=3`) so a bug report can link the exact case; `window.__vblocks` for the headless check. New blocks of this phase (Wyrm body, viaduct, Maidenhold pieces, net, breach gap) are added to the list by their own tasks | T01 | M | Tests (`blocks.test.js`): for every block a scripted push from 8 directions never ends inside the solid, the body can stand on every walkable top and nowhere else on the block, the readouts equal the core queries. Preview at 390 x 844 with no page errors, touch drag and pinch work. Screenshots: a castle wall with its capsule and a walker on the wall walk, a house with its box, a bridge deck with the hero on it |
+| T03 | Wyrm stage: `data.stages` wyrm row, `growthCap` to the Elder line, stage-up at the nest, carry class 3, camera distance by scale, landing pad and courtyard checks for the bigger body; debug "grow to Wyrm" button | - | M | Tests (`wyrm.test.js`): food XP 2400 qualifies for Wyrm, stage-up only at the nest, a Wyrm can land in the Vyshgard courtyard and on a wall walk, carry 3 lifts a cow, the Phase 1-3 bots still pass; on a phone the Wyrm flies and lands without the camera clipping the terrain |
+| T04 | Stage visuals + `campaign/preview/dragon.html`: `buildDragon({ stage })` horns, crest, span, tint, jaw spikes for the four stages (Elder in the preview only); the campaign dragon rebuilds on stage-up | - | M | **Feel checkpoint for Pavel on a phone** (the stages read apart at a glance). Preview at 390 x 844 with no page errors; without `stage` the model is unchanged (vertex count test), duel and co-op unaffected (`mp/sim.test.js`); under 6k triangles for the Wyrm; screenshots: four stages side by side, Wyrm close-up, Wyrm in flight |
+| T05 | Highland Pass region from real terrain: `tools/terrain/regions/pass.json`, crop, bake (`dem-pass.js`), preview image, region data of 4.2 with real coordinates, palette `pass`, `viaduct` bridge kind, exits from the Farmlands (west, late Drake) and the Bend, map world entry, aerie in the Barrand Cliffs | - | L | Tests (`pass.test.js`): heights at checked spots match the bake (river level, Barrandov top, gorge floor), the river runs along the east side, viaduct decks are walkable and high over the gorge floor, the cliff face is not walkable, settlement footprints are flat, a Drake below `minGrowth` cannot take the exit. Region under 300 draw calls, loads under 1.5 s on a mid laptop. **Feel checkpoint for Pavel on a phone**: reads as the Barrandov cliffs over the river; screenshots: high view, the cliffs from the river, the big viaduct from the gorge |
+| T06 | Maidenhold + pass settlements: `fortress` layout from the castle kit on the promontory, chain net over the yard (landing refused 'net'), toll fort, Chuchel village, Jinonice and Branick hamlets, Zlichov rock chapel; discovery, compass and map icons | T05 | M | Tests (`maidenhold.test.js`): layout on the flat top, yard landing refused with 'net', wall walks landable, every footprint flat; Maidenhold visible from the gorge mouth at 600+ units; screenshots: Maidenhold from the river, from the viaduct, at night |
+| T07 | `core/knights.js` + `render/knight-view.js`: stables send knights (alarm over `callAfter`, alert 2 where stables exist), ride roads and walkable ground, chase, lance on a landed or low dragon, arrows do not hurt them, fire does, grab and drop by a Wyrm; Vyshgard stables get knights | T03 | L | Tests (`knights.test.js`): call rule and timing, lance only under `maxAlt`, a burned stable sends none, grab needs carry 3, a drop from 12+ kills, they ride home after `returnAfter`, at most `max`; in game a Drake landing near the Vyshgard gate during a long alarm is charged by knights |
+| T08 | `core/nets.js` + `render/net-view.js` + `netter` defender: net launcher posts on the Farmlands and Lethna outposts (and the pass forts once T06 is in), aim line, net flight, pinned state (glide down, no takeoff), Fire burns it, Boost taps shorten it, immunity after | - | M | Tests (`nets.test.js`): pin time, burn time, struggle taps, immunity, no climb while netted; on a phone the prompt names the buttons, a netted dragon can always get free within `pin` s |
+| T09 | `core/breach.js` + `render/breach-view.js`: stone hp on wall segments, Wyrm breath wear, Boost ram, breach gap (non-solid middle, walk top cut, rubble), rebuild, mission hold | T03 | M | Tests (`breach.test.js`): a Drake never wears stone, a Wyrm does, a ram under `minSpeed` does nothing, the gap is walkable after the breach and solid again after the rebuild, bastions and towers never breach; in game a Wyrm breaches a Vyshgard wall segment |
+| T10 | Caravans generalised: kinds, free-roam schedule, gold train in the pass with knight escort over the big viaduct to Maidenhold, the Farmlands supply wagon (food), gold chest loot (size 3), compass and map markers | T06, T07 | M | Tests (`caravan.test.js` extended): the tithe mission still works, trains spawn on schedule only with the dragon in the region, follow the viaduct deck, stop at 0 hp and drop the chest, a train reaching Maidenhold just ends; the supply wagon drops food |
+| T11 | `core/renown.js`: value, start from the saved history, events, tiers, effects lookup; HUD badge, message on a tier change, message log line | - | S | Tests (`renown.test.js`): start from `stats`, event values, clamping, tier changes emit once; at 390 x 844 the badge does not cover the compass or bars |
+| T12 | Renown in the world: peasants and bells by tier, tribute by tier, more freeable places (Holeshwick, Chuchel), freed and Renown state on the map | T06, T11 | M | Tests (`freed.test.js` extended): hostile stops tribute, friendly gives x1.5, calm peasants do not ring at a dragon that has not attacked (and do after it burns something), Holeshwick and Chuchel can be freed; in game the difference is visible within one visit |
+| T13 | The mother's fall: `campaign/preview/mother-fall.html` first, then `core/fall.js` + `render/fall-scene.js` in the game (first Wyrm leaving the cave, the battery, the fall, Skip), the cairn and map place, mother retired, Act 3 card | T03 | L | **Feel checkpoint for Pavel on a phone** (the scene in the preview page). Tests (`fall.test.js`): plays once, never during a mission, Skip ends it with the same result, `mother.step` does nothing afterwards, act 3 after it; screenshots: three frames of the scene, the cairn |
+| T14 | Wyrm upgrades: Roar (Action slot when netted or a knight is near; breaks the net, stuns knights and peasants), Iron scales II, Siege horns; altar shows the Wyrm row locked below Wyrm | T07, T08, T09 | M | Tests (`upgrades.test.js` extended): Roar frees a net and stuns within range, its cooldown, iron scales II lowers arrow and lance damage, siege horns raises ram damage; on a phone Roar shows in the Action slot only when it applies |
+| T15 | Intercept mission a3_goldtrain: board entry (Act 3, Wyrm), the mission's own gold train with the knight escort, objective and fail at Maidenhold's gate, briefing; seeded bot `test/goldtrain-bot.js` | T10, T13 | M | Mission bot (seeded) completes it in its time band with 20%+ HP at full hunger on average; on a phone the train is easy to find by the gold marker and the viaduct ambush works |
+| T16 | Breach-and-steal mission a3_crown: the Scale-Crown in Maidenhold's keep, the yard net forces a breach, walk in, take it, escape; relic and trophy niche 2; seeded bot `test/breach-bot.js` | T06, T09, T13 | M | Mission bot completes it in its time band; the breach is held while the mission runs; on a phone the full flow from board to the crown on the trophy wall works |
+| T17 | Story for Act 3: briefings and outcome lines for both missions, the Order's view in one line each, tips on the trophy wall niche, no more mother lines after the fall; EN + CS | T13, T15, T16 | S | Every new string in EN and CS; the story test covers act 3 cards and that no mother line can play after the fall |
+| T18 | Save v4 + migration v3 -> v4: renown, mother's fate and cairn, breaches, caravan clocks, freed places, Wyrm upgrades | T09, T10, T12, T13, T14 | M | Reload restores all of it, also a Wyrm saved in the pass; a v3 save migrates with Renown from its history; corrupt v4 handled like v3; save under 32 KB |
+| T19 | Texts and tips (Wyrm, the pass, knights, nets, breach, Renown, Roar; touch wording) + mission bot for both missions in `mission.bot.test.js` + balancing (Wyrm hunger, knights, nets, ram, rewards, caravan times) | T17, T18 | M | Every visible string from `i18n.js` in EN and CS; touch texts name buttons; each mission succeeds within 5-10 min on average with 20%+ HP; Phase 3 missions still pass for a Drake; numbers changed in `data.js` only |
+| T20 | README campaign section (Wyrm, the Highland Pass, knights, nets, breaching, Renown, the two missions), controls table, mark Phase 4 done in `000_spec.md` | T19 | S | README lists the new content for phone and desktop |
 
 ## 8. Testing
 
 | Level | What | How |
 | --- | --- | --- |
-| Unit | Wyrm growth and caps, stage looks (vertex counts), the pass terrain and viaducts, Maidenhold layout and yard net, knights, nets, breach, caravan kinds and schedule, Renown, freeing by tier, the fall timeline, upgrades, save v4 | `node campaign/test/run.js`, seeded `mulberry` RNG |
+| Unit | The shape list against the solids, the pick and the ground probe (T01), every block under a scripted push (T02), Wyrm growth and caps, stage looks (vertex counts), the pass terrain and viaducts, Maidenhold layout and yard net, knights, nets, breach, caravan kinds and schedule, Renown, freeing by tier, the fall timeline, upgrades, save v4 | `node campaign/test/run.js`, seeded `mulberry` RNG |
 | Simulation | Mission bots for the gold train and the crown (Wyrm), Phase 3 bots for a Drake; invariants (a netted dragon always gets free, knights never inside solids, a breached gap always closes on rebuild, projectiles bounded, Renown inside its range) | `test/mission.bot.test.js` |
-| Visual | Stage preview, death scene preview, the pass from high above, Maidenhold by day and night, knights and nets in action at 390 x 844 | Browser check of each visual task; screenshots stay in the scratchpad |
+| Visual | The debug overlay over Vyshgard and Prahold, the block preview, stage preview, death scene preview, the pass from high above, Maidenhold by day and night, knights and nets in action at 390 x 844 | Browser check of each visual task; screenshots stay in the scratchpad |
 | Regression | Phase 1-3 tests (growth sim, raid bot, three Phase 3 missions); duel and co-op unaffected by the shared model change | both test runs |
-| Manual | Phone first: stage looks (T02), the pass (T03), the death scene (T11), knights, nets, breach, each mission, Renown change, reload; then desktop | Checklist in each PR, phone steps first |
+| Manual | Phone first: stage looks (T04), the pass (T05), the death scene (T13), knights, nets, breach, each mission, Renown change, reload; then desktop | Checklist in each PR, phone steps first |
 
 ## 9. Performance budget
 
@@ -427,15 +438,15 @@ Each task ends with both test runs passing and the browser check from the agent 
 
 | Risk | Mitigation |
 | --- | --- |
-| The death scene feels cheap or too long | Preview page first (T11) with Pavel's approval; 30-45 s, skippable, the game's own models, captions instead of voice |
-| A Wyrm is too big for the regions and the castle courtyards | Courtyard and wall walk tests in T01; camera pulled back with scale; Maidenhold's yard is refused on purpose and the breach is the way in |
+| The death scene feels cheap or too long | Preview page first (T13) with Pavel's approval; 30-45 s, skippable, the game's own models, captions instead of voice |
+| A Wyrm is too big for the regions and the castle courtyards | Courtyard and wall walk tests in T03; camera pulled back with scale; Maidenhold's yard is refused on purpose and the breach is the way in |
 | Knights on real terrain get stuck in the gorge or on the cliffs | They prefer roads, use `walk.maxSlope`, and teleport home when stuck longer than 10 s out of the dragon's view |
 | Nets feel unfair on a phone | A visible aim line, 3 s at most, two ways out without upgrades (Fire, Boost taps), immunity afterwards |
 | Breaching makes castles trivial | Wyrm only, stone hp high, the ram hurts the dragon, only wall segments break, rebuild after twice the fire time |
 | Renown punishes players who did not know about it | The start is clamped to -50..50 so old saves land in wary or near it; wary is Phase 3's behaviour; a message explains each tier change |
-| The pass terrain does not read on a phone | Height exaggeration 2.0, limestone colour on the cliff faces, Pavel checks the high view in T03 |
-| The raw tile download fails in the build sandbox (needed once for `crop.py`) | `sources.json` has the URL and checksums; if the download is blocked, the T03 PR reports it and Pavel commits the crop (`tools/terrain/sources/pass_dtm.png`) from his machine |
-| Wyrm hunger makes the long trips to the pass impossible | Pass aerie for banking and resting, hungerMult 1.4 (not 2.2), T17 tunes it with the bots |
+| The pass terrain does not read on a phone | Height exaggeration 2.0, limestone colour on the cliff faces, Pavel checks the high view in T05 |
+| The raw tile download fails in the build sandbox (needed once for `crop.py`) | `sources.json` has the URL and checksums; if the download is blocked, the T05 PR reports it and Pavel commits the crop (`tools/terrain/sources/pass_dtm.png`) from his machine |
+| Wyrm hunger makes the long trips to the pass impossible | Pass aerie for banking and resting, hungerMult 1.4 (not 2.2), T19 tunes it with the bots |
 | Changing the shared dragon model breaks the duel | Stage parts only with the `stage` option; `mp/sim.test.js` and a vertex count test |
 
 ## 11. Open design questions (recommended defaults)
