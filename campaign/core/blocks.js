@@ -267,12 +267,13 @@
     const ground = T.surfaceAt(W.regionId, x, z);
     const groundY = b.kind === 'hero' ? H.groundY(ctx, x, z) : WK.groundAt(ctx, x, z);
     const hit = S.solidHit(x, z), top = S.walkTop(x, z), roof = S.solidAt(x, z);
+    const touch = hit || W.solids(b.pad + 0.05).solidHit(x, z);            // resting against a wall (held at pad + 1e-3)
     const feet = b.kind === 'dragon' ? y - D.walk.stand : y;
     const onTop = top != null && Math.abs(feet - top) < 0.15;
     const pl = { mode: 'air', pos: [x, b.kind === 'dragon' ? feet + 2 : y, z], speed: 0 };
     const land = WK.canLand(pl, W.regionId, S.solidAt, S.walkTop);
     return { x, y, z, ground, groundY, roof, walkTop: top, hit: hit ? { depth: hit.depth, nx: hit.nx, nz: hit.nz, roof: hit.roof } : null,
-      onTop, blocked: !!hit && !onTop && feet < hit.roof - 0.05, land: { ok: land.ok, why: land.why || null },
+      onTop, blocked: !!touch && !onTop && feet < touch.roof - 0.05, land: { ok: land.ok, why: land.why || null },
       slope: T.surfaceSlope(W.regionId, x, z), inSolid: inSolid(W, x, feet, z) };
   }
 
