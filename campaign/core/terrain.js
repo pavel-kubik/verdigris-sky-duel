@@ -175,6 +175,7 @@
   /** Noise, volcano cones and the flatten ring: the ground before roads, rivers and plateaus. */
   function baseHeight(id, x, z) {
     const R = region(id), T = R.terrain;
+    if (T.fn) return T.fn(x, z);                 // Phase 4 T02: a test ground (core/blocks.js preview regions)
     if (T.dem) {                                 // real terrain; a cone with a crater (Mount Rip) digs its crater into it
       let h = demBase(id, R, x, z);
       for (const f of T.features) if (f.type === 'cone') h += cone(f, Math.hypot(x - f.x, z - f.z))[0];
