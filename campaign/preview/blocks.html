@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Verdigris - Block preview</title>
+<style>
+  :root{--ink:#e9e2d0;--mute:#a59d8a;--panel:rgba(18,16,14,.78);--edge:rgba(233,226,208,.18);--on:#c9a24a}
+  html,body{margin:0;height:100%;background:#0d0c0b;color:var(--ink);font:14px/1.3 system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{display:block;width:100vw;height:100vh;touch-action:none}
+  #ui{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;pointer-events:auto}
+  .row b{font-weight:600;color:var(--mute);font-size:11px;letter-spacing:.08em;text-transform:uppercase;min-width:52px;text-shadow:0 1px 2px #000,0 0 6px #000}
+  button{background:var(--panel);color:var(--ink);border:1px solid var(--edge);border-radius:8px;min-height:40px;min-width:44px;padding:0 10px;font:inherit;font-size:13px}
+  button.on{border-color:var(--on);color:var(--on)}
+  #stats{position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:6px 10px;font:12px/1.4 ui-monospace,Menlo,monospace;pointer-events:none;white-space:pre-wrap}
+  #err{position:fixed;inset:auto 8px 230px;color:#f88;font:12px monospace}
+  select{background:var(--panel);color:var(--ink);border:1px solid var(--edge);border-radius:8px;min-height:40px;max-width:52vw;font:inherit;font-size:13px}
+  #stick{position:fixed;left:14px;bottom:calc(env(safe-area-inset-bottom) + 92px);width:120px;height:120px;border-radius:50%;background:rgba(18,16,14,.45);border:1px solid var(--edge);touch-action:none}
+  #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:rgba(233,226,208,.35)}
+  #acts{position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom) + 92px);display:flex;flex-direction:column;gap:6px}
+  #acts button{min-width:64px;min-height:44px}
+  @media (pointer: fine) { #stick, #acts { display: none } }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div class="row" id="rBlock"><b data-i18n="c.bk.block">Block</b><button id="bPrev">&lt;</button><select id="sel"></select><button id="bNext">&gt;</button></div>
+  <div class="row" id="rGround"><b data-i18n="c.bk.ground">Ground</b></div>
+  <div class="row" id="rBody"><b data-i18n="c.bk.body">Body</b></div>
+  <div class="row" id="rCtl"><b data-i18n="c.bk.sim">Sim</b></div>
+</div>
+<div id="stick"><div id="knob"></div></div>
+<div id="acts"></div>
+<div id="stats"></div>
+<div id="err"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  (function () {
+    var v = new URLSearchParams(location.search).get('v'), q = v ? '?v=' + encodeURIComponent(v) : '';
+    ['../../i18n.js', '../../shared/textures.js', '../../shared/dragon.js', '../../shared/forest.js', '../../shared/forest-view.js', '../../shared/human.js',
+     '../core/umd.js', '../core/math.js', '../core/events.js', '../core/data.js', '../core/dem-bend.js', '../core/dem-rip.js', '../core/terrain.js', '../core/clock.js',
+     '../core/growth.js', '../core/hunger.js', '../core/upgrades.js', '../core/settlement.js', '../core/castle.js', '../core/city.js', '../core/shapes.js',
+     '../core/flight.js', '../core/walk.js', '../core/hero.js', '../core/blocks.js',
+     '../render/bridge-view.js', '../render/settlement-view.js', '../render/castle-kit.js', '../render/house-kit.js', '../render/debug-shapes.js', 'blocks.js']
+      .forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
+  })();
+</script>
+</body>
+</html>

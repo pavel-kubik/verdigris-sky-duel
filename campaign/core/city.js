@@ -451,5 +451,5 @@
     return v === STREET ? 1 : v === SQUARE ? 2 : v === GREEN ? 3 : 0;
   }
 
-  M.define('city', { why, build, solidAt, hit, sd, placeAt, pavedAt, lotsNear, STOREY, KIND_SIZE });
+  M.define('city', { why, build, solidAt, hit, sd, placeAt, pavedAt, lotsNear, roofOf, STOREY, KIND_SIZE });
 })(typeof self !== 'undefined' ? self : this);
