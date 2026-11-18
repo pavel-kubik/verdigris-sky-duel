@@ -1,6 +1,6 @@
 # Phase 4 - Highlands: Implementation Spec
 
-Status: draft, 2026-11-08 (agent/p004-plan, waiting for Pavel's review). Refines `000_spec.md` for Phase 4. Built on `campaign-phase-4` (branched from the finished `campaign-phase-3`). Task branches are `agent/t3NN-...` (T01 -> `t301`).
+Status: approved, 2026-11-18 (Pavel: all open questions take their recommended defaults, section 11). Drafted 2026-11-08. Refines `000_spec.md` for Phase 4. Built on `campaign-phase-4` (branched from `main` on 2026-11-18, after Phase 3 was merged into `main`). Task branches are `agent/t3NN-...` (T01 -> `t301`).
 
 Built the way Phase 3 was built (Pavel, 2026-10-31): **visual form first** (the Wyrm and the new region are checked on a phone before the systems that use them), **new regions follow Prague's landscape** on real LiDAR terrain with easy-to-guess fantasy names, and every feature is playable on a touch phone first.
 
@@ -449,18 +449,20 @@ Each task ends with both test runs passing and the browser check from the agent 
 | Wyrm hunger makes the long trips to the pass impossible | Pass aerie for banking and resting, hungerMult 1.4 (not 2.2), T19 tunes it with the bots |
 | Changing the shared dragon model breaks the duel | Stage parts only with the `stage` option; `mp/sim.test.js` and a vertex count test |
 
-## 11. Open design questions (recommended defaults)
+## 11. Design decisions (decided 2026-11-18)
 
-1. Highland Pass terrain: the Barrandov cliffs + Prokop gorge + Hlubočepy viaducts south-west of Prague (default: same tile, the river along the east side, cliffs and viaducts give the "pass"), or the deep Vltava gorge further south (Davle - Štěchovice - Slapy, a true highland canyon, but a new tile N49E014 and farther from the Prague theme)?
-2. Names: Barrand Cliffs, Prokop Gorge, Hlubowick viaducts, Maidenhold (Dívčí hrady, the Maidens' war), Chuchel, Jinonice, Branick, Zlichov rock chapel (default), or other names?
-3. Where and when does the mother die? Default: the first time a new Wyrm leaves the cave, she flies ahead toward the Farmlands and a hidden Order battery of three ballistae brings her down in front of the player (an in-engine scene over the live Ash Wastes, skippable). Alternative: an interactive version where the player arrives too late.
-4. Can the player save her? Default: no, the scene always ends with her death (the story needs it; `000_spec.md` section 2).
-5. Stage visuals: scale plus extra horns, a spine crest and darker scales per stage (default; resolves the open question in `000_spec.md` section 10), or scale only?
-6. Wyrm hunger: hungerMult 1.4 (default, tuned by the bots) instead of the original 2.2?
-7. Breaching: Wyrm breath wears stone slowly and a Boost ram deals a big hit that also hurts the dragon; only wall segments break (default). Or breath only, or ram only?
-8. Nets: up to 3 s pinned, Fire burns the net, Boost taps shorten it, Roar (upgrade) breaks it at once (default)?
-9. Knights: arrow-proof riders that hit only a landed or low dragon, called by long alarms and escorting gold trains; a Wyrm can grab one and drop it (default)?
-10. Renown: three tiers (hostile / wary / friendly), wary = today's behaviour, start from the saved history clamped to -50..50 (default)? Should freed villages turn hostile again at low Renown (default: no tribute, but they stay freed)?
-11. Region gate: the pass at late Drake (`minGrowth 0.45`, as `000_spec.md` section 7 says "Drake (late)"), Act 3 missions at Wyrm (default), or the whole pass at Wyrm?
-12. Missions: two this phase (gold train intercept, breach-and-steal the Scale-Crown) plus free-roam gold trains (default), or a third (for example burn the net workshop at the toll fort)?
-13. Roar on touch: in the Action slot only when it applies (netted, or a knight near and nothing to grab) (default), or its own button?
+Pavel took the recommended default for every question below; the spec above already describes them.
+
+1. **Decided: default.** Highland Pass terrain: the Barrandov cliffs + Prokop gorge + Hlubočepy viaducts south-west of Prague (default: same tile, the river along the east side, cliffs and viaducts give the "pass"), or the deep Vltava gorge further south (Davle - Štěchovice - Slapy, a true highland canyon, but a new tile N49E014 and farther from the Prague theme)?
+2. **Decided: default.** Names: Barrand Cliffs, Prokop Gorge, Hlubowick viaducts, Maidenhold (Dívčí hrady, the Maidens' war), Chuchel, Jinonice, Branick, Zlichov rock chapel (default), or other names?
+3. **Decided: default.** Where and when does the mother die? Default: the first time a new Wyrm leaves the cave, she flies ahead toward the Farmlands and a hidden Order battery of three ballistae brings her down in front of the player (an in-engine scene over the live Ash Wastes, skippable). Alternative: an interactive version where the player arrives too late.
+4. **Decided: default.** Can the player save her? Default: no, the scene always ends with her death (the story needs it; `000_spec.md` section 2).
+5. **Decided: default.** Stage visuals: scale plus extra horns, a spine crest and darker scales per stage (default; resolves the open question in `000_spec.md` section 10), or scale only?
+6. **Decided: default.** Wyrm hunger: hungerMult 1.4 (default, tuned by the bots) instead of the original 2.2?
+7. **Decided: default.** Breaching: Wyrm breath wears stone slowly and a Boost ram deals a big hit that also hurts the dragon; only wall segments break (default). Or breath only, or ram only?
+8. **Decided: default.** Nets: up to 3 s pinned, Fire burns the net, Boost taps shorten it, Roar (upgrade) breaks it at once (default)?
+9. **Decided: default.** Knights: arrow-proof riders that hit only a landed or low dragon, called by long alarms and escorting gold trains; a Wyrm can grab one and drop it (default)?
+10. **Decided: default.** Renown: three tiers (hostile / wary / friendly), wary = today's behaviour, start from the saved history clamped to -50..50 (default)? Should freed villages turn hostile again at low Renown (default: no tribute, but they stay freed)?
+11. **Decided: default.** Region gate: the pass at late Drake (`minGrowth 0.45`, as `000_spec.md` section 7 says "Drake (late)"), Act 3 missions at Wyrm (default), or the whole pass at Wyrm?
+12. **Decided: default.** Missions: two this phase (gold train intercept, breach-and-steal the Scale-Crown) plus free-roam gold trains (default), or a third (for example burn the net workshop at the toll fort)?
+13. **Decided: default.** Roar on touch: in the Action slot only when it applies (netted, or a knight near and nothing to grab) (default), or its own button?

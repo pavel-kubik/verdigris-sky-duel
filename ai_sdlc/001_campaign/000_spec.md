@@ -367,7 +367,7 @@ Stored in `localStorage` (IndexedDB if it grows), autosaved on rest, mission end
 
 ## 9. Roadmap
 
-Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. **Phase 1 is done (2026-10-29, T01-T17 merged into `campaign-phase-1`). Phase 2 is done (2026-10-31, T01-T25 merged into `campaign-phase-2`, branched from phase 1); Phase 3 is done (2026-11-08, T01-T20 merged into `campaign-phase-3`, branched from phase 2; it opened with the castle, revised 2026-10-31). Phase 4 starts on `campaign-phase-4`, branched from the finished phase 3, once its task spec (`004_task_highlands.md`, drafted 2026-11-08) is merged.** Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard, upgrades, the walkable cave interior and the compass with smell moved into Phase 2, map screen in Phase 3, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
+Each phase is a playable increment on its own base branch (`campaign-phase-N`) with one PR per task. Phase 1 is deliberately small to prove that hunting and growth are fun before castles get built. **Phase 1 is done (2026-10-29, T01-T17 merged into `campaign-phase-1`). Phase 2 is done (2026-10-31, T01-T25 merged into `campaign-phase-2`, branched from phase 1); Phase 3 is done (2026-11-08, T01-T20 merged into `campaign-phase-3`, branched from phase 2; it opened with the castle, revised 2026-10-31). Phase 3 is merged into `main`; Phase 4 runs on `campaign-phase-4`, branched from `main` on 2026-11-18, with its task spec `004_task_highlands.md` approved that day (all open questions on their defaults).** Roadmap revised 2026-10-29: landing moved to the start of Phase 2, hoard, upgrades, the walkable cave interior and the compass with smell moved into Phase 2, map screen in Phase 3, the old Phase 4 split into Highlands and Lowlands, co-op gated on the multiplayer backend.
 
 | Phase | Task file | Scope | Exit criteria |
 | --- | --- | --- | --- |
@@ -390,7 +390,7 @@ Phase 7 (co-op) starts only once the persistent multiplayer backend exists; unti
 - [x] Grab controls: hold Grab near prey, with a swoop that steers the dive (Phase 1).
 - [x] Landing: real landing with walking, not hopping (decided 2026-10-29, built at the start of Phase 2).
 - [ ] Does the mission timer pause during region loading only, or also inside the lair menus?
-- [ ] Visual difference between stages: scale only, or extra horns / spines per stage? Proposed in `004_task_highlands.md` (open question 5): scale plus horns, a spine crest and darker scales per stage.
+- [x] Visual difference between stages: scale plus horns, a spine crest and darker scales per stage (decided 2026-11-18, `004_task_highlands.md`).
 - [ ] When does co-op campaign start? Gated on the persistent multiplayer backend (2026-10-29); exact timing still open.
 - [x] Story: the mother lives at the start, teaches flying and hunting, is killed by the Order when the hero reaches Drake; the mother once killed the King; human campaign after the dragon story (decided 2026-10-29).
 - [ ] Story 1: why did the mother kill the King? Default: the King's hunters took her first clutch of eggs, so both sides lost children and both have their reason.
