@@ -9,7 +9,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't302.1 2026-11-18 block preview: one block, test grounds, hero / dragon / hover bodies, pushes, readouts';
+  const BUILD = 't302.1 2026-11-18 block preview (preview/blocks.html), core/blocks.js loaded';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const BK = C.need('blocks'), T = C.need('terrain'), D = C.need('data'), SH = C.need('shapes');
   const t = (k, p) => (I ? I.t(k, p) : k);
@@ -284,5 +284,6 @@
   placeCam();
   requestAnimationFrame(frame);
   window.__vblocks = { set, info, read: () => BK.read(W, body), push: startPush, frames, world: () => W, body: () => body, catalog: CAT, BUILD,
+    place: (x, y, z, yaw) => { scripted = null; trailPts.length = 0; body = BK.body(W, st.body, [x, y, z], yaw || 0); return BK.read(W, body); },
     cam: (th, ph, r) => { orb.th = th; orb.ph = ph; orb.r = r; } };
 })();
