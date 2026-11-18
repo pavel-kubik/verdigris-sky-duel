@@ -219,7 +219,78 @@
   });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-  canvas.addEventListener('pointerdown', e => { if (state === 'play' && e.pointerType === 'mouse' && e.button === 0) giftQ = true; });
+  canvas.addEventListener('pointerdown', e => {
+    if (debug && dbg.pick && state === 'play') { e.preventDefault(); debugPick(e.clientX, e.clientY); return; }   // Phase 4 T01: pick mode takes the tap / click
+    if (state === 'play' && e.pointerType === 'mouse' && e.button === 0) giftQ = true;
+  });
+
+  /* ---------- Phase 4 T01: blocks overlay, object picker, ground probe (?debug only): Shift+B / Shift+P, or the buttons ---------- */
+  const dbg = { shapes: false, pick: false, view: null, list: null, key: '', t: 0, card: null, box: null };
+  const SH = debug ? C.need('shapes') : null;
+  function heroShapes() {
+    const town = world && world.town, key = town ? town.buildings.filter(b => b.ruin).length + ':' + (town.gateClosed ? 1 : 0) : '-';
+    if (!dbg.list || dbg.key !== key) { dbg.list = SH.list(REGION, town); dbg.key = key; }
+    return dbg.list;
+  }
+  function debugToggle(what) {
+    dbg[what] = !dbg[what];
+    if (what === 'pick' && !dbg.pick) pickCard(null);
+    dbg.t = 0;
+    if (dbg.box) for (const b of dbg.box.querySelectorAll('button')) b.style.background = dbg[b.dataset.k] ? 'rgba(255,148,71,.55)' : 'rgba(6,10,8,.8)';
+  }
+  function debugShapesFrame(dt) {
+    if (!dbg.box) {
+      dbg.box = document.createElement('div');
+      dbg.box.style.cssText = 'position:fixed;right:8px;top:calc(64px + env(safe-area-inset-top,0px));z-index:8;display:flex;gap:6px';
+      for (const k of ['shapes', 'pick']) {
+        const b = document.createElement('button');
+        b.dataset.k = k; b.textContent = k; b.title = k === 'shapes' ? 'Shift+B' : 'Shift+P';
+        b.style.cssText = 'min-height:36px;padding:0 10px;border-radius:4px;border:1px solid rgba(233,225,204,.25);background:rgba(6,10,8,.8);color:#ebe3cd;font:600 12px/1 ui-monospace,Menlo,monospace;touch-action:manipulation';
+        b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); debugToggle(k); });
+        dbg.box.appendChild(b);
+      }
+      document.body.appendChild(dbg.box);
+    }
+    dbg.box.hidden = state !== 'play';
+    if (!world || !me || (!dbg.shapes && !dbg.pick)) { if (dbg.view) dbg.view.group.visible = false; return; }
+    if (!dbg.view) { dbg.view = VRender.debugShapes.build(); scene.add(dbg.view.group); }
+    dbg.view.group.visible = true;
+    dbg.t -= dt;
+    if (dbg.t > 0) return;
+    dbg.t = 0.5;
+    dbg.view.update({ regionId: REGION, shapes: dbg.shapes ? heroShapes() : [], x: me.pos[0], z: me.pos[2], radius: 90, raster: dbg.shapes ? 60 : 0,
+                      probe: { x: me.pos[0], y: me.pos[1] + 2.5, z: me.pos[2], ground: TR.surfaceAt(REGION, me.pos[0], me.pos[2]) } });
+  }
+  function debugPick(cx, cy) {
+    if (!world) return;
+    const L = heroShapes(), r = canvas.getBoundingClientRect();
+    const v = new THREE.Vector3((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1, 0.5).unproject(camera);
+    const o = camera.position, d = v.sub(o).normalize();
+    const hit = SH.pick(REGION, L, [o.x, o.y, o.z], [d.x, d.y, d.z], 800);
+    dbg.lastPick = hit;
+    if (!dbg.view) { dbg.view = VRender.debugShapes.build(); scene.add(dbg.view.group); }
+    dbg.view.group.visible = true;
+    dbg.view.pickShow(hit, null);
+    if (!hit) { pickCard(['nothing within 800 (sky)']); return; }
+    const lines = hit.shape ? SH.card(REGION, hit.shape) : ['ground  x ' + hit.pos[0].toFixed(1) + ' z ' + hit.pos[2].toFixed(1) + (hit.under ? '  on ' + hit.under.kind + ' ' + hit.under.id : '')];
+    lines.push('- probe at the hit -', ...SH.probeLines(SH.probe(REGION, hit.pos[0], hit.pos[2], world.town)));
+    lines.push('- probe under the hero -', ...SH.probeLines(SH.probe(REGION, me.pos[0], me.pos[2], world.town)));
+    pickCard(lines);
+  }
+  function pickCard(lines) {
+    if (!lines) { if (dbg.card) dbg.card.hidden = true; if (dbg.view) dbg.view.pickShow(null); dbg.lastPick = null; return; }
+    if (!dbg.card) {
+      const el = dbg.card = document.createElement('div');
+      el.id = 'pickCard';
+      el.style.cssText = 'position:fixed;left:8px;top:calc(108px + env(safe-area-inset-top,0px));z-index:9;max-width:min(92vw,520px);font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.82);border:1px solid rgba(255,90,70,.6);padding:7px 9px;border-radius:4px;white-space:pre-wrap;word-break:break-word;pointer-events:auto';
+      el.title = t('c.dbg.pickClose');
+      el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pickCard(null); });
+      document.body.appendChild(el);
+    }
+    dbg.card.hidden = false;
+    dbg.card.textContent = lines.join('\n');
+  }
+  if (debug) addEventListener('keydown', e => { if (state === 'play' && e.shiftKey && (e.code === 'KeyB' || e.code === 'KeyP')) debugToggle(e.code === 'KeyB' ? 'shapes' : 'pick'); });
   const stick = $('#stick'), nub = $('#nub'); let stickId = null;
   function stickMove(e) {
     const r = stick.getBoundingClientRect();
@@ -470,6 +541,7 @@
     if (world.cityView) world.cityView.update(camera.position, dt, night);
     if (window.VTex) VTex.tick(time);
     if (state === 'play') hud(dt);
+    if (debug) debugShapesFrame(dt);                             // Phase 4 T01: the blocks overlay (only built with ?debug)
     renderer.render(scene, camera);
     if (debug && fpsN === 0) console.log('fps', fps.toFixed(0), 'calls', renderer.info.render.calls, 'tris', renderer.info.render.triangles, 'pos', me.pos.map(v => v.toFixed(0)).join(','));
   }
@@ -481,5 +553,5 @@
   const direct = params.get('tale');
   if (direct && D.tales[direct]) begin(direct, params.has('restart'));
   else setTimeout(() => { if (!world) { buildWorld(); } }, 400);   // Prahold behind the menu
-  window.__vhero = { get ts() { return ts; }, get me() { return me; }, get world() { return world; }, begin, renderer };
+  window.__vhero = { get ts() { return ts; }, get me() { return me; }, get world() { return world; }, begin, renderer, dbg, debugPick, debugToggle };
 })();

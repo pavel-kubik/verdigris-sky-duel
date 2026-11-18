@@ -17,7 +17,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 'vr.1 2026-11-12 every mode in VR on Meta Quest (WebXR): campaign with menus, map and stations in the headset';
+  const BUILD = 't301.1 2026-11-18 debug blocks overlay, object picker, ground probe';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -421,13 +421,16 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[CYJKOTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+J / K: mission finish / fail (T10); Shift+Y chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[BCYJKOPTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+B / P: shapes overlay, pick (Phase 4 T01); Shift+J / K: mission finish / fail (T10); Shift+Y chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseBreath = false; });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.addEventListener('pointerdown', e => { if (state === 'play' && e.pointerType === 'mouse' && e.button === 0) mouseBreath = true; });
+  canvas.addEventListener('pointerdown', e => {
+    if (debug && dbgPick && state === 'play') { e.preventDefault(); debugPick(e.clientX, e.clientY); return; }   // Phase 4 T01: pick mode takes the tap / click
+    if (state === 'play' && e.pointerType === 'mouse' && e.button === 0) mouseBreath = true;
+  });
   addEventListener('mouseup', e => { if (e.button === 0) mouseBreath = false; });
   const stick = $('#stick'), nub = $('#nub'); let stickId = null;
   function stickMove(e) {
@@ -1382,11 +1385,14 @@
     ['Shift+O', 'siege workshop: accepts its mission if needed; in the Veltava Bend fly a run-in from the courtyard side, 160 out, facing the workshop (breathe fire on its roof), T14', 'ShiftKeyO', 'workshop'],
     ['Shift+V', 'free the village: its Order buildings fall to ruins, its archers fall, the Order flag drops (Farmlands village), Phase 3 T16', 'ShiftKeyV', 'free village'],
     ['Shift+T', 'tribute now: the next food tribute of a freed village arrives in the larder (Phase 3 T16)', 'ShiftKeyT', 'tribute now'],
+    ['Shift+B', 'blocks: collision shapes of the region within 160 (lots cyan, settlement / castle pieces orange, walk tops green, decks yellow, plateaus violet) + street / road / water raster + ground probe line (Phase 4 T01)', 'ShiftKeyB', 'shapes'],
+    ['Shift+P', 'pick mode: tap / click an object or a spot - a card names it, its data source, size, ground and top, state (Phase 4 T01); again: off', 'ShiftKeyP', 'pick'],
     ['\\', 'tips: forget the seen ones, the next fitting tip shows now (T23)', 'Backslash', 'tips reset'],
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
   let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
+  let dbgShapes = false, dbgPick = false, dbgShapesT = 0, shapeView = null, shapeList = null, shapeKey = '', lastPick = null, pickEl = null;   // Phase 4 T01: blocks overlay + pick
   let fastTime = false;                                          // T21: debug / - the clock runs x40
   let dbgMission = -1;                                           // T10: catalogue index of the last Shift+3 accept
   let dbgPen = -1, dbgLoot = -1;                                 // T19: item index of the last ',' press                                               // T18: pen index of the last '.' press
@@ -1562,6 +1568,8 @@
       else { const from = AL.level(rs); rs.heat = 0; rs.lastIncident = now; if (from) onEvents([{ e: 'alert:level', level: 0, from, region: cs.region }]); }
       flashPrompt(t('c.dbg.alert', { n: AL.level(rs) }), 1.5);
     }
+    if (code === 'ShiftKeyB') { dbgShapes = !dbgShapes; dbgShapesT = 0; if (shapeView) shapeView.group.visible = dbgShapes || dbgPick; flashPrompt(t(dbgShapes ? 'c.dbg.shapesOn' : 'c.dbg.shapesOff'), 1.5); return; }   // Phase 4 T01
+    if (code === 'ShiftKeyP') { dbgPick = !dbgPick; if (!dbgPick) pickCard(null); flashPrompt(t(dbgPick ? (isTouch ? 'c.dbg.pickOnTouch' : 'c.dbg.pickOn') : 'c.dbg.pickOff'), 1.8); return; }
     if (code === 'Backslash') { TP.reset(cs); cs.tipT = D.tips.gap; flashPrompt(t('c.dbg.tips'), 1.5); }   // T23
     if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
     if (code === 'Equal' && !cs.inLair) {                        // T16: cross the front of the next ballista, already seen
@@ -1842,6 +1850,7 @@
       watchView.update(cs.watch, { regionId, spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId), show: (cones || debug && watchShow) && !cs.inLair,
                                    marks: !cs.inLair, near: pilot.pos, markRange: cones ? Infinity : D.defense.markRange, fanAlpha: cones ? 2.5 : 1 });
     }
+    if (debug) debugShapesFrame(rawDt);                             // Phase 4 T01: the blocks overlay (only built with ?debug)
     targetRing();
     fireTargetRing();
     renderer.render(scene, camera);
@@ -1924,6 +1933,7 @@
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyY', 'ShiftKeyO', 'ShiftKeyC']]]],
+      ['blocks', [['', ['ShiftKeyB', 'ShiftKeyP']]]],
       ['save', [['', ['KeyV', 'DbgSaveReload', 'KeyU', 'KeyR']], ['other', ['KeyY', 'Backslash']]]],
     ];
     const panes = [];
@@ -1977,6 +1987,60 @@
     dbgBox.prepend(bar);
     paint();
   }
+  /* ---------- Phase 4 T01: blocks overlay, object picker, ground probe (?debug only) ---------- */
+  const SH = debug ? C.need('shapes') : null;
+  function currentShapes() {
+    if (cs.inLair || !pilot) return null;
+    const town = cs.town && cs.town.region === regionId ? cs.town : null;
+    const key = regionId + ':' + (town ? town.buildings.filter(b => b.ruin).length + ':' + (town.gateClosed ? 1 : 0) : '-');
+    if (!shapeList || shapeKey !== key) { shapeList = SH.list(regionId, town); shapeKey = key; }
+    return shapeList;
+  }
+  function debugShapesFrame(dt) {
+    if (!dbgShapes && !dbgPick) { if (shapeView) shapeView.group.visible = false; return; }
+    if (!shapeView) { shapeView = VRender.debugShapes.build(); scene.add(shapeView.group); }
+    shapeView.group.visible = !cs.inLair;
+    dbgShapesT -= dt;
+    if (dbgShapesT > 0) return;
+    dbgShapesT = 0.5;
+    const L = currentShapes();
+    if (!L) return;
+    const p = pilot.pos;
+    shapeView.update({ regionId, shapes: dbgShapes ? L : [], x: p[0], z: p[2], radius: 160, raster: dbgShapes ? 100 : 0,
+                       probe: { x: p[0], y: p[1], z: p[2], ground: TR.surfaceAt(regionId, p[0], p[2]) } });
+  }
+  function debugPick(cx, cy) {
+    const L = currentShapes();
+    if (!L) return;
+    const r = canvas.getBoundingClientRect();
+    const v = new THREE.Vector3((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1, 0.5).unproject(camera);
+    const o = camera.position, d = v.sub(o).normalize();
+    const hit = SH.pick(regionId, L, [o.x, o.y, o.z], [d.x, d.y, d.z], 1500);
+    lastPick = hit;
+    if (!shapeView) { shapeView = VRender.debugShapes.build(); scene.add(shapeView.group); }
+    shapeView.group.visible = true;
+    shapeView.pickShow(hit, null);
+    if (!hit) { pickCard(['nothing within 1500 (sky)']); return; }
+    const town = cs.town && cs.town.region === regionId ? cs.town : null;
+    const lines = hit.shape ? SH.card(regionId, hit.shape)
+      : ['ground  x ' + hit.pos[0].toFixed(1) + ' z ' + hit.pos[2].toFixed(1) + (hit.under ? '  on ' + hit.under.kind + ' ' + hit.under.id : ''), ...(hit.under ? [hit.under.src] : [])];
+    lines.push('- probe at the hit -', ...SH.probeLines(SH.probe(regionId, hit.pos[0], hit.pos[2], town)));
+    pickCard(lines);
+  }
+  function pickCard(lines) {
+    if (!lines) { if (pickEl) pickEl.hidden = true; if (shapeView) shapeView.pickShow(null); lastPick = null; return; }
+    if (!pickEl) {
+      pickEl = document.createElement('div');
+      pickEl.id = 'pickCard';
+      pickEl.style.cssText = 'position:fixed;left:8px;bottom:calc(' + (isTouch ? '190px' : '16px') + ' + env(safe-area-inset-bottom,0px));z-index:9;max-width:min(92vw,520px);font:' + (isTouch ? '10px/1.35' : '11.5px/1.4') + ' ui-monospace,Menlo,Consolas,monospace;color:#ebe3cd;background:rgba(6,10,8,.82);border:1px solid rgba(255,90,70,.6);padding:7px 9px;border-radius:4px;white-space:pre-wrap;word-break:break-word;pointer-events:auto';
+      pickEl.title = t('c.dbg.pickClose');
+      pickEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pickCard(null); });
+      document.body.appendChild(pickEl);
+    }
+    pickEl.hidden = false;
+    pickEl.textContent = lines.join('\n');
+  }
+
   const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2);
   function debugHud() {
     if (!dbgEl) {
@@ -2018,6 +2082,13 @@
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
       const lc = (pilot.mode || 'air') === 'air' ? (s => WK.canLand(pilot, regionId, s.solidAt, s.walkTop))(ST.solids(cs, heroScale)) : null;
       L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
+      if (dbgShapes || dbgPick) {                                 // Phase 4 T01: ground probe under the dragon, shapes near, city rejects
+        const town = cs.town && cs.town.region === regionId ? cs.town : null, pr = SH.probeLines(SH.probe(regionId, pilot.pos[0], pilot.pos[2], town));
+        L.push('PROBE   ' + pr.join('\n        '));
+        L.push('SHAPES  ' + (shapeView ? shapeView.info.shapes + ' near  raster ' + shapeView.info.points : '-') + (dbgPick ? '  PICK ON' : '') + (lastPick && lastPick.shape ? '  picked ' + lastPick.shape.id : ''));
+        const why = Object.entries(CI.why || {});
+        L.push('CITY    rejects ' + (why.length ? why.map(([k, n]) => k + ' ' + n).join('  ') : '-'));
+      }
       L.push('STATS   turn ' + f2(stats.turn) + '  cruise ' + stats.cruise + '  boost ' + stats.boost);
       L.push('        spot ' + f1(stats.spot) + '  carry ' + stats.carry + '  hunger x' + f1(stats.hungerMult));
       const pc = PR.census(cs.field), cp = ST.carriedPrey(cs);
@@ -2067,5 +2138,5 @@
   renderer.setAnimationLoop(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get shapeView() { return shapeView; }, debugPick, get lastPick() { return lastPick; }, get shapeList() { return currentShapes(); }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();
