@@ -122,8 +122,9 @@ for (const id of Object.keys(D.regions)) {
 // without ?debug nothing is built: game.js creates the overlay only behind the debug flag
 {
   const src = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
-  const uses = src.split('\n').filter(l => /VRender\.debugShapes\.build|new DebugShapes/.test(l));
-  ok(uses.length >= 1 && uses.every(l => /debug/.test(l)), 'the shape overlay is only built under ?debug');
+  const calls = src.split('\n').filter(l => /debugShapesFrame\(|debugPick\(/.test(l) && !/function debug(ShapesFrame|Pick)/.test(l) && !/__vcamp/.test(l));
+  ok(calls.length >= 2 && calls.every(l => /if \(debug( && dbgPick)?[ )]/.test(l)), 'the shape overlay and the pick run only under ?debug (' + calls.length + ' calls)');
+  ok(/const SH = debug \? C\.need\('shapes'\) : null/.test(src), 'core/shapes is only used with ?debug');
   const idx = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   ok(/core\/shapes\.js/.test(idx) && /render\/debug-shapes\.js/.test(idx), 'index.html loads shapes and debug-shapes');
   const sw = fs.readFileSync(path.join(__dirname, '..', '..', 'sw.js'), 'utf8');
