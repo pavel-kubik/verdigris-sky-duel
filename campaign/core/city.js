@@ -356,6 +356,59 @@
     lineLots(city, id, R, ras, road, dist, rnd, (x, z) => Math.hypot(x - V.x, z - V.z) < V.r + 20);
   }
 
+  /* ---------- bridge approaches: a street from each end of a bridge into the town ----------
+     Rule: a bridge leads somewhere on both banks. Where a bridge end lies in or near a district or a village (within
+     APPROACH.reach of its edge), a street runs from the deck end straight on for APPROACH.lead and then to the nearest
+     street or square in front of it that it can reach without crossing water, a landmark or another bridge; it is laid
+     down before the houses, so no house stands on it (like Mostecka from Karlsbridge to the Lesser Town square). */
+  const APPROACH = { reach: 60, lead: 10, max: 110 };
+  function bridgeApproaches(id, R, city, ras) {
+    const out = [], parts = city.districts.concat(city.villages);
+    for (const f of R.terrain.features) {
+      if (f.type !== 'bridge') continue;
+      const s = Math.sin(f.yaw), c = Math.cos(f.yaw), w = Math.max(6, Math.min(9, f.width));
+      for (const sg of [-1, 1]) {
+        const ux = sg * s, uz = sg * c, ex = f.x + ux * (f.len / 2 - 1), ez = f.z + uz * (f.len / 2 - 1);
+        const part = parts.find(d => Math.hypot(ex - d.x, ez - d.z) < d.r + APPROACH.reach);
+        if (!part) continue;
+        const ap = approachFrom(id, ras, f, ex, ez, ux, uz, w);
+        if (ap) out.push({ pts: ap, w, main: true, bridge: true, district: part.id, dist: city.districts.indexOf(part) >= 0 ? part : null });
+      }
+    }
+    return out;
+  }
+  function approachFrom(id, ras, f, ex, ez, ux, uz, w) {
+    const ax = ex + ux * APPROACH.lead, az = ez + uz * APPROACH.lead;
+    const clear = (x0, z0, x1, z1) => {                       // a strip w wide: no water, landmark or other deck on it
+      const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(L)), nx = -(z1 - z0) / (L || 1), nz = (x1 - x0) / (L || 1);
+      for (let i = 0; i <= n; i++) for (const o of [-w / 2, 0, w / 2]) {
+        const x = x0 + (x1 - x0) * i / n + nx * o, z = z0 + (z1 - z0) * i / n + nz * o;
+        const v = ras.get(x, z);
+        if (v === BUILT || v === 255) return false;
+        const dk = T.deckAt(id, x, z, 1);
+        if (dk && dk.f !== f) return false;
+        if (!dk && T.liquidAt(id, x, z)) return false;
+      }
+      return true;
+    };
+    if (!clear(ex, ez, ax, az)) return null;
+    const cand = [], r = APPROACH.max;
+    for (let dz = -r; dz <= r; dz += CELL) for (let dx = -r; dx <= r; dx += CELL) {
+      const v = ras.get(ax + dx, az + dz);
+      if (v !== STREET && v !== SQUARE) continue;
+      const along = dx * ux + dz * uz, d = Math.hypot(dx, dz);
+      if (along < -2 || d > r) continue;                         // in front of the bridge only
+      cand.push([d + 0.6 * Math.abs(dx * uz - dz * ux), ax + dx, az + dz]);   // straight on is better than a dog-leg
+    }
+    cand.sort((p, q) => p[0] - q[0]);
+    for (const [, x, z] of cand) if (clear(ax, az, x, z)) {
+      // run on 2 units into the street, so the two pavements overlap
+      const L = Math.hypot(x - ax, z - az) || 1;
+      return [[ex, ez], [ax, az], [x + (x - ax) / L * 2, z + (z - az) / L * 2]];
+    }
+    return null;
+  }
+
   /* ---------- build ---------- */
   function build(id) {
     if (cache.has(id)) return cache.get(id);
@@ -375,6 +428,7 @@
     for (const dd of city.districts) for (const L of dd.landmarks || []) landmark(city, id, R, ras, L, dd.id);
     const lines = [];
     for (const dd of city.districts) for (const st of streetsOf(id, R, dd, rnd)) { lines.push([dd, st]); city.streets.push(st); ras.line(st.pts, st.w, STREET); }
+    for (const ap of bridgeApproaches(id, R, city, ras)) { city.streets.push(ap); ras.line(ap.pts, ap.w, STREET); if (ap.dist) lines.push([ap.dist, ap]); }
     for (const dd of city.districts) for (const sq of city.squares) if (sq.district === dd.id && !sq.green) squareLots(city, id, R, ras, sq, dd, rnd, inDist(dd));
     phase = '';
     for (const [dd, st] of lines) lineLots(city, id, R, ras, st, dd, rnd, inDist(dd));

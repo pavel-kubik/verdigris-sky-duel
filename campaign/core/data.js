@@ -479,7 +479,7 @@
             { type: 'plateau', x: 190, z: 250, r: 34 }, { type: 'plateau', x: -250, z: 450, r: 60 },
             { type: 'plateau', x: 230, z: 930, r: 34 }, { type: 'plateau', x: 745, z: -230, r: 24 },
             { type: 'road', width: 8, points: [[255, -1190], [245, -1000], [230, -870]] },            // south entry on the east bank -> gate
-            { type: 'road', width: 7, points: [[640, 40], [460, -125], [360, -125], [280, -300], [250, -600], [230, -870]] },
+            { type: 'road', width: 7, points: [[590, -6], [460, -125], [360, -125], [280, -300], [250, -600], [230, -870]] },
             { type: 'road', width: 7, points: [[280, -300], [100, 20], [-150, 212], [-250, 450]] },       // to Holeshwick
             { type: 'bridge', x: 418, z: -125, yaw: -PI / 2, len: 104, width: 10, towers: true },        // Karlsbridge, bank to bank
             { type: 'bridge', x: -150, z: 212, yaw: -0.5, len: 60, width: 7, kind: 'wood' },
@@ -700,7 +700,7 @@
        wagon or the oxen (`oxen` units ahead) costs `burn` hp/s; at 0 it stops and drops its `chest` on the road
        `chestBack` units behind it. Road 1 of the Bend: the Hradchan side, Karlsbridge, the east bank, the castle gate. */
     caravan: {
-      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 6, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
+      tithe: { region: 'bend', road: 1, from: 0.0, to: 1.0, speed: 5.6, wagons: 1, escort: 3, chest: 'tithe', wagonHp: 80 },
       burn: 20, oxen: 5, catchUp: 2, chestBack: 4,
       slots: [[-4, 1], [4, 1], [0, -7]],
     },

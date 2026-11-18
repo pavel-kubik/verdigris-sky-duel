@@ -66,6 +66,7 @@
       walkTop: (x, z) => SE.surfaceAt(town, x, z),
     };
     world = { region, town, townView, castleView, cityView, sol };
+    setTimeout(() => VRender.townMap.groundImage(REGION), 1500);    // the map's ground, ready before the radar is tapped
     return world;
   }
 
@@ -124,6 +125,7 @@
 
   /* ---------- tale start / cards / save ---------- */
   const storyCard = VRender.storyCard.build(document.body, { t });
+  const townMap = VRender.townMap.build($('#tmap'), { t, region: REGION });
   let state = 'intro';
   function begin(kind, restart) {
     $('#loading').hidden = false;
@@ -159,6 +161,7 @@
     $('#top').hidden = !play; $('#stBar').hidden = !play;
     $('#touch').hidden = !(play && isTouch); $('#legend').hidden = !(play && !isTouch);
     $('#arrow').hidden = true; $('#radar').hidden = s !== 'play';
+    if (s !== 'map' && townMap.isOpen) townMap.close();
     if (s === 'intro') renderIntro();
     for (const k in keys) keys[k] = false;
     touch.x = touch.y = 0; touch.run = false;
@@ -201,6 +204,28 @@
     if (!tg) say(t('c.hero.nothing'), 1.2);
   }
 
+  /* ---------- the map of Prahold: tap the radar (or M / Tab); the telling waits while it is open ---------- */
+  function mapScene() {
+    const o = TL.objective(ts), goal = o ? TL.nearestGoal(ts, me.pos[0], me.pos[2]) : null;
+    return {
+      me: { x: me.pos[0], z: me.pos[2], yaw: me.yaw }, goal,
+      npcs: ts.npcs.map(n => ({ x: n.pos[0], z: n.pos[2], need: !!(n.need && !n.talked), follower: n === ts.follower })),
+      guards: ts.guards.map(q => ({ x: q.pos[0], z: q.pos[2], yaw: q.yaw, cone: q.cone, range: q.range * D.tale.walkSight, charmed: q.charmed > 0 })),
+      targets: ts.targets.filter(q => q.hp > 0).map(q => ({ x: q.pos[0], z: q.pos[2], kind: q.kind })),
+      items: ts.items.filter(it => !it.taken).map(it => ({ x: it.pos[0], z: it.pos[2] })),
+    };
+  }
+  function openMap(view) {
+    if (state !== 'play' || storyCard.open || !ts || !me) return;
+    setState('map');
+    $('#tmapHelp').textContent = t(isTouch ? 'c.hero.mapHelpTouch' : 'c.hero.mapHelp');
+    townMap.open(mapScene(), view);
+  }
+  function closeMap() { if (state === 'map') setState('play'); }
+  $('#radar').addEventListener('click', () => openMap());
+  $('#radar').addEventListener('keydown', e => { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); e.stopPropagation(); openMap(); } });
+  $('#tmapClose').addEventListener('click', closeMap);
+
   /* ---------- input ---------- */
   const keys = {}, touch = { x: 0, y: 0, run: false };
   let giftQ = false, jumpQ = false;
@@ -210,8 +235,10 @@
       else if (e.code === 'Escape') storyCard.close();
       e.preventDefault(); return;
     }
+    if (state === 'map') { if (e.code === 'Escape' || e.code === 'KeyM' || e.code === 'Tab') { closeMap(); e.preventDefault(); } return; }
     if (e.code === 'Escape') { if (state === 'play') setState('paused'); else if (state === 'paused') setState('play'); return; }
     if (state !== 'play') return;
+    if ((e.code === 'KeyM' || e.code === 'Tab') && !e.repeat) { e.preventDefault(); openMap(); return; }
     if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'KeyF') && !e.repeat) giftQ = true;
     if (e.code === 'Space' && !e.repeat) jumpQ = true;
     keys[e.code] = true;
@@ -570,5 +597,5 @@
   const direct = params.get('tale');
   if (direct && D.tales[direct]) begin(direct, params.has('restart'));
   else setTimeout(() => { if (!world) { buildWorld(); } }, 400);   // Prahold behind the menu
-  window.__vhero = { get ts() { return ts; }, get me() { return me; }, get world() { return world; }, begin, renderer };
+  window.__vhero = { get ts() { return ts; }, get me() { return me; }, get world() { return world; }, get state() { return state; }, begin, renderer, openMap, closeMap, townMap };
 })();

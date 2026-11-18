@@ -58,7 +58,16 @@ a.btn{color:var(--bone)}
 #arrow{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top,0px));width:56px;height:56px;margin-left:-28px;pointer-events:none;display:grid;place-items:center;z-index:4}
 #arrow svg{width:40px;height:40px;filter:drop-shadow(0 1px 3px #000)}
 #arrow span{position:absolute;top:50px;font-size:12px;font-weight:700;color:var(--gold);text-shadow:0 1px 3px #000;white-space:nowrap}
-#radar{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));top:calc(62px + env(safe-area-inset-top,0px));width:128px;height:128px;border-radius:50%;pointer-events:none;z-index:4;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
+#radar{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));top:calc(62px + env(safe-area-inset-top,0px));width:128px;height:128px;border-radius:50%;cursor:pointer;touch-action:manipulation;z-index:5;filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))}
+#radar:focus-visible{outline:2px solid var(--verd);outline-offset:3px}
+#tmap{position:fixed;inset:0;z-index:15;background:#1d1810}
+#tmapCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#tmapBar{position:absolute;left:calc(8px + env(safe-area-inset-left,0px));right:calc(8px + env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#tmapBar h2{margin:0 auto 0 4px;font:700 22px/1 var(--f-display);color:#f3ead2}
+#tmapBar button{min-height:44px;min-width:44px;padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);font-weight:700}
+#tmapBar button.on{border-color:var(--verd);color:var(--verd)}
+#tmapBar #tmapClose{background:var(--verd);color:#08130d;border:0}
+#tmapHelp{position:absolute;left:0;right:0;bottom:calc(8px + env(safe-area-inset-bottom,0px));text-align:center;color:var(--mute);font-size:13px;pointer-events:none}
 @media (max-width:520px){#radar{width:104px;height:104px;top:calc(var(--objH,78px) + 16px + env(safe-area-inset-top,0px))}}
 #say{position:fixed;left:50%;bottom:calc(178px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(520px,calc(100% - 24px));text-align:center;pointer-events:none;z-index:6}
 #say p{margin:0 auto;display:inline-block;background:rgba(12,19,16,.86);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font:400 17px/1.35 var(--f-display);color:#efe6cf;opacity:0;transition:opacity .4s}
@@ -101,7 +110,7 @@ a.btn{color:var(--bone)}
   <div id="obj" aria-live="polite"><span class="k"></span><span class="t"></span><span class="p"></span></div>
   <button id="pauseBtn" aria-label="Pause">II</button>
 </div>
-<canvas id="radar" hidden width="128" height="128" role="img" aria-label="Radar" data-i18n-attr="aria-label:c.hero.radar"></canvas>
+<canvas id="radar" hidden width="128" height="128" role="button" tabindex="0" aria-label="Radar - open the map" data-i18n-attr="aria-label:c.hero.radarOpen"></canvas>
 <div id="arrow" hidden><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 L33 31 L20 25 L7 31 Z" fill="#d8b25a" stroke="#2a2010" stroke-width="2"/></svg><span></span></div>
 <div id="say"><p></p></div>
 <div id="stBar" hidden><i></i></div>
@@ -114,6 +123,19 @@ a.btn{color:var(--bone)}
     <button id="bRun" data-i18n="c.hero.run">Run</button>
   </div>
 </div>
+
+<section id="tmap" hidden aria-labelledby="tmapTitle">
+  <canvas id="tmapCanvas"></canvas>
+  <div id="tmapBar">
+    <h2 id="tmapTitle" data-i18n="c.hero.mapTitle">Map of Prahold</h2>
+    <button id="tmapAll" data-i18n="c.map.worldBtn">Whole map</button>
+    <button id="tmapHere" data-i18n="c.map.regionBtn">Here</button>
+    <button id="tmapOut" aria-label="Zoom out" data-i18n-attr="aria-label:c.map.zoomOut">-</button>
+    <button id="tmapIn" aria-label="Zoom in" data-i18n-attr="aria-label:c.map.zoomIn">+</button>
+    <button id="tmapClose" data-i18n="c.map.close">Close</button>
+  </div>
+  <p id="tmapHelp"></p>
+</section>
 
 <section id="pause" class="panel" hidden aria-labelledby="pauseTitle">
   <div class="card">
@@ -132,7 +154,7 @@ a.btn{color:var(--bone)}
      '../core/umd.js', '../core/math.js', '../core/events.js', '../core/data.js', '../core/dem-bend.js', '../core/dem-rip.js', '../core/dem-world.js', '../core/terrain.js', '../core/roads.js', '../core/clock.js',
      '../core/settlement.js', '../core/castle.js', '../core/city.js', '../core/hero.js', '../core/tale.js', '../core/quality.js',
      '../render/flora.js', '../render/bridge-view.js', '../render/ruins-view.js', '../render/volcano-view.js', '../render/terrain.js', '../render/settlement-view.js',
-     '../render/castle-kit.js', '../render/castle-view.js', '../render/house-kit.js', '../render/city-view.js', '../render/sky.js', '../render/story-card.js', 'game.js'
+     '../render/castle-kit.js', '../render/castle-view.js', '../render/house-kit.js', '../render/city-view.js', '../render/sky.js', '../render/story-card.js', '../render/town-map.js', 'game.js'
     ].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
   })();
 </script>
