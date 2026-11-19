@@ -51,9 +51,9 @@
         hp: 450, turn: 0.65, cruise: 34, boost: 58, hungerMult: 1.4, spot: 2.3, carry: 3, breach: true },
     ],
     growthCap: { food: 4799, growth: 0.84 },             // food XP stops under the Elder line (Phase 6)
-    /* Phase 4 T03: the chase camera's distance and height grow with scale ^ scaleDist (all stages; 0.75 as before T03),
+    /* Phase 4 T03: the chase camera's distance and height grow with scale ^ scaleDist (0.75 before T03: a Wyrm filled the phone screen),
        its clearance over the terrain with scale ^ clearDist x clear (a Wyrm keeps its camera out of the hills) */
-    camera: { scaleDist: 0.75, clear: 3, clearDist: 1 },
+    camera: { scaleDist: 0.85, clear: 3, clearDist: 1 },
 
     hunger: {
       max: 100, start: 80,

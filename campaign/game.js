@@ -17,7 +17,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't303.1 2026-11-19 wyrm stage: stage row, growth cap, camera by scale, grow-to-wyrm debug';
+  const BUILD = 't303.2 2026-11-19 wyrm stage: stage row, growth cap, camera by scale, grow-to-wyrm debug';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */

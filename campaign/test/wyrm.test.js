@@ -49,7 +49,7 @@ ok(st.hpMax === 450 && st.carry === 3 && st.turn < G.statsOf(1).turn && st.hunge
   ok(G.camFloor(10, 3.4) - 10 >= D.camera.clear * 3.4 - 1e-9, 'a wyrm keeps its camera at least clear x scale over the ground');
   // a full wyrm's chase camera (22 back, 7 up, x camK) never sits under its own floor: the floor wins over a hill
   const k = G.camK(3.4);
-  ok(22 * k < 60 && 7 * k > D.camera.clear, 'wyrm camera distance stays in a sane range (' + (22 * k).toFixed(1) + ' back)');
+  ok(22 * k < 80 && 7 * k > D.camera.clear, 'wyrm camera distance stays in a sane range (' + (22 * k).toFixed(1) + ' back)');
 }
 
 /* carry: a cow and a size 3 load */
