@@ -1337,7 +1337,7 @@
   function rest() { onEvents(ST.lairRest(cs)); renderLair(); }
   /* ?debug actions: a hotkey on desktop, a button on touch (listed in the debug panel). [key, what, code, button] */
   // region jumps: keys 4 / 5 / 6, Shift+4 for the 4th region (Digit7+ are taken by sight / time / to post)
-  const DBG_REGION_KEYS = [['4', 'Digit4'], ['5', 'Digit5'], ['6', 'Digit6'], ['Shift+4', 'ShiftDigit4']];
+  const DBG_REGION_KEYS = [['4', 'Digit4'], ['5', 'Digit5'], ['6', 'Digit6'], ['Shift+4', 'ShiftDigit4'], ['Shift+L', 'ShiftKeyL']];   // Phase 4 T05: + the Highland Pass
   const DEBUG_KEYS = [
     ['N', '+100 food (hunger + growth)', 'KeyN', '+100 food'], ['J', 'hunger +25 (no growth)', 'KeyJ', 'hunger +25'],
     ['Home', 'hunger -25', 'Home', 'hunger -25'], ['K', 'damage 20 HP (0 HP = death)', 'KeyK', '-20 HP'],

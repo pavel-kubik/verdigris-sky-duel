@@ -4,20 +4,161 @@
   "out": "campaign/core/dem-pass.js",
   "title": "Highland Pass",
   "tile": "N50E014",
-  "crop": { "lon": [14.32, 14.45], "lat": [50.0, 50.08] },
-  "projection": { "lon0": 14.385, "lat0": 50.040, "metresPerUnit": 3.6 },
-  "grid": { "radius": 1200, "cell": 10, "base": 170 },
+  "crop": {
+    "lon": [
+      14.32,
+      14.45
+    ],
+    "lat": [
+      50.0,
+      50.08
+    ]
+  },
+  "projection": {
+    "lon0": 14.385,
+    "lat0": 50.04,
+    "metresPerUnit": 3.6
+  },
+  "grid": {
+    "radius": 1200,
+    "cell": 10,
+    "base": 170
+  },
   "river": {
-    "start": { "zBelow": -1100, "xNear": -350, "xWithin": 350 },
-    "goal": { "zAbove": 950, "xBelow": -100, "minRadius": 1050 },
-    "costScale": 6.0, "maxDist": 170, "aboveLevel": 1.2, "smooth": 4, "simplify": 12
+    "start": {
+      "zBelow": -1100,
+      "xNear": -350,
+      "xWithin": 350
+    },
+    "goal": {
+      "zAbove": 950,
+      "xBelow": -100,
+      "minRadius": 1050
+    },
+    "costScale": 6.0,
+    "maxDist": 170,
+    "aboveLevel": 1.2,
+    "smooth": 4,
+    "simplify": 12
   },
   "preview": {
     "exag": 2.0,
     "out": "ai_sdlc/001_campaign/img/pass-terrain.png",
-    "places": []
+    "label": {
+      "text": "Veltava",
+      "at": [
+        -300,
+        -700
+      ],
+      "rotate": 80
+    },
+    "entry": {
+      "text": "from the Farmlands (west)",
+      "at": [
+        1000,
+        0
+      ]
+    },
+    "places": [
+      [
+        "Maidenhold",
+        -90,
+        325,
+        "order"
+      ],
+      [
+        "Toll fort",
+        290,
+        -115,
+        "order"
+      ],
+      [
+        "Hlubowick viaducts",
+        230,
+        15
+      ],
+      [
+        "Prokop Gorge",
+        500,
+        -20
+      ],
+      [
+        "Barrand Cliffs",
+        -215,
+        -330
+      ],
+      [
+        "Chuchel",
+        -130,
+        -700
+      ],
+      [
+        "Jinonice",
+        720,
+        -120
+      ],
+      [
+        "Branick",
+        -520,
+        -230
+      ],
+      [
+        "Zlichov chapel",
+        -370,
+        650
+      ],
+      [
+        "to the Bend (NE)",
+        -560,
+        900
+      ]
+    ]
   },
   "names": [
-    ["Highland Pass", "Horský průsmyk", "Barrandov - Prokop valley"]
+    [
+      "Highland Pass",
+      "Horský průsmyk",
+      "Barrandov - Prokop valley"
+    ],
+    [
+      "Barrand Cliffs",
+      "Barrandské skály",
+      "Barrandovské skály"
+    ],
+    [
+      "Prokop Gorge",
+      "Prokopova soutěska",
+      "Prokopské údolí"
+    ],
+    [
+      "Hlubowick viaducts",
+      "Hlubočínské viadukty",
+      "Hlubočepské viadukty"
+    ],
+    [
+      "Maidenhold",
+      "Dívčín",
+      "Dívčí hrady"
+    ],
+    [
+      "Zlichov rock chapel",
+      "kaple na Zlíchovské skále",
+      "kostel sv. Filipa a Jakuba, Zlíchov"
+    ],
+    [
+      "Chuchel",
+      "Chuchel",
+      "Velká Chuchle"
+    ],
+    [
+      "Jinonice",
+      "Jinonice",
+      "Jinonice"
+    ],
+    [
+      "Branick",
+      "Braník",
+      "Braník"
+    ]
   ]
 }

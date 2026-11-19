@@ -53,6 +53,14 @@ node campaign/test/run.js                   # dem.test.js checks the module agai
 - Checked: Vyšehrad rock 236 m, Petřín 326 m, Letná 229 m, Vítkov 253 m, river 175-190 m.
 - The game exaggerates heights 1.6x (`regions.bend.terrain.exag` in `campaign/core/data.js`) so hills read on a phone.
 
+## Highland Pass (`regions/pass.json`, Phase 4 T05)
+
+- Crop 14.32-14.45 E, 50.00-50.08 N (the tile starts at 50.0 N); projection around 14.385 E, 50.040 N at 3.6 m per unit;
+  grid 241 x 241 every 10 units, radius 1200.
+- River traced from the south edge (Velka Chuchle) to the north-east edge (Zlichov / Smichov), along the east side.
+- Checked: Divci hrady (Maidenhold) top about 332 m, Prokop valley floor at the mouth about 215 m, river about 187 m.
+- The game exaggerates heights 2.0x (`regions.pass.terrain.exag`) so the Barrandov cliffs read on a phone.
+
 ## Adding a region
 
 1. Add the tile to `sources.json` if it is new (any SRTM-format 1 arc second tile works), run `fetch_sources.py`.
