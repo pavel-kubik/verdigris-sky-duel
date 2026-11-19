@@ -11,6 +11,8 @@
  *   - T06: burned pieces follow the town (kit.setBurn): charred stone pieces dark and roofless, ruined wooden ones
  *     (hall, workshop, stables) hidden (settlement-view draws their rubble); the hall's smoke stops while it is a ruin.
  *     burnOf(town, place, type, x, z) maps a kit instance (local frame) to its town building's state (core-free, tested).
+ *   - Phase 4 T06: a template with yardNet (Maidenhold) gets a chain net over its yard (one transparent mesh, hidden
+ *     while the place has netDown).
  * The LOD rule is core/castle.js lodFor (tested in Node).
  */
 (function (root) {
@@ -115,6 +117,36 @@
     return [hall.x + at[0] * c + at[2] * s, at[1], hall.z - at[0] * s + at[2] * c];
   }
 
+  /** Phase 4 T06: chain-link texture (canvas, transparent between the links), shared by every yard net. */
+  let chainTex = null;
+  function chainTexture() {
+    if (chainTex || typeof document === 'undefined') return chainTex;
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.strokeStyle = 'rgba(200,200,205,1)'; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 64); g.moveTo(64, 0); g.lineTo(0, 64); g.stroke();
+    g.strokeStyle = 'rgba(90,90,96,1)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 64); g.moveTo(64, 0); g.lineTo(0, 64); g.stroke();
+    chainTex = new THREE.CanvasTexture(c);
+    chainTex.wrapS = chainTex.wrapT = THREE.RepeatWrapping;
+    chainTex.repeat.set(1 / 5, 1 / 5);           // one link diamond every 5 units
+    return chainTex;
+  }
+
+  /** Phase 4 T06: the chain net over a yardNet castle's yard (Maidenhold): one transparent mesh over the wall polygon
+   *  at the wall walk + data.castle.yardNet.up, in the castle's local frame (the kit group). */
+  function yardNet(def) {
+    const Y = D.castle.yardNet, shape = new THREE.Shape();
+    def.walls.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));
+    const geo = new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2).translate(0, D.buildings.wall.walkTop + Y.up, 0);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, map: chainTexture(), transparent: true, opacity: Y.opacity,
+                                              side: THREE.DoubleSide, depthWrite: false, alphaTest: 0.05 });
+    if (!mat.map) mat.color.setHex(Y.color);
+    const m = new THREE.Mesh(geo, mat);
+    m.name = 'castle:yardNet';
+    return m;
+  }
+
   function build(town, opts) {
     opts = opts || {};
     const group = new THREE.Group(); group.name = 'castles';
@@ -131,7 +163,9 @@
       const keep = L.buildings.find(b => b.type === 'keep');
       const signal = keep ? signalFire([keep.x, keep.h + 12, keep.z]) : null;   // over the keep's lead roof (apex h + 11)
       if (signal) kit.group.add(signal.pts);                                 // both LODs: the alarm shows far out
-      list.push({ place: pl, kit, smoke, signal, lod: 'full', gate: 0 });
+      const def = D.settlements[pl.type], net = def && def.yardNet ? yardNet(def) : null;   // Phase 4 T06: Maidenhold
+      if (net) kit.group.add(net);
+      list.push({ place: pl, kit, smoke, signal, net, lod: 'full', gate: 0 });
     }
     let night = -1;
     function update(dt, o) {
@@ -164,17 +198,18 @@
             c.kit.setBurn((type, x, z) => burnOf(c.burnMap.get(type + ':' + x + ':' + z)));
           }
           if (c.smoke) c.smoke.pts.visible = !(c.hallB && c.hallB.ruin);
+          if (c.net) { const own = tw.places.find(p => p.id === c.place.id); c.net.visible = !(own && own.netDown); }   // T09 breach takes it down
         }
       }
       if (Math.abs(nt - night) > 0.01) night = nt;
     }
     function info() {
       let calls = 0, tris = 0;
-      for (const c of list) if (c.kit.group.visible) { const i = c.kit.info(); calls += i.calls + (c.lod === 'full' && c.smoke ? 1 : 0) + (c.signal && c.signal.pts.visible ? 1 : 0); tris += i.tris; }
+      for (const c of list) if (c.kit.group.visible) { const i = c.kit.info(); calls += i.calls + (c.lod === 'full' && c.smoke ? 1 : 0) + (c.signal && c.signal.pts.visible ? 1 : 0) + (c.net && c.net.visible ? 1 : 0); tris += i.tris; }
       return { castles: list.length, calls, tris, lod: list.map(c => c.lod).join(',') };
     }
     function dispose() {
-      for (const c of list) { if (c.smoke) c.smoke.dispose(); if (c.signal) c.signal.dispose(); c.kit.dispose(); }
+      for (const c of list) { if (c.smoke) c.smoke.dispose(); if (c.signal) c.signal.dispose(); if (c.net) { c.net.geometry.dispose(); c.net.material.dispose(); } c.kit.dispose(); }
       list.length = 0;
       group.parent && group.parent.remove(group);
     }

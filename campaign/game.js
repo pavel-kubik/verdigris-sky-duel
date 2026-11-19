@@ -17,7 +17,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't305.1 2026-11-19 Highland Pass: real terrain, viaducts, exits';
+  const BUILD = 't306.1 2026-11-19 Maidenhold and the pass settlements';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -2080,7 +2080,7 @@
       L.push('        hp ' + f1(dragon.hp) + '/' + stats.hpMax + '  fire ' + Math.round(pilot.st));
       L.push('        hunger ' + f1(dragon.hunger) + ' ' + e.state);
       L.push('        speed ' + f1(pilot.speed) + '  alt ' + f1(F.altitude(pilot, regionId)) + '  r ' + Math.round(Math.hypot(pilot.pos[0], pilot.pos[2])));
-      const lc = (pilot.mode || 'air') === 'air' ? (s => WK.canLand(pilot, regionId, s.solidAt, s.walkTop))(ST.solids(cs, heroScale)) : null;
+      const lc = (pilot.mode || 'air') === 'air' ? (s => WK.canLand(pilot, regionId, s.solidAt, s.walkTop, s.netAt))(ST.solids(cs, heroScale)) : null;
       L.push('MOVE    ' + (pilot.mode || 'air') + (lc ? '  land ' + (lc.ok ? 'ok' : 'no: ' + lc.why) : '') + '  slope ' + f2(TR.surfaceSlope(regionId, pilot.pos[0], pilot.pos[2])) + '  legs ' + f2(heroPose.ground || 0) + ' wings ' + f2(heroPose.fold || 0) + ' stride ' + f2(heroPose.stride || 0));
       if (dbgShapes || dbgPick) {                                 // Phase 4 T01: ground probe under the dragon, shapes near, city rejects
         const town = cs.town && cs.town.region === regionId ? cs.town : null, pr = SH.probeLines(SH.probe(regionId, pilot.pos[0], pilot.pos[2], town));

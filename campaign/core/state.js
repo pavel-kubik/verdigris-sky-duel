@@ -158,13 +158,15 @@
     const CI = M.need('city');                                  // the houses of Prahold and the villages (core/city.js)
     if (!D.regions[cs.region] || !D.regions[cs.region].city) {
       return { solidAt: (x, z) => SE.solidAt(town, x, z, pad), solidHit: (x, z) => SE.hit(town, x, z, pad),
-               walkTop: (x, z) => SE.surfaceAt(town, x, z) };        // T03: wall walks and bastion tops are landable
+               walkTop: (x, z) => SE.surfaceAt(town, x, z),           // T03: wall walks and bastion tops are landable
+               netAt: (x, z) => SE.netAt(town, x, z) };               // Phase 4 T06: Maidenhold's yard net
     }
     const rid = cs.region;
     return {
       solidAt: (x, z) => { const a = SE.solidAt(town, x, z, pad), b = CI.solidAt(rid, x, z, pad); return a == null ? b : b == null ? a : Math.max(a, b); },
       solidHit: (x, z) => { const a = SE.hit(town, x, z, pad), b = CI.hit(rid, x, z, pad); return !a ? b : !b ? a : (b.depth > a.depth ? b : a); },
       walkTop: (x, z) => SE.surfaceAt(town, x, z),
+      netAt: (x, z) => SE.netAt(town, x, z),
     };
   }
 
@@ -391,7 +393,7 @@
       carried = carriedPrey(cs);
     }
 
-    cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt, sol.walkTop).ok;                // the Move slot offers Land (controls.slots)
+    cs.landOk = air && WK.canLand(p, cs.region, sol.solidAt, sol.walkTop, sol.netAt).ok;                // the Move slot offers Land (controls.slots)
     const aerieNear = air && AE.near(cs);
     if (cs.carriedLoot) cs.hint = LR.near(cs) ? 'lairBank' : aerieNear ? 'aerieBank' : 'lootCarry';   // T19: take it home
     else if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : lootFront.best ? 'lootGrab' : lootFront.heavy ? 'lootHeavy' : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
@@ -500,7 +502,7 @@
   /** Land / Fly one-shot: lands when allowed (else says why), takes off on the ground (else says why). */
   function landToggle(cs, p, stats, eff, ev, sol) {
     if (p.mode === 'air') {
-      const c = WK.canLand(p, cs.region, sol && sol.solidAt, sol && sol.walkTop);
+      const c = WK.canLand(p, cs.region, sol && sol.solidAt, sol && sol.walkTop, sol && sol.netAt);
       if (c.ok) { WK.startLanding(p); cs.swoop = null; emit(cs, ev, { e: 'dragon:landing', noise: D.land.noise }); }
       else emit(cs, ev, { e: 'land:refused', why: c.why });
     } else if (p.mode === 'ground') {

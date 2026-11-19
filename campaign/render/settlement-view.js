@@ -81,7 +81,25 @@
     platform: () => merge([[box(7.4, 3.4, 7.4), COL.wood], [box(8, 0.4, 8, 0, 3.4), COL.darkWood],
                            [box(0.5, 0.8, 4.4, 0, 3.8, 0.4), COL.darkWood], [box(4.2, 0.3, 0.4, 0, 4.4, 2.2), COL.darkWood], [box(0.2, 0.2, 3.2, 0, 4.7, 0.8), COL.iron]]),
     palisade: () => merge([[box(1.5, 5.2, 1), COL.log], [box(1.1, 0.8, 1, 0, 5.2), COL.logTop]]),
+    // Phase 4 T06: the pass settlements. netter: a timber tower with a swivel arm and a rolled net; tollhouse: stone toll
+    // house with a toll bar across its door; rockchapel: a small stone chapel with one spire on its rock; stables: the
+    // ring forts' stables (the castle kit draws its own inside castle walls)
+    netter: () => merge([[box(0.6, 6, 0.6, -2.6, 0, -2.6), COL.wood], [box(0.6, 6, 0.6, 2.6, 0, -2.6), COL.wood], [box(0.6, 6, 0.6, -2.6, 0, 2.6), COL.wood],
+                         [box(0.6, 6, 0.6, 2.6, 0, 2.6), COL.wood], [box(7, 0.6, 7, 0, 6), COL.darkWood], [box(0.8, 1.6, 0.8, 0, 6.6), COL.darkWood],
+                         [box(0.5, 0.5, 5.2, 0, 8.2, 1.2).rotateX(-0.35), COL.wood], [cyl(1, 1, 1.4, 6, 0, 8.6, 3.2), COL.iron],
+                         [box(1.8, 1, 0.05, 0, 4.2, 3.0), COL.order]]),
+    tollhouse: () => merge([[box(9, 5.4, 8), COL.stone], [gable(10, 3, 9, 5.4), COL.slate], [box(2, 3, 0.2, 0, 0, 4.05), COL.iron],
+                            [box(0.5, 1.4, 0.5, 3.6, 0, 6.2), COL.darkWood], [box(8, 0.35, 0.35, -0.4, 1.3, 6.2), COL.order],
+                            [box(1.6, 1.1, 0.05, 0, 6.4, 4.4), COL.order], [box(1.2, 0.6, 0.4, -3, 0, 4.4), COL.gold]]),
+    rockchapel: () => merge([[box(6.4, 6, 9), COL.stone], [gable(7.2, 3.6, 9.8, 6), COL.slate], [box(3.4, 9.4, 3.4, 0, 0, -4.4), COL.stone],
+                             [pyr(2.6, 9, 9.4, 4).translate(0, 0, -4.4), COL.slate], [box(0.2, 2, 0.2, 0, 18.4, -4.4), COL.darkWood],
+                             [box(1.2, 0.2, 0.2, 0, 19.6, -4.4), COL.darkWood], [box(1.6, 2.6, 0.2, 0, 0, 4.55), COL.darkWood],
+                             [cyl(0.9, 0.9, 0.2, 8, 0, 6.4, 4.5), COL.gold]]),
+    stables: () => merge([[box(11.4, 1, 6.4), COL.darkStone], [box(11, 3.2, 6, 0, 1), COL.wood], [gable(12.2, 2.6, 7, 4.2), COL.thatch],
+                          [box(2.2, 2.4, 0.15, -3.6, 1, 3.03), COL.darkWood], [box(2.2, 2.4, 0.15, 0, 1, 3.03), COL.darkWood],
+                          [box(2.2, 2.4, 0.15, 3.6, 1, 3.03), COL.darkWood]]),
   };
+  const KIT_TYPES = { stables: true };   // T06: drawn by the castle kit inside castle walls (render/castle-kit.js)
   COL.char = 0x2a2420; COL.ash = 0x4a4440; COL.ember = 0x7a2e14;
   /** Rubble for every ruin (T13): charred blocks, a fallen beam and a stump of wall on a 5-radius footprint, scaled
    *  to the building's r (palisade pieces: along their length). */
@@ -197,7 +215,9 @@
     function sync(t) {
       current = t; drawn = 0;
       const byType = {};
-      for (const b of (t && t.buildings) || []) (byType[b.type] = byType[b.type] || []).push(b);
+      const kitPl = {};
+      for (const pl of (t && t.places) || []) if (pl.castle) kitPl[pl.id] = true;
+      for (const b of (t && t.buildings) || []) if (!(KIT_TYPES[b.type] && kitPl[b.place])) (byType[b.type] = byType[b.type] || []).push(b);
       for (const type of Object.keys(MODELS)) {
         const list = byType[type] || [];
         let m = meshes[type];

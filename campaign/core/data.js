@@ -328,6 +328,12 @@
       workshop:  { r: 8,  h: 8,  hp: 140, order: true, target: 'workshop' },
       stables:   { r: 7,  h: 6,  hp: 100, order: true },
       well:      { r: 2,  h: 2,  hp: 0 },
+      // Phase 4 T06 (004 spec 4.3): Maidenhold and the pass settlements. netter: a wooden net launcher platform (its
+      // 'netter' post and crew come with T08 nets); rockchapel: the Zlichov chapel on its rock (civil: burning it costs
+      // Renown, T11); stables: knights: how many knights a stable sends (T07 knights)
+      netter:    { r: 4,  h: 7,  hp: 120, order: true },
+      tollhouse: { r: 6,  h: 8,  hp: 140, order: true, loot: ['tithe'] },
+      rockchapel: { r: 5, h: 10, hp: 120, civil: true, stone: true, woodHp: 60, spires: 1, spireH: 22 },
     },
     /* Vyshgard Castle (Phase 3 T01): the look and the kit; layout in settlements.castle, piece list from core/castle.js.
        lod: full kit inside `near`, merged silhouette out to `far`. lights: emissive torches and windows, no real lights. */
@@ -343,6 +349,7 @@
       lod: { near: 280, far: 1000, band: 20 },          // T04: full kit inside near, silhouette to far, +-band hysteresis
       smoke: { puffs: 14, life: 7, rise: 26, drift: 9, size: 6, alpha: 0.5 },   // T04: chimney smoke from the great hall
       lights: { torches: 16, windows: true },
+      yardNet: { up: 4, color: 0x3a3a3a, opacity: 0.55 },   // Phase 4 T06: Maidenhold's chain net, walkTop + up over the yard
     },
     palisade: { piece: 6, radius: 1, gate: 12 },
     // Phase 3 T16 (003 5.7): settlements that can be freed (every Order building burned out and its archers dead at once)
@@ -371,7 +378,21 @@
                   corners: ['bastion', 'ctower', 'bastion', 'gatehouse', 'gatehouse', 'bastion', 'ctower', 'bastion'],
                   buildings: [['keep', -36, 0], ['chapel', 8, 12], ['rotunda', 40, -22], ['hall', 10, -18], ['workshop', 42, 18],
                               ['stables', -14, 26], ['well', 26, 0]],
-                  archers: 10, peasants: 4 },
+                  archers: 10, peasants: 4, knights: 3 },
+      // Phase 4 T06: Maidenhold, the Order's cliff fortress on the promontory over the Prokop Gorge (castle kit, smaller
+      // and taller than Vyshgard). Same frame as the castle: local +X = the gate side (in the pass: west, toward the gold
+      // road from the big viaduct), the cliff on local -X (east, the river). yardNet: a chain net over the yard at the
+      // wall walk + castle.yardNet.up - landing inside the walls is refused ('net', settlement.netAt) until a breach (T09).
+      fortress: { walls: [[-48, -30], [10, -40], [56, -14], [57, 14], [10, 40], [-46, 32]],
+                  corners: ['bastion', 'ctower', 'gatehouse', 'gatehouse', 'bastion', 'ctower'],
+                  buildings: [['keep', -24, 0], ['chapel', 14, 18], ['hall', 16, -18], ['stables', -16, 22], ['netter', 34, 0],
+                              ['netter', -20, -20]],
+                  yardNet: true, archers: 8, netters: 2, knights: 4, peasants: 0 },
+      // the toll fort beside the big viaduct: a palisade ring with the toll house, a watchtower, a net launcher and stables
+      // (spec 4.3 named a stone ctower; the ring forts use the timber watchtower like the outposts)
+      tollfort: { buildings: [['tollhouse', 0, 0], ['tower', 13, 7], ['netter', -12, 8], ['stables', -5, -13]],
+                  ring: [22, 12], archers: 3, netters: 1, knights: 2 },
+      chapelRock: { buildings: [['rockchapel', 0, 0]], peasants: 2 },
     },
 
     regions: {
@@ -567,8 +588,8 @@
          (Divci hrady) north of the gorge mouth. minGrowth: the region's own gate on top of the exits' minStage (a late
          Drake, 000_spec.md 7). Spots picked from the bake: Maidenhold top ~332 m, gorge floor ~216 m, rims ~285-305 m,
          river ~187 m. bridge kind 'viaduct': a stone deck on tall piers between the gorge rims (render/bridge-view.js);
-         road: false = no road on the deck. Settlements (fortress, toll fort, Chuchel, Jinonice, Branick, Zlichov) come
-         with T06; their plateaus are here already. */
+         road: false = no road on the deck. Settlements (fortress, toll fort, Chuchel, Jinonice, Branick, Zlichov) are
+         built in T06 on these plateaus (Maidenhold: the castle kit with a chain net over its yard). */
       pass: {
         nameKey: 'c.region.pass', radius: 1200, seed: 71, ceiling: 380, palette: 'pass',
         minGrowth: 0.45,
@@ -593,7 +614,14 @@
         flora: { trees: 650, rocks: 160, fields: 8 },
         herds: [{ type: 'deer', count: 2, ring: [500, 1150] }, { type: 'boar', count: 2, ring: [600, 1150] },
                 { type: 'goat', count: 2, ring: [300, 900] }],                                                         // goats on the cliffs
-        settlements: [],
+        settlements: [                                                                                  // T06, on the T05 plateaus
+          { type: 'fortress',   x: -90, z: 325,  yaw: 0, name: 'maidenhold' },                           // gate west (+X) to the gold road, cliff east
+          { type: 'tollfort',   x: 290, z: -115, yaw: 0, name: 'tollfort' },                             // gate north (+Z), to the big viaduct
+          { type: 'village',    x: -130, z: -700, yaw: 0.3, name: 'chuchel' },
+          { type: 'hamlet',     x: 720, z: -120, yaw: 1.2, name: 'jinonice' },
+          { type: 'hamlet',     x: -520, z: -230, yaw: -1.4, name: 'branick' },
+          { type: 'chapelRock', x: -370, z: 650, yaw: -PI / 2, name: 'zlichov' },
+        ],
         exits: [{ to: 'farm', angleFrom: PI / 2 - 0.5, angleTo: PI / 2 + 0.5 }, { to: 'bend', angleFrom: -0.75, angleTo: 0.15 }],
         entries: { farm: { angle: PI / 2 }, bend: { angle: -0.4 } },                                     // west from the Farmlands, north-east down the river from the Bend
       },
