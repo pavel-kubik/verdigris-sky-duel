@@ -9,7 +9,7 @@
   const $ = s => document.querySelector(s);
   const t = (k, p) => (window.I18N ? I18N.t(k, p) : k);
   if (!window.THREE || !window.VCamp || !window.VDragon || !window.VRender) { $('#loading').textContent = t('c.engineFail'); return; }
-  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog'), SY = C.need('story'), GU = C.need('guise'), CI = C.need('city');
+  const C = window.VCamp, D = C.need('data'), F = C.need('flight'), TR = C.need('terrain'), G = C.need('growth'), HN = C.need('hunger'), PR = C.need('prey'), MT = C.need('math'), ST = C.need('state'), RG = C.need('region'), LR = C.need('lair'), SV = C.need('save'), CT = C.need('controls'), MO = C.need('mother'), WK = C.need('walk'), NV = C.need('nav'), PC = C.need('perception'), CV = C.need('cave'), SE = C.need('settlement'), DF = C.need('defenders'), AL = C.need('alert'), LT = C.need('loot'), UP = C.need('upgrades'), CK = C.need('clock'), TP = C.need('tips'), AE = C.need('aerie'), MP = C.need('map'), MS = C.need('missions'), RL = C.need('relics'), CA = C.need('caravan'), ML = C.need('msglog'), SY = C.need('story'), GU = C.need('guise'), CI = C.need('city'), KN = C.need('knights');
   const V3 = THREE.Vector3;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -17,7 +17,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't303.2 2026-11-19 wyrm stage: stage row, growth cap, camera by scale, grow-to-wyrm debug';
+  const BUILD = 't307.1 2026-11-19 knights: stables, charge, lance, grab and drop';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -880,6 +880,12 @@
       else if (e.e === 'breath:blocked') flashPrompt(t('c.breath.' + e.why), 2.2);
       else if (e.e === 'dragon:landed') shake = Math.max(shake, 0.25 * heroScale);
       else if (e.e === 'prey:tooHeavy') flashPrompt(t('c.prompt.tooHeavy'), 2.2);
+      // Phase 4 T07: knights
+      else if (e.e === 'knights:called') toast(t('c.toast.knights', { n: e.n }), t('c.toast.knightsSub'), 3);
+      else if (e.e === 'knight:lance') { hero.flash = Math.max(hero.flash || 0, 0.5); hurt = Math.max(hurt, 0.6); shake = Math.max(shake, 0.3); flashPrompt(t('c.prompt.lance'), 2); }
+      else if (e.e === 'knight:killed') flashPrompt(t(e.cause === 'fall' ? 'c.prompt.knightFell' : 'c.prompt.knightBurned'), 2);
+      else if (e.e === 'knight:grabbed') flashPrompt(t(padUi ? 'c.prompt.knightGrabbedTouch' : 'c.prompt.knightGrabbed'), 2.5);
+      else if (e.e === 'knight:tooHeavy') flashPrompt(t('c.prompt.knightHeavy'), 2.2);
       else if (e.e === 'loot:taken' && e.relic) { flashPrompt(null); toast(t('c.toast.relicTaken', { relic: lootName(e) }), t('c.toast.relicTakenSub'), 3.5, 'mission'); }   // Phase 3 T12
       else if (e.e === 'loot:taken') { flashPrompt(null); toast(t('c.toast.lootTaken', { loot: lootName(e) }), t('c.toast.lootTakenSub'), 3); }   // T19
       else if (e.e === 'relic:banked') { goldPulse = 2; if (e.at === 'aerie') aerieMsg(t('c.trophy.bankedAerie', { relic: lootName(e) })); toast(t('c.toast.relicBanked', { relic: lootName(e) }), t('c.toast.relicBankedSub'), 3.5, 'mission'); }   // Phase 3 T12
@@ -1000,6 +1006,8 @@
     else if (cs.hint === 'grab') text = pilot.mode === 'ground' ? t(padUi ? 'c.prompt.pickupTouch' : 'c.prompt.pickup', { prey: t('c.prey.' + ((PR.byId(cs.field, cs.target) || {}).type || 'goat')) }) : t(padUi ? 'c.prompt.grabTouch' : 'c.prompt.grab');
     else if (cs.hint === 'swoop') text = cs.swoop != null ? t('c.prompt.swooping') : t(padUi ? 'c.prompt.swoopTouch' : 'c.prompt.swoop');
     else if (cs.hint === 'heavy') text = t(padUi ? 'c.prompt.heavyTouch' : 'c.prompt.heavy');
+    else if (cs.hint === 'knightGrab') text = t(padUi ? 'c.prompt.knightGrabTouch' : 'c.prompt.knightGrab');   // Phase 4 T07
+    else if (cs.hint === 'knightDrop') text = t(padUi ? 'c.prompt.knightDropTouch' : 'c.prompt.knightDrop');
     else if (cs.hint === 'near') text = t('c.prompt.near');
     else if (cs.hint === 'land') text = t(padUi ? 'c.prompt.landTouch' : 'c.prompt.land');
     else if (cs.hint === 'walk') text = t(padUi ? 'c.prompt.walkTouch' : 'c.prompt.walk');
@@ -1364,6 +1372,8 @@
     [']', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'BracketRight', 'alert +1'],
     ['[', 'alert to 0 in this region', 'BracketLeft', 'calm alert'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
+    ['Shift+H', 'knights: the nearest stables with riders send them at the dragon now (Vyshgard in the Veltava Bend), Phase 4 T07', 'ShiftKeyH', 'knights'],
+    ['Shift+X', 'land near Vyshgard: on the ground outside the castle wall on the stables side, 110 from its centre, facing it; the alarm calls the knights (Phase 4 T07)', 'ShiftKeyX', 'to knights'],
     ['.', 'fly to the next livestock pen (60 out, 25 up, facing it)', 'Period', 'to pen'],
     [',', 'stand on the ground in front of the next loot item of this region (tithe chest / strongbox), facing it', 'Comma', 'to loot'],
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
@@ -1392,7 +1402,7 @@
     ['`', 'hide / show this panel', 'Backquote', null],
   ];
   let cornView = null;                                           // corn fields and popcorn (render/corn-view.js)
-  let watchView = null, watchShow = true, defView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
+  let watchView = null, watchShow = true, defView = null, knightView = null;                        // T14: perception debug view (render/watch-view.js), key / button 7
   let dbgShapes = false, dbgPick = false, dbgShapesT = 0, shapeView = null, shapeList = null, shapeKey = '', lastPick = null, pickEl = null;   // Phase 4 T01: blocks overlay + pick
   let fastTime = false;                                          // T21: debug / - the clock runs x40
   let dbgMission = -1;                                           // T10: catalogue index of the last Shift+3 accept
@@ -1577,6 +1587,19 @@
     if (code === 'ShiftKeyP') { dbgPick = !dbgPick; if (!dbgPick) pickCard(null); flashPrompt(t(dbgPick ? (isTouch ? 'c.dbg.pickOnTouch' : 'c.dbg.pickOn') : 'c.dbg.pickOff'), 1.8); return; }
     if (code === 'Backslash') { TP.reset(cs); cs.tipT = D.tips.gap; flashPrompt(t('c.dbg.tips'), 1.5); }   // T23
     if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
+    if (code === 'ShiftKeyH') {                                  // Phase 4 T07: call the knights now
+      const ev = cs.inLair ? [] : KN.call(cs, [pilot.pos[0], pilot.pos[2]], 'debug');
+      if (!ev.length) flashPrompt(t('c.dbg.noKnights'), 1.8); else onEvents(ev);
+    }
+    if (code === 'ShiftKeyX') {                                  // Phase 4 T07: land near Vyshgard on the stables side
+      if (regionId !== 'bend' || cs.inLair) flashPrompt(t('c.dbg.notBend'), 1.8);
+      else {
+        const st = cs.town.buildings.find(b => b.type === 'stables'), c = cs.town.places.find(p => p.castle);
+        const a = Math.atan2(st.pos[0] - c.x, st.pos[2] - c.z), x = c.x + Math.sin(a) * 110, z = c.z + Math.cos(a) * 110;
+        Object.assign(pilot, { mode: 'ground', tr: null, pos: [x, TR.surfaceAt(regionId, x, z) + D.walk.stand * ST.scaleOf(cs), z], yaw: a + Math.PI, pitch: 0, speed: 0, vel: [0, 0, 0] });
+        snapCam(); flashPrompt(t('c.dbg.toKnights'), 2.5);
+      }
+    }
     if (code === 'Equal' && !cs.inLair) {                        // T16: cross the front of the next ballista, already seen
       const list = ((cs.squad && cs.squad.list) || []).filter(v => v.kind === 'ballista' && v.alive);
       if (!list.length) flashPrompt(t('c.dbg.noBallista'), 1.5);
@@ -1849,6 +1872,9 @@
     if (!defView) { defView = VRender.defenders.build(); scene.add(defView.group); }   // T15: peasants, archers, arrows
     defView.group.visible = !cs.inLair;
     defView.update(cs.squad, { time });
+    if (!knightView) { knightView = VRender.knights.build(); scene.add(knightView.group); }   // Phase 4 T07: mounted knights
+    knightView.group.visible = !cs.inLair;
+    knightView.update(cs.knights, { time });
     if (pilot) {                                                 // T14 / T15: ? / ! marks within markRange; sight fans with ?debug (7)
       if (!watchView) { watchView = VRender.watch.build(); scene.add(watchView.group); }
       const cones = UP.effects(cs).showCones;                    // T20 guard sight: the fans and the marks at any distance
@@ -1935,7 +1961,7 @@
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
       ['dragon', [['', ['KeyC', 'ShiftKeyN', 'KeyB', 'KeyN', 'KeyJ', 'Home', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
-      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
+      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['knights', ['ShiftKeyH', 'ShiftKeyX']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyY', 'ShiftKeyO', 'ShiftKeyC']]]],
       ['blocks', [['', ['ShiftKeyB', 'ShiftKeyP']]]],
@@ -2119,6 +2145,8 @@
         { const sq = cs.squad, al = sq ? sq.list : [], ar = al.filter(v => v.kind === 'archer'), pe = al.filter(v => v.kind === 'peasant'), ba = al.filter(v => v.kind === 'ballista');
           L.push('DEFEND  archers ' + ar.filter(v => v.alive).length + '/' + ar.length + ' (aiming ' + ar.filter(v => v.target).length + ')  peasants ' + pe.length + ' hidden ' + pe.filter(v => v.hidden).length + '  arrows ' + (sq ? sq.arrows.length : 0) + '/' + D.projectiles.max + '  killed ' + (sq ? sq.kills : 0) + '  drawn ' + (defView ? defView.info.drawn : 0));
           L.push('BALLISTA crewed ' + ba.filter(v => v.alive).length + '/' + ba.length + '  aiming ' + ba.filter(v => v.aimAt).map(v => v.aim.toFixed(1) + 's').join(' ') + '  reload ' + ba.filter(v => v.alive && v.cool > 0).map(v => v.cool.toFixed(0) + 's').join(' ') + '  bolts ' + (sq && sq.bolts ? sq.bolts.length : 0)); }
+          { const kn = cs.knights, kl = (kn && kn.list) || [], stb = KN.stables(cs.town);
+            L.push('KNIGHTS riding ' + kl.length + '/' + D.defenders.knight.max + ' (' + ['ride', 'chase', 'return', 'stun', 'carried', 'fall'].map(s => s + ' ' + kl.filter(k => k.state === s).length).filter(x => !/ 0$/.test(x)).join(', ') + ')  stables ' + stb.map(b => KN.left(cs, b)).join('/') + '  killed ' + ((kn && kn.kills) || 0) + '  drawn ' + (knightView ? knightView.info.drawn : 0)); }
         if (wn) L.push('        near ' + wn.kind + ' ' + Math.round(wd) + '  range ' + Math.round(PC.range(wn, { spot: stats.spot, light: cs.light, alt: F.altitude(pilot, regionId) })) + '  seen ' + f2(wn.seen) + '  heard ' + (wn.heard ? wn.heard.kind : '-') + '  aware ' + f2(wn.aware) + ' ' + wn.state); }
       { const pl = (cs.town && cs.town.pens) || [];
         L.push('STOCK   ' + (pl.map(pn => { const c = PR.penCount(cs.field, pn.id); return pn.id.split('.').slice(1).join('.') + ' ' + pn.type + ' ' + (c ? c.penned + (c.inside ? ' +' + c.inside + ' in barn' : '') : '-'); }).join(', ') || '-') + '  taken ' + (cs.stats.livestockTaken || 0)); }

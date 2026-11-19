@@ -19,7 +19,7 @@
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
   const LR = M.need('lair');
 
-  const GRAB_HINTS = { grab: 1, swoop: 1, lootGrab: 1 };   // T19: loot in front on the ground
+  const GRAB_HINTS = { grab: 1, swoop: 1, lootGrab: 1, knightGrab: 1, knightDrop: 1 };   // T19: loot in front on the ground; Phase 4 T07: a knight to grab or drop
 
   const STATIONS = { nest: 1, larder: 1, exit: 1, hoard: 1, altar: 1, mapStone: 1, board: 1, trophy: 1 };   // board: Phase 3 T11   // altar: T20, mapStone: Phase 3 T09
   const isStation = kind => !!STATIONS[kind];
