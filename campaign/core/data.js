@@ -37,6 +37,17 @@
       storeKey: 'vsd-campaign-quality',
     },
 
+    /* Stage looks (phase 4 T04): shared/dragon.js makeDragon(palette, { stage: stageLook[id] }). horns = head horn
+       pairs (2 / 4 / 6), hornLen = main horn length factor, crest = spine plates on the neck and back, span = wing
+       span factor, tint = body colour factor (older = darker), jaw 'spikes', frills = cheek fan. The elder is shown
+       in campaign/preview/dragon.html only until it becomes a stage (phase 6). */
+    stageLook: {
+      hatchling: { horns: 2, hornLen: 0.6, crest: 0, span: 1.0, tint: 1.00 },
+      drake: { horns: 2, hornLen: 1.0, crest: 0, span: 1.05, tint: 0.95 },
+      wyrm: { horns: 4, hornLen: 1.4, crest: 9, span: 1.12, tint: 0.85, jaw: 'spikes' },
+      elder: { horns: 6, hornLen: 1.8, crest: 14, span: 1.2, tint: 0.75, jaw: 'spikes', frills: true },
+    },
+
     /* Growth stages. carry = max prey size class (1 small, 2 medium, 3 large, 4 huge).
        Visual scale grows from scaleFrom to scaleTo with food XP inside a stage;
        the stage itself changes only when resting in the lair. */

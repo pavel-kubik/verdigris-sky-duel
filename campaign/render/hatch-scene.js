@@ -3,7 +3,7 @@
  * The mother lies curled around her small egg in the volcano lair; a heartbeat, glowing cracks, the shell bursts,
  * the hatchling climbs out, she nuzzles it, it breathes its first fire. Built from the game's own dragon model.
  * Its own scene and camera, drawn with the game's renderer while the campaign is in the 'hatch' state.
- *   VRender.hatch.build() -> { scene, camera, update(dt) -> { line, card, t }, resize(w, h), skip(), dispose() }
+ *   VRender.hatch.build(opts) -> { scene, camera, update(dt) -> { line, card, t }, resize(w, h), skip(), dispose() }
  *   line: caption key ('c.hatch.p1' .. 'c.hatch.p4') or ''; card: true once the hatching card should show
  * The mother's flight / bolt path (P, momPos, bolts) is kept switched off here: her death scene comes in phase 4.
  */
@@ -14,7 +14,7 @@
   const VDragon = root.VDragon, V3 = THREE.Vector3;
   const VR = root.VRender = root.VRender || {};
 
-  function build() {
+  function build(opts) {
   const reduce = root.matchMedia ? root.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
   /* ---------- scene, lair lighting ---------- */
   const scene = new THREE.Scene();
@@ -166,7 +166,7 @@
   }
 
   /* ---------- the hatchling (the game's own model, shared/dragon.js) ---------- */
-  const hero = VDragon.makeDragon(VDragon.GREEN);
+  const hero = VDragon.makeDragon(VDragon.GREEN, { stage: (opts && opts.look) || null });   // phase 4 T04: the hatchling look
   scene.add(hero.root);
   const mouthW = new V3();
 

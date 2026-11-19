@@ -14,6 +14,11 @@
  *                                  anim(time, dt, o), dispose() }
  *     palette: { body, dark, belly, wing, horn, eye } (hex colours)
  *     opts.toes (default true): toes and claws on the feet; false leaves plain paws.
+ *     opts.stage (campaign phase 4 T04): a stage look { horns, hornLen, crest, span, tint, jaw, frills } (campaign data
+ *       stageLook): horns 2 / 4 / 6 (pairs of head horns: main, upper back, brow), hornLen scales the main pair, crest =
+ *       spine plates along the neck and back, span = wing span factor, tint = body / belly / wing colour factor,
+ *       jaw 'spikes' = spikes along the lower jaw, frills = a fan of cheek spikes. The parts merge into the existing
+ *       horn meshes (no extra draw calls). Without opts.stage the model is exactly the duel model.
  *     dispose(): removes root from its parent and frees the dragon's materials (geometry is shared).
  *   GREEN, CRIMSON palettes; STAND = model units from the root down to the soles of a standing dragon
  * Legs are hip / knee / foot joints: all at 0 = the tucked flight pose. anim(o.ground, o.gait, o.stride, o.fold) poses
@@ -199,6 +204,11 @@ function spine(B,y,z,h,lean){
   const l=lean==null?0.55:lean,w=h*0.3;
   B.tube([[0,y-h*0.12,z+h*0.1],[0,y+h*0.45,z-h*l*0.35],[0,y+h*0.8,z-h*l*0.8],[0,y+h,z-h*l*1.25]],[[w*0.5,w],[w*0.42,w*0.75],[w*0.26,w*0.42],[0.004,0.004]],6,{ref:[0,0,1],vRep:1.2});
 }
+/** A crest plate (T04): a thin blade standing on (0, y, z), height h, long along the spine, leaning back. */
+function plate(B,y,z,h){
+  const L=h*0.5;
+  B.tube([[0,y-h*0.1,z],[0,y+h*0.35,z-h*0.12],[0,y+h*0.75,z-h*0.3],[0,y+h,z-h*0.48]],[[0.035,L],[0.028,L*0.75],[0.016,L*0.42],[0.004,0.006]],4,{ref:[0,0,1],vRep:1});
+}
 /** A curved horn / claw / tooth through pts, tapering from r to a point. */
 function horn(B,pts,r,n,flat){
   const m=pts.length,radii=pts.map((_,i)=>{const k=1-i/(m-1),rr=Math.max(0.004,r*Math.pow(k,0.8));return [rr*(flat||1),rr];});
@@ -216,7 +226,9 @@ const TORSO=[[-2.3,0.1,0.58,0.56],[-1.95,0.06,0.8,0.74],[-1.45,0.0,0.99,0.92],[-
 const HEAD=[[-0.46,0.12,0.26,0.26],[-0.25,0.16,0.46,0.42],[0.05,0.19,0.56,0.5,0.75],[0.36,0.2,0.52,0.44,0.55],[0.66,0.13,0.4,0.3,0.5],[0.96,0.08,0.31,0.22,0.5],[1.22,0.07,0.28,0.2,0.5],[1.42,0.08,0.26,0.2,0.55],[1.54,0.07,0.19,0.15,0.7],[1.6,0.06,0.09,0.07,0.8]];
 const JAW=[[-0.22,-0.06,0.34,0.2,1,0.3],[0.12,-0.1,0.42,0.25,1,0.25],[0.5,-0.09,0.35,0.2,1,0.25],[0.86,-0.07,0.27,0.15,1,0.28],[1.1,-0.06,0.21,0.11,1,0.35],[1.24,-0.05,0.11,0.06,1,0.6]];
 
-function torsoGeo(){
+/* crest plates (T04): about half on the neck (one per segment from the head down), the rest on the back between the spines */
+const crestNeck=n=>Math.min(6,Math.round(n*0.5));
+function torsoGeo(look){
   const s=new Builder(),b=new Builder(),h=new Builder();
   loft(s,b,TORSO,{nd:12,nb:5,uRep:8,vRep:0.95,cap0:true,cap1:true});
   [-1,1].forEach(sd=>{                                           // haunches and shoulders
@@ -226,12 +238,15 @@ function torsoGeo(){
   });
   const top=z=>{for(let i=0;i+1<TORSO.length;i++){const a=TORSO[i],b=TORSO[i+1];if(z<=b[0]){const k=Math.max(0,(z-a[0])/(b[0]-a[0]));return a[1]+a[3]+(b[1]+b[3]-a[1]-a[3])*k;}}return 1;};
   for(let i=0;i<8;i++){const z=1.5-i*0.48,k=Math.abs(i-3.5)/3.5;spine(h,top(z)-0.06,z,0.62-k*0.2);}
+  const nb=look?look.crest-crestNeck(look.crest):0;
+  for(let i=0;i<nb;i++){const z=1.26-i*0.48,k=Math.abs(i-3.5)/3.5;plate(h,top(z)-0.08,z,0.5-k*0.16);}
   return {skin:s.build(),belly:b.build(),horn:h.build()};
 }
-function neckGeo(i){
+function neckGeo(i,look){
   const s=new Builder(),b=new Builder(),h=new Builder(),r0=NECK_R(i),r1=NECK_R(i+1),rm=(r0+r1)/2*1.03;
   loft(s,b,[[-0.14,0,r0*0.97,r0*0.93],[0.1,0,r0,r0*0.96],[0.3,0,rm,rm*0.96],[0.5,0,r1*1.01,r1*0.97],[0.7,0,r1*0.96,r1*0.92]],{nd:10,nb:4,uRep:5,vRep:0.95,v0:i*0.55,cap0:true,cap1:true,band:()=>(i%2?0.9:1)});
   spine(h,r0*0.9,0.3,0.46-i*0.03);
+  if(look&&5-i<crestNeck(look.crest))plate(h,r0*0.88,0.02,0.4-i*0.02);   // from the head (segment 5) down
   return {skin:s.build(),belly:b.build(),horn:h.build()};
 }
 function tailGeo(i){
@@ -245,8 +260,10 @@ function tailGeo(i){
   }
   return {skin:s.build(),belly:i<9?b.build():null,horn:h.p.length?h.build():null};
 }
-function headGeo(){
-  const s=new Builder(),m=new Builder(),h=new Builder(),t=new Builder(),e=new Builder();
+/* stage look (T04): horn length factor for a horn rooted at pts[0] */
+const stretch=(pts,k)=>pts.map(p=>[pts[0][0]+(p[0]-pts[0][0])*k,pts[0][1]+(p[1]-pts[0][1])*k,pts[0][2]+(p[2]-pts[0][2])*k]);
+function headGeo(look){
+  const s=new Builder(),m=new Builder(),h=new Builder(),t=new Builder(),e=new Builder(),hl=look?look.hornLen:1,hr=look?0.75+0.25*hl:1;
   loft(s,m,HEAD,{nd:12,nb:4,uRep:5,vRep:1.3,cap0:true,cap1:true});
   [-1,1].forEach(sd=>{
     s.shade=0.8;                                                 // brow ridge and cheek
@@ -255,8 +272,14 @@ function headGeo(){
     s.shade=0.92;s.ball([sd*0.13,0.2,1.4],[0.09,0.075,0.13],{uRep:1,vRep:1});      // nostril swell
     m.shade=0.2;m.ball([sd*0.17,0.24,1.49],[0.035,0.03,0.045],{nu:6,nv:4});          // nostril
     e.lens([sd*0.44,0.31,0.5],[sd*0.86,0.22,0.46],[0,1,0],0.13,0.1,0.045);
-    horn(h,[[sd*0.27,0.38,-0.08],[sd*0.34,0.66,-0.42],[sd*0.42,0.9,-0.9],[sd*0.44,1.0,-1.42],[sd*0.4,0.96,-1.9]],0.17,7);
-    horn(h,[[sd*0.44,0.2,-0.14],[sd*0.6,0.3,-0.46],[sd*0.7,0.36,-0.86],[sd*0.72,0.34,-1.2]],0.1,6);
+    horn(h,stretch([[sd*0.27,0.38,-0.08],[sd*0.34,0.66,-0.42],[sd*0.42,0.9,-0.9],[sd*0.44,1.0,-1.42],[sd*0.4,0.96,-1.9]],hl),0.17*hr,7);
+    horn(h,stretch([[sd*0.44,0.2,-0.14],[sd*0.6,0.3,-0.46],[sd*0.7,0.36,-0.86],[sd*0.72,0.34,-1.2]],hl),0.1*hr,6);
+    if(look&&look.horns>=4)horn(h,stretch([[sd*0.13,0.44,0.06],[sd*0.16,0.78,-0.16],[sd*0.2,1.04,-0.52],[sd*0.22,1.14,-0.96]],hl*0.8),0.12*hr,6);   // upper back pair
+    if(look&&look.horns>=6)horn(h,stretch([[sd*0.3,0.46,0.42],[sd*0.42,0.7,0.36],[sd*0.52,0.86,0.16],[sd*0.56,0.92,-0.08]],hl*0.6),0.08*hr,5);   // brow pair
+    if(look&&look.frills)for(let k=0;k<5;k++){                   // cheek frill: a fan of thin spikes behind the jaw hinge
+      const a=-0.5+k*0.32,x0=sd*0.46,y0=0.12,z0=-0.24;
+      horn(h,[[x0,y0,z0],[x0+sd*Math.cos(a)*0.3,y0+Math.sin(a)*0.3,z0-0.24],[x0+sd*Math.cos(a)*0.55,y0+Math.sin(a)*0.55,z0-0.56]],0.05,4);
+    }
     horn(h,[[sd*0.5,-0.02,0.02],[sd*0.68,-0.06,-0.22],[sd*0.78,-0.06,-0.52]],0.07,5);
     horn(h,[[sd*0.46,0.1,-0.2],[sd*0.62,0.1,-0.42],[sd*0.72,0.12,-0.7]],0.06,5);
     for(let k=0;k<7;k++){                                        // upper teeth along the lip, a fang near the front
@@ -268,7 +291,7 @@ function headGeo(){
   for(let k=0;k<3;k++)spine(h,0.5-k*0.02,0.1-k*0.24,0.3-k*0.04);
   return {skin:s.build(),mouth:m.build(),horn:h.build(),teeth:t.build(),eye:e.build()};
 }
-function jawGeo(){
+function jawGeo(look){
   const s=new Builder(),b=new Builder(),m=new Builder(),h=new Builder(),t=new Builder();
   loft(s,b,JAW,{nd:8,nb:4,uRep:4,vRep:1.3,cap0:true,cap1:true});
   m.shade=0.9;m.ball([0,0.02,0.5],[0.17,0.035,0.52],{nu:8,nv:5});                // tongue
@@ -276,6 +299,10 @@ function jawGeo(){
     for(let k=0;k<6;k++){const z=0.3+k*0.15,x=sd*(0.33-k*0.035),big=k===4?1.7:1,l=0.11*big;horn(t,[[x,0,z],[x*0.98,l*0.6,z+0.01],[x*0.96,l,z+0.02]],0.032*big,5);}
     horn(h,[[sd*0.2,-0.2,0.3],[sd*0.24,-0.34,0.2],[sd*0.26,-0.44,0.04]],0.05,5);  // chin barbs
     horn(h,[[sd*0.32,-0.14,-0.02],[sd*0.4,-0.24,-0.16],[sd*0.44,-0.3,-0.36]],0.05,5);
+    if(look&&look.jaw==='spikes')for(let k=0;k<4;k++){          // T04: spikes along the lower jaw line
+      const z=0.98-k*0.24,x=sd*(0.2+k*0.045),y=-0.1-k*0.01,l=0.16+k*0.04;
+      horn(h,[[x,y,z],[x+sd*l*0.45,y-l*0.45,z-l*0.3],[x+sd*l*0.75,y-l*0.7,z-l*0.75]],0.045+k*0.008,4);
+    }
   });
   return {skin:s.build(),belly:b.build(),mouth:m.build(),horn:h.build(),teeth:t.build()};
 }
@@ -334,8 +361,12 @@ function wingGeo(part){
   return {skin:s.build(),wing:w.build(),horn:h.p.length?h.build():null};
 }
 
+const tintHex=(hex,k)=>(Math.round(((hex>>16)&255)*k)<<16)|(Math.round(((hex>>8)&255)*k)<<8)|Math.round((hex&255)*k);
 function makeDragon(c,opts){
-  const toes=!opts||opts.toes!==false,TX=HOST.VTex||null;
+  const toes=!opts||opts.toes!==false,TX=HOST.VTex||null,look=opts&&opts.stage||null;
+  /* stage look: own geometry cache keys for the parts it changes, darker scales by tint */
+  const lk=look?'|'+[look.horns,look.hornLen,look.crest,look.jaw||'',look.frills?1:0].join(','):'';
+  if(look&&look.tint!=null&&look.tint!==1){const k=look.tint;c=Object.assign({},c,{body:tintHex(c.body,k),dark:tintHex(c.dark,k),belly:tintHex(c.belly,k),wing:tintHex(c.wing,k)});}
   const tex=n=>(TX?(n==='eye'?TX.get(n):TX.albedo(n)):null),nrm=(n,k)=>(TX?TX.normal(n,k):null);
   const M=(col,o)=>{
     const p={color:col,roughness:.55,metalness:.1},ns=o&&o.ns;
@@ -362,19 +393,19 @@ function makeDragon(c,opts){
     for(const k in G)if(G[k]){const m=new THREE.Mesh(G[k],matOf[k]);parent.add(m);}
   };
   const root=new THREE.Group(),body=new THREE.Group();root.add(body);
-  put(body,'torso',torsoGeo);
+  put(body,'torso'+(look?'|c'+look.crest:''),()=>torsoGeo(look));
 
   // neck chain
   const neck=[];let j=new THREE.Group();j.position.set(0,0.35,1.65);j.rotation.x=j.userData.bx=-0.32;body.add(j);
   for(let i=0;i<6;i++){
-    put(j,'neck'+i,()=>neckGeo(i));
+    put(j,'neck'+i+(look?'|c'+look.crest:''),()=>neckGeo(i,look));
     neck.push(j);const n=new THREE.Group();n.position.z=0.55;n.rotation.x=n.userData.bx=-0.13;j.add(n);j=n;
   }
   // head
   const head=new THREE.Group();head.rotation.x=0.85;j.add(head);
-  put(head,'head',headGeo);
+  put(head,'head'+lk,()=>headGeo(look));
   const jaw=new THREE.Group();jaw.position.set(0,-0.14,0.3);head.add(jaw);
-  put(jaw,'jaw',jawGeo);
+  put(jaw,'jaw'+lk,()=>jawGeo(look));
   const mouth=new THREE.Object3D();mouth.position.set(0,-0.05,1.55);head.add(mouth);
 
   // tail chain
@@ -404,6 +435,7 @@ function makeDragon(c,opts){
   const wings=[];
   [-1,1].forEach(s=>{
     const wr=new THREE.Group();wr.position.set(s*0.72,0.62,0.65);body.add(wr);
+    if(look&&look.span&&look.span!==1)wr.scale.set(look.span,1,1+(look.span-1)*0.6);   // T04: wider wings for older stages
     const w=new THREE.Group();w.scale.x=s;wr.add(w);
     const arm=new THREE.Group();w.add(arm);
     put(arm,'wingArm',()=>wingGeo('arm'));
@@ -415,7 +447,7 @@ function makeDragon(c,opts){
   const claws=new THREE.Object3D();claws.position.set(0,-1.35,-0.9);body.add(claws);
 
   let meshes=0;root.traverse(o=>{if(o.isMesh)meshes++;});
-  const d={root,body,neck,tail,jaw,head,mouth,wings,legs,claws,mats,meshes,flash:0};
+  const d={root,body,neck,tail,jaw,head,mouth,wings,legs,claws,mats,meshes,flash:0,look};
   const wrapA=x=>{x=(x+Math.PI)%(2*Math.PI);if(x<0)x+=2*Math.PI;return x-Math.PI;};
   /* One leg: foot target in body space (side plane), 2-bone IK, rotations blended in by g (0 = tucked). */
   function poseLeg(L,g,gait,stride,bob){
