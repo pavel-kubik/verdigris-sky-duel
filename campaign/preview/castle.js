@@ -2,11 +2,12 @@
  * Verdigris campaign - castle preview page (Phase 3 T01): Vyshgard Castle from data.settlements.castle on a
  * stand-in rock with a cliff over a river. Orbit camera (drag, pinch / wheel), day / dusk / night, quality tier,
  * LOD switch, draw call and triangle readout. URL: ?time=day|dusk|night&tier=low|mid|high&lod=auto|full|sil&view=...
+ * Phase 4 T06: &castle=fortress shows Maidenhold (its kit and the chain net over the yard) instead of Vyshgard.
  * window.__vpreview = { set(opts), info() } for the headless check.
  */
 (function () {
   'use strict';
-  const BUILD = 't305.1 2026-11-19 Highland Pass: real terrain, viaducts, exits';
+  const BUILD = 't306.1 2026-11-19 Maidenhold and the pass settlements';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);
@@ -56,19 +57,21 @@
   }
 
   /* the castle */
-  const L = C.need('castle').layout();
   const pick = (k, list, def) => (list.includes(params.get(k)) ? params.get(k) : def);
   const st = {
     time: pick('time', ['day', 'dusk', 'night'], 'day'),
     tier: pick('tier', ['low', 'mid', 'high'], touch ? 'mid' : 'high'),
     lod: pick('lod', ['auto', 'full', 'sil'], 'auto'),
     view: pick('view', ['river', 'gate', 'high', 'yard'], 'high'),
+    castle: pick('castle', ['castle', 'fortress'], 'castle'),
   };
+  const DEF = C.need('data').settlements[st.castle], L = C.need('castle').layout(DEF);
   let kit = null;
   function rebuild() {
     if (kit) kit.dispose();
     kit = VR.castleKit.build(L, { tier: st.tier });
     kit.group.position.set(-L.centre[0], 0, -L.centre[1]);
+    if (DEF.yardNet && VR.castleView && VR.castleView.yardNet) kit.group.add(VR.castleView.yardNet(DEF));   // T06: Maidenhold's chain net
     scene.add(kit.group);
     applyTime();
   }

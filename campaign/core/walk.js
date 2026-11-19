@@ -2,7 +2,8 @@
  * Verdigris campaign - landing, walking and takeoff (Phase 2 T06, 002_task_kingdom.md 4.1 and 5.1).
  *
  * pilot.mode: 'air' (core/flight.js) | 'landing' | 'ground' | 'takeoff'.
- *   canLand(p, regionId, solids?, walkTop?) -> { ok, why? }   why: 'busy' | 'high' | 'fast' | 'water' | 'lava' | 'roof' | 'steep'
+ *   canLand(p, regionId, solids?, walkTop?, netAt?) -> { ok, why? }   why: 'busy' | 'high' | 'fast' | 'water' | 'lava' | 'roof' | 'net' | 'steep'
+ *     netAt(x, z) -> height | null (Phase 4 T06): a chain net over a castle yard (Maidenhold) refuses landing below it ('net')
  *                                                     walkTop(x, z) -> height | null (T03): a castle wall walk or bastion
  *                                                     top there is landable (height and slope measured from that top)
  *   startLanding(p)                                   air -> landing (land.time s, then ground)
@@ -38,7 +39,7 @@
   const standY = (ctx, x, z, scale) => groundAt(ctx, x, z) + D.walk.stand * (scale || 1);
 
   /** Is landing allowed here and now? Checked in the order of the reasons a player can fix most easily. */
-  function canLand(p, regionId, solids, walkTop) {
+  function canLand(p, regionId, solids, walkTop, netAt) {
     const L = D.land;
     if ((p.mode || 'air') !== 'air') return { ok: false, why: 'busy' };
     const x = p.pos[0], z = p.pos[2], surf = T.surfaceAt(regionId, x, z);
@@ -54,6 +55,7 @@
     const liquid = T.liquidAt(regionId, x, z);
     if (liquid) return { ok: false, why: liquid };
     if (roof != null) return { ok: false, why: 'roof' };
+    if (netAt && netAt(x, z) != null) return { ok: false, why: 'net' };   // Phase 4 T06: Maidenhold's yard
     if (T.surfaceSlope(regionId, x, z) > L.maxSlope) return { ok: false, why: 'steep' };
     return { ok: true };
   }

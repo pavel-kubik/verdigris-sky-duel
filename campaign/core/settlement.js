@@ -32,6 +32,7 @@
  *   burnedOut(b) -> bool  a ruin or a charred stone shell (its posts are empty, a watchtower counts as down)
  *   fullHp(type) -> hp    the hp a piece (re)starts with: woodHp for stone pieces, else hp
  *   surfaceAt(town, x, z, pad?) -> height | null   the walkable top under (x, z) when it is the highest solid there
+ * Phase 4 T06: netAt(town, x, z) -> height | null   the chain net over a yardNet castle's yard (Maidenhold).
  * A ruin is no solid (rubble only). Pure: no DOM, no THREE.
  */
 (function (root) {
@@ -324,6 +325,21 @@
 
   const B0 = b => D.buildings[b.type];
 
+  /** Phase 4 T06: the chain net over a castle yard (template yardNet, Maidenhold): the net's height when (x, z) is inside
+   *  the walls of such a place, else null. Landing there is refused ('net', walk.canLand). A place with pl.netDown (the
+   *  breach of T09) has no net. */
+  function netAt(town, x, z) {
+    for (const pl of (town && town.places) || []) {
+      const tpl = pl.castle && D.settlements[pl.type];
+      if (!tpl || !tpl.yardNet || pl.netDown) continue;
+      const dx = x - pl.x, dz = z - pl.z;
+      if (Math.hypot(dx, dz) > pl.r) continue;
+      const c = Math.cos(pl.yaw || 0), s = Math.sin(pl.yaw || 0);
+      if (M.need('castle').inside(tpl, dx * c - dz * s, dx * s + dz * c)) return pl.y + D.buildings.wall.walkTop + D.castle.yardNet.up;
+    }
+    return null;
+  }
+
   M.define('settlement', { build, alert3On, solidAt, surfaceAt, topOf, hit, near, layout, placeIds, burn, rebuild, inFire, sd,
-                           burnable, burnedOut, fullHp });
+                           burnable, burnedOut, fullHp, netAt });
 })(typeof self !== 'undefined' ? self : this);
