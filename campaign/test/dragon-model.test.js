@@ -99,3 +99,43 @@ ok(full.root.parent === null && scene.children.length === 0, 'dispose removes th
 eq(stub.stats().disposedGeo, 0, 'dispose keeps the shared geometry');
 eq(stub.stats().disposedMat, mats.size, 'dispose frees every material');
 ok(VD.makeDragon(VD.CRIMSON).body.children[0].geometry === [...geos][0] || geos.has(VD.makeDragon(VD.CRIMSON).body.children[0].geometry), 'a second dragon reuses the geometry');
+
+/* ---------- phase 4 T04: stage looks (opts.stage) ---------- */
+const D4 = require('./harness.js').core('data');
+const count = d => { let v = 0, t = 0, m = 0; d.root.traverse(o => { if (o.isMesh) { m++; v += o.geometry.attributes.position.count; t += o.geometry.index.length / 3; } }); return { v, t, m }; };
+const base = count(VD.makeDragon(VD.GREEN)), baseOpt = count(VD.makeDragon(VD.GREEN, {})), baseNull = count(VD.makeDragon(VD.GREEN, { stage: null }));
+eq(base.v, 7810, 'without a stage the model is exactly the duel model (vertex count)');
+ok(baseOpt.v === base.v && baseNull.v === base.v && baseOpt.t === base.t, 'opts {} and stage: null build the same model');
+ok(D4 && D4.stageLook, 'data has stageLook');
+for (const st of D4.stages) ok(D4.stageLook[st.id], 'stageLook has a row for stage ' + st.id);
+ok(D4.stageLook.elder && D4.stageLook.wyrm, 'stageLook has the wyrm and the elder (preview)');
+const looks = {};
+for (const id of ['hatchling', 'drake', 'wyrm', 'elder']) {
+  const L = Object.assign({ id }, D4.stageLook[id]), d = VD.makeDragon(VD.GREEN, { stage: L }), c = count(d);
+  looks[id] = { d, c, L };
+  eq(c.m, base.m, id + ': no extra draw calls (parts merge into the horn meshes)');
+  ok(d.look === L, id + ': the model keeps its look');
+}
+// the spec's "under 6k" was written before the Phase 3 model grew to about 10k triangles: the budget is now the
+// stage parts, under 1000 triangles on top of the base model for the Wyrm (004_task_highlands.md section 9)
+ok(looks.wyrm.c.t - base.t < 1000, 'Wyrm stage parts under 1000 triangles: +' + (looks.wyrm.c.t - base.t) + ' over ' + base.t);
+ok(looks.wyrm.c.t < 12000, 'Wyrm model under 12k triangles: ' + looks.wyrm.c.t);
+ok(looks.elder.c.t - base.t < 1600, 'Elder stage parts under 1600 triangles: +' + (looks.elder.c.t - base.t));
+ok(looks.hatchling.c.v === base.v && looks.drake.c.v === base.v, 'hatchling and drake keep the base vertex count (shorter / same horns only)');
+ok(looks.wyrm.c.v > looks.drake.c.v && looks.elder.c.v > looks.wyrm.c.v, 'each older stage adds parts: ' + [looks.drake.c.v, looks.wyrm.c.v, looks.elder.c.v]);
+// horn length: the main horn tip reaches further back on older stages
+const hornReach = d => { let minZ = 0; d.head.children.forEach(o => { if (o.isMesh && o.material === d.mats[3]) { const a = o.geometry.attributes.position.array; for (let i = 2; i < a.length; i += 3) minZ = Math.min(minZ, a[i]); } }); return minZ; };
+ok(hornReach(looks.hatchling.d) > hornReach(looks.drake.d) && hornReach(looks.drake.d) > hornReach(looks.wyrm.d) && hornReach(looks.wyrm.d) > hornReach(looks.elder.d), 'horns grow longer with the stage');
+// crest plates on the torso and neck (horn meshes have more vertices), tint, span
+const partVerts = (d, grp) => grp.children.filter(o => o.isMesh).reduce((n, o) => n + o.geometry.attributes.position.count, 0);
+ok(partVerts(looks.wyrm.d, looks.wyrm.d.body) > partVerts(looks.drake.d, looks.drake.d.body), 'the Wyrm has crest plates on the back');
+ok(partVerts(looks.wyrm.d, looks.wyrm.d.neck[5]) > partVerts(looks.drake.d, looks.drake.d.neck[5]) && partVerts(looks.wyrm.d, looks.wyrm.d.neck[0]) === partVerts(looks.drake.d, looks.drake.d.neck[0]), 'Wyrm neck crest starts at the head');
+ok(partVerts(looks.wyrm.d, looks.wyrm.d.jaw) > partVerts(looks.drake.d, looks.drake.d.jaw), 'the Wyrm has jaw spikes');
+const bodyCol = d => d.mats[0].color;
+eq(bodyCol(looks.hatchling.d), VD.GREEN.body, 'hatchling (tint 1) keeps the palette colour');
+ok(bodyCol(looks.wyrm.d) < bodyCol(looks.drake.d) && ((bodyCol(looks.wyrm.d) >> 8) & 255) < ((VD.GREEN.body >> 8) & 255), 'older stages have darker scales');
+eq(VD.GREEN.body, 0x2f7f50, 'tint does not change the shared palette');
+ok(Math.abs(looks.wyrm.d.wings[0].wr.scale.x - 1.12) < 1e-9 && looks.hatchling.d.wings[0].wr.scale.x === 1, 'wing span follows the stage');
+ok(VD.makeDragon(VD.GREEN, { stage: looks.wyrm.L }).head.children[0].geometry === looks.wyrm.d.head.children[0].geometry, 'two Wyrms share the stage geometry');
+looks.wyrm.d.anim(1, 0.1, { phase: 1, amp: 1, ground: 1, gait: 1, stride: 1 });
+ok(true, 'a Wyrm animates');
