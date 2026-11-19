@@ -17,7 +17,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't301.1 2026-11-18 debug blocks overlay, object picker, ground probe';
+  const BUILD = 't304.1 2026-11-19 stage looks: horns, crest, jaw spikes, darker scales per stage';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -130,8 +130,23 @@
   }
 
   /* ---------- the hatchling ---------- */
-  const hero = VDragon.makeDragon(VDragon.GREEN);
+  /* phase 4 T04: the look follows the stage (data.stageLook); refreshStage rebuilds the model once on a change */
+  const stageIdOf = i => (D.stages[Math.min(i, D.stages.length - 1)] || D.stages[0]).id;
+  const lookOf = i => (D.stageLook && D.stageLook[stageIdOf(i)]) || null;
+  let heroLookId = 'hatchling';
+  let hero = VDragon.makeDragon(VDragon.GREEN, { stage: lookOf(0) });
   scene.add(hero.root);
+  function restageHero(i) {
+    const id = stageIdOf(i);
+    if (id === heroLookId) return false;
+    const old = hero, nh = VDragon.makeDragon(VDragon.GREEN, { stage: lookOf(i) });
+    nh.root.position.copy(old.root.position); nh.root.rotation.copy(old.root.rotation); nh.root.scale.copy(old.root.scale);
+    nh.root.visible = old.root.visible; nh.flash = old.flash;
+    (old.root.parent || scene).add(nh.root);
+    old.dispose();                                                 // materials freed; the geometry is shared and cached
+    hero = nh; heroLookId = id;
+    return true;
+  }
   /* the mother (T05, core/mother.js): same model, older bronze-green scales (as in the hatching scene), much bigger */
   const mom = VDragon.makeDragon({ body: 0x2c6450, dark: 0x173a30, belly: 0xb09c66, wing: 0x346e5a, horn: 0xd8c9a8, eye: 0xffb43a });
   mom.root.scale.setScalar(D.mother.scale); mom.root.visible = false; scene.add(mom.root);
@@ -170,6 +185,7 @@
   const heroPose = {};                                          // T07 legs / wings / walk cycle state (walk.pose)
   function refreshStage() {
     stats = G.statsOf(dragon.stage);
+    restageHero(dragon.stage);
     heroScale = ST.scaleOf(cs);                                 // (debug B: Elder size in the cave)
     hero.root.scale.setScalar(heroScale);
     $('#stageText').textContent = t('c.stage.' + D.stages[dragon.stage].id);
@@ -572,7 +588,7 @@
   /* ---------- hatching scene (render/hatch-scene.js): plays on a new run, then the hatching card ---------- */
   function startHatchScene() {
     if (hatchScene) endHatchScene();
-    hatchScene = VRender.hatch.build();
+    hatchScene = VRender.hatch.build({ look: lookOf(0) });
     hatchScene.resize(W, Hh);
     hatchCard = false; hatchLineShown = null;
     $('#hatchLine').textContent = ''; $('#hatchLine').classList.remove('on');
@@ -2138,5 +2154,5 @@
   renderer.setAnimationLoop(frame);
   if (window.I18N) I18N.onChange(() => { if (hatchLineShown) $('#hatchLine').textContent = t(hatchLineShown); actionShown = moveShown = ''; todShown = ''; promptShown = ''; $('#regionText').textContent = t(TR.region(regionId).nameKey); $('#stageText').textContent = stageName(dragon.stage); if (state === 'intro') introUi(); });
 
-  if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, hero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get shapeView() { return shapeView; }, debugPick, get lastPick() { return lastPick; }, get shapeList() { return currentShapes(); }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
+  if (debug) window.__vcamp = { leaveLair() { if (cs.inLair) onEvents(ST.lairLeave(cs)); }, C, D, MO, mom, scene, camera, renderer, get hero() { return hero; }, get heroLook() { return heroLookId; }, restageHero, setState, hatchNow, skipHatch, get hatchScene() { return hatchScene; }, loadRegion, keys, get region() { return region; }, get pilot() { return pilot; }, get state() { return state; }, cs, dragon, feed, rest, snapCam, saveNow, startRun, introUi, SV, storage, get saved() { return saved; }, get saveOff() { return saveOff; }, debugKey, get castleView() { return castleView; }, get shapeView() { return shapeView; }, debugPick, get lastPick() { return lastPick; }, get shapeList() { return currentShapes(); }, get townView() { return townView; }, openStation, closeStation, useStation, renderLair, caveView, CV, swapRegion, get lastSwapMs() { return lastSwapMs; }, get field() { return cs.field; }, QL, applyQuality, mapView, openMap, closeMap, openTravel, travelTo, get travelOn() { return travelOn; }, get quality() { return { tier: qTier, source: qSource, set: qSet, autoFps: qAutoFps, sampler: qSampler }; } };
 })();
