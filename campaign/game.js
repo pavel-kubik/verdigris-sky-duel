@@ -17,7 +17,7 @@
   const params = new URLSearchParams(location.search);
   const debug = params.has('debug');
   /* Build label: bump on every push so a tester can see which build is running (debug panel + intro footer). */
-  const BUILD = 't301.1 2026-11-18 debug blocks overlay, object picker, ground probe';
+  const BUILD = 't303.1 2026-11-19 wyrm stage: stage row, growth cap, camera by scale, grow-to-wyrm debug';
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   /* ---------- renderer / scene (same look as the duel) ---------- */
@@ -421,7 +421,7 @@
     if (state !== 'play') return;
     if (e.code === 'KeyQ') F.tryRoll(pilot, -1);
     if (e.code === 'KeyE') F.tryRoll(pilot, 1);
-    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[BCYJKOPTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+B / P: shapes overlay, pick (Phase 4 T01); Shift+J / K: mission finish / fail (T10); Shift+Y chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
+    if (debug) debugKey(e.shiftKey && /^(Digit[0-9]|Key[BCYJKNOPTVZ])$/.test(e.code) ? 'Shift' + e.code : e.code);   // Shift+B / P: shapes overlay, pick (Phase 4 T01); Shift+J / K: mission finish / fail (T10); Shift+Y chalice (T12), Shift+O workshop run-in (T14), Shift+C wagon (T15), Shift+V / T free the village, tribute now (T16); Shift+N grow to Wyrm (Phase 4 T03); never Shift + a game key (Shift is Boost: Shift+W / F / G / L / X fired debug actions while boosting), Shift+Z to lair; Shift+digit: castle (5-9), map reveal (0), aeries / travel (1-3); Shift+4: 4th region jump
   });
   if (debug) addEventListener('keydown', e => { if (e.code === 'Backquote' && state !== 'play') debugKey(e.code); });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -650,13 +650,13 @@
   const camPos = new V3(), camLook = new V3(), tmpV = new V3();
   function camDesired(out) {
     if (cs.inLair) { const c = CV.camera(pilot.pos, pilot.yaw, heroScale); return out.set(c.pos[0], c.pos[1], c.pos[2]); }   // T10: inside the dome
-    if (cs.inAerie) { const k = Math.pow(heroScale, 0.75), bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);   // T08: in front of the ledge, looking back at the dragon and the cleft
+    if (cs.inAerie) { const k = G.camK(heroScale), bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);   // T08: in front of the ledge, looking back at the dragon and the cleft
       const kk = Math.max(k, 1.6); return out.set(pilot.pos[0] + bx * 17 * kk + bz * 6 * kk, pilot.pos[1] + 3 * kk, pilot.pos[2] + bz * 17 * kk - bx * 6 * kk); }
     const p = pilot.pos, bx = Math.sin(pilot.yaw), bz = Math.cos(pilot.yaw);
-    const k = Math.pow(cs.form === 'human' ? D.guise.cam : heroScale, 0.75), gc = D.groundCam, gb = cs.form === 'human' ? 1 : heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back; the Guise: a person's height
+    const k = G.camK(cs.form === 'human' ? D.guise.cam : heroScale), gc = D.groundCam, gb = cs.form === 'human' ? 1 : heroPose.ground || 0, lerp = MT.lerp;   // a bigger dragon needs the camera further back; the Guise: a person's height
     const back = lerp(22, gc.back, gb) * k, up = lerp(7 - pilot.pitch * 6, gc.height, gb) * k;   // T07: lower and closer on the ground
     out.set(p[0] - bx * back, p[1] + up, p[2] - bz * back);
-    out.y = Math.max(out.y, TR.surfaceAt(regionId, out.x, out.z) + 3);
+    out.y = Math.max(out.y, G.camFloor(TR.surfaceAt(regionId, out.x, out.z), cs.form === 'human' ? 1 : heroScale));   // Phase 4 T03: more clearance for a Wyrm
     return out;
   }
   function snapCam() { camDesired(camPos); }
@@ -1345,6 +1345,7 @@
     ['Shift+Z', 'fly into the lair (Ash Wastes)', 'ShiftKeyZ', 'to lair'], ['R', 'reset to a new hatchling', 'KeyR', 'reset'],
     ['P', 'fly to the nearest herd', 'KeyP', 'to herd'], ['T', 'jump near a region exit (again: the next exit)', 'KeyT', 'to exit'],
     ['C', 'become a Drake now (Farmlands test)', 'KeyC', 'drake now'],
+    ['Shift+N', 'grow to Wyrm now (food XP to the Wyrm line, full HP; Phase 4 T03)', 'ShiftKeyN', 'wyrm now'],
     ['O', 'smell test: 340 from the nearest herd, facing away', 'KeyO', 'smell test'],
     ['V', 'save now', 'KeyV', 'save'], ['U', 'wipe the save and reload', 'KeyU', 'wipe save'],
     ['panel', 'save now, then reload the page (save test: Continue restores it); DBG button only - X is Eat', 'DbgSaveReload', 'save + reload'],
@@ -1419,6 +1420,10 @@
     if (code === 'KeyC' && dragon.stage < 1) {                    // T11: skip to the Drake stage (the Farmlands need one)
       Object.assign(dragon, { stage: 1, foodXp: Math.max(dragon.foodXp, D.stages[1].foodFrom), hp: D.stages[1].hp });
       refreshStage(); flashPrompt(t('c.dbg.drake'), 1.5);
+    }
+    if (code === 'ShiftKeyN' && dragon.stage < 2) {               // Phase 4 T03: skip to the Wyrm stage (the stage-up itself happens at the nest)
+      Object.assign(dragon, { stage: 2, foodXp: Math.max(dragon.foodXp, D.stages[2].foodFrom), hp: D.stages[2].hp });
+      refreshStage(); if (cs.inLair) { CV.clampPos(pilot.pos, ST.scaleOf(cs)); pilot.pos[1] = CV.standY(ST.scaleOf(cs)); } snapCam(); flashPrompt(t('c.dbg.wyrm'), 1.5);
     }
     if (code === 'KeyJ') dragon.hunger = Math.min(D.hunger.max, dragon.hunger + 25);
     if (code === 'Home') dragon.hunger = Math.max(0, dragon.hunger - 25);
@@ -1795,7 +1800,7 @@
       camDesired(tmpV);
       if (dt > 0) camPos.lerp(tmpV, 1 - Math.exp(-dt * 4.5));
       fwdV.set(Math.sin(pilot.yaw) * Math.cos(pilot.pitch), Math.sin(pilot.pitch), Math.cos(pilot.yaw) * Math.cos(pilot.pitch));
-      const human = cs.form === 'human', gb = human ? 1 : heroPose.ground || 0, kc = Math.pow(human ? D.guise.cam : heroScale, 0.75);   // T07: on the ground look a little ahead of the head
+      const human = cs.form === 'human', gb = human ? 1 : heroPose.ground || 0, kc = G.camK(human ? D.guise.cam : heroScale);   // T07: on the ground look a little ahead of the head
       camLook.set(pilot.pos[0], pilot.pos[1] + MT.lerp(2, 1.5 * kc, gb), pilot.pos[2]).addScaledVector(fwdV, MT.lerp(12, D.groundCam.look * kc, gb));
       if (cs.inLair) { const cl = CV.camera(pilot.pos, pilot.yaw, heroScale).look; camLook.set(cl[0], cl[1], cl[2]); }
       else if (cs.inAerie) camLook.set(pilot.pos[0], pilot.pos[1] - (isTouch ? 4 : 1) * Math.max(kc, 1.6), pilot.pos[2]);   // touch: the dragon above the panel
@@ -1929,7 +1934,7 @@
                  ['places', ['Digit1', 'Digit9', 'Equal', 'Comma', 'Period', 'Digit0']],
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
-      ['dragon', [['', ['KeyC', 'KeyB', 'KeyN', 'KeyJ', 'Home', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
+      ['dragon', [['', ['KeyC', 'ShiftKeyN', 'KeyB', 'KeyN', 'KeyJ', 'Home', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
       ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyY', 'ShiftKeyO', 'ShiftKeyC']]]],

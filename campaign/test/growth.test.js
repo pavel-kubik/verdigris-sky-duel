@@ -6,7 +6,8 @@ const [hatch, drake] = D.stages;
 
 // Stage thresholds
 ok(G.stageOf(0).id === 'hatchling' && G.stageOf(drake.foodFrom - 1).id === 'hatchling', 'hatchling below the drake threshold');
-ok(G.stageOf(drake.foodFrom).id === 'drake' && G.stageOf(D.growthCap.food).id === 'drake', 'drake from its threshold to the cap');
+ok(G.stageOf(drake.foodFrom).id === 'drake' && G.stageOf(D.stages[2].foodFrom - 1).id === 'drake', 'drake from its threshold to the wyrm threshold');
+ok(G.stageOf(D.stages[2].foodFrom).id === 'wyrm' && G.stageOf(D.growthCap.food).id === 'wyrm', 'wyrm from its threshold to the cap (phase 4)');
 near(G.stageOf(drake.foodFrom / 2).progress, 0.5, 1e-9, 'progress halfway through the hatchling stage');
 
 // Growth value: monotonic, 0 at start, at the stage boundary equals the drake's growthFrom, capped for phase 1
@@ -40,7 +41,8 @@ near(G.stageOf(drake.foodFrom / 2).progress, 0.5, 1e-9, 'progress halfway throug
   ok(r.grew && r.from === 0 && r.to === 1 && d.stage === 1, 'rest grows the dragon');
   ok(!G.growUp(d).grew, 'resting again changes nothing');
   for (let i = 0; i < 200; i++) G.addFood(d, 45);
-  ok(d.foodXp === D.growthCap.food && d.stage === 1, 'food XP is capped for phase 1, no wyrm yet');
+  ok(d.foodXp === D.growthCap.food && d.stage === 1, 'food XP is capped under the elder line; eating alone keeps the drake');
+  ok(G.readyStage(d.foodXp, d.stage) === 2, 'the wyrm is ready after the cap');
   ok(!G.addFood(d, -50) && d.foodXp === D.growthCap.food, 'negative food is ignored');
   ok(G.readyStage(0, 1) === 1, 'readyStage never demotes');
 }

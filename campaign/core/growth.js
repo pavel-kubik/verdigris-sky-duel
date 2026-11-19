@@ -67,5 +67,14 @@
     return { grew: to > from, from, to };
   }
 
-  M.define('growth', { stageOf, growthValue, scaleOf, readyStage, statsOf, addFood, growUp, progressIn });
+  /** Phase 4 T03: chase camera distance / height factor for a body of this scale (scale ^ camera.scaleDist, never below 1x of a 1.0 body). */
+  function camK(scale) {
+    return Math.pow(Math.max(0.1, scale || 1), D.camera.scaleDist);
+  }
+  /** Phase 4 T03: the lowest camera height over ground `surface` for a body of this scale (clear x scale ^ clearDist, at least clear). */
+  function camFloor(surface, scale) {
+    return surface + D.camera.clear * Math.max(1, Math.pow(scale || 1, D.camera.clearDist));
+  }
+
+  M.define('growth', { stageOf, growthValue, scaleOf, readyStage, statsOf, addFood, growUp, progressIn, camK, camFloor });
 })(typeof self !== 'undefined' ? self : this);

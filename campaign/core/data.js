@@ -46,9 +46,14 @@
       // T24: drake hungerMult 1.5 -> 1.1 so a full Drake can bring a strongbox home from the Farmlands (test/raid.test.js)
       { id: 'drake', foodFrom: 1000, growthFrom: 0.25, scaleFrom: 1.6, scaleTo: 2.4,
         hp: 220, turn: 0.85, cruise: 32, boost: 56, hungerMult: 1.1, spot: 1.5, carry: 2 },
-      // wyrm (foodFrom 2400, growthFrom 0.55) and elder (growthFrom 0.85) arrive in phases 4-5
+      // Phase 4 T03: the Wyrm (carry 3: cattle, a knight; breach: wears stone, Phase 4 T09). The Elder (growthFrom 0.85) is Phase 6
+      { id: 'wyrm', foodFrom: 2400, growthFrom: 0.55, scaleFrom: 2.5, scaleTo: 3.4,
+        hp: 450, turn: 0.65, cruise: 34, boost: 58, hungerMult: 1.4, spot: 2.3, carry: 3, breach: true },
     ],
-    growthCap: { food: 2399, growth: 0.54 },
+    growthCap: { food: 4799, growth: 0.84 },             // food XP stops under the Elder line (Phase 6)
+    /* Phase 4 T03: the chase camera's distance and height grow with scale ^ scaleDist (all stages; 0.75 as before T03),
+       its clearance over the terrain with scale ^ clearDist x clear (a Wyrm keeps its camera out of the hills) */
+    camera: { scaleDist: 0.75, clear: 3, clearDist: 1 },
 
     hunger: {
       max: 100, start: 80,
