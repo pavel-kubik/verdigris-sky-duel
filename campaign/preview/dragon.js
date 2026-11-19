@@ -61,14 +61,11 @@
     });
     place();
   }
-  /* side by side along x, spaced by size (about 5 model units per scale); one at a time: the others hidden */
+  /* side by side in a 2 x 2 grid (small stages in front); one at a time: the others hidden */
   function place() {
-    const gap = 1.2;
-    let x = 0; const xs = figs.map(f => { const w = f.s * 5.2; const c = x + w / 2; x += w + gap; return c; });
-    const mid = x / 2, grid = portrait();
     const GRID = [[-9, 18], [10, 18], [-14, -16], [17, -16]];     // portrait: small stages in front, big ones behind
     figs.forEach((f, i) => {
-      f.x = grid ? GRID[i][0] : xs[i] - mid; f.z = grid ? GRID[i][1] : 0;
+      f.x = GRID[i][0]; f.z = GRID[i][1];
       f.d.root.scale.setScalar(f.s);
       f.d.root.visible = state.stage === 'all' || state.stage === f.id;
       if (state.stage !== 'all') f.x = f.z = 0;
@@ -80,10 +77,10 @@
   function frame() {
     if (state.stage === 'all') {
       const p = portrait();
-      orb.target.set(p ? 5 : 0, (p ? 5 : 3.5) + (state.pose === 'fly' ? 6 : 0), 0); orb.r = p ? 135 : 52; orb.ph = p ? 1.1 : 1.3; orb.th = 0.2;
+      orb.target.set(p ? 5 : 3, 5 + (state.pose === 'fly' ? 6 : 0), 0); orb.r = p ? 135 : 78; orb.ph = 1.1; orb.th = 0.2;
     } else {
       const f = figs.find(q => q.id === state.stage);
-      orb.target.set(0, f.s * (state.pose === 'fly' ? 2.6 : 1.7), 0); orb.r = f.s * (portrait() ? 17 : 8.5); orb.ph = 1.32; orb.th = 0.7;
+      orb.target.set(f.s * 2.4, f.s * (state.pose === 'fly' ? 2.6 : 1.9), 0); orb.r = f.s * (portrait() ? 13 : 8); orb.ph = 1.3; orb.th = 0.9;
     }
   }
   function placeCam() {

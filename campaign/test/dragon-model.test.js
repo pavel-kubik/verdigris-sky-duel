@@ -139,3 +139,14 @@ ok(Math.abs(looks.wyrm.d.wings[0].wr.scale.x - 1.12) < 1e-9 && looks.hatchling.d
 ok(VD.makeDragon(VD.GREEN, { stage: looks.wyrm.L }).head.children[0].geometry === looks.wyrm.d.head.children[0].geometry, 'two Wyrms share the stage geometry');
 looks.wyrm.d.anim(1, 0.1, { phase: 1, amp: 1, ground: 1, gait: 1, stride: 1 });
 ok(true, 'a Wyrm animates');
+// the campaign uses the stage looks: the hero and the hatching scene build with a look, refreshStage rebuilds on a change
+const camp = read('campaign/game.js');
+ok(/VDragon\.makeDragon\(VDragon\.GREEN, \{ stage: lookOf\(/.test(camp), 'the campaign hero is built with its stage look');
+ok(/function refreshStage\(\) \{[^}]*restageHero\(dragon\.stage\)/.test(camp), 'refreshStage rebuilds the hero look on a stage change');
+ok(/old\.dispose\(\)/.test(camp), 'the old hero model is disposed on a rebuild');
+ok(/hatch\.build\(\{ look: lookOf\(0\) \}\)/.test(camp) && /makeDragon\(VDragon\.GREEN, \{ stage: \(opts && opts\.look\)/.test(read('campaign/render/hatch-scene.js')), 'the hatching scene shows the hatchling look');
+const prevHtml = read('campaign/preview/dragon.html');
+ok(at(prevHtml, 'three.min.js') > 0 && prevHtml.includes('../../shared/dragon.js') && prevHtml.includes("'dragon.js'"), 'preview/dragon.html loads Three.js, the shared dragon and its script');
+ok(/__vdragon/.test(read('campaign/preview/dragon.js')), 'preview/dragon.js exposes __vdragon for the headless check');
+// the duel pages never pass a stage
+ok(!/stage:/.test(mpGame) && !/makeDragon\([^)]*stage/.test(solo), 'duel and co-op build the model without a stage');
