@@ -200,6 +200,17 @@
       // every seeded mission bot keeps 20%+ HP, test/mission.bot.test.js)
       ballista: { hp: 18, sight: 170, fov: 1.2, range: 220, aimTime: 2.0, lock: 0.5, bolt: 160, damage: 28, reload: 8,
                   turn: 0.9, crew: 1, hit: 3, life: 2 },
+      // Phase 4 T07 (core/knights.js): mounted, arrow-proof; the lance hits only a landed dragon or one whose body flies
+      // lower than lance.maxAlt over the ground; size 3: a Wyrm can grab one, a drop from dropKill or higher kills it;
+      // a settlement alarm lasting callAfter s calls the nearest stables; at most max riders per region.
+      // ai: full AI within near of the dragon, farHz beyond; road following (roadNear / roadMin / roadLook), pad from
+      // solids, stuck s without progress while farther than unseen from the dragon -> home, stun s after a low drop, arrive =
+      // how near the alarm spot a rider stops and looks around; gateIn = lining up this far in front of the castle gate,
+      // space = riders keep this far apart
+      knight:   { hp: 45, speed: 16, gallop: 24, turn: 2.2, sight: 160, fov: 2.4,
+                  lance: { range: 7, damage: 18, cooldown: 2.5, maxAlt: 9 },
+                  arrowProof: true, fireDamage: 0.6, size: 3, dropKill: 12, callAfter: 60, max: 8, returnAfter: 40,
+                  ai: { near: 400, farHz: 4, roadNear: 40, roadMin: 80, roadLook: 30, pad: 1.2, stuck: 10, unseen: 150, stun: 3, arrive: 12, gateIn: 12, space: 3.5 } },
     },
     defense: { eye: 1.6, wander: 7, stroll: 0.3, pad: 0.6, ringTime: 2, ringCool: 40, towerSpacing: 1.6, aimCone: 0.5, burn: 14, markRange: 120 },
     projectiles: { max: 60, gravity: 30, life: 4, stick: 3, hit: 2.4 },
@@ -231,7 +242,7 @@
       patrol: { speed: 4, gap: 2.5, pause: 4, trim: 80 },   // walk speed, the pair's spacing, s at each end, route ends kept off the region edge
       responses: {
         1: { extraArchers: 1, bellFast: true },
-        2: { patrols: 2 },
+        2: { patrols: 2, knights: true },                 // Phase 4 T07: an alarm calls the stables at once
         3: { villageBallista: true, livestockInside: true, extraArchers: 2 },
       },
     },
@@ -331,7 +342,7 @@
       rotunda:   { r: 4,  h: 9,  hp: 120, civil: true, stone: true, woodHp: 60 },
       hall:      { r: 9,  h: 11, hp: 200, order: true, loot: ['strongbox'] },
       workshop:  { r: 8,  h: 8,  hp: 140, order: true, target: 'workshop' },
-      stables:   { r: 7,  h: 6,  hp: 100, order: true },
+      stables:   { r: 7,  h: 6,  hp: 100, order: true, knights: 3 },   // Phase 4 T07: riders it sends (none while a ruin)
       well:      { r: 2,  h: 2,  hp: 0 },
     },
     /* Vyshgard Castle (Phase 3 T01): the look and the kit; layout in settlements.castle, piece list from core/castle.js.

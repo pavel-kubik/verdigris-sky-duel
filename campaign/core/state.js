@@ -57,7 +57,7 @@
 (function (root) {
   'use strict';
   const M = typeof module === 'object' && module.exports ? require('./umd.js') : root.VCamp;
-  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story'), GU = M.need('guise');
+  const D = M.need('data'), F = M.need('flight'), G = M.need('growth'), HN = M.need('hunger'), PR = M.need('prey'), RG = M.need('region'), LR = M.need('lair'), MO = M.need('mother'), WK = M.need('walk'), NV = M.need('nav'), DF = M.need('defenders'), CV = M.need('cave'), SE = M.need('settlement'), CR = M.need('crops'), AL = M.need('alert'), LT = M.need('loot'), UP = M.need('upgrades'), CK = M.need('clock'), TP = M.need('tips'), MP = M.need('map'), AE = M.need('aerie'), MS = M.need('missions'), RL = M.need('relics'), CA = M.need('caravan'), FR = M.need('freed'), SY = M.need('story'), GU = M.need('guise'), KN = M.need('knights');
   const { createBus } = M.need('events');
   const { wrap, clamp } = M.need('math');
 
@@ -185,6 +185,7 @@
     run(cs, inp, dt, ev);
     for (const e of CA.step(cs, dt, { burn: UP.effects(cs).burnRate })) emit(cs, ev, e);   // Phase 3 T15: the intercept wagon and its escort
     defend(cs, ev, dt);                                          // T15: peasants and archers see, hear, ring, hide and shoot
+    knightsStep(cs, ev, dt);                                     // Phase 4 T07: mounted knights ride out of the stables, chase, lance
     alertStep(cs, ev, dt);                                       // T17: incidents raise the region's heat, quiet lowers it
     for (const e of FR.step(cs)) emit(cs, ev, e);               // Phase 3 T16: Order buildings burned out + archers dead = freed
     livestock(cs, ev, dt);                                       // T18: sheep and cows in pens, into the barn at alert 3
@@ -222,7 +223,8 @@
     }
     if (d.hp <= 0) return die(cs, ev, 'wounds');
     const stats = G.statsOf(d.stage), hEff = HN.effects(d.hunger), up = UP.effects(cs), eff = UP.apply(LT.effects(hEff, cs.carriedLoot), up), scale = scaleOf(cs), sol = solids(cs, scale);
-    const loaded = !!cs.carriedLoot;                             // T19: loot in the claws - no prey until it is banked
+    const knight = cs.knights && cs.knights.carried;             // Phase 4 T07: a knight in the claws (Grab again drops it)
+    const loaded = !!cs.carriedLoot || !!knight;                 // T19: loot in the claws - no prey until it is banked
     let carried = carriedPrey(cs);
     if (!carried) d.carried = null;
     const eating = !!carried && !!inp.eat;
@@ -320,7 +322,14 @@
     // grab
     cs.flags.heavyT = Math.max(0, cs.flags.heavyT - dt);
     const r = air ? PR.reach(cs.field, p, stats, eff, scale) : { best: null };
-    if (!carried && !loaded && inp.grab && air) {
+    // Phase 4 T07: a new Grab press with a knight in the claws lets it fall; a knight under the claws comes before prey
+    const press = !!inp.grab && !cs.grabHeld;
+    cs.grabHeld = !!inp.grab;
+    const kr = air && !carried && !loaded ? KN.reach(cs, p, limit, scale) : { best: null, heavy: null };
+    if (knight && press && air) for (const e of KN.drop(cs, p)) emit(cs, ev, e);
+    else if (!carried && !loaded && inp.grab && air && kr.best) { for (const e of KN.grab(cs, kr.best)) emit(cs, ev, e); kr.best = null; }
+    else if (!carried && !loaded && inp.grab && air && kr.heavy && !r.best && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'knight:tooHeavy' }); }
+    if (!carried && !loaded && inp.grab && air && !(cs.knights && cs.knights.carried)) {
       const g = PR.tryGrab(cs.field, p, stats, eff, scale);
       if (g.prey) { d.carried = g.prey.id; carried = g.prey; emit(cs, ev, { e: 'prey:grabbed', type: g.prey.type, id: g.prey.id }); }
       else if (g.heavy && cs.flags.heavyT === 0) { cs.flags.heavyT = D.grab.heavyCooldown; emit(cs, ev, { e: 'prey:tooHeavy', type: g.heavy.type }); }
@@ -394,7 +403,8 @@
     const aerieNear = air && AE.near(cs);
     if (cs.carriedLoot) cs.hint = LR.near(cs) ? 'lairBank' : aerieNear ? 'aerieBank' : 'lootCarry';   // T19: take it home
     else if (!air) cs.hint = carried ? 'eat' : p.mode !== 'ground' ? null : lootFront.best ? 'lootGrab' : lootFront.heavy ? 'lootHeavy' : front.best ? 'grab' : front.heavy ? 'heavy' : 'walk';
-    else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : aerieNear ? 'aerie' : r.best ? 'grab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
+    else if (cs.knights && cs.knights.carried) cs.hint = 'knightDrop';   // Phase 4 T07
+    else cs.hint = carried ? (LR.near(cs) ? 'lairStore' : 'eat') : LR.near(cs) ? 'lair' : aerieNear ? 'aerie' : r.best ? 'grab' : kr.best ? 'knightGrab' : target ? 'swoop' : r.heavy || r.nearHeavy ? 'heavy' : r.near ? 'near' : cs.landOk ? 'land' : null;
     return ev;
   }
 
@@ -415,6 +425,20 @@
     }
   }
 
+  /** Knights (Phase 4 T07): calls, riding, the lance (HP, cancels a meal, can kill: cause 'lance'). */
+  function knightsStep(cs, ev, dt) {
+    const d = cs.dragon;
+    for (const e of KN.step(cs, dt, { scale: scaleOf(cs), spot: G.statsOf(d.stage).spot })) {
+      emit(cs, ev, e);
+      if (e.e === 'knight:killed') cs.stats.knightsKilled = (cs.stats.knightsKilled || 0) + 1;
+      if (e.e !== 'knight:lance' || cs.inLair || d.hp <= 0) continue;
+      d.hp = Math.max(0, d.hp - e.damage);
+      if (d.eatT > 0) emit(cs, ev, { e: 'eat:cancel' });
+      d.eatT = 0;
+      if (d.hp <= 0) die(cs, ev, 'lance');
+    }
+  }
+
   /** Alert (T17): this frame's incidents -> heat of the current region (alert.add), decay (alert.step), the
    *  responses follow the level (defenders.step respawns the squad, the village platform at alert 3). */
   function alertStep(cs, ev, dt) {
@@ -425,7 +449,7 @@
       if (e.e === 'aware:state' && e.state === 'alert' && sq && !sq.alarmed[e.place || '']) { sq.alarmed[e.place || ''] = true; inc('sighted'); }
       else if (e.e === 'bell:ring' || e.e === 'horn:blow') inc('bell');   // T05: the castle horn counts as a bell
       else if ((e.e === 'building:ruined' || e.e === 'building:charred') && !(D.buildings[e.type] && D.buildings[e.type].wall)) inc(e.order ? 'orderBurned' : 'civilBurned');
-      else if (e.e === 'defender:killed') inc('defenderKilled');
+      else if (e.e === 'defender:killed' || e.e === 'knight:killed') inc('defenderKilled');
       else if (e.e === 'loot:taken') inc('loot');                // T19: a tithe chest or strongbox taken
       else if ((e.e === 'prey:grabbed' || e.e === 'prey:roasted') && D.prey[e.type] && D.prey[e.type].livestock) {
         // T18: a sheep or cow taken (grabbed, or roasted where it stood) raises the heat once per animal
