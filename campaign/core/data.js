@@ -454,8 +454,9 @@
           { id: 'libcice', nameKey: 'c.placeName.libcice', x: -720, z: 600, r: 52, plan: 'street', yaw: 0.4 },
           { id: 'suchdol', nameKey: 'c.placeName.suchdol', x: 820, z: 80, r: 50 },
         ] },
-        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }, { to: 'bend', angleFrom: PI - 0.5, angleTo: PI + 0.5, minStage: 1 }],
-        entries: { wild: { angle: 0 }, bend: { angle: PI } },
+        exits: [{ to: 'wild', angleFrom: -0.6, angleTo: 0.6 }, { to: 'bend', angleFrom: PI - 0.5, angleTo: PI + 0.5, minStage: 1 },
+                { to: 'pass', angleFrom: PI / 2 - 0.5, angleTo: PI / 2 + 0.5, minStage: 1 }],                 // Phase 4 T05: west to the Highland Pass (+ its minGrowth)
+        entries: { wild: { angle: 0 }, bend: { angle: PI }, pass: { angle: PI / 2 } },
       },
       /* Veltava Bend (Phase 3 T02, 003_task_missions.md 4.2): real Prague terrain baked into core/dem-bend.js
          (tools/terrain). terrain.dem: base heights from that grid (metres above its base / metresPerUnit x exag +
@@ -557,8 +558,44 @@
             { id: 'dejvice', nameKey: 'c.placeName.dejvice', x: 840, z: 290, r: 55 },
           ],
         },
-        exits: [{ to: 'farm', angleFrom: -0.1, angleTo: 0.9 }],
-        entries: { farm: { angle: 0.45 } },                                                             // north-west, where the river leaves the city (Podbaba)
+        exits: [{ to: 'farm', angleFrom: -0.1, angleTo: 0.9 }, { to: 'pass', angleFrom: 3 * PI / 4 - 0.35, angleTo: 3 * PI / 4 + 0.35, minStage: 1 }],
+        entries: { farm: { angle: 0.45 }, pass: { angle: 3 * PI / 4 } },                               // north-west, where the river leaves the city (Podbaba); south-west from the pass
+      },
+      /* Highland Pass (Phase 4 T05, 004_task_highlands.md 4.2): real terrain south-west of Prague baked into
+         core/dem-pass.js (tools/terrain/regions/pass.json): the Barrand Cliffs (Barrandovske skaly) over the river on
+         the east side, the Prokop Gorge cutting west, the two Hlubowick viaducts across it, Maidenhold's promontory
+         (Divci hrady) north of the gorge mouth. minGrowth: the region's own gate on top of the exits' minStage (a late
+         Drake, 000_spec.md 7). Spots picked from the bake: Maidenhold top ~332 m, gorge floor ~216 m, rims ~285-305 m,
+         river ~187 m. bridge kind 'viaduct': a stone deck on tall piers between the gorge rims (render/bridge-view.js);
+         road: false = no road on the deck. Settlements (fortress, toll fort, Chuchel, Jinonice, Branick, Zlichov) come
+         with T06; their plateaus are here already. */
+      pass: {
+        nameKey: 'c.region.pass', radius: 1200, seed: 71, ceiling: 380, palette: 'pass',
+        minGrowth: 0.45,
+        terrain: {
+          dem: 'demPass', exag: 2.0, offset: 4, water: 'mask',
+          features: [
+            { type: 'plateau', x: -90, z: 325, r: 90, edge: 20, level: 'top' },                         // Maidenhold top
+            { type: 'cliff', x: -90, z: 325, r: 90, face: -PI / 2, drop: 14, width: 70 },               // its rock face east (-X), to the river
+            { type: 'plateau', x: 290, z: -115, r: 30 },                                                // toll fort by the big viaduct
+            { type: 'plateau', x: -130, z: -700, r: 60 },                                               // Chuchel
+            { type: 'plateau', x: 720, z: -120, r: 34 },                                                // Jinonice
+            { type: 'plateau', x: -520, z: -230, r: 30 },                                               // Branick (east bank)
+            { type: 'plateau', x: -370, z: 650, r: 20 },                                                // Zlichov rock chapel
+            { type: 'road', width: 8, points: [[1150, -160], [900, -125], [720, -120], [520, -100], [380, -90], [300, -66]] },   // gold road: west edge -> Jinonice -> the gorge's south rim -> big viaduct
+            { type: 'road', width: 8, points: [[300, 86], [230, 175], [120, 250], [10, 300]] },                                // big viaduct -> along the north rim -> Maidenhold gate
+            { type: 'road', width: 7, points: [[-40, 260], [-60, 150], [-90, 40], [-70, -100], [-40, -300], [-60, -500], [-120, -660]] },   // Maidenhold -> down across the gorge mouth -> the cliff top -> Chuchel
+            { type: 'bridge', kind: 'viaduct', x: 300, z: 10, yaw: 0, len: 150, width: 9, arches: 9 },                     // big Hlubowick viaduct, rim to rim
+            { type: 'bridge', kind: 'viaduct', x: 150, z: 15, yaw: 0, len: 110, width: 7, arches: 6, road: false },        // small Hlubowick viaduct
+          ],
+        },
+        palette: 'pass',
+        flora: { trees: 650, rocks: 160, fields: 8 },
+        herds: [{ type: 'deer', count: 2, ring: [500, 1150] }, { type: 'boar', count: 2, ring: [600, 1150] },
+                { type: 'goat', count: 2, ring: [300, 900] }],                                                         // goats on the cliffs
+        settlements: [],
+        exits: [{ to: 'farm', angleFrom: PI / 2 - 0.5, angleTo: PI / 2 + 0.5 }, { to: 'bend', angleFrom: -0.75, angleTo: 0.15 }],
+        entries: { farm: { angle: PI / 2 }, bend: { angle: -0.4 } },                                     // west from the Farmlands, north-east down the river from the Bend
       },
     },
     startRegion: 'ash',
@@ -602,8 +639,8 @@
     map: {
       cell: 50, reveal: 160, revealAlt: 1.5, highAlt: 0.6, every: 0.25, image: 256,
       world: { bend: [0, 0], farm: [0.2, 1], wild: [-0.3, 2], ash: [-0.2, 3], pass: [-1.3, 0.6], low: [1.3, 0.5], capital: [0, -1.3] },
-      later: { pass: { stage: 1 }, low: { stage: 2 }, capital: { stage: 3 } },   // 000_spec.md 9: Drake (late), Wyrm, Elder
-      links: [['pass', 'farm'], ['low', 'bend'], ['capital', 'bend']],
+      later: { low: { stage: 2 }, capital: { stage: 3 } },   // 000_spec.md 9: Wyrm, Elder (the pass is in the game from Phase 4 T05)
+      links: [['pass', 'farm'], ['pass', 'bend'], ['low', 'bend'], ['capital', 'bend']],
       zoom: [1, 4], tapPx: 36,
     },
 
@@ -616,6 +653,7 @@
       wild: { x: -620, z: 480, facing: PI - 1.9 },
       farm: { x: 720, z: -560, facing: PI + 2.4 },
       bend: { x: 120, z: 1010, facing: Math.PI },      // a cleft in the Troyvale rocks, facing the river
+      pass: { x: -215, z: -330, facing: -PI / 2 },     // Phase 4 T05: a cleft in the Barrand Cliffs, facing the river (east)
       discover: 200, enterRange: 40, nearRange: 110, mouthR: 9, above: 6, out: 26, outY: 22, room: { r: 22, h: 14 },
     },
 

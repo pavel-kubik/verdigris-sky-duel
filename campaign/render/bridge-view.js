@@ -2,7 +2,8 @@
  * Verdigris campaign - bridges over a region's river (Phase 3 T02): the terrain 'bridge' features.
  * The deck height and footprint come from core terrain.deckAt, so the dragon walks and lands on what is drawn.
  *   stone (Karlsbridge): a deck with parapets on low arches (piers + arch rings), a gate tower at each end;
- *   wood: a plank deck with rails on piles.
+ *   wood: a plank deck with rails on piles;
+ *   viaduct (Phase 4 T05): a deck on tall piers and arches across a gorge (the Hlubowick viaducts).
  * Everything of one region is merged into one vertex-coloured mesh (1 draw call).
  *   VRender.bridges.build(regionId) -> { group, count, dispose() } | null (no bridges)
  */
@@ -75,6 +76,30 @@
     }
   }
 
+  /** Phase 4 T05: a railway-style viaduct across a gorge - a deck with parapets on f.arches tall piers down to the
+      gorge floor, a round arch between each pair of piers under the deck. */
+  function viaduct(id, f, y, M, box, cyl) {
+    const s = Math.sin(f.yaw), c = Math.cos(f.yaw), at = v => [f.x + s * v, f.z + c * v];
+    M.add(box, f.x, y - 1, f.z, f.yaw, f.width, 2, f.len, COL.stone);
+    for (const side of [-1, 1]) {
+      const ox = c * side * (f.width / 2 - 0.4), oz = -s * side * (f.width / 2 - 0.4);
+      M.add(box, f.x + ox, y + PARAPET / 2, f.z + oz, f.yaw, 0.8, PARAPET, f.len, COL.stoneDark);
+    }
+    const n = f.arches || 8, span = f.len / n;
+    for (let k = 0; k <= n; k++) {
+      const v = -f.len / 2 + k * span, [x, z] = at(v), bed = T.meshAt(id, x, z) - 2;
+      const h = y - 2 - bed;
+      if (h > 0.5) {
+        M.add(box, x, bed + h / 2, z, f.yaw, f.width * 1.05, h, span * 0.22, COL.pier);
+        M.add(box, x, bed + Math.min(h, 6) / 2, z, f.yaw, f.width * 1.3, Math.min(h, 6), span * 0.3, COL.stoneDark);   // pier foot
+      }
+      if (k < n) {
+        const [ax, az] = at(v + span / 2), r = span * 0.39;
+        M.add(cyl, ax, y - 2 - r * 0.55, az, f.yaw + Math.PI / 2, r, f.width, r, COL.stoneDark, Math.PI / 2);
+      }
+    }
+  }
+
   function wood(id, f, y, M, box, cyl) {
     const s = Math.sin(f.yaw), c = Math.cos(f.yaw), at = v => [f.x + s * v, f.z + c * v];
     M.add(box, f.x, y - 0.4, f.z, f.yaw, f.width, 0.8, f.len, COL.wood);
@@ -100,7 +125,9 @@
     const M = merger();
     for (const f of list) {
       const y = T.deckAt(id, f.x, f.z).y;
-      if (f.kind === 'wood') wood(id, f, y, M, box, cyl); else stone(id, f, y, M, box, cyl, cone);
+      if (f.kind === 'wood') wood(id, f, y, M, box, cyl);
+      else if (f.kind === 'viaduct') viaduct(id, f, y, M, box, cyl);
+      else stone(id, f, y, M, box, cyl, cone);
     }
     box.dispose(); cyl.dispose(); cone.dispose();
     const group = new THREE.Group(); group.name = 'bridges:' + id;

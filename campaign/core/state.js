@@ -376,7 +376,8 @@
 
     // region edge: offer the exit while near it heading outward (and a moment after); confirm travels
     let ex = air ? RG.exitAt(cs.region, p.pos, p.yaw) : null;
-    if (ex && ex.minStage != null && d.stage < ex.minStage) {     // T11: too small for that region - a prompt, no travel
+    const gate = ex && D.regions[ex.to] && D.regions[ex.to].minGrowth;                        // Phase 4 T05: the region's own growth gate (late Drake)
+    if (ex && ((ex.minStage != null && d.stage < ex.minStage) || (gate && G.growthValue(d.foodXp) < gate))) {     // T11: too small for that region - a prompt, no travel
       if (!cs.exitSmall || cs.exitSmall.to !== ex.to) emit(cs, ev, { e: 'region:tooSmall', from: cs.region, to: ex.to, minStage: ex.minStage });
       cs.exitSmall = ex; cs.exitSmallT = D.travel.promptHold; ex = null;
     } else if (cs.exitSmall && (cs.exitSmallT -= dt) <= 0) { cs.exitSmall = null; cs.exitSmallT = 0; }

@@ -159,7 +159,7 @@
     // region exits (greyed out while the dragon is too small); the exit on the way home is already the lair marker
     for (const e of T.region(cs.region).exits || []) {
       if (e === via) continue;
-      const q = exitPoint(cs.region, e), dim = e.minStage != null && cs.dragon.stage < e.minStage;
+      const q = exitPoint(cs.region, e), dim = (e.minStage != null && cs.dragon.stage < e.minStage) || (D.regions[e.to] && D.regions[e.to].minGrowth && G.growthValue(cs.dragon.foodXp) < D.regions[e.to].minGrowth);
       add('exit', 'exit:' + e.to, q[0], q[1], { key: dim ? 'c.nav.exitSmall' : 'c.nav.exit', p: { region: D.regions[e.to] ? D.regions[e.to].nameKey : e.to } }, dim ? { dim: true } : null);
     }
     // discovered settlements of this region (T12)

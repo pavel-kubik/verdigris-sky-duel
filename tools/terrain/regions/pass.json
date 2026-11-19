@@ -1,0 +1,23 @@
+{
+  "id": "pass",
+  "module": "demPass",
+  "out": "campaign/core/dem-pass.js",
+  "title": "Highland Pass",
+  "tile": "N50E014",
+  "crop": { "lon": [14.32, 14.45], "lat": [50.0, 50.08] },
+  "projection": { "lon0": 14.385, "lat0": 50.040, "metresPerUnit": 3.6 },
+  "grid": { "radius": 1200, "cell": 10, "base": 170 },
+  "river": {
+    "start": { "zBelow": -1100, "xNear": -350, "xWithin": 350 },
+    "goal": { "zAbove": 950, "xBelow": -100, "minRadius": 1050 },
+    "costScale": 6.0, "maxDist": 170, "aboveLevel": 1.2, "smooth": 4, "simplify": 12
+  },
+  "preview": {
+    "exag": 2.0,
+    "out": "ai_sdlc/001_campaign/img/pass-terrain.png",
+    "places": []
+  },
+  "names": [
+    ["Highland Pass", "Horský průsmyk", "Barrandov - Prokop valley"]
+  ]
+}
