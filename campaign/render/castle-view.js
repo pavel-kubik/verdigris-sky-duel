@@ -216,5 +216,5 @@
     return { group, list, update, info, dispose };
   }
 
-  VR.castleView = { build, chimney, pieceOf, burnOf };
+  VR.castleView = { build, chimney, pieceOf, burnOf, yardNet };
 })(typeof window !== 'undefined' ? window : globalThis);
