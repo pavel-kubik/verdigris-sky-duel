@@ -6,7 +6,7 @@
  */
 (function () {
   'use strict';
-  const BUILD = 't301.1 2026-11-18 debug blocks overlay, object picker, ground probe';
+  const BUILD = 't303.2 2026-11-19 wyrm stage: stage row, growth cap, camera by scale, grow-to-wyrm debug';
   const THREE = window.THREE, C = window.VCamp, VR = window.VRender, I = window.I18N;
   const t = (k, p) => (I ? I.t(k, p) : k);
   const params = new URLSearchParams(location.search);

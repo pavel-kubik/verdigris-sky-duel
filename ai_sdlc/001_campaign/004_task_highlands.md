@@ -135,7 +135,7 @@ stageLook: {                                           // shared/dragon.js build
   wyrm:      { horns: 4, hornLen: 1.4, crest: 9,  span: 1.12, tint: 0.85, jaw: 'spikes' },
   elder:     { horns: 6, hornLen: 1.8, crest: 14, span: 1.2,  tint: 0.75, jaw: 'spikes', frills: true },  // shown in the preview only
 },
-camera: { scaleDist: 0.7 },                            // camera distance grows with scale ^ scaleDist
+camera: { scaleDist: 0.85, clear: 3, clearDist: 1 },   // camera distance grows with scale ^ scaleDist; clearance over the ground clear x scale ^ clearDist (T03: 0.85, not 0.7 - the game used 0.75 and a Wyrm already filled the phone screen)
 ```
 
 `000_spec.md` gives the Wyrm `hungerMult 2.2`; Phase 2 had to cut the Drake from 1.5 to 1.1 so missions stay possible, so the Wyrm starts at 1.4 and T19 tunes it with the mission bots.

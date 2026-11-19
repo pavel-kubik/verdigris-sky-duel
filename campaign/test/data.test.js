@@ -13,7 +13,8 @@ for (let i = 1; i < D.stages.length; i++) {
   ok(b.turn < a.turn && b.hungerMult > a.hungerMult && b.spot > a.spot, 'bigger stage is slower to turn, hungrier, easier to spot: ' + b.id);
 }
 ok(D.stages[0].foodFrom === 0 && D.stages[0].growthFrom === 0, 'first stage starts at zero');
-ok(D.growthCap.food < 2400, 'phase 1 caps food XP below the wyrm threshold');
+ok(D.growthCap.food < 4800 && D.growthCap.growth < 0.85, 'phase 4 caps food XP and growth below the elder line (phase 6)');
+ok(D.stages[D.stages.length - 1].foodFrom <= D.growthCap.food, 'the last stage can be reached under the cap');
 D.stages.forEach(s => ok(s.scaleTo > s.scaleFrom && s.cruise < s.boost, 'stage curves sane: ' + s.id));
 
 // Hunger thresholds

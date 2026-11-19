@@ -406,7 +406,7 @@
       'c.story.out.a2_workshop.ok': 'The siege workshop is ash. The Order will need a long winter to build again.', 'c.story.out.a2_workshop.fail': 'The workshop still stands. Rest, then try again.',
       'c.story.out.a2_caravan.ok': 'The tithe is yours. The villages keep their bread this season.', 'c.story.out.a2_caravan.fail': 'The wagon reached the gate. Rest, then try again.',
       'c.mother.done': 'Lessons learned', 'c.mother.doneSub': 'Your mother will look in on you now and then',
-      'c.dbg.mother': 'Mother: lesson {n}', 'c.dbg.scale': 'Dragon scale {s}', 'c.dbg.drake': 'Now a Drake', 'c.dbg.exit': 'Exit to {region}', 'c.dbg.region': 'Jumped to {region}',
+      'c.dbg.mother': 'Mother: lesson {n}', 'c.dbg.scale': 'Dragon scale {s}', 'c.dbg.drake': 'Now a Drake', 'c.dbg.wyrm': 'Now a Wyrm', 'c.dbg.exit': 'Exit to {region}', 'c.dbg.region': 'Jumped to {region}',
 
       /* co-op */
       'mp.title': 'Verdigris Co-op',
@@ -1097,7 +1097,7 @@
       'c.story.out.a2_workshop.ok': 'Obléhací dílna je popel. Řád bude stavět celou dlouhou zimu.', 'c.story.out.a2_workshop.fail': 'Dílna pořád stojí. Odpočiň si a zkus to znovu.',
       'c.story.out.a2_caravan.ok': 'Desátek je tvůj. Vesnice si tuhle sezónu nechají chleba.', 'c.story.out.a2_caravan.fail': 'Vůz dojel k bráně. Odpočiň si a zkus to znovu.',
       'c.mother.done': 'Lekce zvládnuty', 'c.mother.doneSub': 'Matka se na tebe občas přiletí podívat',
-      'c.dbg.mother': 'Matka: lekce {n}', 'c.dbg.scale': 'Velikost draka {s}', 'c.dbg.drake': 'Teď drak', 'c.dbg.exit': 'Východ: {region}', 'c.dbg.region': 'Skok do: {region}',
+      'c.dbg.mother': 'Matka: lekce {n}', 'c.dbg.scale': 'Velikost draka {s}', 'c.dbg.drake': 'Teď drak', 'c.dbg.wyrm': 'Teď saň', 'c.dbg.exit': 'Východ: {region}', 'c.dbg.region': 'Skok do: {region}',
 
       'mp.title': 'Verdigris Co-op',
       'mp.desc': 'Leťte společně se zelenými draky proti vlnám karmínových wyveren. Kooperace v prohlížeči, spojení peer-to-peer.',
