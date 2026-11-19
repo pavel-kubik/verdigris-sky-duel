@@ -1372,8 +1372,8 @@
     [']', 'alert +1 level in this region (extra archers, patrols at 2, village ballista at 3)', 'BracketRight', 'alert +1'],
     ['[', 'alert to 0 in this region', 'BracketLeft', 'calm alert'],
     ['-', 'calm: every defender forgets the dragon, the fallen stand again, no arrows', 'Minus', 'calm'],
-    ['Shift+H', 'knights: the nearest stables with riders send them at the dragon now (Vyshgard in the Veltava Bend), Phase 4 T07', 'ShiftKeyH', 'knights'],
-    ['Shift+X', 'land near Vyshgard: on the ground outside the castle wall on the stables side, 110 from its centre, facing it; the alarm calls the knights (Phase 4 T07)', 'ShiftKeyX', 'to knights'],
+    ['Shift+I', 'knights: the nearest stables with riders send them at the dragon now (Vyshgard in the Veltava Bend), Phase 4 T07', 'ShiftKeyI', 'knights'],
+    ['Shift+U', 'land near Vyshgard: on the ground outside the castle wall on the stables side, 110 from its centre, facing it; the alarm calls the knights (Phase 4 T07)', 'ShiftKeyU', 'to knights'],
     ['.', 'fly to the next livestock pen (60 out, 25 up, facing it)', 'Period', 'to pen'],
     [',', 'stand on the ground in front of the next loot item of this region (tithe chest / strongbox), facing it', 'Comma', 'to loot'],
     [';', 'hoard +100 gold (coin pile tiers)', 'Semicolon', '+100 gold'],
@@ -1587,11 +1587,11 @@
     if (code === 'ShiftKeyP') { dbgPick = !dbgPick; if (!dbgPick) pickCard(null); flashPrompt(t(dbgPick ? (isTouch ? 'c.dbg.pickOnTouch' : 'c.dbg.pickOn') : 'c.dbg.pickOff'), 1.8); return; }
     if (code === 'Backslash') { TP.reset(cs); cs.tipT = D.tips.gap; flashPrompt(t('c.dbg.tips'), 1.5); }   // T23
     if (code === 'Minus') { DF.calm(cs.squad); flashPrompt(t('c.dbg.calm'), 1.5); }
-    if (code === 'ShiftKeyH') {                                  // Phase 4 T07: call the knights now
+    if (code === 'ShiftKeyI') {                                  // Phase 4 T07: call the knights now
       const ev = cs.inLair ? [] : KN.call(cs, [pilot.pos[0], pilot.pos[2]], 'debug');
       if (!ev.length) flashPrompt(t('c.dbg.noKnights'), 1.8); else onEvents(ev);
     }
-    if (code === 'ShiftKeyX') {                                  // Phase 4 T07: land near Vyshgard on the stables side
+    if (code === 'ShiftKeyU') {                                  // Phase 4 T07: land near Vyshgard on the stables side
       if (regionId !== 'bend' || cs.inLair) flashPrompt(t('c.dbg.notBend'), 1.8);
       else {
         const st = cs.town.buildings.find(b => b.type === 'stables'), c = cs.town.places.find(p => p.castle);
@@ -1961,7 +1961,7 @@
                  ['prey', ['KeyP', 'KeyI', 'KeyO']],
                  ['castle', ['ShiftDigit6', 'ShiftDigit8']]]],
       ['dragon', [['', ['KeyC', 'ShiftKeyN', 'KeyB', 'KeyN', 'KeyJ', 'Home', 'KeyK', 'KeyZ', 'KeyM']], ['hoard', ['Semicolon', 'Quote']]]],
-      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['knights', ['ShiftKeyH', 'ShiftKeyX']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
+      ['world', [['', ['Digit8', 'Slash', 'Digit7', 'ShiftDigit0', 'ShiftDigit2']], ['fire', ['Digit2', 'Digit3']], ['alert', ['BracketRight', 'BracketLeft', 'Minus']], ['knights', ['ShiftKeyI', 'ShiftKeyU']], ['village', ['ShiftKeyV', 'ShiftKeyT']]]],
       ['castle', [['', ['ShiftDigit5', 'ShiftDigit7', 'ShiftDigit9']]]],
       ['mission', [['', ['ShiftDigit3', 'ShiftKeyJ', 'ShiftKeyK', 'ShiftKeyY', 'ShiftKeyO', 'ShiftKeyC']]]],
       ['blocks', [['', ['ShiftKeyB', 'ShiftKeyP']]]],
