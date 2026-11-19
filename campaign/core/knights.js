@@ -301,6 +301,19 @@
     }
     if (farStep) kn.acc = 0;
     kn.list = kn.list.filter(k => k.alive);
+    // riders keep apart (ai.space): a pair too close is pushed apart, never into a solid
+    const R = kn.list.filter(k => k.state !== 'carried' && k.state !== 'fall');
+    for (let i = 0; i < R.length; i++) for (let j = i + 1; j < R.length; j++) {
+      const a = R[i], b = R[j], dx = b.pos[0] - a.pos[0], dz = b.pos[2] - a.pos[2], d = Math.hypot(dx, dz);
+      if (d >= A.space) continue;
+      const ux = d > 1e-6 ? dx / d : Math.sin(i + j), uz = d > 1e-6 ? dz / d : Math.cos(i + j), push = Math.min(A.space - d, 4 * dt) / 2;
+      for (const [k, sg] of [[a, -1], [b, 1]]) {
+        const nx = k.pos[0] + ux * push * sg, nz = k.pos[2] + uz * push * sg;
+        if (cs.town && SE.hit(cs.town, nx, nz, A.pad)) continue;
+        if (!WK.passable({ regionId: cs.region }, k.pos[0], k.pos[2], nx, nz, 1)) continue;
+        k.pos[0] = nx; k.pos[2] = nz; k.pos[1] = T.surfaceAt(cs.region, nx, nz);
+      }
+    }
     return out;
   }
 
