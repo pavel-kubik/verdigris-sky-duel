@@ -90,12 +90,13 @@ const countBits = b => b.reduce((n, w) => { for (let k = 0; k < 32; k++) n += (w
   cs.dragon.stage = 1;
   r = by(MP.model(cs));
   ok(!r.farm.locked, 'farm open for a Drake');
+  ok(!r.pass.known, 'pass unknown until the farmlands or the bend are visited');
   cs.regionStates.bend = { heat: 2.4 };
   r = by(MP.model(cs));
   ok(r.bend.alert === 2, 'bend alert level');
   ok(r.low.known && r.low.locked && r.low.locked.stage === 2 && !r.low.playable, 'later region locked with its stage');
   ok(r.capital.locked.stage === 3, 'capital needs stage 3');
-  ok(!r.pass.known, 'pass unknown until the farmlands are visited');
+  ok(r.pass.known && r.pass.playable && !r.pass.locked, 'Phase 4 T05: the pass is a real region now, known from the bend, open to a Drake');
   ok(MP.model(cs).regions.length === Object.keys(D.map.world).length, 'every world region listed');
 }
 

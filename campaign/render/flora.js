@@ -23,10 +23,11 @@
     forest: [['conifer', 0.5, [0.8, 1.6]], ['broadleaf', 0.28, [0.8, 1.4]], ['pine', 0.12, [0.9, 1.5]], ['birch', 0.1, [0.9, 1.4]]],
     farm:   [['broadleaf', 0.55, [0.8, 1.3]], ['poplar', 0.3, [0.9, 1.3]], ['birch', 0.15, [0.9, 1.3]]],       // T11: hedgerows and poplars
     bend:   [['broadleaf', 0.5, [0.8, 1.4]], ['poplar', 0.2, [0.9, 1.3]], ['conifer', 0.2, [0.8, 1.4]], ['birch', 0.1, [0.9, 1.3]]],   // Phase 3 T02
+    pass:   [['broadleaf', 0.55, [0.8, 1.3]], ['conifer', 0.25, [0.8, 1.3]], ['birch', 0.2, [0.8, 1.2]]],   // Phase 4 T05: beech woods in the gorge, pines on the limestone
     ash:    [['deadwood', 1, [0.7, 1.5]]],
     ashfar: [['conifer', 0.42, [0.8, 1.5]], ['pine', 0.26, [0.9, 1.5]], ['broadleaf', 0.2, [0.8, 1.3]], ['birch', 0.12, [0.9, 1.3]]],
   };
-  const ROCK_COL = { forest: [0x6a5f50, 0x7b7364], ash: [0x2a2420, 0x3d3530], farm: [0x7a7262, 0x8c8474], bend: [0x8f8a7e, 0xa49e90] };
+  const ROCK_COL = { forest: [0x6a5f50, 0x7b7364], ash: [0x2a2420, 0x3d3530], farm: [0x7a7262, 0x8c8474], bend: [0x8f8a7e, 0xa49e90], pass: [0xb0aa9c, 0xc4bdae] };
 
   function place(id, rng, n, ok) {
     const R = T.region(id), out = [];

@@ -38,6 +38,14 @@
       char: 0x3a332e, charLight: 0x5a5048, vine: [0x5d7a33, 0x7a6a44],
       crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a], [0x6a5a3a, 0x4f6a2c]],
     },
+    pass: {   // Phase 4 T05: the Highland Pass - limestone cliffs (more rock than the Bend), dry steppe grass on the tops,
+              // dark beech woods in the gorge, meadows at Chuchel, slate blue water
+      fog: 0x9ea6a6, sky: { top: 0x1b3d5e, mid: 0x7d9aa8, bot: 0xdcb48a },
+      low: 0x5f7f3e, mid: 0x4b6a36, high: 0xa49c66, steep: 0xc4beb0, strata: 0x948e80, water: 0x4a6a80,
+      meadow: 0x7c9a4a, bank: 0x8a7f62, road: 0x9c8a66, roadEdge: 0x7f7a50, plateau: 0x8c9058, gorge: 0x3c5a30,
+      steepFrom: 0.32, highFrom: 50, highSpan: 30,
+      crops: [[0xc9ad55, 0xb39440], [0x86a845, 0x6f9238], [0x6e5438, 0x5a4430], [0xb0a058, 0x9a8c4a], [0x6a5a3a, 0x4f6a2c]],
+    },
   };
   const EXTENT = 1500;                     // build chunks out to here (past the rim, hidden by fog)
 
@@ -87,12 +95,14 @@
         if (rd < rw) c.set(pal.road);
         else if (rd < rw + 3) c.lerp(b.set(pal.roadEdge), 0.6);
         if (slope > 0.6) c.lerp(b.set(pal.steep), Math.min(1, (slope - 0.6) * 2.5));
-      } else if (R.palette === 'bend') {
+      } else if (R.palette === 'bend' || R.palette === 'pass') {
         a.set(pal.low); b.set(pal.mid);
         c.copy(a).lerp(b, 0.2 + 0.6 * (Math.sin(x * 0.012 + Math.cos(z * 0.01) * 1.6) * Math.cos(z * 0.013 - x * 0.005) + 1) / 2);
         const wy = T.waterY(id, x, z);
         if (h < wy + 5) c.lerp(b.set(pal.meadow), 0.55 * (1 - Math.max(0, h - wy) / 5));             // river meadows
-        if (h > 40) c.lerp(b.set(pal.high), Math.min(1, (h - 40) / 25));
+        const hf = pal.highFrom || 40;
+        if (h > hf) c.lerp(b.set(pal.high), Math.min(1, (h - hf) / (pal.highSpan || 25)));         // pass: dry steppe on the tops
+        if (pal.gorge && h < hf - 10 && h > wy + 6) c.lerp(b.set(pal.gorge), 0.45);                // pass: dark woods down in the gorge
         const vn = R.vines;
         if (vn && Math.hypot(x - vn.x, z - vn.z) < vn.r && slope > 0.08 && !T.plateauAt(id, x, z, 4)) {   // vineyard rows
           c.set(pal.vine[Math.sin(x * 0.9) > 0.2 ? 0 : 1]);
@@ -109,8 +119,9 @@
         const rd = T.lineDist(id, 'road', x, z);
         if (rd < 3.6) c.set(pal.road);
         else if (rd < 6.5) c.lerp(b.set(pal.roadEdge), 0.6);
-        if (slope > 0.45) {                                      // limestone on steep slopes (the Vyshgard face), with strata
-          c.lerp(b.set(Math.sin(h * 1.3) > 0.3 ? pal.strata : pal.steep), Math.min(1, (slope - 0.45) * 3));
+        const sf = pal.steepFrom || 0.45;
+        if (slope > sf) {                                        // limestone on steep slopes (the Vyshgard face, the Barrand Cliffs), with strata
+          c.lerp(b.set(Math.sin(h * 1.3) > 0.3 ? pal.strata : pal.steep), Math.min(1, (slope - sf) * 3));
         }
       } else {
         if (h < 2.2) c.set(pal.sand);
